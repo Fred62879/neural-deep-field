@@ -35,15 +35,15 @@ class NeuralRadianceField(BaseNeuralField):
     def init_embedder(self):
         """Creates positional embedding functions for the position and view direction.
         """
-        self.pos_embedder, self.pos_embed_dim = get_positional_embedder(self.pos_multires, 
+        self.pos_embedder, self.pos_embed_dim = get_positional_embedder(self.pos_multires,
                                                                        self.embedder_type == "positional")
-        self.view_embedder, self.view_embed_dim = get_positional_embedder(self.view_multires, 
+        self.view_embedder, self.view_embed_dim = get_positional_embedder(self.view_multires,
                                                                          self.embedder_type == "positional")
         log.info(f"Position Embed Dim: {self.pos_embed_dim}")
         log.info(f"View Embed Dim: {self.view_embed_dim}")
 
     def init_decoder(self):
-        """Initializes the decoder object. 
+        """Initializes the decoder object.
         """
         if self.multiscale_type == 'cat':
             self.effective_feature_dim = self.grid.feature_dim * self.num_lods
@@ -88,9 +88,9 @@ class NeuralRadianceField(BaseNeuralField):
         """Prunes the blas based on current state.
         """
         if self.grid is not None:
-            
+
             if self.grid_type == "HashGrid":
-                # TODO(ttakikawa): Expose these parameters. 
+                # TODO(ttakikawa): Expose these parameters.
                 # This is still an experimental feature for the most part. It does work however.
                 density_decay = 0.6
                 min_density = ((0.01 * 512)/np.sqrt(3))
@@ -110,7 +110,7 @@ class NeuralRadianceField(BaseNeuralField):
                 self.grid.occupancy = torch.stack([density[:, 0, 0], self.grid.occupancy], -1).max(dim=-1)[0]
 
                 mask = self.grid.occupancy > min_density
-                
+
                 #print(density.mean())
                 #print(density.max())
                 #print(mask.sum())
@@ -144,10 +144,10 @@ class NeuralRadianceField(BaseNeuralField):
             pidx (torch.LongTensor): SPC point_hierarchy indices of shape [batch].
                                      Unused in the current implementation.
             lod_idx (int): index into active_lods. If None, will use the maximum LOD.
-        
+
         Returns:
             {"rgb": torch.FloatTensor, "density": torch.FloatTensor}:
-                - RGB tensor of shape [batch, num_samples, 3] 
+                - RGB tensor of shape [batch, num_samples, 3]
                 - Density tensor of shape [batch, num_samples, 1]
         """
         timer = PerfTimer(activate=False, show_memory=True)
@@ -155,18 +155,18 @@ class NeuralRadianceField(BaseNeuralField):
             lod_idx = len(self.grid.active_lods) - 1
         batch, num_samples, _ = coords.shape
         timer.check("rf_rgba_preprocess")
-        
+
         # Embed coordinates into high-dimensional vectors with the grid.
         feats = self.grid.interpolate(coords, lod_idx).reshape(-1, self.effective_feature_dim)
         timer.check("rf_rgba_interpolate")
-        
+
         if self.position_input:
             raise NotImplementedError
 
         # Decode high-dimensional vectors to RGBA.
         density_feats = self.decoder_density(feats)
         timer.check("rf_rgba_decode")
-        
+
         # Optionally concat the positions to the embedding, and also concatenate embedded view directions.
         fdir = torch.cat([density_feats,
             self.view_embedder(-ray_d)[:,None].repeat(1, num_samples, 1).view(-1, self.view_embed_dim)], dim=-1)
@@ -178,6 +178,5 @@ class NeuralRadianceField(BaseNeuralField):
         # Density is [particles / meter], so need to be multiplied by distance
         density = torch.relu(density_feats[...,0:1]).reshape(batch, num_samples, 1)
         timer.check("rf_rgba_activation")
-        
-        return dict(rgb=colors, density=density)
 
+        return dict(rgb=colors, density=density)

@@ -42,6 +42,7 @@ class BaseNeuralField(nn.Module):
         sample_tex       : bool  = False,
         dilate           : int   = None,
         feature_dim      : int   = 16,
+        space_dim        : int   = 3,
 
         # decoder args
         hidden_dim       : int   = 128,
@@ -68,6 +69,7 @@ class BaseNeuralField(nn.Module):
         self.sample_tex = sample_tex
         self.dilate = dilate
         self.feature_dim = feature_dim
+        self.space_dim = space_dim
         
         self.hidden_dim = hidden_dim
         self.pos_multires = pos_multires

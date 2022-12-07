@@ -26,10 +26,10 @@ class Pipeline(nn.Module):
 
         - A forward map (``self.tracer``) which is a function which will invoke the pipeline in
           some outer loop. Usually this consists of renderers which will output a RenderBuffer object.
-    
+
     The 'Pipeline' classes are responsible for holding and orchestrating these components.
     """
-    
+
     def __init__(self, nef: BaseNeuralField, tracer: BaseTracer = None):
         """Initialize the Pipeline.
 
@@ -38,13 +38,13 @@ class Pipeline(nn.Module):
             tracer (nn.Module or None): Forward map module.
         """
         super().__init__()
-    
+
         self.nef: BaseNeuralField = nef
         self.tracer: BaseTracer = tracer
 
     def forward(self, *args, **kwargs):
-        """The forward function will use the tracer (the forward model) if one is available. 
-        
+        """The forward function will use the tracer (the forward model) if one is available.
+
         Otherwise, it'll execute the neural field.
         """
         if self.tracer is not None:

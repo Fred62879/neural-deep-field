@@ -26,18 +26,18 @@ def register_class(cls, name):
 
 def parse_options(return_parser=False):
     """Function used to parse options.
-    
+
     Apps should use these CLI options, and then extend using parser.add_argument_group('app')
-    
+
     Args:
         return_parser : If true, will return the parser object instead of the parsed arguments.
                         This is useful if you want to keep the parser around to add special argument
                         groups through app.
     """
-    
+
     # New CLI parser
     parser = argparse.ArgumentParser(description='ArgumentParser for kaolin-wisp.')
-    
+
     ###################
     # Global arguments
     ###################
@@ -57,14 +57,14 @@ def parse_options(return_parser=False):
     # Grid arguments
     ###################
     grid_group = parser.add_argument_group('grid')
-    
+
     grid_group.add_argument('--grid-type', type=str, default='OctreeGrid',
                             choices=['None', 'OctreeGrid', 'CodebookOctreeGrid', 'TriplanarGrid', 'HashGrid'],
                             help='Type of grid to use.')
     grid_group.add_argument('--interpolation-type', type=str, default='linear',
                             choices=['linear', 'closest'],
                             help='SPC interpolation mode.')
-    grid_group.add_argument('--as-type', type=str, default='none', 
+    grid_group.add_argument('--as-type', type=str, default='none',
                             choices=['none', 'octree'],
                             help='Type of accelstruct to use.')
     grid_group.add_argument('--raymarch-type', type=str, default='voxel',
@@ -89,11 +89,11 @@ def parse_options(return_parser=False):
                             help='Base level LOD')
     grid_group.add_argument('--max-grid-res', type=int, default=2048,
                             help='The maximum grid resolution. Used only in geometric initialization.')
-    grid_group.add_argument('--tree-type', type=str, default='quad', 
+    grid_group.add_argument('--tree-type', type=str, default='quad',
                             choices=['quad', 'geometric'],
                             help='What type of tree to use. `quad` is a quadtree or octree-like growing \
                                   scheme, whereas geometric is the Instant-NGP growing scheme.')
-    grid_group.add_argument('--codebook-bitwidth', type=int, default=8, 
+    grid_group.add_argument('--codebook-bitwidth', type=int, default=8,
                             help='Bitwidth to use for the codebook. The number of vectors will be 2^bitwidth.')
 
     ###################
@@ -111,7 +111,7 @@ def parse_options(return_parser=False):
     # Decoder arguments (and general global network things)
     ###################
     net_group = parser.add_argument_group('net')
-    
+
     net_group.add_argument('--nef-type', type=str,
                           help='The neural field class to be used.')
     net_group.add_argument('--layer-type', type=str, default='none',
@@ -140,16 +140,16 @@ def parse_options(return_parser=False):
     data_group = parser.add_argument_group('dataset')
 
     data_group.add_argument('--dataset-type', type=str, default=None,
-                            choices=['sdf', 'multiview'],
+                            choices=['sdf', 'multiview','astro2d','astro3d'],
                             help='Dataset class to use')
     data_group.add_argument('--dataset-path', type=str,
                             help='Path to the dataset')
-    data_group.add_argument('--dataset-num-workers', type=int, default=-1, 
+    data_group.add_argument('--dataset-num-workers', type=int, default=-1,
                             help='Number of workers for dataset preprocessing, if it supports multiprocessing. \
                                  -1 indicates no multiprocessing.')
 
     # SDF Dataset
-    data_group.add_argument('--sample-mode', type=str, nargs='*', 
+    data_group.add_argument('--sample-mode', type=str, nargs='*',
                             default=['rand', 'near', 'near', 'trace', 'trace'],
                             help='The sampling scheme to be used.')
     data_group.add_argument('--get-normals', action='store_true',
@@ -175,49 +175,51 @@ def parse_options(return_parser=False):
     data_group.add_argument('--bg-color', default='white',
                             choices=['white', 'black'],
                             help='Background color')
-    data_group.add_argument('--mip', type=int, default=None, 
+    data_group.add_argument('--mip', type=int, default=None,
                             help='MIP level of ground truth image')
+
+    # astro 2D dataset
 
     ###################
     # Arguments for optimizer
     ###################
     optim_group = parser.add_argument_group('optimizer')
-    optim_group.add_argument('--optimizer-type', type=str, default='adam', choices=list(str2optim.keys()), 
+    optim_group.add_argument('--optimizer-type', type=str, default='adam', choices=list(str2optim.keys()),
                              help='Optimizer to be used.')
-    optim_group.add_argument('--lr', type=float, default=0.001, 
+    optim_group.add_argument('--lr', type=float, default=0.001,
                              help='Learning rate.')
-    optim_group.add_argument('--weight-decay', type=float, default=0, 
+    optim_group.add_argument('--weight-decay', type=float, default=0,
                              help='Weight decay.')
     optim_group.add_argument('--grid-lr-weight', type=float, default=100.0,
                              help='Relative LR weighting for the grid')
-    optim_group.add_argument('--rgb-loss', type=float, default=1.0, 
+    optim_group.add_argument('--rgb-loss', type=float, default=1.0,
                             help='Weight of rgb loss')
 
     ###################
     # Arguments for training
     ###################
     train_group = parser.add_argument_group('trainer')
-    train_group.add_argument('--epochs', type=int, default=250, 
+    train_group.add_argument('--epochs', type=int, default=250,
                              help='Number of epochs to run the training.')
-    train_group.add_argument('--batch-size', type=int, default=512, 
+    train_group.add_argument('--batch-size', type=int, default=512,
                              help='Batch size for the training.')
-    train_group.add_argument('--resample', action='store_true', 
+    train_group.add_argument('--resample', action='store_true',
                              help='Resample the dataset after every epoch.')
-    train_group.add_argument('--only-last', action='store_true', 
+    train_group.add_argument('--only-last', action='store_true',
                              help='Train only last LOD.')
     train_group.add_argument('--resample-every', type=int, default=1,
                              help='Resample every N epochs')
     train_group.add_argument('--model-format', type=str, default='full',
                              choices=['full', 'state_dict'],
                              help='Format in which to save models.')
-    train_group.add_argument('--save-as-new', action='store_true', 
+    train_group.add_argument('--save-as-new', action='store_true',
                              help='Save the model at every epoch (no overwrite).')
-    train_group.add_argument('--save-every', type=int, default=5, 
+    train_group.add_argument('--save-every', type=int, default=5,
                              help='Save the model at every N epoch.')
     train_group.add_argument('--render-every', type=int, default=5,
                                 help='Render every N epochs')
     # TODO (ttakikawa): Only used for SDFs, but also should support RGB etc
-    train_group.add_argument('--log-2d', action='store_true', 
+    train_group.add_argument('--log-2d', action='store_true',
                              help='Log cutting plane renders to TensorBoard.')
     train_group.add_argument('--log-dir', type=str, default='_results/logs/runs/',
                              help='Log file directory for checkpoints.')
@@ -229,7 +231,7 @@ def parse_options(return_parser=False):
     # TODO (ttakikawa): Only used in multiview training, combine with the SDF growing schemes.
     train_group.add_argument('--random-lod', action='store_true',
                              help='Use random lods to train.')
-    # One by one trains one level at a time. 
+    # One by one trains one level at a time.
     # Increase starts from [0] and ends up at [0,...,N]
     # Shrink strats from [0,...,N] and ends up at [N]
     # Fine to coarse starts from [N] and ends up at [0,...,N]
@@ -237,12 +239,12 @@ def parse_options(return_parser=False):
     train_group.add_argument('--growth-strategy', type=str, default='increase',
                              choices=['onebyone','increase','shrink', 'finetocoarse', 'onlylast'],
                              help='Strategy for coarse-to-fine training')
-    
+
     ###################
     # Arguments for training
     ###################
     valid_group = parser.add_argument_group('validation')
-    
+
     valid_group.add_argument('--valid-only', action='store_true',
                              help='Run validation only (and do not run training).')
     valid_group.add_argument('--valid-every', type=int, default=-1,
@@ -254,37 +256,37 @@ def parse_options(return_parser=False):
     # Arguments for renderer
     ###################
     renderer_group = parser.add_argument_group('renderer')
-    renderer_group.add_argument('--render-res', type=int, nargs=2, default=[512, 512], 
+    renderer_group.add_argument('--render-res', type=int, nargs=2, default=[512, 512],
                                 help='Width/height to render at.')
-    renderer_group.add_argument('--render-batch', type=int, default=0, 
+    renderer_group.add_argument('--render-batch', type=int, default=0,
                                 help='Batch size (in number of rays) for batched rendering.')
-    renderer_group.add_argument('--camera-origin', type=float, nargs=3, default=[-2.8, 2.8, -2.8], 
+    renderer_group.add_argument('--camera-origin', type=float, nargs=3, default=[-2.8, 2.8, -2.8],
                                 help='Camera origin.')
-    renderer_group.add_argument('--camera-lookat', type=float, nargs=3, default=[0, 0, 0], 
+    renderer_group.add_argument('--camera-lookat', type=float, nargs=3, default=[0, 0, 0],
                                 help='Camera look-at/target point.')
-    renderer_group.add_argument('--camera-fov', type=float, default=30, 
+    renderer_group.add_argument('--camera-fov', type=float, default=30,
                                 help='Camera field of view (FOV).')
-    renderer_group.add_argument('--camera-proj', type=str, choices=['ortho', 'persp'], default='persp', 
+    renderer_group.add_argument('--camera-proj', type=str, choices=['ortho', 'persp'], default='persp',
                                 help='Camera projection.')
-    renderer_group.add_argument('--camera-clamp', nargs=2, type=float, default=[0, 10], 
+    renderer_group.add_argument('--camera-clamp', nargs=2, type=float, default=[0, 10],
                                 help='Camera clipping bounds.')
-    renderer_group.add_argument('--tracer-type', type=str, default='PackedRFTracer', 
+    renderer_group.add_argument('--tracer-type', type=str, default='PackedRFTracer',
                                 help='The tracer to be used.')
-    
-    # TODO(ttakikawa): In the future the interface will be such that you either select an absolute step size or 
+
+    # TODO(ttakikawa): In the future the interface will be such that you either select an absolute step size or
     #                  you select the number of steps to take. Sphere tracing will take step-scales.
     renderer_group.add_argument('--num-steps', type=int, default=128,
                                 help='Number of steps for raymarching / spheretracing / etc')
     renderer_group.add_argument('--step-size', type=float, default=1.0,
                                 help='Scale of step size')
-    
+
     # Sphere tracing stuff
     renderer_group.add_argument('--min-dis', type=float, default=0.0003,
                                 help='Minimum distance away from surface for spheretracing')
-    
+
     # TODO(ttakikawa): Shader stuff... will be more modular in future
-    renderer_group.add_argument('--matcap-path', type=str, 
-                                default='data/matcaps/matcap_plastic_yellow.jpg', 
+    renderer_group.add_argument('--matcap-path', type=str,
+                                default='data/matcaps/matcap_plastic_yellow.jpg',
                                 help='Path to the matcap texture to render with.')
     renderer_group.add_argument('--ao', action='store_true',
                                 help='Use ambient occlusion.')
@@ -315,9 +317,9 @@ def parse_yaml_config(config_path, parser):
     for group in parser._action_groups:
         group_dict = {list_of_valid_fields.append(a.dest) for a in group._group_actions}
     list_of_valid_fields = set(list_of_valid_fields)
-    
+
     defaults_dict = {}
-    
+
     # Load the parent config if it exists
     parent_config_path = config_dict.pop("parent", None)
 
@@ -335,7 +337,7 @@ def parse_yaml_config(config_path, parser):
                         f"ERROR: {field} is not a valid option. Check for typos in the config."
                     )
                 defaults_dict[field] = parent_config_dict[key][field]
-        
+
     # Loads child parent and overwrite the parent configs
     # The yaml files assumes the argument groups, which aren't actually nested.
     for key in config_dict:
@@ -354,12 +356,12 @@ def argparse_to_str(parser, args=None):
     Args:
         parser (argparse.parser): Parser object. Needed for the argument groups.
         args : The parsed arguments. Will compute from the parser if None.
-    
+
     Returns:
         args    : The parsed arguments.
         arg_str : The string to be printed.
     """
-    
+
     if args is None:
         args = parser.parse_args()
 
@@ -410,7 +412,7 @@ def get_modules_from_config(args):
         transform = SampleRays(args.num_rays_sampled_per_img)
         train_dataset = MultiviewDataset(**vars(args), transform=transform)
         train_dataset.init()
-        
+
         if pipeline.nef.grid is not None:
             if isinstance(pipeline.nef.grid, OctreeGrid):
                 if not args.valid_only and not pipeline.nef.grid.blas_initialized():
@@ -432,15 +434,15 @@ def get_modules_from_config(args):
     elif args.dataset_type == "sdf":
         train_dataset = SDFDataset(args.sample_mode, args.num_samples,
                                    args.get_normals, args.sample_tex)
-        
+
         if pipeline.nef.grid is not None:
             if isinstance(pipeline.nef.grid, OctreeGrid):
-                
+
                 if not args.valid_only and not pipeline.nef.grid.blas_initialized():
                     pipeline.nef.grid.init_from_mesh(
                         args.dataset_path, sample_tex=args.sample_tex, num_samples=args.num_samples_on_mesh)
                     pipeline.to(device)
-                
+
                 train_dataset.init_from_grid(pipeline.nef.grid, args.samples_per_voxel)
             else:
                 train_dataset.init_from_mesh(args.dataset_path, args.mode_mesh_norm)

@@ -19,7 +19,8 @@ at::Tensor hashgrid_interpolate_cuda(
     at::Tensor coords,
     std::vector<at::Tensor> codebook,
     std::vector<int32_t> resolution,
-    int32_t codebook_bitwidth);
+    int32_t codebook_bitwidth,
+    int8_t  space_dim);
 
 std::vector<at::Tensor> hashgrid_interpolate_backward_cuda(
     at::Tensor coords,
@@ -27,7 +28,8 @@ std::vector<at::Tensor> hashgrid_interpolate_backward_cuda(
     std::vector<int32_t> resolution,
     std::vector<int32_t> codebook_shapes,
     int32_t codebook_bitwidth,
-    int32_t feature_dim);
+    int32_t feature_dim,
+    int8_t  space_dim);
 
 }
 

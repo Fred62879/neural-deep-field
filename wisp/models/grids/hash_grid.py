@@ -31,8 +31,9 @@ class HashGrid(BLASGrid):
     """This is a feature grid where the features are defined in a codebook that is hashed.
     """
 
-    def __init__(self, 
+    def __init__(self,
         feature_dim        : int,
+        space_dim          : int   = 3,
         interpolation_type : str   = 'linear',
         multiscale_type    : str   = 'cat',
         feature_std        : float = 0.0,
@@ -53,11 +54,12 @@ class HashGrid(BLASGrid):
             feature_bias (float): The mean of the Gaussian distribution.
             codebook_bitwidth (int): The bitwidth of the codebook.
             blas_level (int): The level of the octree to be used as the BLAS.
-        
+
         Returns:
             (void): Initializes the class.
         """
         super().__init__()
+        self.space_dim = space_dim
         self.feature_dim = feature_dim
         self.interpolation_type = interpolation_type
         self.multiscale_type = multiscale_type
@@ -68,7 +70,7 @@ class HashGrid(BLASGrid):
         self.blas_level = blas_level
 
         self.kwargs = kwargs
-    
+
         self.blas = OctreeAS()
         self.blas.init_dense(self.blas_level)
         self.dense_points = spc_ops.unbatched_get_level_points(self.blas.points, self.blas.pyramid, self.blas_level).clone()
@@ -85,15 +87,15 @@ class HashGrid(BLASGrid):
     def init_from_geometric(self, min_width, max_width, num_lods):
         """Build the multiscale hash grid with a geometric sequence.
 
-        This is an implementation of the geometric multiscale grid from 
+        This is an implementation of the geometric multiscale grid from
         instant-ngp (https://nvlabs.github.io/instant-ngp/).
 
         See Section 3 Equations 2 and 3 for more details.
         """
-        b = np.exp((np.log(max_width) - np.log(min_width)) / num_lods) 
+        b = np.exp((np.log(max_width) - np.log(min_width)) / num_lods)
         resolutions = [int(np.floor(min_width*(b**l))) for l in range(num_lods)]
         self.init_from_resolutions(resolutions)
-    
+
     def init_from_resolutions(self, resolutions):
         """Build a multiscale hash grid from a list of resolutions.
         """
@@ -103,7 +105,7 @@ class HashGrid(BLASGrid):
         self.max_lod = self.num_lods - 1
 
         log.info(f"Active Resolutions: {self.resolutions}")
-        
+
         self.codebook_size = 2 ** self.codebook_bitwidth
 
         self.codebook = nn.ParameterList([])
@@ -123,7 +125,7 @@ class HashGrid(BLASGrid):
 
         Args:
             coords (torch.FloatTensor): coords of shape [batch, num_samples, 3]
-            lod_idx  (int): int specifying the index to ``active_lods`` 
+            lod_idx  (int): int specifying the index to ``active_lods``
             pidx (torch.LongTensor): Primitive indices of shape [batch]. Unused here.
 
         Returns:
@@ -132,9 +134,9 @@ class HashGrid(BLASGrid):
         timer = PerfTimer(activate=False, show_memory=False)
 
         batch, num_samples, _ = coords.shape
-        
+
         feats = grid_ops.hashgrid(coords, self.resolutions, self.codebook_bitwidth,
-                                  lod_idx, self.codebook)
+                                  self.space_dim, lod_idx, self.codebook)
 
         if self.multiscale_type == 'cat':
             return feats

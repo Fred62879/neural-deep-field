@@ -41,7 +41,7 @@ class SDFTrainer(BaseTrainer):
         pts = data[0].to(self.device)
         gts = data[1].to(self.device)
         if self.extra_args["sample_tex"]:
-            rgb = data[2].to(self.device) 
+            rgb = data[2].to(self.device)
 
         # Prepare for inference
         batch_size = pts.shape[0]
@@ -62,12 +62,12 @@ class SDFTrainer(BaseTrainer):
             for i, pred in zip(self.loss_lods, preds):
                 _rgb_loss = ((pred[0] - rgb[...,:3])**2).sum()
 
-                rgb_loss += _rgb_loss     
+                rgb_loss += _rgb_loss
 
                 res = 1.0
                 _l2_loss = ((pred[1] - res * gts)**2).sum()
                 l2_loss += _l2_loss
-            
+
                 loss += rgb_loss
                 self.log_dict['rgb_loss'] += rgb_loss.item()
         else:
@@ -77,7 +77,7 @@ class SDFTrainer(BaseTrainer):
                 res = 1.0
                 _l2_loss = ((pred - res * gts)**2).sum()
                 l2_loss += _l2_loss
-        
+
         loss += l2_loss
 
         loss /= batch_size
@@ -125,7 +125,7 @@ class SDFTrainer(BaseTrainer):
     def validate(self, epoch=0):
         """Implement validation. Just computes IOU.
         """
-            
+
         # Same as training since we're overfitting
         metric_name = None
         if self.dataset.initialization_mode == "mesh":
@@ -134,17 +134,17 @@ class SDFTrainer(BaseTrainer):
             metric_name = "narrowband_iou"
         else:
             raise NotImplementedError
-        
+
         val_dict = {}
         val_dict[metric_name] = []
-    
+
         # Uniform points metrics
         for n_iter, data in enumerate(self.train_data_loader):
 
             pts = data[0].to(self.device)
             gts = data[1].to(self.device)
             nrm = data[2].to(self.device) if self.extra_args["get_normals"] else None
-                
+
 
             for lod_idx in self.loss_lods:
                 # TODO(ttakkawa): Currently the SDF metrics computed for sparse grid-based SDFs are not entirely proper

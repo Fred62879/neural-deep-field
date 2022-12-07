@@ -69,12 +69,12 @@ if not torch.cuda.is_available():
         )
 
 def get_extensions():
-    extra_compile_args = {'cxx': ['-O3']} 
+    extra_compile_args = {'cxx': ['-O3']}
     define_macros = []
     include_dirs = []
     extensions = []
     sources = glob.glob('wisp/csrc/**/*.cpp', recursive=True)
- 
+
     if len(sources) == 0:
         print("No source files found for extension, skipping extension compilation")
         return None
@@ -102,7 +102,7 @@ def get_extensions():
     for ext in extensions:
         ext.libraries = ['cudart_static' if x == 'cudart' else x
                          for x in ext.libraries]
- 
+
     return extensions
 
 if __name__ == '__main__':
@@ -123,7 +123,7 @@ if __name__ == '__main__':
         zip_safe=True,
         ext_modules=get_extensions(),
         cmdclass={
-            'build_ext': BuildExtension.with_options(no_python_abi_suffix=True)    
+            'build_ext': BuildExtension.with_options(no_python_abi_suffix=True)
         }
 
     )

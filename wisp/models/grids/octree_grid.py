@@ -31,6 +31,7 @@ class OctreeGrid(BLASGrid):
 
     def __init__(self, 
         feature_dim        : int,
+        space_dim          : int   = 3,
         base_lod           : int   = 0,
         num_lods           : int   = 1, 
         interpolation_type : str   = 'linear',

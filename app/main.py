@@ -25,10 +25,10 @@ if __name__ == "__main__":
     pipeline, train_dataset, device = get_modules_from_config(args)
     optim_cls, optim_params = get_optimizer_from_config(args)
     trainer = globals()[args.trainer_type](pipeline, train_dataset, args.epochs, args.batch_size,
-                                      optim_cls, args.lr, args.weight_decay,
-                                      args.grid_lr_weight, optim_params, args.log_dir, device,
-                                      exp_name=args.exp_name, info=args_str, extra_args=vars(args),
-                                      render_every=args.render_every, save_every=args.save_every)
+                                           optim_cls, args.lr, args.weight_decay,
+                                           args.grid_lr_weight, optim_params, args.log_dir, device,
+                                           exp_name=args.exp_name, info=args_str, extra_args=vars(args),
+                                           render_every=args.render_every, save_every=args.save_every)
     if args.valid_only:
         trainer.validate()
     else:
