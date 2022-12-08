@@ -22,7 +22,7 @@ class BaseNeuralField(nn.Module):
 
     TODO(ttakikawa): More complete documentation here.
     """
-    def __init__(self, 
+    def __init__(self,
         grid_type          : str = 'OctreeGrid',
         interpolation_type : str = 'linear',
         multiscale_type    : str = 'none',
@@ -31,12 +31,12 @@ class BaseNeuralField(nn.Module):
         raymarch_type      : str = 'voxel',
 
         decoder_type       : str = 'none',
-        embedder_type      : str = 'none', 
+        embedder_type      : str = 'none',
         activation_type    : str = 'relu',
         layer_type         : str = 'none',
 
         base_lod         : int   = 2,
-        num_lods         : int   = 1, 
+        num_lods         : int   = 1,
 
         # grid args
         sample_tex       : bool  = False,
@@ -46,6 +46,7 @@ class BaseNeuralField(nn.Module):
 
         # decoder args
         hidden_dim       : int   = 128,
+        output_dim       : int   = 5,
         pos_multires     : int   = 10,
         view_multires    : int   = 4,
         num_layers       : int   = 1,
@@ -70,8 +71,9 @@ class BaseNeuralField(nn.Module):
         self.dilate = dilate
         self.feature_dim = feature_dim
         self.space_dim = space_dim
-        
+
         self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
         self.pos_multires = pos_multires
         self.view_multires = view_multires
         self.num_layers = num_layers
@@ -81,7 +83,7 @@ class BaseNeuralField(nn.Module):
 
         self.grid = None
         self.decoder = None
-        
+
         self.init_grid()
         self.init_embedder()
         self.init_decoder()
@@ -141,8 +143,8 @@ class BaseNeuralField(nn.Module):
     @abstractmethod
     def register_forward_functions(self):
         """Register forward functions with the channels that they output.
-        
-        This function should be overrided and call `self._register_forward_function` to 
+
+        This function should be overrided and call `self._register_forward_function` to
         tell the class which functions output what output channels. The function can be called
         multiple times to register multiple functions.
 
@@ -157,8 +159,8 @@ class BaseNeuralField(nn.Module):
 
     def get_forward_function(self, channel):
         """Will return the function that will return the channel.
-        
-        Args: 
+
+        Args:
             channel (str): The name of the channel to return.
 
         Returns:
@@ -187,8 +189,8 @@ class BaseNeuralField(nn.Module):
             kwargs: Any keyword argument passed in will be passed into the respective forward functions.
 
         Returns:
-            (list or dict or torch.Tensor): 
-                If channels is a string, will return a tensor of the request channel. 
+            (list or dict or torch.Tensor):
+                If channels is a string, will return a tensor of the request channel.
                 If channels is a list, will return a list of channels.
                 If channels is a set, will return a dictionary of channels.
                 If channels is None, will return a dictionary of all channels.
@@ -206,10 +208,9 @@ class BaseNeuralField(nn.Module):
         unsupported_channels = requested_channels - self.get_supported_channels()
         if unsupported_channels:
             raise Exception(f"Channels {unsupported_channels} are not supported in {self.__class__.__name__}")
-        
+
         return_dict = {}
         for fn in self._forward_functions:
-
             output_channels = self._forward_functions[fn]
             # Filter the set of channels supported by the current forward function
             supported_channels = output_channels & requested_channels
@@ -221,10 +222,10 @@ class BaseNeuralField(nn.Module):
                 argspec = inspect.getfullargspec(fn)
                 required_args = argspec.args[:-len(argspec.defaults)][1:] # Skip first element, self
                 optional_args = argspec.args[-len(argspec.defaults):]
-                
+
                 input_args = {}
                 for _arg in required_args:
-                    # TODO(ttakiakwa): This doesn't actually format the string, fix :) 
+                    # TODO(ttakiakwa): This doesn't actually format the string, fix :)
                     if _arg not in kwargs:
                         raise Exception(f"Argument {_arg} not found as input to in {self.__class__.__name__}.{fn.__name__}()")
                     input_args[_arg] = kwargs[_arg]
@@ -235,7 +236,7 @@ class BaseNeuralField(nn.Module):
 
                 for channel in supported_channels:
                     return_dict[channel] = output[channel]
-        
+
         if isinstance(channels, str):
             if channels in return_dict:
                 return return_dict[channels]

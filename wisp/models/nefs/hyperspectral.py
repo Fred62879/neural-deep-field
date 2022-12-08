@@ -1,27 +1,15 @@
 
 import torch
-import torch.nn.functional as F
-import torch.nn as nn
-import numpy as np
-import logging as log
-import time
-import math
-import inspect
-from abc import abstractmethod
 
-from wisp.ops.spc import sample_spc
-from wisp.utils import PsDebugger, PerfTimer
-from wisp.ops.geometric import sample_unif_sphere
-
+from wisp.models.grids import *
+from wisp.utils import PerfTimer
+from wisp.models.common import Fn
+from wisp.models.pe import Rand_Gaus_Linr
 from wisp.models.nefs import BaseNeuralField
-from wisp.models.embedders import get_positional_embedder
-from wisp.accelstructs import OctreeAS
+from wisp.models.decoders import BasicDecoder
 from wisp.models.layers import get_layer_class
 from wisp.models.activations import get_activation_class
-from wisp.models.decoders import BasicDecoder
-from wisp.models.grids import *
-
-import kaolin.ops.spc as spc_ops
+from wisp.models.embedders import get_positional_embedder
 
 
 class NeuralHyperSpectral(BaseNeuralField):
@@ -32,7 +20,7 @@ class NeuralHyperSpectral(BaseNeuralField):
         """
         return
 
-    def init_decoder(self):
+    def init_decoder(self, pe=False):
         """Initializes the decoder object.
         """
         if self.multiscale_type == 'cat':
@@ -40,7 +28,19 @@ class NeuralHyperSpectral(BaseNeuralField):
         else:
             self.effective_feature_dim = self.grid.feature_dim
 
-        self.input_dim = self.effective_feature_dim
+        self.pe = pe
+        if self.pe:
+            self.input_dim = 2
+            pe_dim = 2000
+            sigma = 1
+            omega = 1
+            pe_bias = True
+            float_tensor = torch.cuda.FloatTensor
+            verbose = False
+            self.pe = Rand_Gaus_Linr((self.input_dim, pe_dim, sigma, omega, pe_bias, float_tensor, verbose))
+            self.input_dim = pe_dim
+        else:
+            self.input_dim = self.effective_feature_dim
 
         if self.position_input:
             self.input_dim += self.pos_embed_dim
@@ -49,6 +49,8 @@ class NeuralHyperSpectral(BaseNeuralField):
             (self.input_dim, self.output_dim, get_activation_class(self.activation_type),
              True, layer=get_layer_class(self.layer_type), num_layers=self.num_layers+1,
              hidden_dim=self.hidden_dim, skip=[])
+
+        self.sinh_scaling = Fn(torch.sinh)
 
         '''
         self.decoder_hyperspectral = BasicDecoder \
@@ -74,7 +76,7 @@ class NeuralHyperSpectral(BaseNeuralField):
             raise NotImplementedError
 
         self.grid = grid_class \
-            (self.feature_dim, base_lod=self.base_lod, num_lods=self.num_lods,
+            (self.feature_dim, space_dim=self.space_dim, base_lod=self.base_lod, num_lods=self.num_lods,
              interpolation_type=self.interpolation_type,
              multiscale_type=self.multiscale_type, **self.kwargs)
 
@@ -87,22 +89,23 @@ class NeuralHyperSpectral(BaseNeuralField):
 
     def register_forward_functions(self):
         """Register forward functions with the channels that they output.
-
         This function should be overrided and call `self._register_forward_function` to
         tell the class which functions output what output channels. The function can be called
         multiple times to register multiple functions.
         """
-        self._register_forward_function(self.hyperspectral, ["density"])
+        self._register_forward_function(
+            self.hyperspectral,
+            ["density", "recon_spectra", "cdbk_loss", "embd_ids", "latents"]
+        )
 
     def hyperspectral(self, coords, pidx=None, lod_idx=None):
         """Compute hyperspectral intensity for the provided coordinates.
-
         Args:
             coords (torch.FloatTensor): tensor of shape [batch, num_samples, 3]
             pidx (torch.LongTensor): SPC point_hierarchy indices of shape [batch].
                                      Unused in the current implementation.
             lod_idx (int): index into active_lods. If None, will use the maximum LOD.
-
+                           Currently interpolation doesn't use this.
         Returns:
             {"indensity": torch.FloatTensor }:
                 - Output intensity tensor of shape [batch, num_samples, 3]
@@ -110,18 +113,27 @@ class NeuralHyperSpectral(BaseNeuralField):
         timer = PerfTimer(activate=False, show_memory=True)
         if lod_idx is None:
             lod_idx = len(self.grid.active_lods) - 1
-        batch, num_samples, _ = coords.shape
+
+        if coords.ndim == 2:
+            batch, _ = coords.shape
+        elif coords.ndim == 3:
+            batch, num_samples, _ = coords.shape
+        else:
+            raise Exception("Wrong coordinate dimension.")
         timer.check("rf_hyperspectral_preprocess")
 
-        # Embed coordinates into high-dimensional vectors with the grid.
-        feats = self.grid.interpolate(coords, lod_idx).reshape(-1, self.effective_feature_dim)
-        timer.check("rf_hyperspectra_interpolate")
+        if self.pe:
+            feats = self.pe([coords,None])[:,0]
+        else:
+            # Embed coordinates into high-dimensional vectors with the grid.
+            feats = self.grid.interpolate(coords, lod_idx).reshape(-1, self.effective_feature_dim)
+            timer.check("rf_hyperspectra_interpolate")
 
-        if self.position_input:
-            raise NotImplementedError
+            if self.position_input:
+                raise NotImplementedError
 
         # Decode high-dimensional vectors to output intensity.
         density = self.decoder_intensity(feats)
+        density = self.sinh_scaling(density)
         timer.check("rf_hyperspectral_decode")
-
-        return dict(density=density)
+        return dict(density=density,recon_spectra=None,cdbk_loss=None,embd_ids=None,latents=None)

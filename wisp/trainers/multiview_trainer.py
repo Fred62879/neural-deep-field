@@ -31,7 +31,7 @@ class MultiviewTrainer(BaseTrainer):
         """Override pre_step to support pruning.
         """
         super().pre_step()
-        
+
         if self.extra_args["prune_every"] > -1 and self.iteration > 0 and self.iteration % self.extra_args["prune_every"] == 0:
             self.pipeline.nef.prune()
 
@@ -88,12 +88,12 @@ class MultiviewTrainer(BaseTrainer):
         self.scaler.update()
 
         timer.check("backward and step")
-        
+
     def log_cli(self):
         log_text = 'EPOCH {}/{}'.format(self.epoch, self.num_epochs)
         log_text += ' | total loss: {:>.3E}'.format(self.log_dict['total_loss'] / len(self.train_data_loader))
         log_text += ' | rgb loss: {:>.3E}'.format(self.log_dict['rgb_loss'] / len(self.train_data_loader))
-        
+
         log.info(log_text)
 
     def evaluate_metrics(self, rays, imgs, lod_idx, name=None):
@@ -133,7 +133,7 @@ class MultiviewTrainer(BaseTrainer):
         psnr_total /= len(imgs)
         lpips_total /= len(imgs)
         ssim_total /= len(imgs)
-                
+
         log_text = 'EPOCH {}/{}'.format(self.epoch, self.num_epochs)
         log_text += ' | {}: {:.2f}'.format(f"{name} PSNR", psnr_total)
         log_text += ' | {}: {:.6f}'.format(f"{name} SSIM", ssim_total)
@@ -172,12 +172,12 @@ class MultiviewTrainer(BaseTrainer):
                 if out.get('alpha') is not None:
                     log_images_to_wandb(f"LOD-{d}-360-Degree-Scene/Alpha", out['alpha'].T, idx)
                 wandb.log({})
-        
+
             rgb_gif = out_rgb[0]
             gif_path = os.path.join(self.log_dir, "rgb.gif")
             rgb_gif.save(gif_path, save_all=True, append_images=out_rgb[1:], optimize=False, loop=0)
             wandb.log({f"360-Degree-Scene/RGB-Rendering/LOD-{d}": wandb.Video(gif_path)})
-    
+
     def validate(self):
         self.pipeline.eval()
 

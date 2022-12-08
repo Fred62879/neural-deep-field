@@ -6,12 +6,14 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
+import re
 import collections
 import torch
 from torch._six import string_classes
 from torch.utils.data._utils.collate import default_convert
 from wisp.core import Rays
 
+np_str_obj_array_pattern = re.compile(r'[SaUO]')
 
 def default_collate(batch):
     r"""

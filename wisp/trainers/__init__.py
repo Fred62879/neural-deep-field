@@ -8,4 +8,5 @@
 
 from .base_trainer import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 from .multiview_trainer import MultiviewTrainer
+from .astro_trainer import AstroTrainer
 from .sdf_trainer import SDFTrainer

@@ -91,7 +91,7 @@ class BaseTrainer(ABC):
             render_tb_every (int): The number of epochs between renders for tensorboard logging. -1 = no rendering.
             save_every (int): The number of epochs between model saves. -1 = no saving.
         """
-        log.info(f'Info: \n{info}')
+        #log.info(f'Info: \n{info}')
         log.info(f'Training on {extra_args["dataset_path"]}')
 
         self.extra_args = extra_args
@@ -257,7 +257,7 @@ class BaseTrainer(ABC):
         self.loss_lods = list(range(0, self.extra_args["num_lods"]))
         if self.extra_args["grow_every"] > 0:
             self.grow()
-
+        
         if self.extra_args["only_last"]:
             self.loss_lods = self.loss_lods[-1:]
 

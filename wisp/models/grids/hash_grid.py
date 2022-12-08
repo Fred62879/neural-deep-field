@@ -45,7 +45,9 @@ class HashGrid(BLASGrid):
         """Initialize the hash grid class.
 
         Args:
+            dim (int): The dimension of the output data
             feature_dim (int): The dimension of the features stored on the grid.
+            space_dim (int): The dimension of the data space (2 for image, 3 for shapes).
             interpolation_type (str): The type of interpolation function.
             multiscale_type (str): The type of multiscale aggregation. Usually 'sum' or 'cat'.
                                    Note that 'cat' will change the decoder input dimension.
@@ -110,7 +112,7 @@ class HashGrid(BLASGrid):
 
         self.codebook = nn.ParameterList([])
         for res in resolutions:
-            num_pts = res ** 3
+            num_pts = res ** self.space_dim
             fts = torch.zeros(min(self.codebook_size, num_pts), self.feature_dim)
             fts += torch.randn_like(fts) * self.feature_std
             self.codebook.append(nn.Parameter(fts))
