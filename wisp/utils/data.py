@@ -5,6 +5,7 @@ import logging as log
 
 from astropy.io import fits
 from astropy.wcs import WCS
+from functools import reduce
 from os.path import join, exists
 from astropy.nddata import Cutout2D
 from astropy.coordinates import SkyCoord
@@ -32,11 +33,13 @@ class FITSData:
         self.fits_cutout_sz = kwargs["fits_cutout_sz"]
         self.use_full_fits = kwargs["use_full_fits"]
 
-        self.num_rows = []
-        self.num_cols = []
+        self.headers = {}
+        self.num_rows = {}
+        self.num_cols = {}
 
         self.set_path(dataset_path)
         self.compile_fits_fnames()
+        self.load_headers()
         self.load_all_fits()
         self.get_world_coords_all_fits()
 
@@ -121,9 +124,17 @@ class FITSData:
             header = cutout.wcs.to_header()
             num_rows, num_cols = self.fits_cutout_sz, self.fits_cutout_sz
 
-        self.num_rows.append(num_rows)
-        self.num_cols.append(num_cols)
-        return header, num_rows, num_cols
+        #self.headers.append(header)
+        #self.num_rows.append(num_rows)
+        #self.num_cols.append(num_cols)
+        self.headers[fits_id] = header
+        self.num_rows[fits_id] = num_rows
+        self.num_cols[fits_id] = num_cols
+        #return header, num_rows, num_cols
+
+    def load_headers(self):
+        for fits_id in self.fits_ids:
+            self.load_header(fits_id, True)
 
     def load_one_fits(self, fits_id, load_pixels=True):
         ''' Load pixel values or variance from one FITS file (tile_id/subtile_id).
@@ -234,11 +245,11 @@ class FITSData:
             @Return
               coords: 2D coordinates [npixels,2]
         '''
-        header, num_rows, num_cols = self.load_header(fits_id, True)
+        num_rows, num_cols = self.num_rows[fits_id], self.num_cols[fits_id]
         xids = np.tile(np.arange(0, num_cols), num_rows)
         yids = np.repeat(np.arange(0, num_rows), num_cols)
 
-        wcs = WCS(header)
+        wcs = WCS(self.headers[fits_id])
         ras, decs = wcs.all_pix2world(xids, yids, 0) # x-y pixel coord
         if self.use_full_fits:
             coords = np.array([ras, decs]).T
@@ -521,15 +532,35 @@ class FITSData:
 # FITS class ends
 #################
 
-def generate_recon_cutout_pixel_ids(pos, cutout_sz, num_cols):
+def get_recon_cutout_pixel_ids(pos, cutout_sz, num_rows, num_cols, cutout_tile_id, use_full_fits):
+    """ Get id of pixels within cutout to reconstruct.
+        Cutout could be within the original image or the same as original.
+        If train over multiple tiles, we reconstruct cutout only for one of the tile.
+        @Param
+          pos: starting r/c position of cutout
+               (local r/c relative to original image start r/c position)
+          num_rows/cols: number of rows/columns of original image
+                         (map from tile_id to num_rows/cols)
+        @Return
+          ids: pixels ids (with 0 being the first pixel in the original image)
     """
-    """
+
+    # count #pixels before the selected tile
+    offset = 0
+    for (tile_id, num_row), (_, num_col) in zip(num_rows.items(), num_cols.items()):
+        if tile_id == cutout_tile_id: break
+        if use_full_fits: offset += num_row * num_col
+        else: offset += cutout_sz**2
+
     (r, c) = pos
     rlo, rhi = r, r + cutout_sz
     clo, chi = c, c + cutout_sz
     rs = np.arange(rlo, rhi)
-    id_inits = rs * num_cols + clo
+
+    num_col = num_cols[cutout_tile_id] if use_full_fits else cutout_sz
+    id_inits = rs * num_col + clo
     ids = reduce(lambda acc, id_init:
                  acc + list(np.arange(id_init, id_init + cutout_sz)),
                  id_inits, [])
-    return np.array(ids)
+    ids = np.array(ids) + offset
+    return ids

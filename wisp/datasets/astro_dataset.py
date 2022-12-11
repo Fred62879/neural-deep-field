@@ -4,8 +4,7 @@ import torch
 
 from typing import Callable
 from torch.utils.data import Dataset
-from wisp.utils.data import FITSData, \
-    generate_cutout_pixl_ids
+from wisp.utils.data import FITSData, get_recon_cutout_pixel_ids
 
 
 class AstroDataset(Dataset):
@@ -37,7 +36,7 @@ class AstroDataset(Dataset):
             self.data['coords'] = coords
         else:
             self.fits_dataset = FITSData(self.root, **self.kwargs)
-            num_rows, num_cols = self.fits_dataset.get_img_sz()
+            self.num_rows, self.num_cols = self.fits_dataset.get_img_sz()
             self.data['coords'] = self.fits_dataset.get_coords(to_tensor=False)
             self.data['pixels'] = self.fits_dataset.get_pixels(to_tensor=False)
             #self.data['mask'] = self.fits_dataset.get_mask()
@@ -48,9 +47,6 @@ class AstroDataset(Dataset):
 
                 if self.kwargs["spectra_supervision"]:
                     self.data['spectra'] = self.trans_dataset.get_spectra()
-
-        # get ids of pixels within specified cutout to save
-        self.cutout_pixels_ids = generate_cutout_pixl_ids(pos, cutout_sz, num_cols[0])
 
     ############
     # Sample data
@@ -84,11 +80,17 @@ class AstroDataset(Dataset):
         self.smpl_trans = smpl_trans # [bsz,nbands,nsmpl]
         self.nsmpl_within_each_band_mixture = nsmpl_within_each_band_mixture # [bsz,nbands]
 
-    def resample(self):
-        """ Resamples a new working set of SDFs """
+    def get_recon_cutout_gt(self, cutout_pixel_ids):
+        """ Get gt cutout from loaded pixels. """
+        sz = self.kwargs["recon_cutout_sz"]
+        return self.data["pixels"][cutout_pixel_ids].T.reshape((-1, sz, sz))
 
-    def get_cutotu_pixel_ids(self):
-        return self.cutout_pixel_ids
+    def get_recon_cutout_pixel_ids(self):
+        """ Get pixel ids of cutout to reconstruct. """
+        return get_recon_cutout_pixel_ids(
+            self.kwargs["recon_cutout_start_pos"], self.kwargs["recon_cutout_sz"],
+            self.num_rows, self.num_cols, self.kwargs["recon_cutout_tile_id"],
+            self.kwargs["use_full_fits"])
 
     def __len__(self):
         """ Length of the dataset in number of pixels """

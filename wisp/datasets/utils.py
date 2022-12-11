@@ -20,6 +20,7 @@ def default_collate(batch):
         Function that extends torch.utils.data._utils.collate.default_collate
         to support Rays.
     """
+    #print(batch)
     elem = batch[0]
     elem_type = type(elem)
     if isinstance(elem, torch.Tensor):

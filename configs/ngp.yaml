@@ -26,20 +26,15 @@ dataset:
     trans_cho: 'orig_trans'
 
     use_full_fits: False
-    fits_cutout_sz: 64
+    fits_cutout_sz: 1024
     fits_tile_ids: ['1'] #,'1']
     fits_subtile_ids: ['5'] #,'7']
     fits_footprints: ['9812'] #,'9812']
-    trans_thresh: 1e-3
-    train_pixl_ratio_per_epoch: 1e-6
-    masked_pixl_ratio_per_epoch: 1
-    num_model_checkpoint: 10
-    train_bsz_hi: 4096
 
     #start_r: 2000 # large pixl 5
     #start_c: 900  # large pixl 5
-    start_r: 86
-    start_c: 188
+    #start_r: 86
+    #start_c: 188
     #start_r: 1900 # 192 img sz
     #start_c: 772
     #start_r: 1908 # 4 spectra 
@@ -67,31 +62,38 @@ dataset:
     # sensor_collection_name: '10'
     # filter_ids: [0,1,2,3,4,5,6,7,8,9]
     # filters: [g,r,i,z,y,nb387,nb816,nb921,u,us]
-    # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y,NB0387,NB0816,NB0921,u,uS]   
+    # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y,NB0387,NB0816,NB0921,u,uS]
+
+    trans_thresh: 1e-3
 
 trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 2000
-    batch_size: 4096
+    num_epochs: 1200
+    batch_size: 4096000
     valid_every: -1
     save_every: 400
     render_tb_every: -1
     log_tb_every: 100
     save_local_every: 400
     save_as_new: True
+    #train_pixl_ratio_per_epoch: 1e-6
+    masked_pixl_ratio_per_epoch: 1
+    #num_model_checkpoint: 10
+    #train_bsz_hi: 4096000
 
     loss_cho: l1
-    weight_train: True
+    weight_train: False
     resume_train: False
     train_use_all_wave: False
     infer_during_train: False
     permute_pixls_train: True
     save_cutout_during_train: True
 
+    recon_cutout_tile_id: '981215'
     recon_cutout_sz: 64
-    recon_cutout_pos: [32,32] # [1024,1024]
+    recon_cutout_start_pos: [86,188]
 
     # spectra supervision
     spectra_supervision: False
@@ -118,10 +120,10 @@ grid:
     multiscale_type: 'cat'
     feature_dim: 2
     feature_std: 0.01
-    num_lods: 8
+    num_lods: 12
     tree_type: 'geometric'
-    min_grid_res: 4
-    max_grid_res: 64
+    min_grid_res: 1
+    max_grid_res: 96
     codebook_bitwidth: 19
 
 net:
@@ -232,6 +234,6 @@ inpaint:
     relative_train_bands: [0,2,3,4]
     relative_inpaint_bands: [1]
 
-experiment:
-    abl_cho: 0
+#experiment:
+#    abl_cho: 
     

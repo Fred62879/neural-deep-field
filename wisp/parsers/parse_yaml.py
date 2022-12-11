@@ -207,7 +207,7 @@ def define_cmd_line_args():
     data_group.add_argument('--start_r', type=int, default=0,
                             help='starting row number of cutout from fits')
     data_group.add_argument('--start_c', type=int, default=0,
-                            help='starting column number of cutout from fits'))
+                            help='starting column number of cutout from fits')
 
     data_group.add_argument('--u-band-scale',type=float, default=10**((30-27)/2.5),
                             help='scale value for u band pixel values')
@@ -335,9 +335,11 @@ def define_cmd_line_args():
     train_group.add_argument('--plot_embd_map_during_train', action='store_true', default=False)
     train_group.add_argument('--infer_during_train', action='store_true', default=False)
 
+    train_group.add_argument('--recon_cutout_tile_id',type=str, default='981215',
+                             help='id of tile to generate reconstructed cutout')
     train_group.add_argument('--recon_cutout_sz',type=int, default=64,
                              help='size of cutout to save during train (if save_cutout_during_train is True)')
-    train_group.add_argument('--recon_cutout_pos', nargs='+', type=int, required=False,
+    train_group.add_argument('--recon_cutout_start_pos', nargs='+', type=int,
                              help='start (r/c) position of cutout')
 
     # TODO (ttakikawa): Only used for SDFs, but also should support RGB etc
