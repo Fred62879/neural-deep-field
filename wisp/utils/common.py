@@ -3,7 +3,7 @@ import os
 import torch
 import pickle
 import random
-#import nvidia_smi
+import nvidia_smi
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -27,6 +27,12 @@ def get_grid(rlo, rhi, clo, chi):
     c = np.tile(np.arange(clo, chi), nr).reshape((nr,nc,1))
     grid = np.concatenate((r, c), axis=2)
     return grid
+
+def get_gpu_info():
+    nvidia_smi.nvmlInit()
+    handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+    # card id 0 hardcoded here, there is also a call to get all available card ids, so we could iterate
+    return nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
 
 def query_mem(a):
     return a.element_size() * a.nelement()

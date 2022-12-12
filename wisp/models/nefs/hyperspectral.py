@@ -114,6 +114,8 @@ class NeuralHyperSpectral(BaseNeuralField):
         if lod_idx is None:
             lod_idx = len(self.grid.active_lods) - 1
 
+        coords = coords[0]
+        #print('forward', coords.shape)
         if coords.ndim == 2:
             batch, _ = coords.shape
         elif coords.ndim == 3:
@@ -132,8 +134,10 @@ class NeuralHyperSpectral(BaseNeuralField):
             if self.position_input:
                 raise NotImplementedError
 
+        #print(feats.shape)
         # Decode high-dimensional vectors to output intensity.
         density = self.decoder_intensity(feats)
+        #print(density.shape)
         density = self.sinh_scaling(density)
         timer.check("rf_hyperspectral_decode")
         return dict(density=density,recon_spectra=None,cdbk_loss=None,embd_ids=None,latents=None)

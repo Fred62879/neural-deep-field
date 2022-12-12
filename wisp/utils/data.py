@@ -532,13 +532,19 @@ class FITSData:
 # FITS class ends
 #################
 
-def get_recon_cutout_pixel_ids(pos, cutout_sz, num_rows, num_cols, cutout_tile_id, use_full_fits):
+def get_recon_cutout_pixel_ids(pos, fits_cutout_sz, recon_cutout_sz,
+                               num_rows, num_cols, cutout_tile_id, use_full_fits):
+
     """ Get id of pixels within cutout to reconstruct.
         Cutout could be within the original image or the same as original.
         If train over multiple tiles, we reconstruct cutout only for one of the tile.
         @Param
           pos: starting r/c position of cutout
                (local r/c relative to original image start r/c position)
+          fits_cutout_sz: size of fits cutout (if not use full fits)
+                          this is the size of the image we train over.
+          recon_cutout_sz: size of cutout to reconstruct.
+                           this is <= fits_cutout_sz
           num_rows/cols: number of rows/columns of original image
                          (map from tile_id to num_rows/cols)
         @Return
@@ -553,14 +559,15 @@ def get_recon_cutout_pixel_ids(pos, cutout_sz, num_rows, num_cols, cutout_tile_i
         else: offset += cutout_sz**2
 
     (r, c) = pos
-    rlo, rhi = r, r + cutout_sz
-    clo, chi = c, c + cutout_sz
+    rlo, rhi = r, r + recon_cutout_sz
+    clo, chi = c, c + recon_cutout_sz
     rs = np.arange(rlo, rhi)
 
-    num_col = num_cols[cutout_tile_id] if use_full_fits else cutout_sz
+    num_col = num_cols[cutout_tile_id] if use_full_fits else fits_cutout_sz
     id_inits = rs * num_col + clo
     ids = reduce(lambda acc, id_init:
-                 acc + list(np.arange(id_init, id_init + cutout_sz)),
+                 acc + list(np.arange(id_init, id_init + recon_cutout_sz)),
                  id_inits, [])
+
     ids = np.array(ids) + offset
     return ids

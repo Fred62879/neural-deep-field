@@ -32,15 +32,17 @@ class AstroDataset(Dataset):
         self.data = {}
         if self.kwargs["is_test"]:
             pixels, coords = utils.load_fake_data(False, self.args)
-            self.data['pixels'] = pixels
-            self.data['coords'] = coords
+            self.data['pixels'] = pixels[:,None,:]
+            self.data['coords'] = coords[:,None,:]
         else:
             self.fits_dataset = FITSData(self.root, **self.kwargs)
             self.num_rows, self.num_cols = self.fits_dataset.get_img_sz()
-            self.data['coords'] = self.fits_dataset.get_coords(to_tensor=False)
-            self.data['pixels'] = self.fits_dataset.get_pixels(to_tensor=False)
+            self.data['coords'] = self.fits_dataset.get_coords(to_tensor=False)[:,None,:]
+            self.data['pixels'] = self.fits_dataset.get_pixels(to_tensor=False) #[:,None,:]
             #self.data['mask'] = self.fits_dataset.get_mask()
-            self.data['weights'] = self.fits_dataset.get_weights(to_tensor=False)
+
+            if self.kwargs["weight_train"]:
+                self.data['weights'] = self.fits_dataset.get_weights(to_tensor=False) #[:,None,:]
 
             if self.kwargs["space_dim"] == 3:
                 self.data['trans'] = self.trans_dataset.get_trans()
@@ -88,30 +90,35 @@ class AstroDataset(Dataset):
     def get_recon_cutout_pixel_ids(self):
         """ Get pixel ids of cutout to reconstruct. """
         return get_recon_cutout_pixel_ids(
-            self.kwargs["recon_cutout_start_pos"], self.kwargs["recon_cutout_sz"],
-            self.num_rows, self.num_cols, self.kwargs["recon_cutout_tile_id"],
+            self.kwargs["recon_cutout_start_pos"],
+            self.kwargs["fits_cutout_sz"],
+            self.kwargs["recon_cutout_sz"],
+            self.num_rows, self.num_cols,
+            self.kwargs["recon_cutout_tile_id"],
             self.kwargs["use_full_fits"])
 
     def __len__(self):
         """ Length of the dataset in number of pixels """
         return self.data["pixels"].shape[0]
 
-    def __getitem__(self, idx : int):
+    def __getitem__(self, idx : list):
         """ Returns coord and pixel value for pixel.
             Together with sampled lambda values if doing 3d training.
         """
         out = {
             'pixels': self.data['pixels'][idx],
-            'coords': self.data['coords'][idx:idx+1] # always sample a 3d coords [bsz,1,dim]
+            'coords': self.data['coords'][idx] # always sample a 3d coords [bsz,1,dim]
         }
 
         if self.kwargs["weight_train"]:
             out["weights"] = self.data['weights'][idx]
 
         if self.kwargs["space_dim"] == 3:
-            out["wave"] = self.data['wave'][idx:idx+1]
+            out["wave"] = self.data['wave'][idx]
             out["trans"] = self.data['trans'][idx]
 
         if self.transform is not None:
             out = self.transform(out)
+        #print('got item', (out['coords']).shape)
+        #print('got item', (out['pixels']).shape)
         return out

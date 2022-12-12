@@ -9,15 +9,19 @@ import os
 import time
 import torch
 import shutil
+import nvidia_smi
 import numpy as np
 import torch.nn as nn
 import logging as log
 
 from pathlib import Path
 from os.path import exists, join
-from torch.utils.data import DataLoader
+from torch.utils.data import BatchSampler, SequentialSampler, \
+    RandomSampler, DataLoader
+
 from wisp.datasets import default_collate
 from wisp.utils.plot import plot_gt_recon
+from wisp.utils.common import get_gpu_info
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 
@@ -64,9 +68,6 @@ class AstroTrainer(BaseTrainer):
         dst = join(self.log_dir, "config.yaml")
         shutil.copyfile(extra_args["config"], dst)
 
-        self.num_batches = int(np.ceil(len(self.dataset) / batch_size))
-        log.info(f"{self.num_batches} batches per epoch")
-
         self.verbose = self.extra_args["verbose"]
 
         self.space_dim = self.extra_args["space_dim"]
@@ -85,6 +86,10 @@ class AstroTrainer(BaseTrainer):
 
         self.init_loss()
         self.set_log_path()
+
+        # calculations
+        self.num_batches = int(np.ceil(len(self.dataset) / batch_size))
+        log.info(f"{self.num_batches} batches per epoch")
         self.recon_cutout_pixel_ids = self.dataset.get_recon_cutout_pixel_ids()
         self.recon_cutout_gt = self.dataset.get_recon_cutout_gt(self.recon_cutout_pixel_ids)
 
@@ -134,78 +139,33 @@ class AstroTrainer(BaseTrainer):
     ##############
 
     def train(self):
-        """
-        self.scene_state.optimization.running = True
+        super().train()
+        nvidia_smi.nvmlShutdown()
 
-        while self.scene_state.optimization.running:
-            self.iterate(data)
-
-        self.writer.close()
-        """
-        self.scene_state.optimization.running = True
-        self.begin_epoch()
-        data = self.next_batch()
-        for i in range(self.num_epochs):
-            #log.info('epoch start')
-            self.begin_epoch()
-            #log.info('begin epoch done')
-            self.iterate(data)
-            #log.info('batches done')
-            self.end_epoch()
-            #log.info('end epoch done')
-
-        self.writer.close()
-
-
-    # def iterate(self):
-    # """ Advances the training by one training step (batch). """
-    # if self.scene_state.optimization.running:
-    #     iter_start_time = time.time()
-    #     self.scene_state.optimization.iteration = self.iteration
-    #     try:
-    #         if self.train_data_loader_iter is None:
-    #             self.begin_epoch()
-    #         data = self.next_batch()
-    #         self.iteration += 1
-
-    #     except StopIteration:
-    #         self.end_epoch()
-    #         self.begin_epoch()
-    #         data = self.next_batch()
-
-    #     self.pre_step()
-    #     log.info("step")
-    #     self.step(data)
-    #     log.info("stepped")
-    #     self.post_step()
-    #     iter_end_time = time.time()
-    #     self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
-
-    def iterate(self, data):
-        """ Advances the training by one training epoch. """
+    def iterate(self):
+        """ Advances the training by one training step (batch). """
         if self.scene_state.optimization.running:
-            #self.begin_epoch()
-
-            for i in range(self.num_batches):
-                iter_start_time = time.time()
-                self.scene_state.optimization.iteration = self.iteration
-
-                # log.info("get next batch")
-                # data = self.next_batch()
-                # log.info("got next batch")
-
-                self.pre_step()
-                #log.info("step")
-                self.step(data)
-                #log.info("stepped")
-                self.post_step()
-
-                iter_end_time = time.time()
-                self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
-
+            iter_start_time = time.time()
+            self.scene_state.optimization.iteration = self.iteration
+            try:
+                if self.train_data_loader_iter is None:
+                    self.begin_epoch()
+                data = self.next_batch()
+                #print('got data', (data["coords"]).shape)
+                #print('got data', (data["pixels"]).shape)
                 self.iteration += 1
 
-            #self.end_epoch()
+            except StopIteration:
+                self.end_epoch()
+                self.begin_epoch()
+                data = self.next_batch()
+
+            self.pre_step()
+            self.step(data)
+            self.post_step()
+
+            iter_end_time = time.time()
+            self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
 
     def next_batch(self):
         """ Actually iterate the data loader """
@@ -235,14 +195,10 @@ class AstroTrainer(BaseTrainer):
             self.loss_lods = self.loss_lods[-1:]
 
         if self.extra_args["resample"] and self.epoch % self.extra_args["resample_every"] == 0:
-            #module.shuffle_pixls() # shuffle pixels at each epoch
             self.resample_dataset()
 
         if self.extra_args["save_local_every"] > -1 and self.epoch % self.extra_args["save_local_every"] == 0:
             #if self.epoch == 0 or (self.epoch + 1) % args.loss_smpl_intvl == 0
-            # if save data, use pixels in orig order (incl. spectra supervision pixls)
-            # redo batch division as total number of pixels changed
-            #num_batches = module.reinit_pixl_ids()
             self.save_data_to_local = True
             self.latents, self.embd_ids, self.smpl_pixels = [], [], []
 
@@ -254,26 +210,26 @@ class AstroTrainer(BaseTrainer):
         self.timer.check("pre_epoch done")
 
     def init_log_dict(self):
-        """ Custom log dict """
+        """ Custom log dict. """
         super().init_log_dict()
         self.log_dict["recon_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
         self.log_dict["codebook_loss"] = 0.0
 
-    def resample_dataset(self):
-        if hasattr(self.dataset, "resample"):
-            if self.verbose: log.info("Reset DataLoader")
-            self.dataset.resample()
-            self.init_dataloader()
-            self.timer.check("create_dataloader")
-        else:
-            raise ValueError("resample=True but the dataset doesn't have a resample method")
-
     def init_dataloader(self):
+        #if self.shuffle_dataloader: sampler_cls = RandomSampler
+        #else: sampler_cls = SequentialSampler
+        sampler_cls = SequentialSampler
+
         self.train_data_loader = DataLoader(
-            self.dataset, batch_size=self.batch_size,
-            collate_fn=default_collate, shuffle=False, #self.shuffle_dataloader,
-            pin_memory=True, num_workers=0)
+            self.dataset,
+            batch_size=self.batch_size,
+            #collate_fn=default_collate,
+            sampler=BatchSampler(
+                sampler_cls(self.dataset), batch_size=self.batch_size, drop_last=False),
+            pin_memory=True,
+            num_workers=0
+        )
 
     ###########
     # end epoch
@@ -334,6 +290,7 @@ class AstroTrainer(BaseTrainer):
 
         if dim == 2:
             requested_channels = {"density"}
+            #print("forward", data["coords"].shape)
             net_args = {"coords": data["coords"].to(self.device), "covar": None}
 
         elif dim == 3:
@@ -369,7 +326,8 @@ class AstroTrainer(BaseTrainer):
 
         ret = self.forward(data)
         recon_pixels = ret["density"]
-        gt_pixels = data["pixels"].to(self.device)
+        gt_pixels = data["pixels"][0].to(self.device)
+        #print(recon_pixels.shape, gt_pixels.shape)
 
         if self.extra_args["weight_train"]:
             weights = data["weights"].to(self.device)
@@ -448,6 +406,12 @@ class AstroTrainer(BaseTrainer):
         """ Sample lambda (and corrpesponding transmission) before each iteration. """
         if self.space_dim == 3:
             self.dataset.sample_wave()
+
+        if self.epoch == 0 and self.extra_args["log_gpu_every"] > -1 and self.epoch % self.extra_args["log_gpu_every"] == 0:
+            gpu_info = get_gpu_info()
+            free = gpu_info.free / 1e9
+            used = gpu_info.used / 1e9
+            log.info(f"Free/Used GPU memory: ~{free}GB / ~{used}GB")
 
     def post_step(self):
         if self.save_latent_during_train:
@@ -532,8 +496,8 @@ class AstroTrainer(BaseTrainer):
     def save_model(self):
         if self.extra_args["save_as_new"]:
             fname = f"model-ep{self.epoch}-it{self.iteration}.pth"
-            model_fname = os.path.join(self.log_dir, fname)
-        else: model_fname = os.path.join(self.log_dir, f"model.pth")
+            model_fname = os.path.join(self.model_dir, fname)
+        else: model_fname = os.path.join(self.model_dir, f"model.pth")
 
         #model_fname = self.args.model_fns[model_id]
         if self.verbose: log.info(f"Saving model checkpoint to: {model_fname}")
@@ -551,11 +515,15 @@ class AstroTrainer(BaseTrainer):
     ############
 
     def validate(self):
+
+        model_fname = os.path.abspath(os.path.join(self.model_dir, f"model-ep{}-it{}.pth"))
+        checkpoint = torch.load(model_fname)["mdoel_state_dict"]
+        load_model_weights(self.pipeline)
         self.pipeline.eval()
 
         record_dict = self.extra_args
         dataset_name = os.path.splitext(os.path.basename(self.extra_args["dataset_path"]))[0]
-        model_fname = os.path.abspath(os.path.join(self.log_dir, f"model.pth"))
+
         record_dict.update({"dataset_name" : dataset_name, "epoch": self.epoch,
                             "log_fname" : self.log_fname, "model_fname": model_fname})
         parent_log_dir = os.path.dirname(self.log_dir)
@@ -588,3 +556,38 @@ class AstroTrainer(BaseTrainer):
             df_ = pd.read_parquet(fname)
             df = pd.concat([df_, df])
         df.to_parquet(fname, index=False)
+
+
+    def recon_multi_band(self, model_id, nmodels, checkpoint, recon_synthetic=False):
+        utils.load_net_weights(self.net_mb, checkpoint['model_state_dict'])
+        self.net_mb.train()
+
+        recon_fn = os.path.join(self.recon_dir, str(model_id))
+        if self.recon_norm: recon_fn += '_rnorm'
+        if recon_synthetic: recon_fn += '_flat'
+
+        if self.plot_embd_map_during_recon and self.encoder_quantize:
+            embd_map_fn = self.embd_map_fn
+        else: embd_map_fn = None
+
+        cur_to_hdu = self.to_hdu and model_id == nmodels-1
+        recon, cur_metrics, cur_metrics_zscale = utils.reconstruct_multi_band_img \
+            (recon_synthetic, self.coords, self.covars, self.gt_img,
+             self.net_mb, self.trans_args, self.args,
+             mask=self.masks, fn=recon_fn, to_hdu=cur_to_hdu,
+             header=self.cutout_header, denorm_args=self.denorm_args,
+             embd_map_fn=embd_map_fn)
+
+        img_fn = join(self.recon_dir, str(model_id))
+        plot_gt_recon(self.gt_img, recon, img_fn)
+        resid = self.gt_img - recon
+        heat_all(resid, fn=join(self.recon_dir, 'resid.png'))
+
+        if cur_metrics is not None:
+            cur_metrics = np.expand_dims(cur_metrics, axis=1)
+            self.metrics = np.concatenate((self.metrics, cur_metrics), axis=1)
+
+        if cur_metrics_zscale is not None:
+            cur_metrics_zscale = np.expand_dims(cur_metrics_zscale, axis=1)
+            self.metrics_zscale = np.concatenate(
+                (self.metrics_zscale, cur_metrics_zscale), axis=1)

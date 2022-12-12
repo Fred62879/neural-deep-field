@@ -26,15 +26,15 @@ dataset:
     trans_cho: 'orig_trans'
 
     use_full_fits: False
-    fits_cutout_sz: 1024
+    fits_cutout_sz: 64
     fits_tile_ids: ['1'] #,'1']
     fits_subtile_ids: ['5'] #,'7']
     fits_footprints: ['9812'] #,'9812']
 
     #start_r: 2000 # large pixl 5
     #start_c: 900  # large pixl 5
-    #start_r: 86
-    #start_c: 188
+    start_r: 86
+    start_c: 188
     #start_r: 1900 # 192 img sz
     #start_c: 772
     #start_r: 1908 # 4 spectra 
@@ -70,12 +70,13 @@ trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 1200
+    num_epochs: 400
     batch_size: 4096000
     valid_every: -1
     save_every: 400
     render_tb_every: -1
     log_tb_every: 100
+    log_gpu_every: 100
     save_local_every: 400
     save_as_new: True
     #train_pixl_ratio_per_epoch: 1e-6
@@ -93,7 +94,7 @@ trainer:
 
     recon_cutout_tile_id: '981215'
     recon_cutout_sz: 64
-    recon_cutout_start_pos: [86,188]
+    recon_cutout_start_pos: [0,0] #[86,188]
 
     # spectra supervision
     spectra_supervision: False

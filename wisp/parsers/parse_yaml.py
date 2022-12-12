@@ -312,6 +312,8 @@ def define_cmd_line_args():
                                 help='Render every N iterations')
     train_group.add_argument('--log-tb-every', type=int, default=100,
                              help='Log to cli and tb at every N epoch.')
+    train_group.add_argument('--log-gpu-every', type=int, default=100,
+                             help='Log to cli gpu usage at every N epoch.')
     train_group.add_argument('--save-local-every', type=int, default=100,
                              help='Save data to local every N epoch.')
 
