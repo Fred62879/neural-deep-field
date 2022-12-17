@@ -1,7 +1,9 @@
 
 global:
+    verbose: True
     exp_name: 'test-ngp-nerf'
-    verbose: False
+    #tasks: ['train','save_recon_during_train','infer','recon_img']
+    tasks: ['infer','recon_img']
 
 optimizer:
     optimizer_type: 'rmsprop'
@@ -12,7 +14,6 @@ dataset:
     fits_choice_id: '0'
     space_dim: 2
     load_cache: True
-    to_hdu: True
     dataset_path: '../../data/pdr3'
     gt_img_norm_cho: 'identity'     # identity/arcsinh/linear/clip(0,1)
     output_norm_cho: 'sinh'   # identity/arcsinh/sinh
@@ -26,7 +27,7 @@ dataset:
     trans_cho: 'orig_trans'
 
     use_full_fits: False
-    fits_cutout_sz: 64
+    fits_cutout_size: 64
     fits_tile_ids: ['1'] #,'1']
     fits_subtile_ids: ['5'] #,'7']
     fits_footprints: ['9812'] #,'9812']
@@ -80,21 +81,14 @@ trainer:
     save_local_every: 400
     save_as_new: True
     #train_pixl_ratio_per_epoch: 1e-6
-    masked_pixl_ratio_per_epoch: 1
+    #masked_pixl_ratio_per_epoch: 1
     #num_model_checkpoint: 10
-    #train_bsz_hi: 4096000
 
     loss_cho: l1
     weight_train: False
     resume_train: False
     train_use_all_wave: False
-    infer_during_train: False
-    permute_pixls_train: True
-    save_cutout_during_train: True
-
-    recon_cutout_tile_id: '981215'
-    recon_cutout_sz: 64
-    recon_cutout_start_pos: [0,0] #[86,188]
+    #permute_pixls_train: True
 
     # spectra supervision
     spectra_supervision: False
@@ -104,13 +98,17 @@ trainer:
     spectra_supervision_cho: 1
 
 infer:
-    infer_use_all_wave: True
-    plot_histogram: False
-    recon_multiband: True
-    recon_synthetic: False
-    plot_spectrum: False
-    plot_cdbk_spectrum: False
-    plot_centerize_spectrum: False
+    inferrer_type: 'AstroInferrer'
+    infer_batch_size: 409600
+    to_HDU: True
+    infer_use_all_wave: True # enforced
+    #infer_log_fname: '20221219-175517'
+    metric_options: ['mse','ssim','psnr']
+
+    recon_cutout_fits_ids: ['981215']
+    recon_cutout_sizes: [ [64] ]
+    recon_cutout_start_pos: [ [[0,0]] ] #[86,188]
+   
 test:
     is_test: False
     fake_spectra_cho: -1
@@ -171,10 +169,6 @@ monte_carlo:
     cdbk_seed: 8
     quantize_latent: False
     plot_latent: True
-    plot_latent_embd: True
-    save_latent_during_train: True
-    plot_embd_map_during_recon: True
-    plot_embd_map_during_train: True
 
     pe_wave: True
     wave_pe_cho: 'rand_gaus'
@@ -234,7 +228,3 @@ inpaint:
     inpaint_bands: [1]
     relative_train_bands: [0,2,3,4]
     relative_inpaint_bands: [1]
-
-#experiment:
-#    abl_cho: 
-    

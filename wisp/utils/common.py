@@ -113,3 +113,96 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
     coords = torch.tensor(coords).type(args.float_tensor)
     #coords = reshape_coords(coords, args, infer=infer, spectrum=spectrum, coord_wave=coord_wave)
     return coords
+
+def forward(class_obj, pipeline, data, quantize_latent=False, plot_embd_map=False, spectra_supervision=False):
+    if class_obj.space_dim == 2:
+        requested_channels = {"density"}
+        #print("forward", data["coords"].shape)
+        net_args = {"coords": data["coords"].to(class_obj.device), "covar": None}
+
+    elif class_obj.space_dim == 3:
+        requested_channels = ["density"]
+        if class_obj.quantize_latent:
+            requested_channels.append("cdbk_loss")
+            if class_obj.plot_embd_map:
+                requested_channels.append("embd_ids")
+                requested_channels.append("latents")
+
+        if spectra_supervision:
+            requested_channels.append("recon_spectra")
+        requested_channels = set(requested_channels)
+
+        mc_cho = self.extra_args["mc_cho"]
+
+        if mc_cho == "mc_hardcode":
+            net_args = {"coords": self.cur_coords, "covar": self.covar, "trans": self.smpl_trans}
+        elif mc_cho == "mc_bandwise":
+            net_args = [self.cur_coords, self.covar, self.smpl_wave, self.smpl_trans]
+        elif mc_cho == "mc_mixture":
+            net_args = [self.cur_coords, self.covar, self.smpl_wave,
+                        self.smpl_trans, self.nsmpl_within_each_band_mixture]
+        else:
+            raise Exception("Unsupported monte carlo choice")
+    else:
+        raise Exception("Unsupported space dim")
+
+    return pipeline(channels=requested_channels, **net_args)
+
+def load_partial_latent(model, pretrained_state, lo, hi):
+    cur_state = model.state_dict()
+    pretrained_dict = {}
+    for k, v in pretrained_state.items():
+        if 'latents' in k: v = v[lo:hi]
+        pretrained_dict[k] = v
+    model.load_state_dict(pretrained_dict)
+
+def load_model_weights_exact(model, pretrained_state, train_chnls):
+    cur_state = model.state_dict()
+    pretrained_dict = {}
+    for k, v in pretrained_state.items():
+        if k in cur_state and 'scale_layer' in k:
+            v = v[train_chnls]
+        pretrained_dict[k] = v
+    model.load_state_dict(pretrained_dict)
+
+def load_model_weights(model, pretrained_state):
+    cur_state = model.state_dict()
+    pretrained_dict = {k: v for k, v in pretrained_state.items() if k in cur_state}
+    model.load_state_dict(pretrained_dict)
+
+def load_model(model, optimizer, modelDir, model_smpl_intvl, cuda, verbose):
+    try:
+        nmodels = len(os.listdir(modelDir))
+        if nmodels < 1: raise ValueError("No saved models found")
+
+        modelnm = os.path.join(modelDir, str(nmodels-1)+'.pth')
+        if verbose:
+            print(f'= Saved model found, loading {modelnm}')
+        checkpoint = torch.load(modelnm)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.train()
+
+        if cuda:
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            for state in optimizer.state.values():
+                for k, v in state.items():
+                    if torch.is_tensor(v):
+                        state[k] = v.cuda()
+        else:
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        epoch_trained = checkpoint['epoch_trained']
+        model_file_id = (epoch_trained+1)//model_smpl_intvl+1
+        if verbose: print("= resume training")
+        return model_file_id, epoch_trained, model, optimizer
+    except Exception as e:
+        if verbose:
+            print('!=', e)
+            print("= start training from begining")
+        return 0, -1, model, optimizer
+
+def load_layer_weights(checkpoint, layer_name):
+    for n, p in checkpoint.items():
+        if layer_name in n:
+            return p
+    assert(False)

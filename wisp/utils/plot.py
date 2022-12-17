@@ -60,50 +60,59 @@ def plot_latent_embedding(model_id, smpl_latent_dir, out_dir,
 
 def plot_embd_map(embd_ids, embd_map_fn):
     num_ids = len(set(list(embd_ids.flatten())))
-    #print(num_ids)
     embd_ids = np.clip(embd_ids, 0, 255)
     plt.imshow(embd_ids, cmap='gray',origin='lower')
     plt.savefig(embd_map_fn)
     plt.close()
 
-def zscale_plot(ax, data, vmin, vmax):
+def plot_zscale(ax, data, vmin, vmax):
     ax.axis('off')
     ax.imshow(data, cmap='gray', interpolation='none', vmin=vmin,
               vmax=vmax, alpha=1.0, aspect='equal',origin='lower')
 
-def plot_one(fig, r, c, lo, img, vmins, vmaxs, vmnmx_return, nchls):
-
-    if vmnmx_return:
+def plot_one_row(fig, r, c, lo, img, vmins, vmaxs, num_bands, cal_z_range=False):
+    if cal_z_range:
         vmins, vmaxs = [], []
-        for i in range(nchls):
+        for i in range(num_bands):
             vmin, vmax = ZScaleInterval(contrast=.25).get_limits(img[i])
             vmins.append(vmin);vmaxs.append(vmax)
 
-    for i in range(nchls):
+    for i in range(num_bands):
         ax = fig.add_subplot(r, c, lo+i+1)
-        zscale_plot(ax, img[i], vmins[i], vmaxs[i])
+        plot_zscale(ax, img[i], vmins[i], vmaxs[i])
 
-    if vmnmx_return:
+    if cal_z_range:
         return vmins,vmaxs
 
-def plot_gt_recon(gt, recon, fn, self_zscale=False):
+def plot_gt_recon(gt, recon, fn, cal_z_range=False):
     n = 1
     nchls = gt.shape[0]
     fig = plt.figure(figsize=(20,2*n+2))
     r, c = n+1, nchls
-    vmins, vmaxs = plot_one(fig, r, c, 0, gt, [], [], True, nchls)
-    plot_one(fig, r, c, nchls, recon, vmins, vmaxs, self_zscale, nchls)
+    vmins, vmaxs = plot_one_row(fig, r, c, 0, gt, [], [], True, nchls)
+    plot_one(fig, r, c, nchls, recon, vmins, vmaxs, nchls, cal_z_range=cal_z_range)
     fig.tight_layout()
     plt.savefig(fn)
     plt.close()
 
-def plot_gt(gt, fn):
-    nchls = gt.shape[0]
-    fig = plt.figure(figsize=(3*nchls + 1,3))
-    r, c = 1, nchls
-    vmins, vmaxs = plot_one(fig, r, c, 0, gt, [], [], True, nchls)
+def plot_horizontally(img, png_fname, zscale_ranges=None):
+    """ Plot multiband image horizontally
+        @Param
+          img: multiband image [nbands,sz,sz]
+          zscale_ranges: min and max value for zscaling [2,nbands]
+    """
+    if zscale_ranges is None:
+        vmins, vmaxs = [], []
+        cal_z_range = True
+    else:
+        (vmins, vmaxs) = zscale_ranges
+        cal_z_range = False
+
+    num_bands = img.shape[0]
+    fig = plt.figure(figsize=(3*num_bands + 1,3))
+    plot_one_row(fig, 1, num_bands, 0, img, vmins, vmaxs, num_bands, cal_z_range=cal_z_range)
     fig.tight_layout()
-    plt.savefig(fn)
+    plt.savefig(png_fname)
     plt.close()
 
 def sdss_rgb(imgs, bands, scales=None, m = 0.02):
@@ -339,7 +348,6 @@ def plot_grad_flow(named_parameters, gradFileName=None):
     layers, ave_grads = [], []
     for n, p in named_parameters:
         if(p.requires_grad) and ("bias" not in n):
-            #print(n)
             #if 'decoder' in n: continue
             layers.append(n[:20])
             #if 'codebook' in n:

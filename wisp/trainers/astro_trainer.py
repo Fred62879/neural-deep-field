@@ -20,8 +20,9 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
     RandomSampler, DataLoader
 
 from wisp.datasets import default_collate
-from wisp.utils.plot import plot_gt_recon
-from wisp.utils.common import get_gpu_info
+from wisp.utils.data import recon_img_and_evaluate
+from wisp.utils.common import get_gpu_info, forward
+from wisp.utils.plot import plot_gt_recon, plot_horizontally
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 
@@ -57,7 +58,7 @@ class AstroTrainer(BaseTrainer):
                  exp_name=None, info=None, scene_state=None, extra_args=None,
                  render_tb_every=-1, save_every=-1, using_wandb=False):
 
-        self.shuffle_dataloader = True
+        self.shuffle_dataloader = True # pre-epoch requires this
 
         super().__init__(pipeline, dataset, num_epochs, batch_size, optim_cls,
                          lr, weight_decay, grid_lr_weight, optim_params, log_dir,
@@ -68,40 +69,85 @@ class AstroTrainer(BaseTrainer):
         dst = join(self.log_dir, "config.yaml")
         shutil.copyfile(extra_args["config"], dst)
 
-        self.verbose = self.extra_args["verbose"]
-
-        self.space_dim = self.extra_args["space_dim"]
-        self.quantize_latent = self.extra_args['quantize_latent']
-        self.spectra_supervision = self.extra_args['spectra_supervision']
-        self.spectral_inpaint = self.extra_args['inpaint_cho'] == 'spectral_inpaint'
-
-        self.save_latent_during_train = self.space_dim == 3 and \
-            (self.extra_args["use_ngp"] or self.extra_args["encode"]) and \
-            self.extra_args["save_latent_during_train"]
-
-        self.plot_embd_map = self.space_dim == 3 and \
-           (self.extra_args["use_ngp"] or self.extra_args["encode"]) and \
-           self.extra_args["quantize_latent"] and \
-           self.extra_args["plot_embd_map_during_train"]
-
-        self.init_loss()
+        self.set_training_mechanism()
+        self.configure_dataset()
         self.set_log_path()
+        self.init_loss()
+        if self.extra_args["resume_train"]:
+            self.resume_train()
 
-        # calculations
         self.num_batches = int(np.ceil(len(self.dataset) / batch_size))
-        log.info(f"{self.num_batches} batches per epoch")
-        self.recon_cutout_pixel_ids = self.dataset.get_recon_cutout_pixel_ids()
-        self.recon_cutout_gt = self.dataset.get_recon_cutout_gt(self.recon_cutout_pixel_ids)
+        if self.verbose:
+            log.info(f"{self.num_batches} batches per epoch")
+
+    #############
+    # Initializations
+    #############
+
+    def set_training_mechanism(self):
+        """ Set training mechanism. """
+        self.verbose = self.extra_args["verbose"]
+        self.space_dim = self.extra_args["space_dim"]
+        self.cuda = "cuda" in str(self.device)
+        self.weight_train = self.extra_args["weight_train"]
+        self.spectra_supervision = self.space_dim == 3 \
+            and self.extra_args['spectra_supervision']
+        self.quantize_latent = self.extra_args["quantize_latent"] and \
+            (self.extra_args["use_ngp"] or self.extra_args["encode"])
+
+        tasks = set(self.extra_args["tasks"])
+        self.spectral_inpaint = self.space_dim == 3 and 'spectral_inpaint' in tasks
+        self.plot_embd_map = "plot_embd_map_during_train" in tasks and \
+            self.space_dim == 3 and self.quantiza_latent
+        self.save_latent = self.space_dim == 3 and self.quantize_latent and \
+            ("save_latent_during_train" in tasks or "plot_latent_embd" in tasks)
+
+        # save all train image reconstruction in original size
+        self.save_recon = "save_recon_during_train" in tasks
+
+        if self.save_recon:
+            # save selected-cropped train image reconstruction
+            self.recon_cutout_fits_ids = self.extra_args["recon_cutout_fits_ids"]
+            self.recon_cutout_sizes = self.extra_args["recon_cutout_sizes"]
+            self.recon_cutout_start_pos = self.extra_args["recon_cutout_start_pos"]
+            self.save_cropped_recon = self.recon_cutout_fits_ids is not None and \
+                self.recon_cutout_sizes is not None and self.recon_cutout_start_pos is not None
+        else: self.save_cropped_recon = False
+
+    def configure_dataset(self):
+        """ Configure dataset with selected fields and set length accordingly. """
+        length = self.dataset.get_num_coords()
+        self.dataset.set_dataset_length(length)
+
+        fields = ['coords','pixels']
+        if self.weight_train: fields.append('weights')
+        if self.space_dim == 3: fields.extend(['wave','trans'])
+        if self.spectral_inpaint: pass
+        if self.spectra_supervision: pass
+        self.dataset.set_dataset_fields(fields)
+
+    def set_log_path(self):
+        Path(self.log_dir).mkdir(parents=True, exist_ok=True)
+        if self.verbose: log.info(f'logging to {self.log_dir}')
+
+        for cur_path, cur_pname, in zip(['recon_dir','model_dir'], ['train_recons','models']):
+            path = join(self.log_dir, cur_pname)
+            setattr(self, cur_path, path)
+            Path(path).mkdir(parents=True, exist_ok=True)
+
+        self.grad_fn = join(self.log_dir, 'gradient.png')
+        self.train_loss_fn = join(self.log_dir, 'loss.npy')
+        self.embd_map_fn = join(self.log_dir, 'embd_map.png')
+        #self.model_fns = [join(config['model_dir'], str(i) + '.pth')
+        #                       for i in range(config['num_model_smpls'])]
 
     def init_loss(self):
         cho = self.extra_args['loss_cho']
-
         if cho == 'l1':
-            loss = nn.L1Loss() if not self.extra_args['cuda'] else nn.L1Loss().cuda()
+            loss = nn.L1Loss() if not self.cuda else nn.L1Loss().cuda()
         elif cho == 'l2':
-            loss = nn.MSELoss() if not self.extra_args['cuda'] else nn.MSELoss().cuda()
-        else:
-            raise Exception('Unsupported loss choice')
+            loss = nn.MSELoss() if not self.cuda else nn.MSELoss().cuda()
+        else: raise Exception('Unsupported loss choice')
 
         if self.spectra_supervision:
             self.spectra_loss = partial(spectra_supervision_loss, loss)
@@ -112,31 +158,37 @@ class AstroTrainer(BaseTrainer):
                            self.extra_args['relative_inpaint_bands'])
         self.loss = loss
 
-    def set_log_path(self):
-        Path(self.log_dir).mkdir(parents=True, exist_ok=True)
-        if self.verbose: log.info('logging to', self.log_dir)
+    def resume_train(self):
+        try:
+            model_fname = join(model_dir, self.extra_args["pretrained_mdoel_name"] +'.pth')
+            assert(exists(model_fname))
 
-        for cur_path, cur_pname, in zip(
-                ['model_dir','recon_dir','metric_dir', 'spectrum_dir',
-                 'cdbk_spectrum_dir', 'cutout_dir','embd_map_dir','latent_dir',
-                 'latent_embd_dir'],
-                ['models','recons','metrics','spectrum','cdbk_spectrum',
-                 'cutout','embd_map','latent','latent_embd_dir']
-        ):
-            path = join(self.log_dir, cur_pname)
-            setattr(self, cur_path, path)
-            Path(path).mkdir(parents=True, exist_ok=True)
+            if self.verbose:
+                log.info(f'saved model found, loading {modelnm}')
+            checkpoint = torch.load(modelnm)
 
-        self.grad_fn = join(self.log_dir, 'gradient.png')
-        self.train_loss_fn = join(self.log_dir, 'loss.npy')
-        self.embd_map_fn = join(self.recon_dir, 'embd_map')
-        self.cutout_png_fn = join(self.recon_dir, 'cutout')
-        #self.model_fns = [join(config['model_dir'], str(i) + '.pth')
-        #                       for i in range(config['num_model_smpls'])]
+            self.pipeline.load_state_dict(checkpoint['model_state_dict'])
+            self.pipeline.eval()
 
-    ##############
-    # One epoch loop
-    ##############
+            if "cuda" in self.device:
+                self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                for state in self.optimizer.state.values():
+                    for k, v in state.items():
+                        if torch.is_tensor(v):
+                            state[k] = v.cuda()
+            else:
+                self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+            if verbose: log.info("resume training")
+
+        except Exception as e:
+            if verbose:
+                log.info(e)
+                log.info("start training from begining")
+
+    #############
+    # Train loops
+    #############
 
     def train(self):
         super().train()
@@ -168,12 +220,12 @@ class AstroTrainer(BaseTrainer):
             self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
 
     def next_batch(self):
-        """ Actually iterate the data loader """
+        """ Actually iterate the data loader. """
         return next(self.train_data_loader_iter)
 
-    ##########
+    #############
     # begin epoch
-    ##########
+    #############
 
     def begin_epoch(self):
         self.reset_data_iterator()
@@ -217,9 +269,9 @@ class AstroTrainer(BaseTrainer):
         self.log_dict["codebook_loss"] = 0.0
 
     def init_dataloader(self):
-        #if self.shuffle_dataloader: sampler_cls = RandomSampler
-        #else: sampler_cls = SequentialSampler
-        sampler_cls = SequentialSampler
+        if self.shuffle_dataloader: sampler_cls = RandomSampler
+        else: sampler_cls = SequentialSampler
+        #sampler_cls = SequentialSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
@@ -231,9 +283,9 @@ class AstroTrainer(BaseTrainer):
             num_workers=0
         )
 
-    ###########
+    #############
     # end epoch
-    ###########
+    #############
 
     def end_epoch(self):
         self.post_epoch()
@@ -281,53 +333,29 @@ class AstroTrainer(BaseTrainer):
 
         self.timer.check("post_epoch done")
 
-    ###############
+    #############
     # Core training step
-    ###############
+    #############
 
-    def forward(self, data):
-        dim = self.space_dim
+    def pre_step(self):
+        # sample lambda (and transmission) before each iteration
+        if self.space_dim == 3:
+            self.dataset.sample_wave()
 
-        if dim == 2:
-            requested_channels = {"density"}
-            #print("forward", data["coords"].shape)
-            net_args = {"coords": data["coords"].to(self.device), "covar": None}
-
-        elif dim == 3:
-            requested_channels = ["density"]
-            if self.quantize_latent:
-                requested_channels.append("cdbk_loss")
-                if self.plot_embd_map:
-                    requested_channels.append("embd_ids")
-                    requested_channels.append("latents")
-
-            if self.spectra_supervision:
-                requested_channels.append("recon_spectra")
-            requested_channels = set(requested_channels)
-
-            mc_cho = self.extra_args["mc_cho"]
-
-            if mc_cho == "mc_hardcode":
-                net_args = {"coords": self.cur_coords, "covar": self.covar, "trans": self.smpl_trans}
-            elif mc_cho == "mc_bandwise":
-                net_args = [self.cur_coords, self.covar, self.smpl_wave, self.smpl_trans]
-            elif mc_cho == "mc_mixture":
-                net_args = [self.cur_coords, self.covar, self.smpl_wave,
-                            self.smpl_trans, self.nsmpl_within_each_band_mixture]
-            else:
-                raise Exception("Unsupported monte carlo choice")
-        else:
-            raise Exception("Unsupported space dim")
-
-        return self.pipeline(channels=requested_channels, **net_args)
+        if self.epoch == 0 and self.extra_args["log_gpu_every"] > -1 \
+           and self.epoch % self.extra_args["log_gpu_every"] == 0:
+            gpu_info = get_gpu_info()
+            free = gpu_info.free / 1e9
+            used = gpu_info.used / 1e9
+            log.info(f"Free/Used GPU memory: ~{free}GB / ~{used}GB")
 
     def calculate_loss(self, data):
         total_loss = 0
 
-        ret = self.forward(data)
+        ret = forward(self, self.pipeline, data, self.quantize_latent,
+                      self.plot_embd_map, self.spectra_supervision)
         recon_pixels = ret["density"]
         gt_pixels = data["pixels"][0].to(self.device)
-        #print(recon_pixels.shape, gt_pixels.shape)
 
         if self.extra_args["weight_train"]:
             weights = data["weights"].to(self.device)
@@ -359,7 +387,6 @@ class AstroTrainer(BaseTrainer):
         else: cdbk_loss = 0
 
         total_loss = recon_loss + spectra_loss + cdbk_loss
-        #print(recon_loss, spectra_loss, cdbk_loss, total_loss, total_loss.dtype)
         self.log_dict["total_loss"] += total_loss.item()
 
         if self.quantize_latent:
@@ -394,36 +421,21 @@ class AstroTrainer(BaseTrainer):
 
         #plot_grad_flow(self.model.named_parameters(), self.args.grad_fn)
         if self.save_data_to_local:
-            # return {"recon_pixels": recon_pixels,
-            #         "recon_spectra": recon_spectra,
-            #         "embd_ids": embd_ids,
-            #         "latents": latents }
             self.latents = latents
             self.embd_ids = embd_ids
             self.recon_pixels = recon_pixels
 
-    def pre_step(self):
-        """ Sample lambda (and corrpesponding transmission) before each iteration. """
-        if self.space_dim == 3:
-            self.dataset.sample_wave()
-
-        if self.epoch == 0 and self.extra_args["log_gpu_every"] > -1 and self.epoch % self.extra_args["log_gpu_every"] == 0:
-            gpu_info = get_gpu_info()
-            free = gpu_info.free / 1e9
-            used = gpu_info.used / 1e9
-            log.info(f"Free/Used GPU memory: ~{free}GB / ~{used}GB")
-
     def post_step(self):
-        if self.save_latent_during_train:
+        if self.save_latent:
             self.latents.extend(self.latents.detach().cpu().numpy())
 
         if self.plot_embd_map:
             self.embd_ids.extend(self.embd_ids.detach().cpu().numpy())
 
-        if self.extra_args["save_cutout_during_train"]:
-            self.smpl_pixels.extend(self.recon_pixels.detach().cpu().numpy())
+        if self.save_recon or self.save_cropped_recon:
+            self.smpl_pixels.extend(self.recon_pixels) #.detach().cpu().numpy())
 
-    ############
+    #############
     # Helper methods
     #############
 
@@ -477,7 +489,7 @@ class AstroTrainer(BaseTrainer):
         # after data saving is done, init pixel ids again to only use fraction of pixels
         #num_batches = module.init_pixel_ids()
         #if save_model: model_id += 1
-        if self.save_latent_during_train:
+        if self.save_latent:
             fname = join(self.latent_dir, str(self.epoch))
             np.save(fname, np.array(self.latents))
 
@@ -485,13 +497,31 @@ class AstroTrainer(BaseTrainer):
             fname = join(self.embd_map_dir, str(self.epoch))
             np.save(fname, np.array(self.embd_ids))
 
-        if self.extra_args["save_cutout_during_train"]:
-            smpl_cutout = np.array(self.smpl_pixels)[self.recon_cutout_pixel_ids].T # [nbands,npixels]
-            sz = self.extra_args['recon_cutout_sz']
-            smpl_cutout = smpl_cutout.reshape((-1, sz, sz ))
-            fname = join(self.cutout_dir, str(self.epoch))
-            np.save(fname + '.npy', smpl_cutout)
-            plot_gt_recon(self.recon_cutout_gt, smpl_cutout, fname + '.png')
+        if self.save_recon or self.save_cropped_recon:
+            kwargs = {
+                "fname": str(self.epoch),
+                "dir": self.recon_dir,
+                "verbose": self.verbose,
+                "to_HDU": False,
+                "recon_HSI": False,
+                "recon_norm": False,
+                "recon_flat_trans": False,
+                "calculate_metrics": False
+            }
+            _, _ = recon_img_and_evaluate(self.smpl_pixels, self.dataset, **kwargs)
+
+            if self.save_cropped_recon:
+                for i, fits_id in enumerate(self.extra_args["recon_cutout_fits_ids"]):
+                    zscale_ranges = self.dataset.get_zscale_ranges(fits_id)
+
+                    np_fname = join(self.recon_dir, f"{fits_id}_{self.epoch}.npy")
+                    recon = np.load(np_fname) # [nbands,sz,sz]
+
+                    for (size, (r,c)) in zip(self.extra_args["recon_cutout_sizes"][i],
+                                             self.extra_args["recon_cutout_start_pos"][i]):
+                        fname = join(self.recon_dir, f"{fits_id}_{r}_{c}_{size}")
+                        np.save(fname, recon[:,r:r+size,c:c+size])
+                        plot_horizontally(recon[:,r:r+size,c:c+size], fname, zscale_ranges=zscale_ranges)
 
     def save_model(self):
         if self.extra_args["save_as_new"]:
@@ -510,84 +540,6 @@ class AstroTrainer(BaseTrainer):
         torch.save(checkpoint, model_fname)
         return checkpoint
 
-    ############
-    # Inference
-    ############
 
     def validate(self):
-
-        model_fname = os.path.abspath(os.path.join(self.model_dir, f"model-ep{}-it{}.pth"))
-        checkpoint = torch.load(model_fname)["mdoel_state_dict"]
-        load_model_weights(self.pipeline)
-        self.pipeline.eval()
-
-        record_dict = self.extra_args
-        dataset_name = os.path.splitext(os.path.basename(self.extra_args["dataset_path"]))[0]
-
-        record_dict.update({"dataset_name" : dataset_name, "epoch": self.epoch,
-                            "log_fname" : self.log_fname, "model_fname": model_fname})
-        parent_log_dir = os.path.dirname(self.log_dir)
-
-        if self.verbose: log.info("Beginning validation...")
-
-        data = self.dataset.get_images(split=self.extra_args["valid_split"], mip=self.extra_args["mip"])
-        imgs = list(data["imgs"])
-
-        img_shape = imgs[0].shape
-        if self.verbose: log.info(f"Loaded validation dataset with {len(imgs)} images at resolution {img_shape[0]}x{img_shape[1]}")
-
-        self.valid_log_dir = os.path.join(self.log_dir, "val")
-        if self.verbose: log.info(f"Saving validation result to {self.valid_log_dir}")
-        if not os.path.exists(self.valid_log_dir):
-            os.makedirs(self.valid_log_dir)
-
-        lods = list(range(self.pipeline.nef.num_lods))
-        evaluation_results = self.evaluate_metrics(data["rays"], imgs, lods[-1], f"lod{lods[-1]}")
-        record_dict.update(evaluation_results)
-        if self.using_wandb:
-            log_metric_to_wandb("Validation/psnr", evaluation_results["psnr"], self.epoch)
-            log_metric_to_wandb("Validation/lpips", evaluation_results["lpips"], self.epoch)
-            log_metric_to_wandb("Validation/ssim", evaluation_results["ssim"], self.epoch)
-
-        df = pd.DataFrame.from_records([record_dict])
-        df["lod"] = lods[-1]
-        fname = os.path.join(parent_log_dir, f"logs.parquet")
-        if os.path.exists(fname):
-            df_ = pd.read_parquet(fname)
-            df = pd.concat([df_, df])
-        df.to_parquet(fname, index=False)
-
-
-    def recon_multi_band(self, model_id, nmodels, checkpoint, recon_synthetic=False):
-        utils.load_net_weights(self.net_mb, checkpoint['model_state_dict'])
-        self.net_mb.train()
-
-        recon_fn = os.path.join(self.recon_dir, str(model_id))
-        if self.recon_norm: recon_fn += '_rnorm'
-        if recon_synthetic: recon_fn += '_flat'
-
-        if self.plot_embd_map_during_recon and self.encoder_quantize:
-            embd_map_fn = self.embd_map_fn
-        else: embd_map_fn = None
-
-        cur_to_hdu = self.to_hdu and model_id == nmodels-1
-        recon, cur_metrics, cur_metrics_zscale = utils.reconstruct_multi_band_img \
-            (recon_synthetic, self.coords, self.covars, self.gt_img,
-             self.net_mb, self.trans_args, self.args,
-             mask=self.masks, fn=recon_fn, to_hdu=cur_to_hdu,
-             header=self.cutout_header, denorm_args=self.denorm_args,
-             embd_map_fn=embd_map_fn)
-
-        img_fn = join(self.recon_dir, str(model_id))
-        plot_gt_recon(self.gt_img, recon, img_fn)
-        resid = self.gt_img - recon
-        heat_all(resid, fn=join(self.recon_dir, 'resid.png'))
-
-        if cur_metrics is not None:
-            cur_metrics = np.expand_dims(cur_metrics, axis=1)
-            self.metrics = np.concatenate((self.metrics, cur_metrics), axis=1)
-
-        if cur_metrics_zscale is not None:
-            cur_metrics_zscale = np.expand_dims(cur_metrics_zscale, axis=1)
-            self.metrics_zscale = np.concatenate(
-                (self.metrics_zscale, cur_metrics_zscale), axis=1)
+        pass

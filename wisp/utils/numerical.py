@@ -41,6 +41,30 @@ def normalize_coords(coords):
     coords[...,1] = (coords[...,1] - min_y) / (max_y - min_y)
     return np.float32(coords), np.float32(coords_range)
 
+def calculate_zscale_ranges(pixels):
+    """ Calculate zscale ranges based on given pixels for each bands separately.
+        @Param
+          pixels: [npixels,nbands]
+        @Return
+          zscale: [2,nbands] (vmin, vmax)
+    """
+    num_bands = pixels.shape[-1]
+    zmins, zmaxs = [], []
+    for i in range(num_bands):
+        zmin, zmax = ZScaleInterval(contrast=.25).get_limits(pixels[...,i])
+        zmins.append(zmin);zmaxs.append(zmax)
+    return np.array([zmins, zmaxs])
+
+def calculate_zscale_ranges_multiple_FITS(pixels):
+    """ Calculate zscale ranges based on given pixels for each bands separately.
+        @Param
+          pixels: [n,npixels,nbands]
+        @Return
+          zscale: [n,2,nbands] (vmin, vmax)
+    """
+    return np.array([calculate_zscale_ranges(pixels[i])
+                     for i in range(len(pixels))])
+
 def normalize(data, normcho, verbose=False, gt=None):
     ''' Normalize input img data
         @Param
@@ -135,7 +159,6 @@ def calculate_metrics(recon, gt, options, zscale=False):
 
     if zscale:
         recon = zscale_img(recon, gt)
-        #print( [[np.min(b), np.max(b)] for b in recon])
 
     for i, option in enumerate(options):
         for band in range(num_bands):

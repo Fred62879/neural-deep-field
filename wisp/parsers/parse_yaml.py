@@ -88,7 +88,8 @@ def parse_yaml_config(config_path, parser):
 def define_cmd_line_args():
     """ Define all command line arguments
     """
-    parser = argparse.ArgumentParser(description='ArgumentParser for kaolin-wisp.')
+    parser = argparse.ArgumentParser(
+        description='ArgumentParser for implicit universe based on kaolin-wisp.')
 
     ###################
     # Global arguments
@@ -98,11 +99,16 @@ def define_cmd_line_args():
     global_group.add_argument('--config', type=str, help='Path to config file to replace defaults.')
 
     global_group.add_argument('--verbose', action='store_true')
-    global_group.add_argument('--operations', nargs='+',type=int)
     global_group.add_argument('--exp-name', type=str, help='Experiment name.')
+    global_group.add_argument('--operations', nargs='+', type=str, choices=['train','infer'])
     global_group.add_argument('--detect-anomaly', action='store_true', help='Turn on anomaly detection.')
     global_group.add_argument('--perf', action='store_true', help='Use high-level profiling for the trainer.')
 
+    global_group.add_argument('--tasks', nargs='+', type=str,
+                              choices=['train','spectral_inpaint','spatial_inpaint','plot_embd_map_during_train',
+                                       'save_latent_during_train','save_recon_during_train','infer_during_train',
+                                       'infer','recon_img','recon_flat','recon_spectra','plot_centerize_spectrum'
+                                       'recon_cdbk_spectra','plot_embd_map','plot_latent_embd'])
     ###################
     # Grid arguments
     ###################
@@ -202,7 +208,7 @@ def define_cmd_line_args():
     data_group.add_argument('--use_full_fits', action='store_true')
     data_group.add_argument('--load_fits_data_cache', action='store_true')
 
-    data_group.add_argument('--fits_cutout_sz',type=int, default=64,
+    data_group.add_argument('--fits_cutout_size',type=int, default=64,
                             help='size of cutout from fits (if not using full fits)')
     data_group.add_argument('--start_r', type=int, default=0,
                             help='starting row number of cutout from fits')
@@ -217,7 +223,7 @@ def define_cmd_line_args():
                             choices=['identity','arcsinh','linear','clip','zscale'])
     data_group.add_argument('--infer_pixels_norm', type=str,
                             choices=['identity','arcsinh'])
-    data_group.add_argument('--to_hdu', action='store_true', default=False)
+
     data_group.add_argument('--load_cache', action='store_true', default=False)
     data_group.add_argument('--gt_spectra_cho', type=int, default=0)
     data_group.add_argument('--trans_cho', type=str, default='orig_trans')
@@ -292,7 +298,6 @@ def define_cmd_line_args():
 
     train_group.add_argument('--num-epochs', type=int, default=250,
                              help='Number of epochs to run the training.')
-    train_group.add_argument('--train_bsz_hi', type=int, default=4*4096)
     train_group.add_argument('--batch-size', type=int, default=512,
                              help='Batch size for the training.')
     train_group.add_argument('--resample', action='store_true',
@@ -318,31 +323,21 @@ def define_cmd_line_args():
                              help='Save data to local every N epoch.')
 
     train_group.add_argument('--loss_cho',type=str, choices=['l1','l2'])
-    train_group.add_argument('--eps_rnerf',type=float, default=1, help='epsilon for raw nerf')
-    train_group.add_argument('--num_model_checkpoint', type=int, default=5)
-    train_group.add_argument('--cuda', action='store_true', default=False)
-    train_group.add_argument('--train_pixl_ratio_per_epoch', type=float, default=1,
-                             help='ratio of (unmasked) pixels used for training per epoch')
-    train_group.add_argument('--masked_pixl_ratio_per_epoch', type=float, default=1,
-                             help='ratio of masked pixels used for spectral inpaint training per epoch')
+    # train_group.add_argument('--eps_rnerf',type=float, default=1, help='epsilon for raw nerf')
+    # train_group.add_argument('--num_model_checkpoint', type=int, default=5)
+    # train_group.add_argument('--cuda', action='store_true', default=False)
+    # train_group.add_argument('--train_pixl_ratio_per_epoch', type=float, default=1,
+    #                          help='ratio of (unmasked) pixels used for training per epoch')
+    # train_group.add_argument('--masked_pixl_ratio_per_epoch', type=float, default=1,
+    #                          help='ratio of masked pixels used for spectral inpaint training per epoch')
     train_group.add_argument('--resume_train', action='store_true', default=False)
     train_group.add_argument('--weight_train', action='store_true', default=False)
-    train_group.add_argument('--eps',type=float, default=1e-6, help='epsilon to process weight')
+    # train_group.add_argument('--eps',type=float, default=1e-6, help='epsilon to process weight')
     train_group.add_argument('--train_use_all_wave', action='store_true', default=False)
-    train_group.add_argument('--cutout_based_train', action='store_true', default=False)
+    # train_group.add_argument('--cutout_based_train', action='store_true', default=False)
     train_group.add_argument('--spectra_supervision', action='store_true', default=False)
     train_group.add_argument('--spectra_supervision_cho', type=int, default=0)
-    train_group.add_argument('--save_latent_during_train', action='store_true', default=False)
-    train_group.add_argument('--save_cutout_during_train', action='store_true', default=False)
-    train_group.add_argument('--plot_embd_map_during_train', action='store_true', default=False)
-    train_group.add_argument('--infer_during_train', action='store_true', default=False)
-
-    train_group.add_argument('--recon_cutout_tile_id',type=str, default='981215',
-                             help='id of tile to generate reconstructed cutout')
-    train_group.add_argument('--recon_cutout_sz',type=int, default=64,
-                             help='size of cutout to save during train (if save_cutout_during_train is True)')
-    train_group.add_argument('--recon_cutout_start_pos', nargs='+', type=int,
-                             help='start (r/c) position of cutout')
+    # train_group.add_argument('--permute_pixls_train', action='store_true', default=False)
 
     # TODO (ttakikawa): Only used for SDFs, but also should support RGB etc
     train_group.add_argument('--log-2d', action='store_true',
@@ -399,20 +394,29 @@ def define_cmd_line_args():
     ##################
     infer_group = parser.add_argument_group('inference')
 
-    infer_group.add_argument('--recon_img_sz', type=int)
-    infer_group.add_argument('--recon_bsz_hi', type=int, default=100)
+    infer_group.add_argument('--inferrer-type', type=str, help='Inferrer class to use',
+                             choices=['AstroInferrer'])
+
+    infer_group.add_argument('--infer-log_fname', type=str)
+    infer_group.add_argument('--infer-batch-size', type=int, default=4096)
+    infer_group.add_argument('--infer_use_all_wave', action='store_true', default=False,
+                             help='should set this to true, implementation assumes infer with all lambda')
+
+    infer_group.add_argument('--to_HDU', action='store_true', default=False,
+                             help='generate HDU files for reconstructed image')
     infer_group.add_argument('--recon_norm', action='store_true', default=False)
     infer_group.add_argument('--recon_restore', action='store_true', default=False)
-    infer_group.add_argument('--plot_spectrum', action='store_true', default=False)
-    infer_group.add_argument('--plot_histogram', action='store_true', default=False)
-    infer_group.add_argument('--plot_eltws_prod', action='store_true', default=False)
-    infer_group.add_argument('--recon_synthetic', action='store_true', default=False)
-    infer_group.add_argument('--recon_multiband', action='store_true', default=False)
-    infer_group.add_argument('--infer_use_all_wave', action='store_true', default=False)
-    infer_group.add_argument('--plot_cdbk_spectrum', action='store_true', default=False)
-    infer_group.add_argument('--permute_pixls_train', action='store_true', default=False)
-    infer_group.add_argument('--plot_centerize_spectrum', action='store_true', default=False)
-    infer_group.add_argument('--plot_embd_map_during_recon', action='store_true', default=False)
+    infer_group.add_argument('--metric_options', nargs='+', choices=['mse','psnr','ssim'])
+
+    # these three args, if specified, directs reconstructing smaller cutouts than train image
+    # Note, if recon_img is included as inferrence tasks, we always reconstruct the full train image
+    # regardless of whether these three are given or not
+    infer_group.add_argument('--recon_cutout_fits_ids', nargs='+', type=str,
+                             help='id of tiles to generate reconstructed cutout')
+    infer_group.add_argument('--recon_cutout_sizes', nargs='+', type=list,
+                             help='list of sizes of each cutout for each tile')
+    infer_group.add_argument('--recon_cutout_start_pos', nargs='+', type=list,
+                             help='list of start (r/c) positions of each cutout for each tile')
 
     ###################
     # Arguments for renderer
