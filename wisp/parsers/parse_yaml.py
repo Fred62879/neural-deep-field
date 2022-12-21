@@ -200,20 +200,17 @@ def define_cmd_line_args():
     data_group.add_argument('--fits-subtile-ids', nargs='+', help='subid of chose FITS files')
     data_group.add_argument('--fits-footprints', nargs='+', help='footprints of chose FITS files')
 
+    data_group.add_argument('--use_full_fits', action='store_true')
+    data_group.add_argument('--load_fits_data_cache', action='store_true')
+    data_group.add_argument('--fits_cutout_sizes',nargs='+', type=int,
+                            help='size of cutout from fits (if not using full fits)')
+    data_group.add_argument('--fits_cutout_start_pos', nargs='+', type=list,
+                            help='starting row number of cutout from fits')
+
     data_group.add_argument('--filters', nargs='+', type=str)
     data_group.add_argument('--filter_ids', nargs='+', type=int)
     data_group.add_argument('--sensors_full_name', nargs='+')
     data_group.add_argument('--sensor_collection_name', type=str)
-
-    data_group.add_argument('--use_full_fits', action='store_true')
-    data_group.add_argument('--load_fits_data_cache', action='store_true')
-
-    data_group.add_argument('--fits_cutout_size',type=int, default=64,
-                            help='size of cutout from fits (if not using full fits)')
-    data_group.add_argument('--start_r', type=int, default=0,
-                            help='starting row number of cutout from fits')
-    data_group.add_argument('--start_c', type=int, default=0,
-                            help='starting column number of cutout from fits')
 
     data_group.add_argument('--u-band-scale',type=float, default=10**((30-27)/2.5),
                             help='scale value for u band pixel values')

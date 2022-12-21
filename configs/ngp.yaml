@@ -2,8 +2,8 @@
 global:
     verbose: True
     exp_name: 'test-ngp-nerf'
-    #tasks: ['train','save_recon_during_train','infer','recon_img']
-    tasks: ['infer','recon_img']
+    tasks: ['train','save_recon_during_train','infer','recon_img']
+    #tasks: ['infer','recon_img']
 
 optimizer:
     optimizer_type: 'rmsprop'
@@ -27,23 +27,12 @@ dataset:
     trans_cho: 'orig_trans'
 
     use_full_fits: False
-    fits_cutout_size: 64
+    # always pick exactly one cutout from one tile
     fits_tile_ids: ['1'] #,'1']
-    fits_subtile_ids: ['5'] #,'7']
+    fits_subtile_ids: ['5'] #['5','7']
     fits_footprints: ['9812'] #,'9812']
-
-    #start_r: 2000 # large pixl 5
-    #start_c: 900  # large pixl 5
-    start_r: 86
-    start_c: 188
-    #start_r: 1900 # 192 img sz
-    #start_c: 772
-    #start_r: 1908 # 4 spectra 
-    #start_c: 708
-    #start_r: 750  # large pixel value 8 bands
-    #start_c: 3200
-    #start_r: 80   # large pixel value 5 bands 64
-    #start_c: 190
+    fits_cutout_sizes: [ 64 ]
+    fits_cutout_start_pos: [[86,188]] #,[240,270] ]
 
     # sensor_collection_name: '1_y'
     # filter_ids: [4]
@@ -71,7 +60,7 @@ trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 400
+    num_epochs: 800
     batch_size: 4096000
     valid_every: -1
     save_every: 400
@@ -105,9 +94,10 @@ infer:
     #infer_log_fname: '20221219-175517'
     metric_options: ['mse','ssim','psnr']
 
-    recon_cutout_fits_ids: ['981215']
-    recon_cutout_sizes: [ [64] ]
-    recon_cutout_start_pos: [ [[0,0]] ] #[86,188]
+    #recon_cutout_fits_ids: ['981215','981217']
+    # each fits may have multiple cutouts
+    #recon_cutout_sizes: [ [64], [32] ]
+    #recon_cutout_start_pos: [ [[0,0]], [[0,0]] ] #[86,188]
    
 test:
     is_test: False

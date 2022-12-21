@@ -47,9 +47,9 @@ def query_GPU_mem():
     print("Used memory:", info.used)
     nvidia_smi.nvmlShutdown()
 
-def generate_hdu(header, data, fn):
+def generate_hdu(header, data, fname):
     hdu = fits.PrimaryHDU(data=data, header=header)
-    hdu.writeto(fn, overwrite=True)
+    hdu.writeto(fname, overwrite=True)
 
 def get_num_wave_smpl(infer, args):
     ''' Get # of wave samples to use. '''

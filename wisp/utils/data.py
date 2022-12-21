@@ -9,6 +9,7 @@ from functools import reduce
 from os.path import join, exists
 from astropy.nddata import Cutout2D
 from astropy.coordinates import SkyCoord
+from wisp.utils.common import generate_hdu
 from wisp.utils.plot import plot_horizontally
 from wisp.utils.numerical import normalize_coords, normalize, \
     calculate_metrics, calculate_zscale_ranges_multiple_FITS
@@ -31,10 +32,9 @@ class FITSData:
         #self.cutout_based_train = kwargs["cutout_based_train"]
         self.load_fits_data_cache = kwargs["load_fits_data_cache"]
 
-        self.start_r = kwargs["start_r"]
-        self.start_c = kwargs["start_c"]
         self.use_full_fits = kwargs["use_full_fits"]
-        self.fits_cutout_size = kwargs["fits_cutout_size"]
+        self.fits_cutout_sizes = kwargs["fits_cutout_sizes"]
+        self.fits_cutout_start_pos = kwargs["fits_cutout_start_pos"]
 
         self.headers = {}
         self.num_rows = {}
@@ -51,44 +51,6 @@ class FITSData:
     ################
     # Generate filenames
     ################
-
-    def set_path(self, dataset_path):
-        dataset_path = dataset_path
-        input_path = join(dataset_path, 'input')
-        img_data_path = join(input_path, self.kwargs['sensor_collection_name'], 'img_data')
-
-        self.input_fits_path = join(input_path, 'input_fits')
-
-        # suffix that uniquely identifies the currently selected group of
-        # files with the corresponding cropping parameters, if any
-        suffix = self.kwargs['fits_choice_id']
-        if not self.use_full_fits:
-            suffix = f"{suffix}_{str(self.fits_cutout_size)}_{str(self.start_r)}_{str(self.start_c)}"
-        norm_str = self.kwargs['train_pixels_norm']
-
-        # image data path creation
-        self.coords_fname = join(img_data_path, f'coords_{suffix}.npy')
-        self.weights_fname = join(img_data_path, f'weights_{suffix}.npy')
-        self.coords_range_fname = join(img_data_path, f'coords_range_{suffix}.npy')
-        self.zscale_range_fname = join(img_data_path, f"zscale_range_{suffix}.npy")
-
-        self.pixels_fname = join(img_data_path, f'pixels_{norm_str}_{suffix}.npy')
-        self.gt_imgs_fnames = { fits_id: join(img_data_path, f'gt_imgs_{norm_str}_{suffix}_{fits_id}')
-                                for fits_id in self.fits_ids }
-
-        # mask path creation
-        mask_path = join(input_path, 'mask')
-        if self.kwargs['mask_config'] == 'region':
-            mask_str = '_' + str(self.kwargs['m_start_r']) + '_' \
-                + str(self.kwargs['m_start_c']) + '_' \
-                + str(self.kwargs['mask_size'])
-        else: mask_str = '_' + str(float(100 * self.kwargs['sample_ratio']))
-
-        if self.kwargs['inpaint_cho'] == 'spectral_inpaint':
-            self.mask_fn = join(self.mask_path, str(self.kwargs['fits_cutout_size']) + mask_str + '.npy')
-            self.masked_pixl_id_fn = join(mask_path, str(self.kwargs['fits_cutout_size']) + mask_str + '_masked_id.npy')
-        else:
-            self.mask_fn, self.masked_pixl_id_fn = None, None
 
     def compile_fits_fnames(self):
         """ Get fnames of all given fits input for all bands. """
@@ -117,11 +79,55 @@ class FITSData:
             self.fits_groups[fits_id] = np.concatenate((hsc_fits_fname, nb_fits_fname, megau_fits_fname))
             self.fits_wgroups[fits_id] = np.concatenate((hsc_fits_fname, nb_fits_fname, megau_weights_fname))
 
+    def set_path(self, dataset_path):
+        dataset_path = dataset_path
+        input_path = join(dataset_path, 'input')
+        img_data_path = join(input_path, self.kwargs['sensor_collection_name'], 'img_data')
+
+        self.input_fits_path = join(input_path, 'input_fits')
+
+        # suffix that uniquely identifies the currently selected group of
+        #   tiles with the corresponding cropping parameters, if any
+        suffix, self.gt_img_fnames = "", {}
+        if self.use_full_fits:
+            for fits_id in self.fits_ids:
+                suffix += f"_{fits_id}"
+                self.gt_img_fnames[fits_id] = join(img_data_path, f'gt_img_{fits_id}')
+        else:
+            for (fits_id, size, (r,c)) in zip(
+                    self.fits_ids, self.fits_cutout_sizes, self.fits_cutout_start_pos):
+                suffix += f"_{fits_id}_{size}_{r}_{c}"
+                self.gt_img_fnames[fits_id] = join(
+                    img_data_path, f'gt_img_{fits_id}_{size}_{r}_{c}')
+
+        norm_str = self.kwargs['train_pixels_norm']
+
+        # image data path creation
+        self.coords_fname = join(img_data_path, f'coords{suffix}.npy')
+        self.weights_fname = join(img_data_path, f'weights{suffix}.npy')
+        self.pixels_fname = join(img_data_path, f'pixels_{norm_str}{suffix}.npy')
+        self.coords_range_fname = join(img_data_path, f'coords_range{suffix}.npy')
+        self.zscale_ranges_fname = join(img_data_path, f"zscale_ranges{suffix}.npy")
+
+        # mask path creation
+        mask_path = join(input_path, 'mask')
+        if self.kwargs['mask_config'] == 'region':
+            mask_str = '_' + str(self.kwargs['m_start_r']) + '_' \
+                + str(self.kwargs['m_start_c']) + '_' \
+                + str(self.kwargs['mask_size'])
+        else: mask_str = '_' + str(float(100 * self.kwargs['sample_ratio']))
+
+        if self.kwargs['inpaint_cho'] == 'spectral_inpaint':
+            self.mask_fn = join(self.mask_path, str(self.kwargs['fits_cutout_size']) + mask_str + '.npy')
+            self.masked_pixl_id_fn = join(mask_path, str(self.kwargs['fits_cutout_size']) + mask_str + '_masked_id.npy')
+        else:
+            self.mask_fn, self.masked_pixl_id_fn = None, None
+
     ###############
     # Load FITS data
     ###############
 
-    def load_header(self, fits_id, full_fits):
+    def load_header(self, index, fits_id, full_fits):
         ''' Load header for both full tile and current cutout. '''
         fits_fname = self.fits_groups[fits_id][0]
         id = 0 if 'Mega-u' in fits_fname else 1
@@ -131,26 +137,23 @@ class FITSData:
         if full_fits:
             num_rows, num_cols = header['NAXIS2'], header['NAXIS1']
         else:
-            pos = (self.start_c + self.fits_cutout_size//2,
-                   self.start_r + self.fits_cutout_size//2)
+            size = self.fits_cutout_sizes[index]
+            (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
+            pos = (c + size//2, r + size//2)           # center position (x/y)
             wcs = WCS(header)
             cutout = Cutout2D(hdu.data, position=pos, size=self.fits_cutout_size, wcs=wcs)
             header = cutout.wcs.to_header()
             num_rows, num_cols = self.fits_cutout_size, self.fits_cutout_size
 
-        #self.headers.append(header)
-        #self.num_rows.append(num_rows)
-        #self.num_cols.append(num_cols)
         self.headers[fits_id] = header
         self.num_rows[fits_id] = num_rows
         self.num_cols[fits_id] = num_cols
-        #return header, num_rows, num_cols
 
     def load_headers(self):
-        for fits_id in self.fits_ids:
-            self.load_header(fits_id, True)
+        for index, fits_id in enumerate(self.fits_ids):
+            self.load_header(index, fits_id, True)
 
-    def load_one_fits(self, fits_id, load_pixels=True):
+    def load_one_fits(self, index, fits_id, load_pixels=True):
         ''' Load pixel values or variance from one FITS file (tile_id/subtile_id).
             Load pixel and weights separately to avoid using up mem.
         '''
@@ -169,8 +172,9 @@ class FITSData:
                     pixels /= self.u_bands_scale
 
                 if not self.use_full_fits:
-                    pixels = pixels[self.start_r:self.start_r + self.fits_cutout_size,
-                                    self.start_c:self.start_c + self.fits_cutout_size]
+                    size = self.fits_cutout_sizes[index]
+                    (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
+                    pixels = pixels[r:r+size, c:c+size]
 
                 if not self.kwargs['train_pixels_norm'] == 'linear':
                     pixels = normalize(pixels, self.kwargs["train_pixels_norm"], gt=pixels)
@@ -188,20 +192,25 @@ class FITSData:
                 if self.use_full_fits:
                     cur_data.append(weight.flatten())
                 else:
-                    var = var[self.start_r:self.start_r + self.fits_cutout_size,
-                              self.start_c:self.start_c + self.fits_cutout_size].flatten()
+                    size = self.fits_cutout_sizes[index]
+                    (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
+                    var = var[r:r+size, c:c+size].flatten()
                     cur_data.append(var)
 
         if load_pixels:
             # save gt np img individually for each fits file
             # since different fits may differ in size
             cur_data = np.array(cur_data)    # [nbands,sz,sz]
-            np.save(self.gt_imgs_fnames[fits_id], cur_data)
-            plot_horizontally(cur_data, self.gt_imgs_fnames[fits_id])
+            np.save(self.gt_img_fnames[fits_id], cur_data)
+            plot_horizontally(cur_data, self.gt_img_fnames[fits_id])
+
+            if self.kwargs["to_HDU"]:
+                generate_hdu(self.headers[fits_id], cur_data,
+                             self.gt_img_fnames[fits_id] + ".fits")
 
             # flatten into pixels for ease of training
             cur_data = cur_data.reshape(self.num_bands, -1).T
-            return cur_data                  # [npixels,nbands]
+            return cur_data # [npixels,nbands]
 
         # load weights
         return np.sqrt(np.array(cur_data).T) # [npixels,nbands]
@@ -218,7 +227,7 @@ class FITSData:
         cached = self.load_fits_data_cache and exists(self.pixels_fname) and \
             ([exists(fname) for fname in self.gt_fnames]) and \
             (not self.load_weights or exists(self.weights_fname)) and \
-            exists(self.zscale_range_fname)
+            exists(self.zscale_ranges_fname)
 
         if cached:
             if self.verbose: log.info('FITS data cached.')
@@ -226,18 +235,18 @@ class FITSData:
             if self.verbose: log.info('Loading FITS data.')
             if self.load_weights:
                 if self.verbose: log.info('Loading weights.')
-                weights = np.concatenate([ self.load_one_fits(fits_id, load_pixels=False)
-                                           for fits_id in self.fits_ids ])
+                weights = np.concatenate([ self.load_one_fits(index, fits_id, load_pixels=False)
+                                           for index, fits_id in enumerate(self.fits_ids) ])
                 np.save(self.weights_fname, weights)
             else: weights = None
 
             if self.verbose: log.info('Loading pixels.')
-            pixels = [ self.load_one_fits(fits_id) # nfits*[npixels,nbands]
-                       for fits_id in self.fits_ids ]
+            pixels = [ self.load_one_fits(index, fits_id) # nfits*[npixels,nbands]
+                       for index, fits_id in enumerate(self.fits_ids) ]
 
             # calcualte zscale range for pixel normalization
             zscale_ranges = calculate_zscale_ranges_multiple_FITS(pixels)
-            np.save(self.zscale_range_fname, zscale_ranges)
+            np.save(self.zscale_ranges_fname, zscale_ranges)
 
             pixels = np.concatenate(pixels) # [total_npixels,nbands]
 
@@ -269,7 +278,7 @@ class FITSData:
         if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
         return mgrid
 
-    def get_world_coords_one_fits(self, fits_id):
+    def get_world_coords_one_fits(self, id, fits_id):
         ''' Get ra/dec coords from one fits file and normalize.
             pix2world calculate coords in x-y order
               coords can be indexed using r-c
@@ -287,9 +296,9 @@ class FITSData:
         else:
             coords = np.concatenate(( ras.reshape((num_rows, num_cols, 1)),
                                       decs.reshape((num_rows, num_cols, 1)) ), axis=2)
-            coords = coords[self.start_r:self.start_r + self.fits_cutout_size,
-                            self.start_c:self.start_c + self.fits_cutout_size]
-            coords = coords.reshape(-1,2)
+            size = self.fits_cutout_sizes[id]
+            (r, c) = self.fits_cutout_start_pos[id] # start position (r/c)
+            coords = coords[r:r+size,c:c+size].reshape(-1,2)
         return coords
 
     def get_world_coords_all_fits(self):
@@ -299,8 +308,8 @@ class FITSData:
             #coords = np.load(self.coords_fname)
         else:
             log.info('Generating coords.')
-            coords = np.concatenate([ self.get_world_coords_one_fits(fits_id)
-                                      for fits_id in self.fits_ids ])
+            coords = np.concatenate([ self.get_world_coords_one_fits(id, fits_id)
+                                      for id, fits_id in enumerate(self.fits_ids) ])
             coords, coords_range = normalize_coords(coords)
             np.save(self.coords_fname, coords)
             np.save(self.coords_range_fname, np.array(coords_range))
@@ -499,7 +508,7 @@ class FITSData:
     #########
 
     def get_zscale_ranges(self, fits_id=None):
-        zscale_ranges = np.load(self.zscale_range_fname)
+        zscale_ranges = np.load(self.zscale_ranges_fname)
         if fits_id is not None:
             id = self.fits_ids.index(fits_id)
             zscale_ranges = zscale_ranges[id]
@@ -574,10 +583,10 @@ class FITSData:
     # Utilities
     ############
 
-    def restore_evaluate_one_tile(self, fits_id, num_pixels_acc, pixels, func, kwargs):
+    def restore_evaluate_one_tile(self, index, fits_id, num_pixels_acc, pixels, func, kwargs):
         if self.use_full_fits:
             num_rows, num_cols = self.num_rows[fits_id], self.num_cols[fits_id]
-        else: num_rows, num_cols = self.fits_cutout_size, self.fits_cutout_size
+        else: num_rows, num_cols = self.fits_cutout_sizes[index], self.fits_cutout_sizes[index]
         cur_num_pixels = num_rows * num_cols
 
         cur_tile = np.array(pixels[num_pixels_acc : num_pixels_acc + cur_num_pixels]).T. \
@@ -613,9 +622,9 @@ class FITSData:
         else: metrics, metrics_zscale = None, None
 
         num_pixels_acc = 0
-        for fits_id in self.fits_ids:
+        for index, fits_id in enumerate(self.fits_ids):
             num_pixels_acc, cur_metrics, cur_metrics_zscale = self.restore_evaluate_one_tile(
-                fits_id, num_pixels_acc, pixels, func, kwargs)
+                index, fits_id, num_pixels_acc, pixels, func, kwargs)
 
             if kwargs["calculate_metrics"]:
                 metrics = np.concatenate((metrics, cur_metrics), axis=1)
@@ -691,7 +700,7 @@ def evaluate_func(class_obj, fits_id, recon_tile, **kwargs):
 
     # calculate metrics
     if kwargs["calculate_metrics"]:
-        gt_fname = class_obj.gt_imgs_fnames[fits_id] + '.npy'
+        gt_fname = class_obj.gt_img_fnames[fits_id] + '.npy'
         gt_tile = np.load(gt_fname)
         gt_max = np.round(np.max(gt_tile, axis=(1,2)), 1)
         if verbose: log.info(f"GT. pixel max {gt_max}")
