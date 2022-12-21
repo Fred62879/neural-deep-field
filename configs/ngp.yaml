@@ -75,7 +75,9 @@ trainer:
 
     loss_cho: l1
     weight_train: False
-    resume_train: False
+    resume_train: True
+    #resume_log_dir: '20221220-194546'
+    #pretrained_model_name: 'model-ep800-it2.pth'
     train_use_all_wave: False
     #permute_pixls_train: True
 

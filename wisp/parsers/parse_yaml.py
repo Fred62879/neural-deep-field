@@ -319,22 +319,20 @@ def define_cmd_line_args():
     train_group.add_argument('--save-local-every', type=int, default=100,
                              help='Save data to local every N epoch.')
 
-    train_group.add_argument('--loss_cho',type=str, choices=['l1','l2'])
-    # train_group.add_argument('--eps_rnerf',type=float, default=1, help='epsilon for raw nerf')
+    train_group.add_argument('--loss-cho',type=str, choices=['l1','l2'])
     # train_group.add_argument('--num_model_checkpoint', type=int, default=5)
-    # train_group.add_argument('--cuda', action='store_true', default=False)
     # train_group.add_argument('--train_pixl_ratio_per_epoch', type=float, default=1,
     #                          help='ratio of (unmasked) pixels used for training per epoch')
     # train_group.add_argument('--masked_pixl_ratio_per_epoch', type=float, default=1,
     #                          help='ratio of masked pixels used for spectral inpaint training per epoch')
-    train_group.add_argument('--resume_train', action='store_true', default=False)
-    train_group.add_argument('--weight_train', action='store_true', default=False)
-    # train_group.add_argument('--eps',type=float, default=1e-6, help='epsilon to process weight')
-    train_group.add_argument('--train_use_all_wave', action='store_true', default=False)
+    train_group.add_argument('--resume-train', action='store_true', default=False)
+    train_group.add_argument('--resume-log_dir', type=str)
+    train_group.add_argument('--pretrained_model_name', type=str)
+    train_group.add_argument('--weight-train', action='store_true', default=False)
+    train_group.add_argument('--train-use-all-wave', action='store_true', default=False)
     # train_group.add_argument('--cutout_based_train', action='store_true', default=False)
-    train_group.add_argument('--spectra_supervision', action='store_true', default=False)
-    train_group.add_argument('--spectra_supervision_cho', type=int, default=0)
-    # train_group.add_argument('--permute_pixls_train', action='store_true', default=False)
+    train_group.add_argument('--spectra-supervision', action='store_true', default=False)
+    train_group.add_argument('--spectra-supervision-cho', type=int, default=0)
 
     # TODO (ttakikawa): Only used for SDFs, but also should support RGB etc
     train_group.add_argument('--log-2d', action='store_true',

@@ -141,6 +141,27 @@ class AstroTrainer(BaseTrainer):
         #self.model_fns = [join(config['model_dir'], str(i) + '.pth')
         #                       for i in range(config['num_model_smpls'])]
 
+        if self.extra_args["resume_train"]:
+            if self.extra_args["resume_log_dir"] is not None:
+                pretrained_model_dir = join(self.log_dir, "..", self.extra_args["resume_log_dir"])
+            else:
+                # if log dir not specified, use last directory (exclude newly created one)
+                dnames = os.listdir(join(self.log_dir, ".."))
+                assert(len(dnames) > 1)
+                dnames.sort()
+                pretrained_model_dir = join(self.log_dir, "..", dnames[-2])
+
+            pretrained_model_dir = join(pretrained_model_dir, "models")
+
+            if self.extra_args["pretrained_model_name"] is not None:
+                self.pretrained_model_fname = join(
+                    pretrained_model_dir, self.extra_args["pretrained_model_name"])
+            else:
+                fnames = os.listdir(pretrained_model_dir)
+                assert(len(fnames) > 0)
+                fnames.sort()
+                self.pretrained_model_fname = join(pretrained_model_dir, fnames[-1])
+
     def init_loss(self):
         cho = self.extra_args['loss_cho']
         if cho == 'l1':
@@ -160,17 +181,15 @@ class AstroTrainer(BaseTrainer):
 
     def resume_train(self):
         try:
-            model_fname = join(model_dir, self.extra_args["pretrained_mdoel_name"] +'.pth')
-            assert(exists(model_fname))
-
+            assert(exists(self.pretrained_model_fname))
             if self.verbose:
-                log.info(f'saved model found, loading {modelnm}')
-            checkpoint = torch.load(modelnm)
+                log.info(f'saved model found, loading {self.pretrained_model_fname}')
+            checkpoint = torch.load(self.pretrained_model_fname)
 
             self.pipeline.load_state_dict(checkpoint['model_state_dict'])
             self.pipeline.eval()
 
-            if "cuda" in self.device:
+            if "cuda" in str(self.device):
                 self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
                 for state in self.optimizer.state.values():
                     for k, v in state.items():
@@ -179,10 +198,10 @@ class AstroTrainer(BaseTrainer):
             else:
                 self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-            if verbose: log.info("resume training")
+            if self.verbose: log.info("resume training")
 
         except Exception as e:
-            if verbose:
+            if self.verbose:
                 log.info(e)
                 log.info("start training from begining")
 
