@@ -20,8 +20,8 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
     RandomSampler, DataLoader
 
 from wisp.datasets import default_collate
-from wisp.utils.data import recon_img_and_evaluate
 from wisp.utils.common import get_gpu_info, forward
+from wisp.utils.fits_data import recon_img_and_evaluate
 from wisp.utils.plot import plot_gt_recon, plot_horizontally
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
@@ -359,7 +359,9 @@ class AstroTrainer(BaseTrainer):
     def pre_step(self):
         # sample lambda (and transmission) before each iteration
         if self.space_dim == 3:
-            self.dataset.sample_wave()
+            wave, trans = self.dataset.sample_wave(num_samples)
+            data["wave"] = wave
+            data["trans"] = trans
 
         if self.epoch == 0 and self.extra_args["log_gpu_every"] > -1 \
            and self.epoch % self.extra_args["log_gpu_every"] == 0:

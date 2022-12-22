@@ -3,11 +3,10 @@ import torch
 
 from wisp.models.grids import *
 from wisp.utils import PerfTimer
-from wisp.models.common import Fn
-from wisp.models.pe import Rand_Gaus_Linr
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.decoders import BasicDecoder
-from wisp.models.layers import get_layer_class
+from wisp.models.hypers.pe import Rand_Gaus_Linr
+from wisp.models.layers import get_layer_class, Fn
 from wisp.models.activations import get_activation_class
 from wisp.models.embedders import get_positional_embedder
 

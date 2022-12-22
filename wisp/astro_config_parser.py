@@ -9,7 +9,7 @@ import argparse
 from wisp.datasets import *
 from wisp.models.nefs import *
 from wisp.models.grids import *
-from wisp.models import Pipeline
+from wisp.models import AstroPipeline
 from wisp.datasets.transforms import *
 
 str2optim = {m.lower(): getattr(torch.optim, m) for m in dir(torch.optim) if m[0].isupper()}
@@ -44,14 +44,15 @@ def get_pipelines_from_config(args, tasks=[]):
 
     if args.dataset_type == 'astro2d':
         nef = globals()[args.nef_type](**vars(args))
-        pipeline = Pipeline(nef)
+        pipeline = AstroPipeline(nef)
         pipeline.nef.grid.init_from_geometric(
             args.min_grid_res, args.max_grid_res, args.num_lods)
 
     elif args.dataset_type == 'astro3d':
         nef = globals()[args.nef_type](**vars(args))
-        spatial_pipeline = Pipeline(nef)
-        spatial_pipeline.nef.grid.init_from_geometric(
+
+        pipeline = AstroPipeline(nef)
+        pipeline.nef.grid.init_from_geometric(
             args.min_grid_res, args.max_grid_res, args.num_lods)
     else:
         raise ValueError(f'"{args.dataset_type}" unrecognized dataset_type')

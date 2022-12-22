@@ -31,11 +31,11 @@ def parse_args():
     ''' Parse all command arguments and generate all needed ones. '''
     config, args_str = parse_input_config()
 
-    add_basic_args(config)
-    add_input_args(config)
-    add_trans_spectra_args(config)
-    setup_experiments(config)
-    add_experiment_dependent_args(config)
+    #add_basic_args(config)
+    #add_input_args(config)
+    #add_trans_spectra_args(config)
+    #setup_experiments(config)
+    #add_experiment_dependent_args(config)
     #finalize(config)
 
     args = argparse.Namespace(**config)

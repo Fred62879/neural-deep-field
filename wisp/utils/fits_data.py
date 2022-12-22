@@ -80,7 +80,6 @@ class FITSData:
             self.fits_wgroups[fits_id] = np.concatenate((hsc_fits_fname, nb_fits_fname, megau_weights_fname))
 
     def set_path(self, dataset_path):
-        dataset_path = dataset_path
         input_path = join(dataset_path, 'input')
         img_data_path = join(input_path, self.kwargs['sensor_collection_name'], 'img_data')
 
@@ -169,7 +168,7 @@ class FITSData:
 
                 pixels = fits.open(join(self.input_fits_path, fits_fname))[id].data
                 if is_u: # scale u and u* band pixel values
-                    pixels /= self.u_bands_scale
+                    pixels /= self.u_band_scale
 
                 if not self.use_full_fits:
                     size = self.fits_cutout_sizes[index]
@@ -225,7 +224,7 @@ class FITSData:
         #    raise Exception('Cutout based train only works on one fits file.')
 
         cached = self.load_fits_data_cache and exists(self.pixels_fname) and \
-            ([exists(fname) for fname in self.gt_fnames]) and \
+            ([exists(fname) for fname in self.gt_img_fnames]) and \
             (not self.load_weights or exists(self.weights_fname)) and \
             exists(self.zscale_ranges_fname)
 
@@ -633,15 +632,6 @@ class FITSData:
         return metrics, metrics_zscale
 
 # FITS class ends
-#################
-
-class TransData:
-
-    def __init__(self):
-        trans_path = join(self.input_path, self.kwargs['sensor_collection_name'], 'transmission')
-
-
-# Trans class ends
 #################
 
 def recon_img_and_evaluate(recon_pixels, dataset, **kwargs):

@@ -10,4 +10,4 @@ from .base_nef import *
 from .neural_sdf import *
 from .nerf import *
 from .spc_field import *
-from .hyperspectral import *
+from .hyper_nerf import *

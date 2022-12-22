@@ -11,20 +11,13 @@ optimizer:
 
 dataset:
     dataset_type: 'astro2d'
-    fits_choice_id: '0'
-    space_dim: 2
-    load_cache: True
+    #fits_choice_id: '0'
+    space_dim: 3
+    load_fits_data_cache: True
     dataset_path: '../../data/pdr3'
     gt_img_norm_cho: 'identity'     # identity/arcsinh/linear/clip(0,1)
     output_norm_cho: 'sinh'   # identity/arcsinh/sinh
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
-
-    gt_spectra_cho: -1
-    wave_lo: 6000
-    wave_hi: 8000
-    uniform_smpl: True
-    generate_trans: True # set to True once for each setup
-    trans_cho: 'orig_trans'
 
     use_full_fits: False
     # always pick exactly one cutout from one tile
@@ -34,27 +27,33 @@ dataset:
     fits_cutout_sizes: [ 64 ]
     fits_cutout_start_pos: [[86,188]] #,[240,270] ]
 
+    # num_bands: 1
     # sensor_collection_name: '1_y'
     # filter_ids: [4]
     # filters: [y]
     # sensors_full_name: [HSC-Y]
 
+    num_bands: 5
     sensor_collection_name: '5_grizy'
     filter_ids: [0,1,2,3,4]
     filters: [g,r,i,z,y]
     sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y]
 
-    # sensor_collection_name: '8'
-    # filter_ids: [0,1,2,3,4,5,6,7]
-    # filters: [g,r,i,z,y,nb387,nb816,nb921]
-    # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y,NB0387,NB0816,NB0921]
-
+    # num_bands: 10
     # sensor_collection_name: '10'
     # filter_ids: [0,1,2,3,4,5,6,7,8,9]
     # filters: [g,r,i,z,y,nb387,nb816,nb921,u,us]
     # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y,NB0387,NB0816,NB0921,u,uS]
 
-    trans_thresh: 1e-3
+    gt_spectra_cho: -1
+    wave_lo: 6000
+    wave_hi: 8000
+    plot_trans: True
+    uniform_smpl: True
+    trans_sample_method: 'bandwise'
+    #trans_cho: 'orig_trans'
+    trans_threshold: 1e-3
+    hardcode_num_trans_samples: 35
 
 trainer:
     trainer_type: 'AstroTrainer'
@@ -82,6 +81,7 @@ trainer:
     #permute_pixls_train: True
 
     # spectra supervision
+    num_trans_samples: 40
     spectra_supervision: False
     trans_smpl_interval: 10
     trusted_wave_lo: 6000

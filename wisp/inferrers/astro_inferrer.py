@@ -8,7 +8,7 @@ from pathlib import Path
 from os.path import exists, join
 from wisp.inferrers import BaseInferrer
 from wisp.utils.plot import plot_horizontally
-from wisp.utils.data import recon_img_and_evaluate
+from wisp.utils.fits_data import recon_img_and_evaluate
 from wisp.utils.common import forward, load_model_weights
 
 

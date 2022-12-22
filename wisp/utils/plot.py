@@ -19,6 +19,11 @@ from wisp.utils.trans import process_gt_spectra, generate_spectra
 # basic plotting funcs
 #######################
 
+def plot_save(fname, x, y):
+    plt.plot(x, y)
+    plt.savefig(fname);
+    plt.close()
+
 def plot_latent_embedding(model_id, smpl_latent_dir, out_dir,
                           model_dict=None, plot_latent_only=False):
 

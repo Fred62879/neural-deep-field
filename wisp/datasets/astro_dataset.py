@@ -3,7 +3,8 @@ import torch
 
 from typing import Callable
 from torch.utils.data import Dataset
-from wisp.utils.data import FITSData
+from wisp.utils.fits_data import FITSData
+from wisp.utils.trans_data import TransData
 
 
 class AstroDataset(Dataset):
@@ -64,13 +65,12 @@ class AstroDataset(Dataset):
                 self.data['masks'] = self.fits_dataset.get_mask()
 
         if self.kwargs["space_dim"] == 3:
-            self.require_full_wave = "train" not in self.tasks or self.kwargs["train_with_full_wave"]
-            self.require_trans = self.status == "train"
+            #self.require_full_wave = "train" not in self.tasks or self.kwargs["train_with_full_wave"]
+            #self.require_trans = self.status == "train"
+            # assume reconstruction always use all lambda
 
-            # assume reconstruction (img, spectum) always use full spectra
             self.trans_dataset = TransData(self.root, **self.kwargs)
-
-            self.data['trans'] = self.trans_dataset.get_trans()
+            self.trans_dataset.get_trans()
 
             if self.kwargs["spectra_supervision"]:
                 self.data['spectra'] = self.trans_dataset.get_spectra()
@@ -92,7 +92,7 @@ class AstroDataset(Dataset):
     # Getters
     ############
 
-    def sample_wave(self, batch_size):
+    def sample_wave(self, batch_size, num_samples):
         """ Sample lambda randomly for each pixel at the begining of each iteration
             For mixture sampling, we also record # samples falling
               within response range of each band. each band may have

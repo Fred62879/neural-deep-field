@@ -107,3 +107,41 @@ def get_layer_class(layer_type):
         return L_inf_Linear
     else:
         assert(False and "layer type does not exist")
+
+class Normalization(nn.Module):
+    def __init__(self, norm_cho):
+        super(Normalization, self).__init__()
+        self.init_norm_layer(norm_cho)
+
+    def init_norm_layer(self, norm_cho):
+        if norm_cho == 'identity':
+            self.norm = nn.Identity()
+        elif norm_cho == 'arcsinh':
+            self.norm = Fn(torch.arcsinh)
+        elif norm_cho == 'sinh':
+            self.norm = Fn(torch.sinh)
+        else:
+            raise Exception('Unsupported normalization choice')
+
+    def forward(self, input):
+        return self.norm(input)
+
+class Fn(nn.Module):
+    def __init__(self, fn):
+        super(Fn, self).__init__()
+        self.fn = fn
+
+    def forward(self, input):
+        return self.fn(input)
+
+class TrainableEltwiseLayer(nn.Module):
+    def __init__(self, ndim, mean=0, std=.1):
+        super(TrainableEltwiseLayer, self).__init__()
+
+        #weights = torch.exp(torch.normal(mean=mean, std=std, size=(ndim,)).abs())
+        weights = torch.ones(ndim)
+        self.weights = nn.Parameter(weights)
+
+    # input, [bsz,ndim]
+    def forward(self, input):
+        return input * self.weights
