@@ -8,7 +8,7 @@ from torch.nn.functional import one_hot
 from wisp.utils.numerical import find_closest_tensor
 
 
-class Quantized_Encoder(nn.Module):
+class LatentQuantizer(nn.Module):
     ''' Encoder with vector quantization
           dim_in is by default 2 (2 dim coordinate)
           dim_out is the latent dimension
@@ -17,7 +17,7 @@ class Quantized_Encoder(nn.Module):
     def __init__(self, latent_dim, num_embd, mlp_cho, mlp_args, output_scaler,
                  output_redshift, calculate_loss, quantize, beta, cdbk_seed):
 
-        super(Quantized_Encoder, self).__init__()
+        super(LatentQuantizer, self).__init__()
 
         self.quantize = quantize
         self.output_scaler = output_scaler

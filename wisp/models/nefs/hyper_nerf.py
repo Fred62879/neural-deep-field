@@ -5,64 +5,35 @@ from wisp.models.grids import *
 from wisp.utils import PerfTimer
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.decoders import BasicDecoder
-from wisp.models.hypers.pe import Rand_Gaus_Linr
 from wisp.models.layers import get_layer_class, Fn
 from wisp.models.activations import get_activation_class
-from wisp.models.embedders import get_positional_embedder
+from wisp.models.embedders import get_positional_embedder, RandGausLinr
 
 
 class NeuralHyperSpectral(BaseNeuralField):
-    """Model for encoding hyperspectral cube
+    """ Model for encoding RA/DEC coordinates.
+        In hyperspectral setup, output is embedded latent variables.
+        Otherwise, output is decoded pixel intensities.
+
+        Discrete from how the base_nef works,
+          here we use either the positional encoding or the grid for embedding.
     """
+
     def init_embedder(self):
-        """Initialize positional embedding objects.
-        """
-        return
+        if self.kwargs["coords_embed_method"] != "positional": return
 
-    def init_decoder(self, pe=False):
-        """Initializes the decoder object.
-        """
-        if self.multiscale_type == 'cat':
-            self.effective_feature_dim = self.grid.feature_dim * self.num_lods
-        else:
-            self.effective_feature_dim = self.grid.feature_dim
-
-        self.pe = pe
-        if self.pe:
-            self.input_dim = 2
-            pe_dim = 2000
-            sigma = 1
-            omega = 1
-            pe_bias = True
-            float_tensor = torch.cuda.FloatTensor
-            verbose = False
-            self.pe = Rand_Gaus_Linr((self.input_dim, pe_dim, sigma, omega, pe_bias, float_tensor, verbose))
-            self.input_dim = pe_dim
-        else:
-            self.input_dim = self.effective_feature_dim
-
-        if self.position_input:
-            self.input_dim += self.pos_embed_dim
-
-        self.decoder_intensity = BasicDecoder \
-            (self.input_dim, self.output_dim, get_activation_class(self.activation_type),
-             True, layer=get_layer_class(self.layer_type), num_layers=self.num_layers+1,
-             hidden_dim=self.hidden_dim, skip=[])
-
-        self.sinh_scaling = Fn(torch.sinh)
-
-        '''
-        self.decoder_hyperspectral = BasicDecoder \
-            (self.input_dim + self.wave_pe_dim, self.spectra_dim,
-             get_activation_class(self.activation_type),
-             True, layer=get_layer_class(self.layer_type),
-             num_layers=self.num_layers+1,
-             hidden_dim=self.hidden_dim, skip=[])
-        '''
+        pe_dim = self.kwargs["coords_embed_dim"]
+        sigma = 1
+        omega = 1
+        pe_bias = True
+        #float_tensor = torch.cuda.FloatTensor
+        verbose = False
+        self.embedder = RandGausLinr((3, pe_dim, sigma, omega, pe_bias, verbose))
 
     def init_grid(self):
-        """Initialize the grid object.
-        """
+        """ Initialize the grid object. """
+        if self.kwargs["coords_embed_method"] != "grid": return
+
         if self.grid_type == "OctreeGrid":
             grid_class = OctreeGrid
         elif self.grid_type == "CodebookOctreeGrid":
@@ -79,64 +50,97 @@ class NeuralHyperSpectral(BaseNeuralField):
              interpolation_type=self.interpolation_type,
              multiscale_type=self.multiscale_type, **self.kwargs)
 
-    def get_nef_type(self):
-        """Returns a text keyword of the neural field type.
-        Returns:
-            (str): The key type
+        self.grid.init_from_geometric(
+            self.kwargs["min_grid_res"], self.kwargs["max_grid_res"], self.num_lods)
+
+        if self.multiscale_type == 'cat':
+            self.effective_feature_dim = self.grid.feature_dim * self.num_lods
+        else:
+            self.effective_feature_dim = self.grid.feature_dim
+
+    def init_decoder(self):
+        """ Initializes the decoder object.
         """
+        # hyperspectral setup doesn't need decoder
+        if self.space_dim == 3: return
+
+        if self.kwargs["coords_embed_method"] == "positional":
+            input_dim = self.kwargs["coords_embed_dim"]
+        elif self.kwargs["coords_embed_method"] == "grid":
+            input_dim = self.effective_feature_dim
+        else:
+            input_dim = 3 #2 ^^
+
+        self.decoder_intensity = BasicDecoder \
+            (input_dim, self.output_dim, get_activation_class(self.activation_type),
+             True, layer=get_layer_class(self.layer_type), num_layers=self.num_layers+1,
+             hidden_dim=self.hidden_dim, skip=[])
+
+        self.sinh_scaling = Fn(torch.sinh)
+
+    def get_nef_type(self):
         return 'hyperspectral'
 
     def register_forward_functions(self):
-        """Register forward functions with the channels that they output.
-        This function should be overrided and call `self._register_forward_function` to
-        tell the class which functions output what output channels. The function can be called
-        multiple times to register multiple functions.
+        """ Register forward functions with the channels that they output.
+            For hyperspectral setup, we need latent embedding as output.
+            Otherwise, we need pixel intensity values as output.
         """
-        self._register_forward_function(
-            self.hyperspectral,
-            ["density", "recon_spectra", "cdbk_loss", "embd_ids", "latents"]
-        )
+        channels = ["intensity"] if self.space_dim == 2 else ["latents"]
+        self._register_forward_function( self.hyperspectral, channels )
 
     def hyperspectral(self, coords, pidx=None, lod_idx=None):
-        """Compute hyperspectral intensity for the provided coordinates.
-        Args:
-            coords (torch.FloatTensor): tensor of shape [batch, num_samples, 3]
-            pidx (torch.LongTensor): SPC point_hierarchy indices of shape [batch].
-                                     Unused in the current implementation.
-            lod_idx (int): index into active_lods. If None, will use the maximum LOD.
-                           Currently interpolation doesn't use this.
-        Returns:
-            {"indensity": torch.FloatTensor }:
+        """ Compute hyperspectral intensity for the provided coordinates.
+            @Params:
+              coords (torch.FloatTensor): tensor of shape [1, batch, num_samples, 2]
+              pidx (torch.LongTensor): SPC point_hierarchy indices of shape [batch].
+                                       Unused in the current implementation.
+              lod_idx (int): index into active_lods. If None, will use the maximum LOD.
+                             Currently interpolation doesn't use this.
+            @Return
+              {"indensity": torch.FloatTensor }:
                 - Output intensity tensor of shape [batch, num_samples, 3]
         """
         timer = PerfTimer(activate=False, show_memory=True)
-        if lod_idx is None:
-            lod_idx = len(self.grid.active_lods) - 1
 
-        coords = coords[0]
-        #print('forward', coords.shape)
+        coords = coords[0] # ****** replace
         if coords.ndim == 2:
             batch, _ = coords.shape
         elif coords.ndim == 3:
             batch, num_samples, _ = coords.shape
         else:
             raise Exception("Wrong coordinate dimension.")
+
         timer.check("rf_hyperspectral_preprocess")
 
-        if self.pe:
-            feats = self.pe([coords,None])[:,0]
-        else:
-            # Embed coordinates into high-dimensional vectors with the grid.
-            feats = self.grid.interpolate(coords, lod_idx).reshape(-1, self.effective_feature_dim)
-            timer.check("rf_hyperspectra_interpolate")
+        #print(torch.min(coords), torch.max(coords))
+        #print(coords.isnan().any())
+        # embed 2D coords into high-dimensional vectors with PE or the grid
+        if self.kwargs["coords_embed_method"] == "positional":
+            feats = self.embedder(coords) # [bsz,coords_embed_dim]
+            timer.check("rf_hyperspectral_pe")
 
+        elif self.kwargs["coords_embed_method"] == "grid":
+            coords = coords[:,None] # ****** replace
+
+            if lod_idx is None:
+                lod_idx = len(self.grid.active_lods) - 1
+
+            feats = self.grid.interpolate(coords, lod_idx)
+            feats = feats.reshape(-1, self.effective_feature_dim)
+            timer.check("rf_hyperspectra_interpolate")
             if self.position_input:
                 raise NotImplementedError
+        else:
+            raise ValueError("Unrecognized coords embedding method.")
 
-        #print(feats.shape)
-        # Decode high-dimensional vectors to output intensity.
-        density = self.decoder_intensity(feats)
-        #print(density.shape)
-        density = self.sinh_scaling(density)
+        #print(feats.isnan().any())
+        timer.check("rf_hyperspectral_embedding")
+
+        if self.space_dim == 3:
+            return dict(latents=feats)
+
+        intensity = self.decoder_intensity(feats)
+        intensity = self.sinh_scaling(intensity)
         timer.check("rf_hyperspectral_decode")
-        return dict(density=density,recon_spectra=None,cdbk_loss=None,embd_ids=None,latents=None)
+        return dict(intensity=intensity)

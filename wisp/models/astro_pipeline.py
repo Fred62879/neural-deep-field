@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+# (c) 2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
 #
 # NVIDIA CORPORATION & AFFILIATES and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -8,8 +8,9 @@
 
 import torch.nn as nn
 
-from wisp.models.hypers import LatentQuantizer, Integrator
 from wisp.models.nefs import BaseNeuralField
+from wisp.models.hypers import HyperSpectralDecoder
+from wisp.models.quantization import LatentQuantizer
 
 
 class AstroPipeline(nn.Module):
@@ -28,28 +29,30 @@ class AstroPipeline(nn.Module):
         - A forward map (``self.tracer``) which is a function which will invoke the pipeline in
           some outer loop. Usually this consists of renderers which will output a RenderBuffer object.
 
-    The 'Pipeline' classes are responsible for holding and orchestrating these components.
+        The 'Pipeline' classes are responsible for holding and orchestrating these components.
     """
 
-    def __init__(self, nef: BaseNeuralField, quantz: LatentQuantizer, inte: Integrator):
-        """ Initialize the Pipeline.
+    def __init__(self, nef: BaseNeuralField,
+                 quantz: LatentQuantizer=None,
+                 hyper_decod: HyperSpectralDecoder=None):
 
-        Args:
-            nef (nn.Module): Neural fields module.
-        """
         super().__init__()
 
         self.nef: BaseNeuralField = nef
-        self.quantz: LatentQuantizer = qantz
-        self.inte: Integrator = inte
+        self.quantz: LatentQuantizer = quantz
+        self.hyper_decod: HyperSpectralDecoder = hyper_decod
 
     def forward(self, *args, **kwargs):
-        """ The forward function will use the tracer (the forward model) if one is available.
-            Otherwise, it'll execute the neural field.
-        """
         ret = self.nef(*args, **kwargs)
+        #print(ret["latents"].isnan().any())
+
+        # quantize latent variables
         if self.quantz is not None:
             ret = self.quantz(ret)
-        if self.inte is not None:
-            ret = self.inte(ret)
+            # scaler, redshift, latent, embd_id
+
+        # convert RA/DEC latents to hyperspectral intermediates and decode
+        if self.hyper_decod is not None:
+            ret = self.hyper_decod(ret, **kwargs)
+
         return ret

@@ -357,12 +357,11 @@ class AstroTrainer(BaseTrainer):
     #############
 
     def pre_step(self):
-        # sample lambda (and transmission) before each iteration
-        if self.space_dim == 3:
-            wave, trans = self.dataset.sample_wave(num_samples)
-            data["wave"] = wave
-            data["trans"] = trans
-
+        """ Sample lambda (and transmission) at the start of each iteration.
+            Append to current batch data.
+            @Param
+              data: current batch data
+        """
         if self.epoch == 0 and self.extra_args["log_gpu_every"] > -1 \
            and self.epoch % self.extra_args["log_gpu_every"] == 0:
             gpu_info = get_gpu_info()
@@ -375,7 +374,7 @@ class AstroTrainer(BaseTrainer):
 
         ret = forward(self, self.pipeline, data, self.quantize_latent,
                       self.plot_embd_map, self.spectra_supervision)
-        recon_pixels = ret["density"]
+        recon_pixels = ret["intensity"]
         gt_pixels = data["pixels"][0].to(self.device)
 
         if self.extra_args["weight_train"]:

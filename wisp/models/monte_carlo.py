@@ -220,7 +220,7 @@ class MC_Base(nn.Module):
         if scaler is not None: # cdbk spectrum plot doesnt have scaler
             if use_full_wave: scaler = scaler[-self.bsz_full_pixl:]
             else: scaler = scaler[:self.bsz_sampled_pixl].tile(1,self.nsmpl)
-            spectra *= torch.exp(scaler)
+`            spectra *= torch.exp(scaler)
         return spectra
 
     ''' Integrate spectra over transmission to get pixel value

@@ -277,6 +277,11 @@ class AstroInferrer(BaseInferrer):
         """
         # load model checkpoint into model
         load_model_weights(self.full_pipeline, checkpoint)
+        # if model_id == self.num_models - 1:
+        #     for k,v in self.full_pipeline.state_dict().items():
+        #         if "embedder" in k and "bias" not in k:
+        #             print(v.T)
+
         self.full_pipeline.eval()
 
         # run one epoch for inferrence
@@ -286,7 +291,7 @@ class AstroInferrer(BaseInferrer):
                 ret = forward(self, self.full_pipeline, data, self.quantize_latent,
                               self.plot_embd_map, self.spectra_supervision)
 
-            if self.recon_img: self.recon_pixels.extend( ret["density"] )
+            if self.recon_img: self.recon_pixels.extend( ret["intensity"] )
             if self.plot_embd_map: self.embd_ids.extend( ret["embd_ids"] )
 
     # Plot embd map

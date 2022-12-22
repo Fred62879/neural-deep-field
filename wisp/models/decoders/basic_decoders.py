@@ -83,15 +83,18 @@ class BasicDecoder(nn.Module):
                 - The last hidden layer of shape [batch, ..., hidden_dim]
         """
         N = x.shape[0]
-
         for i, l in enumerate(self.layers):
             if i == 0:
-                h = self.activation(l(x))
+                a=l(x)
+                #print(l.weight)
+                #print('****', a)
+                h = self.activation(a)
             elif i in self.skip:
                 h = self.activation(l(h))
                 h = torch.cat([x, h], dim=-1)
             else:
                 h = self.activation(l(h))
+            #print(h)
         
         out = self.lout(h)
         

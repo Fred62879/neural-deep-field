@@ -47,17 +47,16 @@ dataset:
     wave_lo: 6000
     wave_hi: 8000
     plot_trans: True
-    uniform_smpl: False
-    trans_sample_method: 'bandwise'
+    trans_sample_method: 'mixture'
     trans_threshold: 1e-3
-    hardcode_num_trans_samples: 35
+    hardcode_num_trans_samples: 40
     gt_spectra_cho: -1
 
 trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 800
+    num_epochs: 2000
     batch_size: 4096000
     valid_every: -1
     save_every: 400
@@ -80,6 +79,8 @@ trainer:
 
     # spectra supervision
     num_trans_samples: 40
+    uniform_sample_trans: True
+    mixture_avg_per_band: True
     spectra_supervision: False
     trans_smpl_interval: 10
     trusted_wave_lo: 6000
@@ -105,7 +106,6 @@ test:
 
 net:
     nef_type: 'NeuralHyperSpectral'
-    embed_coords_with_pe: False
 
     # decoder
     hidden_dim: 64
@@ -127,83 +127,17 @@ grid:
     max_grid_res: 96
     codebook_bitwidth: 19
 
-hps:
-    coords_embed_dim: 0
-    coords_embed_methed: 'none'
-    wave_embed_dim: 0
-    wave_embed_method: 'none'
+hyperspectral:
+    coords_embed_dim: 8000
+    coords_embed_method: 'positional'
+    wave_embed_dim: 8000
+    wave_embed_method: 'positional'
     hps_convert_method: 'add'
-    hps_decode_activation_type: 'relu'
-    hps_decod_num_layers: 1
-    hps_decod_hidden_dim: 256
-    hps_decod_layer_type: 'linear'
-
-monte_carlo:
-    mc_cho: 'mc_mixture'
-
-    encode: True
-    encoder_mlp_seed: 0
-    encoder_output_scaler: True
-    encoder_output_redshift: False
-
-    latent_dim: 3
-    encoder_dim_hidden: 256
-    encoder_num_hidden_layers: 1
-
-    encoder_cho: 'relumlp'
-    encoder_first_w0: 30
-    encoder_hidden_w0: 30
-    encoder_siren_last_linr: True
-    encoder_coords_scaler: 1
-    encoder_mfn_w_scale: 10
-    encoder_mfn_omega: 150
-    encoder_mfn_alpha: 6
-    encoder_mfn_beta: 1
-    encoder_pe_cho: 'rand_gaus'
-    encoder_pe_omega: 1
-    encoder_pe_sigma: 1
-    encoder_pe_dim: 4000
-    encoder_pe_min_deg: 0
-    encoder_pe_max_deg: 1500
-
-    # ~ quantizer
-    vae_beta: 1
-    num_embd: 4
-    cdbk_seed: 8
-    quantize_latent: False
-    plot_latent: True
-
-    pe_wave: True
-    wave_pe_cho: 'rand_gaus'
-    wave_pe_seed: 1
-    wave_pe_omega: 1
-    wave_pe_sigma: 1
-    wave_pe_dim: 16 # cannot be odd
-    wave_pe_min_deg: 0
-    wave_pe_max_deg: 500
-
-    ## iii) main mlp
-    mlp_cho: 'siren'
-    mlp_seed: 0
-    mlp_dim_hidden: 256
-    mlp_num_hidden_layers: 3
-
-    first_w0: 24
-    hidden_w0: 6
-    coords_scaler: 8
-
-    mfn_w_scale: 10
-    mfn_omega: 150
-    mfn_alpha: 6
-    mfn_beta: 1
-
-    pe_cho: 'rand_gaus'
-    pe_seed: 1
-    pe_omega: 4
-    pe_sigma: 4
-    pe_dim: 10000
-    pe_min_deg: 0
-    pe_max_deg: 1500
+    hps_decod_activation_type: 'relu'
+    hps_decod_num_layers: 5
+    hps_decod_hidden_dim: 512
+    hps_decod_layer_type: 'none'
+    integration_method: 'dot_prod'
 
 inpaint:
     inpaint_cho: 'no_inpaint' # 'spectral_inpaint'

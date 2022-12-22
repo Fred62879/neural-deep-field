@@ -1,6 +1,8 @@
 
 import torch
 import torch.nn as nn
+import logging as log
+
 
 class PE(nn.Module): # pe0
     ''' conventional positional encoding
@@ -312,7 +314,7 @@ class InteRandGaus(nn.Module):
         return torch.cat((torch.cos(encd_coords)*self.exp_var,
                           torch.sin(encd_coords)*self.exp_var), dim=-1)
 
-class Rand_Gaus_Linr(nn.Module): # pe8
+class RandGausLinr(nn.Module): # pe8
     ''' randomized gaussian as in fourier features where P is multiplied with (1,...n)
         P = |0.31 0.23 0.11 ... |   | 1 2 3 ... |
             |0.12 0.28 0.29 ... | * | 1 2 3 ... |
@@ -322,41 +324,44 @@ class Rand_Gaus_Linr(nn.Module): # pe8
         output: [bsz,(nsmpl,)pe_dim]
     '''
     def __init__(self, pe_args):
-        super(Rand_Gaus_Linr, self).__init__()
+        super(RandGausLinr, self).__init__()
 
-        (dim, pe_dim, sigma, omega, pe_bias, float_tensor, verbose) = pe_args
+        #(dim, pe_dim, sigma, omega, pe_bias, float_tensor, verbose) = pe_args
+        (dim, pe_dim, sigma, omega, pe_bias, verbose) = pe_args
 
         self.dim = dim
         self.sigma = sigma
         self.omega = omega
         self.bias = pe_bias
         self.pe_dim = pe_dim//2
-        self.float_tensor = float_tensor
+        #self.float_tensor = float_tensor
 
-        self.scale = torch.arange(start=0,end=self.pe_dim) #.type(float_tensor)
+        #self.scale = torch.arange(start=0,end=self.pe_dim)
         self.mappings = nn.ModuleList([self.init_mapping(i) for i in range(dim)])
         if verbose:
-            print('    Linr transformed Randmized Gaussian with {} dim and sigma {} omega {}'\
-                  .format(pe_dim, sigma, omega))
+            log.info(f"linear transformed Randmized Gaussian with {pe_dim} \
+            dim and sigma {sigma} omega {omega}")
 
     def init_mapping(self, seed):
         mapping = nn.Linear(1, self.pe_dim, bias=self.bias)
-        mapping.weight = nn.Parameter(self.randmz_weights(),requires_grad=False)
+        mapping.weight = nn.Parameter(self.randmz_weights(), requires_grad=False)
+        #print('weight', mapping.weight.isnan().any)
+        #print(mapping.weight)
         return mapping
 
     def randmz_weights(self):
         weight = torch.empty(self.pe_dim).normal_(mean=0.,std=self.sigma**2)
-        #weight = 2 * torch.pi * self.omega * weight
-        weight = 2 * torch.pi * weight * self.scale
-        return weight.reshape((self.pe_dim, 1)).type(self.float_tensor)
+        weight = 2 * torch.pi * weight * self.omega #self.scale
+        weight = torch.FloatTensor(weight.reshape((self.pe_dim, 1)))
+        return weight
 
-    def forward(self, input):
-        (coords, _) = input
-        encd_coords = self.mappings[0](coords[...,0:1])
+    def forward(self, input): # [bsz,...,input_dim]
+        encd_input = self.mappings[0](input[...,0:1])
         for i in range(1,self.dim):
-            encd_coords += self.mappings[i](coords[...,i:i+1])
-        return torch.cat((torch.cos(encd_coords),
-                          torch.sin(encd_coords)), dim=-1)
+            encd_input += self.mappings[i](input[...,i:i+1])
+        #print('encd_input', encd_input.isnan().any())
+        return torch.cat((torch.cos(encd_input),
+                          torch.sin(encd_input)), dim=-1)
 
 class RandIGausLinr(nn.Module): # pe9
     ''' integrated RandGausLinr, assuming each dim is indep from each other

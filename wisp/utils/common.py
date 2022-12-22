@@ -116,36 +116,42 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
 
 def forward(class_obj, pipeline, data, quantize_latent=False, plot_embd_map=False, spectra_supervision=False):
     if class_obj.space_dim == 2:
-        requested_channels = {"density"}
+        requested_channels = {"intensity"}
         #print("forward", data["coords"].shape)
-        net_args = {"coords": data["coords"].to(class_obj.device), "covar": None}
+        net_args = {"coords": data["coords"].to(class_obj.device) }
 
     elif class_obj.space_dim == 3:
-        requested_channels = ["density"]
-        if class_obj.quantize_latent:
-            requested_channels.append("cdbk_loss")
-            if class_obj.plot_embd_map:
-                requested_channels.append("embd_ids")
-                requested_channels.append("latents")
+        requested_channels = {"latents"}
+        # if class_obj.quantize_latent:
+        #     requested_channels.append("cdbk_loss")
+        #     if class_obj.plot_embd_map:
+        #         requested_channels.append("embd_ids")
+        #         requested_channels.append("latents")
+        # if class_obj.spectra_supervision:
+        #     requested_channels.append("recon_spectra")
+        # requested_channels = set(requested_channels)
 
-        if spectra_supervision:
-            requested_channels.append("recon_spectra")
-        requested_channels = set(requested_channels)
-
-        mc_cho = self.extra_args["mc_cho"]
-
-        if mc_cho == "mc_hardcode":
-            net_args = {"coords": self.cur_coords, "covar": self.covar, "trans": self.smpl_trans}
-        elif mc_cho == "mc_bandwise":
-            net_args = [self.cur_coords, self.covar, self.smpl_wave, self.smpl_trans]
-        elif mc_cho == "mc_mixture":
-            net_args = [self.cur_coords, self.covar, self.smpl_wave,
-                        self.smpl_trans, self.nsmpl_within_each_band_mixture]
-        else:
-            raise Exception("Unsupported monte carlo choice")
-    else:
-        raise Exception("Unsupported space dim")
-
+        trans_sample_method = class_obj.extra_args["trans_sample_method"]
+        if trans_sample_method == "hardcode":
+            net_args = {
+                "coords": data["coords"],
+                "trans": data["trans"]
+            }
+        elif trans_sample_method == "bandwise":
+            net_args = {
+                "coords": data["coords"].to(class_obj.device),
+                "wave": data["wave"].to(class_obj.device),
+                "trans": data["trans"].to(class_obj.device)
+            }
+        elif trans_sample_method == "mixture":
+            net_args = {
+                "coords": data["coords"].to(class_obj.device),
+                "wave":   data["wave"].to(class_obj.device),
+                "trans":  data["trans"].to(class_obj.device),
+                "nsmpl":  data["nsmpl"].to(class_obj.device)
+            }
+        else: raise ValueError("Unrecognized transmission sampling method.")
+    else: raise Exception("Unsupported space dimension.")
     return pipeline(channels=requested_channels, **net_args)
 
 def load_partial_latent(model, pretrained_state, lo, hi):

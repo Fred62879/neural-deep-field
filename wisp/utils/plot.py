@@ -8,11 +8,7 @@ import scipy.interpolate as interpolate
 
 from os.path import join
 from astropy.visualization import ZScaleInterval
-
-#import sys
-#sys.path.insert(0, './utils')
 from wisp.utils.numerical import calculate_sam_spectrum
-from wisp.utils.trans import process_gt_spectra, generate_spectra
 
 
 #######################
@@ -542,94 +538,3 @@ def batch_heat(arrs, lo=None, hi=None, heat_range=True):
             heat(fig, arr, r, c, i+1)
 
     plt.show()
-
-####################
-# spectrum plotting
-def plot_spectrum(model_id, i, spectrum_dir, spectra, spectrum_wave,
-                  orig_wave, orig_transms, colors, lbs, styles):
-    ''' Plot spectrum with sensor transmission as background.
-        spectra [bsz,nsmpl]
-    '''
-    for j, cur_spectra in enumerate(spectra):
-        for k, trans in enumerate(orig_transms):
-            plt.plot(orig_wave, trans, color=colors[k], label=lbs[k], linestyle=styles[k])
-
-        if spectrum_wave.ndim == 3: # bandwise
-            cur_s_wave = spectrum_wave[j].flatten()
-            cur_s_wave, ids = torch.sort(cur_s_wave)
-            cur_spectra = cur_spectra[ids]
-        else:
-            cur_s_wave = spectrum_wave
-
-        plot_fn = join(spectrum_dir, str(model_id) + '_' + str(i) + '_' + str(j) + '.png')
-        plt.plot(cur_s_wave, cur_spectra/np.max(cur_spectra), color='black', label='spectrum')
-        #plt.xlabel('wavelength');plt.ylabel('intensity');plt.legend(loc="upper right")
-        plt.title('Spectrum for pixel{}'.format(i))
-        plt.savefig(plot_fn);plt.close()
-
-def plot_spectrum_gt(model_id, i, gt_fn, spectrum_dir, spectra, spectrum_wave,
-                     orig_wave, orig_transms, colors, lbs, styles):
-    def helper(nm, cur_spectra):
-        for j, trans in enumerate(orig_transms):
-            plt.plot(orig_wave, trans, color=colors[j], label=lbs[j], linestyle=styles[j])
-
-        if spectrum_wave.ndim == 3: # bandwise
-            cur_s_wave = spectrum_wave[i].flatten()
-            cur_s_wave, ids = torch.sort(cur_s_wave)
-            cur_spectra = cur_spectra[ids]
-        else:
-            cur_s_wave = spectrum_wave
-
-        plot_fn = join(spectrum_dir, 'gt_' + nm)
-        plt.plot(cur_s_wave, cur_spectra/np.max(cur_spectra), color='black', label='spectrum')
-        plt.plot(gt_wave, gt_spectra/np.max(gt_spectra),label='gt')
-        plt.savefig(plot_fn);plt.close()
-
-        '''
-        wave, gt_spectra_ol, gen_spectra_ol = overlay_spectrum(gt_fn, cur_s_wave, spectra)
-        print(gt_spectra_ol.shape, gen_spectra_ol.shape)
-        sam = calculate_sam_spectrum(gt_spectra_ol/np.max(gt_spectra_ol), gen_spectra_ol/np.max(gen_spectra_ol))
-        cur_sam.append(sam)
-        '''
-
-    cur_sam = []
-    avg_spectra = np.mean(spectra, axis=0)
-    gt_wave, gt_spectra = process_gt_spectra(gt_fn)
-    helper(str(model_id) + '_' + str(i), avg_spectra)
-    return cur_sam
-
-def recon_spectrum_(model_id, batch_coords, covars, spectrum_wave, orig_wave,
-                    orig_transms, net, trans_args, spectrum_dir, args):
-    ''' Generate spectra for pixels specified by coords using given net
-        Save, plot spectrum, and calculate metrics
-        @Param
-          coords: list of n arrays, each array can be of size
-                  [bsz,nsmpl,3] / [bsz,nbands,nsmpl_per_band,2] / [bsz,nsmpl,2]
-    '''
-    sams = []
-    wave_fn = join(spectrum_dir, 'wave.npy')
-    np.save(wave_fn, spectrum_wave)
-    gt_fns = args.gt_spectra_fns
-
-    wave_hi = int(min(args.wave_hi, int(np.max(spectrum_wave))))
-    id_lo = np.argmax(spectrum_wave > args.wave_lo)
-    id_hi = np.argmin(spectrum_wave < wave_hi)
-    spectrum_wave = spectrum_wave[id_lo:id_hi]
-
-    for i, coord in enumerate(batch_coords):
-        print(coord)
-        spectra = generate_spectra(args.mc_cho, coord, None, net, trans_args) # None is covar[i]
-        #np.save(join(spectrum_dir, str(model_id) + '_' + str(i)), spectra)
-
-        if args.mc_cho == 'mc_hardcode':
-            pix = np.load(args.hdcd_trans_fn)@spectra[0] / args.num_trans_smpl
-        else: pix = np.load(args.full_trans_fn)@spectra[0] / np.load(args.nsmpl_within_bands_fn)
-
-        spectra = spectra[:,id_lo:id_hi]
-        if gt_fns is None:
-            plot_spectrum(model_id, i, spectrum_dir, spectra, spectrum_wave, orig_wave, orig_transms,
-                          args.spectrum_colors, args.spectrum_labels, args.spectrum_styles)
-        else:
-            plot_spectrum_gt(model_id, i, gt_fns[i], spectrum_dir, spectra, spectrum_wave, orig_wave,
-                             orig_transms, args.spectrum_colors, args.spectrum_labels, args.spectrum_styles)
-    return np.array(sams)

@@ -164,6 +164,7 @@ def define_cmd_line_args():
                             choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
     net_group.add_argument("--activation-type", type=str, default="relu", choices=["relu", "sin"])
     net_group.add_argument("--decoder-type", type=str, default="basic", choices=["none", "basic"])
+    net_group.add_argument("--embed_coords_with_pe", action="store_true")
 
     net_group.add_argument("--num-layers", type=int, default=1,
                           help="Number of layers for the decoder")
@@ -179,12 +180,32 @@ def define_cmd_line_args():
                           help="Use position as input.")
 
     ###################
+    # Hyperspectral arguments
+    ###################
+    hps_group = parser.add_argument_group("hyperspectral")
+
+    hps_group.add_argument("--coords-embed-dim", type=int, help="ra/dec coordinate embedding dimension.")
+    hps_group.add_argument("--coords-embed-method", type=str, choices=["positional","grid"],
+                           help="ra/dec coordinate embedding method.")
+    hps_group.add_argument("--wave-embed-dim", type=int, help="wave embedding dimension.")
+    hps_group.add_argument("--wave-embed-method", type=str, choices=["positional"],
+                           help="wave embedding method.")
+    hps_group.add_argument("--hps-convert-method", type=str, choices=["add","concat"],
+                           help="method to combine ra/dec coordinate with lambda.")
+    hps_group.add_argument("--hps-decod-activation-type", type=str)
+    hps_group.add_argument("--hps-decod-num-layers", type=int)
+    hps_group.add_argument("--hps-decod-hidden-dim", type=int)
+    hps_group.add_argument("--hps-decod-layer-type", type=str, default="none")
+    hps_group.add_argument("--integration-method", type=str,
+                            choices=["identity","dot_prod","trapezoid","simpson"])
+
+    ###################
     # Arguments for dataset
     ###################
     data_group = parser.add_argument_group("dataset")
 
     data_group.add_argument("--dataset-type", type=str, default=None,
-                            choices=["sdf", "multiview", "astro2d","astro3d"],
+                            choices=["sdf", "multiview", "astro"],
                             help="Dataset class to use")
     data_group.add_argument("--dataset-path", type=str, help="Path to the dataset")
     data_group.add_argument("--dataset-num-workers", type=int, default=-1,
@@ -221,7 +242,8 @@ def define_cmd_line_args():
     data_group.add_argument("--infer-pixels-norm", type=str,
                             choices=["identity","arcsinh"])
 
-    data_group.add_argument("--trans-sample-method", type=str)
+    data_group.add_argument("--trans-sample-method", type=str,
+                            choices=["hardcode","bandwise","mixture"])
     data_group.add_argument("--gt-spectra-cho", type=int)
     #data_group.add_argument("--trans-cho", type=str, default="orig_trans")
     data_group.add_argument("--wave-lo", type=int, default=3000,
@@ -334,8 +356,11 @@ def define_cmd_line_args():
 
     train_group.add_argument("--num-trans-samples", type=int, default=40,
                              help="# transmission to sample at each training iteration.")
-    train_group.add_argument("--uniform-smpl", action="store_true",
+    train_group.add_argument("--uniform-sample-trans", action="store_true",
                              help="whether uniformly sample transmission or not.")
+    train_group.add_argument("--mixture-avg-per-band", action="store_true",
+                            help="for mixture sampling method, whether average pixel values \
+                            with number of samples falling within each band")
     train_group.add_argument("--spectra-supervision", action="store_true")
     train_group.add_argument("--spectra-supervision-cho", type=int, default=0)
     train_group.add_argument("--trusted-wave-lo", type=int, default=6000)

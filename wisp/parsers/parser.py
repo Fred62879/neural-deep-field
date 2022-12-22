@@ -2,16 +2,12 @@
 import argparse
 import configargparse
 
-import sys
-sys.path.insert(0, './parsers')
-
-from os.path import join
 from wisp.parsers.parse_yaml import parse_input_config
-from wisp.parsers.parse_basic import add_basic_args
-from wisp.parsers.parse_input import add_input_args
-from wisp.parsers.setup_experiment import setup_experiments
-from wisp.parsers.parse_trans_spectra import add_trans_spectra_args
-from wisp.parsers.parse_experiment_dependent import add_experiment_dependent_args
+#from wisp.parsers.parse_basic import add_basic_args
+#from wisp.parsers.parse_input import add_input_args
+#from wisp.parsers.setup_experiment import setup_experiments
+#from wisp.parsers.parse_trans_spectra import add_trans_spectra_args
+#from wisp.parsers.parse_experiment_dependent import add_experiment_dependent_args
 
 
 def finalize(config):

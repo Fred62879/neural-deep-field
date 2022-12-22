@@ -29,12 +29,12 @@ class AstroDataset(Dataset):
         self.root = dataset_path
         self.transform = transform
         self.dataset_num_workers = dataset_num_workers
+        self.unbatched_fields = {"wave","trans","nsmpl"}
 
     def init(self):
         """ Initializes the dataset.
             Load all needed data based on given tasks.
         """
-
         self.data = {}
 
         if "test" in self.tasks:
@@ -56,24 +56,19 @@ class AstroDataset(Dataset):
             self.num_rows, self.num_cols = self.fits_dataset.get_img_sizes()
 
             if self.require_full_coords:
-                self.data['coords'] = self.fits_dataset.get_coords(to_tensor=False)[:,None,:]
+                self.data['coords'] = self.fits_dataset.get_coords()
             if self.require_pixels:
-                self.data['pixels'] = self.fits_dataset.get_pixels(to_tensor=False) #[:,None,:]
+                self.data['pixels'] = self.fits_dataset.get_pixels()
             if self.require_weights:
-                self.data['weights'] = self.fits_dataset.get_weights(to_tensor=False) #[:,None,:]
+                self.data['weights'] = self.fits_dataset.get_weights()
             if self.require_masks:
                 self.data['masks'] = self.fits_dataset.get_mask()
 
         if self.kwargs["space_dim"] == 3:
-            #self.require_full_wave = "train" not in self.tasks or self.kwargs["train_with_full_wave"]
-            #self.require_trans = self.status == "train"
-            # assume reconstruction always use all lambda
-
             self.trans_dataset = TransData(self.root, **self.kwargs)
-            self.trans_dataset.get_trans()
-
+            self.num_samples = self.kwargs["num_trans_samples"]
             if self.kwargs["spectra_supervision"]:
-                self.data['spectra'] = self.trans_dataset.get_spectra()
+                self.data['spectra'] = self.spectra_dataset.get_spectra()
 
         # randomly initialize
         self.set_dataset_length(1)
@@ -91,34 +86,6 @@ class AstroDataset(Dataset):
     ############
     # Getters
     ############
-
-    def sample_wave(self, batch_size, num_samples):
-        """ Sample lambda randomly for each pixel at the begining of each iteration
-            For mixture sampling, we also record # samples falling
-              within response range of each band. each band may have
-              different # of samples (bandwise has this as a hyper-para)
-        """
-        nsmpl_within_each_band_mixture = None
-        if self.mc_cho == 'mc_hardcode':
-            smpl_wave, smpl_trans = None, self.trans
-
-        elif self.mc_cho == 'mc_bandwise':
-            smpl_wave, smpl_trans, _ = trans_utils.batch_sample_trans_bandwise \
-                (batch_size, self.norm_wave, self.trans, self.distrib, self.args,
-                 waves=self.wave, sort=False, counts=self.counts)
-
-        elif self.mc_cho == 'mc_mixture':
-            assert(self.encd_ids is not None)
-            smpl_wave, smpl_trans, _, nsmpl_within_each_band_mixture = trans_utils.batch_sample_trans \
-                (batch_size, self.norm_wave, self.trans, self.distrib, self.num_trans_smpl,
-                 sort=True, counts=self.counts, encd_ids=self.encd_ids,
-                 use_all_wave=self.train_use_all_wave, avg_per_band=self.avg_per_band)
-        else:
-            raise Exception('Unsupported monte carlo choice')
-
-        self.smpl_wave = smpl_wave   # [bsz,nsmpl,1]/[bsz,nbands,nsmpl,1]
-        self.smpl_trans = smpl_trans # [bsz,nbands,nsmpl]
-        self.nsmpl_within_each_band_mixture = nsmpl_within_each_band_mixture # [bsz,nbands]
 
     def get_recon_cutout_gt(self, cutout_pixel_ids):
         """ Get gt cutout from loaded pixels. """
@@ -162,19 +129,27 @@ class AstroDataset(Dataset):
     def __getitem__(self, idx : list):
         """ Sample data from requried fields using given index. """
         out = {}
-        for field in self.dataset_fields:
-            out[field] = self.data[field][idx]
 
-        # if self.require_pixels:
-        #     out["pixels"] = self.data["pixels"][idx]
-        # if self.require_coords:
-        #     out["coords"] = self.data["coords"][idx] # always sample a 3d coords [bsz,1,dim]
-        # if self.require_weights:
-        #     out["weights"] = self.data["weights"][idx]
-        # if self.require_masks:
-        #     out["masks"] = self.data["masks"][idx]
-        # print('got item', (out['coords']).shape)
-        # print('got item', (out['pixels']).shape)
+        requested_fields = set(self.dataset_fields)
+        batched_fields = list(requested_fields - self.unbatched_fields)
+
+        for field in batched_fields:
+            out[field] = self.data[field][idx]
+            #print(field, out[field].shape)
+
+        # fields that are not batched (we do monte carlo sampling at every step)
+        if len(requested_fields.intersection(self.unbatched_fields)) != 0:
+            batch_size = len(idx)
+            out["wave"], out["trans"], out["nsmpl"] = \
+                self.trans_dataset.sample_wave_trans(batch_size, self.num_samples)
+            #print(out["wave"].shape)
+            #print(out["trans"].shape)
+            #print(out["nsmpl"].shape)
+
+        out["coords"] = out["coords"][:,None].tile(1, self.num_samples,1)
+        out["wave"] = out["wave"][...,None]
+        #print(out["coords"].shape, out["wave"].shape)
+        out["coords"] = torch.cat((out["coords"], out["wave"]), dim=-1)
 
         if self.transform is not None:
             out = self.transform(out)
