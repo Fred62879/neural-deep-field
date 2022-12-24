@@ -1,5 +1,6 @@
 
 import torch
+import logging as log
 
 from wisp.models.grids import *
 from wisp.utils import PerfTimer
@@ -113,31 +114,25 @@ class NeuralHyperSpectral(BaseNeuralField):
 
         timer.check("rf_hyperspectral_preprocess")
 
-        #print(torch.min(coords), torch.max(coords))
-        #print(coords.isnan().any())
         # embed 2D coords into high-dimensional vectors with PE or the grid
         if self.kwargs["coords_embed_method"] == "positional":
             feats = self.embedder(coords) # [bsz,coords_embed_dim]
             timer.check("rf_hyperspectral_pe")
 
         elif self.kwargs["coords_embed_method"] == "grid":
-            coords = coords[:,None] # ****** replace
-
             if lod_idx is None:
                 lod_idx = len(self.grid.active_lods) - 1
 
             feats = self.grid.interpolate(coords, lod_idx)
             feats = feats.reshape(-1, self.effective_feature_dim)
             timer.check("rf_hyperspectra_interpolate")
-            if self.position_input:
-                raise NotImplementedError
         else:
-            raise ValueError("Unrecognized coords embedding method.")
+            log.info("no embedding performed on the coordinates.")
 
-        #print(feats.isnan().any())
         timer.check("rf_hyperspectral_embedding")
 
         if self.space_dim == 3:
+            feats = feats.reshape(batch, num_samples, -1)
             return dict(latents=feats)
 
         intensity = self.decoder_intensity(feats)

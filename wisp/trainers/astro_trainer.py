@@ -58,6 +58,7 @@ class AstroTrainer(BaseTrainer):
                  exp_name=None, info=None, scene_state=None, extra_args=None,
                  render_tb_every=-1, save_every=-1, using_wandb=False):
 
+        self.use_all_pixels = False
         self.shuffle_dataloader = True # pre-epoch requires this
 
         super().__init__(pipeline, dataset, num_epochs, batch_size, optim_cls,
@@ -275,6 +276,7 @@ class AstroTrainer(BaseTrainer):
 
             # re-init dataloader to make sure pixels are in order
             self.shuffle_dataloader = False
+            self.use_all_pixels = True
             self.init_dataloader()
 
         self.pipeline.train()
@@ -288,6 +290,16 @@ class AstroTrainer(BaseTrainer):
         self.log_dict["codebook_loss"] = 0.0
 
     def init_dataloader(self):
+        """ (Re-)Initialize dataloader.
+            When need to save data locally, use all coords in original order.
+            Otherwise, randomly select 10% coords.
+        """
+        length = self.dataset.get_num_coords()
+        if self.use_all_pixels:
+            self.dataset.set_dataset_length(length)
+        else:
+            self.dataset.set_dataset_length(int(length*0.1))
+
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
         #sampler_cls = SequentialSampler
@@ -342,6 +354,7 @@ class AstroTrainer(BaseTrainer):
 
         if self.save_data_to_local: # set in pre-epoch
             self.save_local()
+            self.use_all_pixels = False
             self.shuffle_dataloader = True
             self.save_data_to_local = False
 

@@ -56,7 +56,7 @@ trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 2000
+    num_epochs: 1000
     batch_size: 4096000
     valid_every: -1
     save_every: 400
@@ -119,23 +119,23 @@ grid:
     grid_type: 'HashGrid'
     interpolation_type: 'linear'
     multiscale_type: 'cat'
-    feature_dim: 2
+    feature_dim: 4
     feature_std: 0.01
     num_lods: 12
     tree_type: 'geometric'
     min_grid_res: 1
-    max_grid_res: 96
-    codebook_bitwidth: 19
+    max_grid_res: 64
+    codebook_bitwidth: 22
 
 hyperspectral:
-    coords_embed_dim: 8000
-    coords_embed_method: 'positional'
-    wave_embed_dim: 8000
+    coords_embed_dim: 2000
+    coords_embed_method: 'grid'
+    wave_embed_dim: 2000
     wave_embed_method: 'positional'
     hps_convert_method: 'add'
     hps_decod_activation_type: 'relu'
-    hps_decod_num_layers: 5
-    hps_decod_hidden_dim: 512
+    hps_decod_num_layers: 1
+    hps_decod_hidden_dim: 64
     hps_decod_layer_type: 'none'
     integration_method: 'dot_prod'
 

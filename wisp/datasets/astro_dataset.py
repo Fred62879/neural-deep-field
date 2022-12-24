@@ -71,7 +71,7 @@ class AstroDataset(Dataset):
                 self.data['spectra'] = self.spectra_dataset.get_spectra()
 
         # randomly initialize
-        self.set_dataset_length(1)
+        self.set_dataset_length(1000)
 
     ############
     # Setters
