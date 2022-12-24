@@ -314,6 +314,43 @@ class AstroTrainer(BaseTrainer):
             num_workers=0
         )
 
+    def init_optimizer(self):
+        """Default initialization for the optimizer.
+        """
+        params_dict = { name : param for name, param in self.pipeline.named_parameters() }
+
+        params = []
+        decoder_params = []
+        grid_params = []
+        rest_params = []
+
+        for name in params_dict:
+
+            if 'decoder' in name:
+                # If "decoder" is in the name, there's a good chance it is in fact a decoder,
+                # so use weight_decay
+                decoder_params.append(params_dict[name])
+
+            elif 'grid' in name:
+                # If "grid" is in the name, there's a good chance it is in fact a grid,
+                # so use grid_lr_weight
+                grid_params.append(params_dict[name])
+
+            else:
+                rest_params.append(params_dict[name])
+
+        params.append({"params" : decoder_params,
+                       "lr": self.lr,
+                       "weight_decay": self.weight_decay})
+
+        params.append({"params" : grid_params,
+                       "lr": self.lr * self.grid_lr_weight})
+
+        params.append({"params" : rest_params,
+                       "lr": self.lr})
+
+        self.optimizer = self.optim_cls(params, **self.optim_params)
+
     #############
     # end epoch
     #############

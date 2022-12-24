@@ -98,9 +98,9 @@ class BaseTrainer(ABC):
         self.info = info
 
         self.pipeline = pipeline
-        log.info("Total number of parameters: {}".format(
-            sum(p.numel() for p in self.pipeline.nef.parameters()))\
-        )
+        #log.info("Total number of parameters: {}".format(
+        #    sum(p.numel() for p in self.pipeline.nef.parameters()))\
+        #)
         # Set device to use
         self.device = device
         device_name = torch.cuda.get_device_name(device=self.device)

@@ -46,9 +46,11 @@ def get_pipelines_from_config(args, tasks=[]):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if args.dataset_type == 'astro':
-        nef = globals()[args.nef_type](**vars(args))
+        nef, quantz, hyper_decod = None, None, None
 
-        quantz, hyper_decod = None, None
+        if args.space_dim == 2 or args.coords_embed_method in {"positional","grid"}:
+            nef = globals()[args.nef_type](**vars(args))
+
         if args.space_dim == 3:
             if args.quantize_latent:
                 quantz = LatentQuantizer(**vars(args))

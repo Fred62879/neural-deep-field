@@ -199,6 +199,12 @@ def define_cmd_line_args():
     hps_group.add_argument("--integration-method", type=str,
                             choices=["identity","dot_prod","trapezoid","simpson"])
 
+    hps_group.add_argument("--hps-siren-seed", type=int, default=1)
+    hps_group.add_argument("--hps-siren-first-w0", type=int, default=30)
+    hps_group.add_argument("--hps-siren-hidden-w0", type=int, default=30)
+    hps_group.add_argument("--hps-siren-coords-scaler", type=int, default=1)
+    hps_group.add_argument("--hps-siren-last-linear", action="store_true")
+
     ###################
     # Arguments for dataset
     ###################

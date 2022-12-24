@@ -93,7 +93,7 @@ class NeuralHyperSpectral(BaseNeuralField):
     def hyperspectral(self, coords, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
-              coords (torch.FloatTensor): tensor of shape [1, batch, num_samples, 2]
+              coords (torch.FloatTensor): tensor of shape [1, batch, num_samples, 2/3]
               pidx (torch.LongTensor): SPC point_hierarchy indices of shape [batch].
                                        Unused in the current implementation.
               lod_idx (int): index into active_lods. If None, will use the maximum LOD.
@@ -116,7 +116,7 @@ class NeuralHyperSpectral(BaseNeuralField):
 
         # embed 2D coords into high-dimensional vectors with PE or the grid
         if self.kwargs["coords_embed_method"] == "positional":
-            feats = self.embedder(coords) # [bsz,coords_embed_dim]
+            feats = self.embedder(coords) # [bsz,num_samples,coords_embed_dim]
             timer.check("rf_hyperspectral_pe")
 
         elif self.kwargs["coords_embed_method"] == "grid":
@@ -127,6 +127,7 @@ class NeuralHyperSpectral(BaseNeuralField):
             feats = feats.reshape(-1, self.effective_feature_dim)
             timer.check("rf_hyperspectra_interpolate")
         else:
+            feats = coords
             log.info("no embedding performed on the coordinates.")
 
         timer.check("rf_hyperspectral_embedding")
