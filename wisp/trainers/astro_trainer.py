@@ -58,6 +58,7 @@ class AstroTrainer(BaseTrainer):
                  exp_name=None, info=None, scene_state=None, extra_args=None,
                  render_tb_every=-1, save_every=-1, using_wandb=False):
 
+        self.hps_lr = extra_args["hps_lr"]
         self.use_all_pixels = False
         self.shuffle_dataloader = True # pre-epoch requires this
 
@@ -315,40 +316,30 @@ class AstroTrainer(BaseTrainer):
         )
 
     def init_optimizer(self):
-        """Default initialization for the optimizer.
-        """
-        params_dict = { name : param for name, param in self.pipeline.named_parameters() }
-
+        params_dict = { name : param for name, param
+                        in self.pipeline.named_parameters() }
         params = []
-        decoder_params = []
-        grid_params = []
-        rest_params = []
+        hps_params, decoder_params, grid_params, rest_params = [],[],[],[]
 
         for name in params_dict:
-
-            if 'decoder' in name:
-                # If "decoder" is in the name, there's a good chance it is in fact a decoder,
-                # so use weight_decay
+            if "hyper_decod" in name:
+                hps_params.append(params_dict[name])
+            elif "decoder" in name:
                 decoder_params.append(params_dict[name])
-
-            elif 'grid' in name:
-                # If "grid" is in the name, there's a good chance it is in fact a grid,
-                # so use grid_lr_weight
+            elif "grid" in name:
                 grid_params.append(params_dict[name])
-
             else:
                 rest_params.append(params_dict[name])
 
+        params.append({"params": hps_params,
+                       "lr": self.hps_lr})
         params.append({"params" : decoder_params,
                        "lr": self.lr,
                        "weight_decay": self.weight_decay})
-
         params.append({"params" : grid_params,
                        "lr": self.lr * self.grid_lr_weight})
-
         params.append({"params" : rest_params,
                        "lr": self.lr})
-
         self.optimizer = self.optim_cls(params, **self.optim_params)
 
     #############

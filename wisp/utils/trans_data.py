@@ -11,9 +11,10 @@ from wisp.utils.plot import plot_save
 
 class TransData:
 
-    def __init__(self, dataset_path, **kwargs):
+    def __init__(self, dataset_path, device, **kwargs):
 
         self.kwargs = kwargs
+        self.device = device
         self.verbose = kwargs["verbose"]
         self.plot = kwargs["plot_trans"]
 
@@ -92,6 +93,7 @@ class TransData:
 
         if self.sample_method == "mixture":
             self.trans_data = (self.full_norm_wave, self.full_trans, self.full_distrib, encd_ids)
+            #self.trans_data = (self.full_norm_wave.to(self.device), self.full_trans.to(self.device), self.full_distrib.to(self.device), encd_ids.to(self.device))
         elif self.sample_method == "bandwise":
             self.trans_data = self.load_bandwise_wave_trans(norm_wave, trans)
         elif self.sample_method == "hardcode":

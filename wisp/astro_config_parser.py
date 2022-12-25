@@ -33,8 +33,9 @@ def get_optimizer_from_config(args):
 
 def get_dataset_from_config(args):
     """ Utility function to get the dataset from the parsed config. """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if args.dataset_type == 'astro':
-        dataset = AstroDataset(**vars(args))
+        dataset = AstroDataset(device, **vars(args))
         dataset.init()
     else:
         raise ValueError(f'"{args.dataset_type}" unrecognized dataset_type')
@@ -46,11 +47,9 @@ def get_pipelines_from_config(args, tasks=[]):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if args.dataset_type == 'astro':
-        nef, quantz, hyper_decod = None, None, None
+        nef = globals()[args.nef_type](**vars(args))
 
-        if args.space_dim == 2 or args.coords_embed_method in {"positional","grid"}:
-            nef = globals()[args.nef_type](**vars(args))
-
+        quantz, hyper_decod = None, None
         if args.space_dim == 3:
             if args.quantize_latent:
                 quantz = LatentQuantizer(**vars(args))

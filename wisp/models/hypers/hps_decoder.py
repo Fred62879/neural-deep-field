@@ -16,10 +16,10 @@ class HyperSpectralDecoder(nn.Module):
 
         super(HyperSpectralDecoder, self).__init__()
 
-        #self.convert = HyperSpectralConverter(**kwargs)
-
         '''
-        # encode ra/dec coords with wave separately
+        self.convert = HyperSpectralConverter(**kwargs)
+
+        # encode ra/dec coords first and then combine with wave
         if kwargs["hps_convert_method"] == "add":
             assert(kwargs["wave_embed_dim"] == kwargs["coords_embed_dim"])
             input_dim = kwargs["wave_embed_dim"]
@@ -32,12 +32,17 @@ class HyperSpectralDecoder(nn.Module):
 
         # encode ra/dec coords with wave together
         if kwargs["coords_embed_method"] == "grid":
+            assert(kwargs["hps_decod_activation_type"] == "relu")
+            input_dim = kwargs["feature_dim"]
             if kwargs["multiscale_type"] == 'cat':
-                input_dim = kwargs["feature_dim"] * kwargs["num_lods"]
-            else: input_dim = kwargs["feature_dim"]
+                input_dim *= kwargs["num_lods"]
+
         elif kwargs["coords_embed_method"] == "positional":
+            assert(kwargs["hps_decod_activation_type"] == "relu")
             input_dim = kwargs["coords_embed_dim"]
+
         else:
+            assert(kwargs["hps_decod_activation_type"] == "sin")
             input_dim = 3
 
         if kwargs["hps_decod_activation_type"] == "relu":
@@ -54,23 +59,21 @@ class HyperSpectralDecoder(nn.Module):
                 kwargs["hps_siren_seed"], kwargs["hps_siren_coords_scaler"],
                 kwargs["hps_siren_last_linear"])
 
-        self.sinh = Fn(torch.sinh)
+        else: raise ValueError("Unrecognized hyperspectral decoder activation type.")
+
         self.integrate = HyperSpectralIntegrator(**kwargs)
+        self.sinh = Fn(torch.sinh)
 
     def forward(self, data, **kwargs):
         """ @Param
               data: output from nerf, including:
-                   latent: (embedded or original) ra/dec coords [bsz,coords_embed_dim or 2]
+                   latent: (embedded or original) coords [bsz,num_samples,coords_embed_dim or 2 or 3]
                    scaler: (if perform quantization) unique scaler value for each coord [bsz,1]
                    redshift: (if perform quantization) unique redshift value for each coord [bsz,1]
               wave: lambda values, used to convert ra/dec to hyperspectral coords [bsz,num_samples]
               trans: corresponding transmission values of lambda [bsz,num_samples]
         """
-        if data is None:
-            latents = kwargs["coords"]
-        else:
-            latents = data["latents"]
-        #print(latents.shape, latents[0])
+        latents = data["latents"]
         scaler = None if "scaler" not in data else data["scaler"]
         redshift = None if "redshift" not in data else data["redshift"]
 
@@ -82,5 +85,6 @@ class HyperSpectralDecoder(nn.Module):
         if scaler is not None: spectra *= scaler
 
         intensity = self.integrate(spectra[...,0], **kwargs)
+        intensity = self.sinh(intensity)
         data["intensity"] = intensity
         return data

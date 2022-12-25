@@ -18,8 +18,9 @@ from wisp.utils.numerical import normalize_coords, normalize, \
 class FITSData:
     ''' Data class for FITS files. '''
 
-    def __init__(self, dataset_path, **kwargs):
+    def __init__(self, dataset_path, device, **kwargs):
         self.kwargs = kwargs
+        self.device = device
         self.verbose = kwargs["verbose"]
         self.footprints = kwargs["fits_footprints"]
         self.tile_ids = kwargs["fits_tile_ids"]
@@ -46,7 +47,6 @@ class FITSData:
         self.load_headers()
         self.load_all_fits()
         self.get_world_coords_all_fits()
-
 
     ################
     # Generate filenames

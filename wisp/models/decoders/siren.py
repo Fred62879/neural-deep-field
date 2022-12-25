@@ -37,9 +37,7 @@ class Siren(nn.Module):
               output [bsz,...,dim_out]
         """
     def forward(self, coords):
-        print(coords.isnan().any())
         ret = self.net(coords * self.coords_scaler)
-        print(ret.isnan().any())
         return ret
 
 class Sine_Layer(nn.Module):

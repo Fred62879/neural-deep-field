@@ -8,9 +8,10 @@ global:
 optimizer:
     optimizer_type: 'rmsprop'
     lr: 0.001
+    hps_lr: 1e-5
 
 dataset:
-    space_dim: 3
+    space_dim: 2
     dataset_type: 'astro'
     load_fits_data_cache: True
     dataset_path: '../../data/pdr3'
@@ -56,10 +57,10 @@ trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 1000
+    num_epochs: 2000
     batch_size: 4096000
     valid_every: -1
-    save_every: 400
+    save_every: 100
     render_tb_every: -1
     log_tb_every: 100
     log_gpu_every: 100
@@ -111,6 +112,13 @@ net:
     hidden_dim: 64
     num_layers: 1
     out_dim: 5
+    activation_type: "relu"
+
+    siren_seed: 0
+    siren_first_w0: 24
+    siren_hidden_w0: 6
+    siren_coords_scaler: 8
+    siren_last_linear: False
 
 embedder:
     embedder_type: 'positional'
@@ -128,21 +136,21 @@ grid:
     codebook_bitwidth: 22
 
 hyperspectral:
-    coords_embed_dim: 2000
+    coords_embed_dim: 4000
     coords_embed_method: 'none'
     wave_embed_dim: 2000
     wave_embed_method: 'none'
     hps_convert_method: 'add'
     hps_decod_activation_type: 'sin'
-    hps_decod_num_layers: 1
-    hps_decod_hidden_dim: 64
+    hps_decod_num_layers: 3
+    hps_decod_hidden_dim: 256
     hps_decod_layer_type: 'none'
     integration_method: 'dot_prod'
 
     hps_siren_seed: 0
-    hps_siren_first_w0: 30
-    hps_siren_hidden_w0: 30
-    hps_siren_coords_scaler: 1
+    hps_siren_first_w0: 24
+    hps_siren_hidden_w0: 6
+    hps_siren_coords_scaler: 8
     hps_siren_last_linear: False
 
 inpaint:

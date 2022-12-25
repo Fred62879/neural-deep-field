@@ -1,6 +1,5 @@
 
 import torch
-import logging as log
 
 from wisp.models.grids import *
 from wisp.utils import PerfTimer
@@ -8,7 +7,7 @@ from wisp.models.nefs import BaseNeuralField
 from wisp.models.decoders import BasicDecoder
 from wisp.models.layers import get_layer_class, Fn
 from wisp.models.activations import get_activation_class
-from wisp.models.embedders import get_positional_embedder, RandGausLinr
+from wisp.models.embedders import get_positional_embedder, RandGaus
 
 
 class NeuralHyperSpectral(BaseNeuralField):
@@ -29,7 +28,8 @@ class NeuralHyperSpectral(BaseNeuralField):
         pe_bias = True
         #float_tensor = torch.cuda.FloatTensor
         verbose = False
-        self.embedder = RandGausLinr((3, pe_dim, sigma, omega, pe_bias, verbose))
+        seed = 0
+        self.embedder = RandGaus((3, pe_dim, omega, sigma, pe_bias, seed, verbose))
 
     def init_grid(self):
         """ Initialize the grid object. """
@@ -66,18 +66,32 @@ class NeuralHyperSpectral(BaseNeuralField):
         if self.space_dim == 3: return
 
         if self.kwargs["coords_embed_method"] == "positional":
+            assert(kwargs["activation_type"] == "relu")
             input_dim = self.kwargs["coords_embed_dim"]
+
         elif self.kwargs["coords_embed_method"] == "grid":
+            assert(kwargs["activation_type"] == "relu")
             input_dim = self.effective_feature_dim
         else:
-            input_dim = 3 #2 ^^
+            assert(kwargs["activation_type"] == "sin")
+            input_dim = 2
 
-        self.decoder_intensity = BasicDecoder \
-            (input_dim, self.output_dim, get_activation_class(self.activation_type),
-             True, layer=get_layer_class(self.layer_type), num_layers=self.num_layers+1,
-             hidden_dim=self.hidden_dim, skip=[])
+        if kwargs["activation_type"] == "relu":
+            self.decoder_intensity = BasicDecoder \
+                (input_dim, self.output_dim, get_activation_class(self.activation_type),
+                 True, layer=get_layer_class(self.layer_type), num_layers=self.num_layers+1,
+                 hidden_dim=self.hidden_dim, skip=[])
 
-        self.sinh_scaling = Fn(torch.sinh)
+        elif kwargs["activation_type"] == "sin":
+            self.decode = Siren(
+                input_dim, self.output_dim, self.num_layers, self.hidden_dim,
+                kwargs["siren_first_w0"], kwargs["siren_hidden_w0"],
+                kwargs["siren_seed"], kwargs["siren_coords_scaler"],
+                kwargs["siren_last_linear"])
+
+        else: raise ValueError("Unrecognized hyperspectral decoder activation type.")
+
+        self.sin = Fn(torch.sinh)
 
     def get_nef_type(self):
         return 'hyperspectral'
@@ -128,7 +142,6 @@ class NeuralHyperSpectral(BaseNeuralField):
             timer.check("rf_hyperspectra_interpolate")
         else:
             feats = coords
-            log.info("no embedding performed on the coordinates.")
 
         timer.check("rf_hyperspectral_embedding")
 
@@ -137,6 +150,6 @@ class NeuralHyperSpectral(BaseNeuralField):
             return dict(latents=feats)
 
         intensity = self.decoder_intensity(feats)
-        intensity = self.sinh_scaling(intensity)
+        intensity = self.sinh(intensity)
         timer.check("rf_hyperspectral_decode")
         return dict(intensity=intensity)

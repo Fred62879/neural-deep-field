@@ -43,9 +43,7 @@ class AstroPipeline(nn.Module):
         self.hyper_decod: HyperSpectralDecoder = hyper_decod
 
     def forward(self, *args, **kwargs):
-        if self.nef is not None:
-            ret = self.nef(*args, **kwargs)
-        else: ret = None
+        ret = self.nef(*args, **kwargs)
 
         # quantize latent variables
         if self.quantz is not None:

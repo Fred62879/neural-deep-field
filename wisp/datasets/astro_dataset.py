@@ -13,6 +13,7 @@ class AstroDataset(Dataset):
           a astro image with 2d architectures.
     """
     def __init__(self,
+                 device                   : str,
                  tasks                    : list, # test/train/inferrence (incl. img recon etc.)
                  dataset_path             : str,
                  dataset_num_workers      : int      = -1,
@@ -25,6 +26,7 @@ class AstroDataset(Dataset):
         """
         self.kwargs = kwargs
 
+        self.device = device
         self.tasks = set(tasks)
         self.root = dataset_path
         self.transform = transform
@@ -51,7 +53,7 @@ class AstroDataset(Dataset):
         self.require_masks = "train" in self.tasks and self.kwargs["inpaint_cho"] == "spectral_inpaint"
 
         if self.require_full_coords or self.require_pixels or self.require_weights:
-            self.fits_dataset = FITSData(self.root, **self.kwargs)
+            self.fits_dataset = FITSData(self.root, self.device, **self.kwargs)
             self.fits_ids = self.fits_dataset.get_fits_ids()
             self.num_rows, self.num_cols = self.fits_dataset.get_img_sizes()
 
@@ -65,7 +67,7 @@ class AstroDataset(Dataset):
                 self.data['masks'] = self.fits_dataset.get_mask()
 
         if self.kwargs["space_dim"] == 3:
-            self.trans_dataset = TransData(self.root, **self.kwargs)
+            self.trans_dataset = TransData(self.root, self.device, **self.kwargs)
             self.num_samples = self.kwargs["num_trans_samples"]
             if self.kwargs["spectra_supervision"]:
                 self.data['spectra'] = self.spectra_dataset.get_spectra()

@@ -179,6 +179,12 @@ def define_cmd_line_args():
     net_group.add_argument("--position-input", action="store_true",
                           help="Use position as input.")
 
+    net_group.add_argument("--siren-seed", type=int, default=1)
+    net_group.add_argument("--siren-first-w0", type=int, default=30)
+    net_group.add_argument("--siren-hidden-w0", type=int, default=30)
+    net_group.add_argument("--siren-coords-scaler", type=int, default=1)
+    net_group.add_argument("--siren-last-linear", action="store_true")
+
     ###################
     # Hyperspectral arguments
     ###################
@@ -304,6 +310,7 @@ def define_cmd_line_args():
                              help="Optimizer to be used.")
     optim_group.add_argument("--lr", type=float, default=0.001,
                              help="Learning rate.")
+    optim_group.add_argument("--hps-lr", type=float, default=0.0001)
     optim_group.add_argument("--weight-decay", type=float, default=0,
                              help="Weight decay.")
     optim_group.add_argument("--grid-lr-weight", type=float, default=100.0,
