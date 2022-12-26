@@ -4,10 +4,10 @@ import torch
 from wisp.models.grids import *
 from wisp.utils import PerfTimer
 from wisp.models.nefs import BaseNeuralField
-from wisp.models.layers import get_layer_class, Fn
 from wisp.models.decoders import BasicDecoder, Siren
 #from wisp.models.siren import Siren
 from wisp.models.activations import get_activation_class
+from wisp.models.layers import get_layer_class, Normalization
 from wisp.models.embedders import get_positional_embedder, RandGaus
 
 
@@ -33,10 +33,9 @@ class NeuralHyperSpectral(BaseNeuralField):
         sigma = 1
         omega = 1
         pe_bias = True
-        #float_tensor = torch.cuda.FloatTensor
         verbose = False
         seed = 0
-        self.embedder = RandGaus((3, pe_dim, omega, sigma, pe_bias, seed, verbose))
+        self.embedder = RandGaus((self.space_dim, pe_dim, omega, sigma, pe_bias, seed, verbose))
 
     def init_grid(self):
         """ Initialize the grid object. """
@@ -54,7 +53,7 @@ class NeuralHyperSpectral(BaseNeuralField):
             raise NotImplementedError
 
         self.grid = grid_class(
-            self.feature_dim, space_dim=self.space_dim,
+            self.feature_dim, grid_dim=self.grid_dim,
             base_lod=self.base_lod, num_lods=self.num_lods,
             interpolation_type=self.interpolation_type,
             multiscale_type=self.multiscale_type, **self.kwargs)
@@ -70,7 +69,10 @@ class NeuralHyperSpectral(BaseNeuralField):
     def init_decoder(self):
         """ Initializes the decoder object.
         """
-        # set decoder input dimension
+        # hyperspectral setup w.o/ quantization doesn't need decoder
+        if self.space_dim == 3 and not self.kwargs["quantize_latent"]:
+            return
+
         if self.kwargs["coords_embed_method"] == "positional":
             assert(self.activation_type == "relu")
             input_dim = self.kwargs["coords_embed_dim"]
@@ -117,7 +119,7 @@ class NeuralHyperSpectral(BaseNeuralField):
 
         else: raise ValueError("Unrecognized decoder activation type.")
 
-        self.sinh = Fn(torch.sinh)
+        self.norm = Normalization(self.kwargs["mlp_output_norm_method"])
 
     def get_nef_type(self):
         return 'hyperspectral'
@@ -197,6 +199,6 @@ class NeuralHyperSpectral(BaseNeuralField):
             return dict(latents=latents, scaler=scaler, redshift=redshift)
 
         intensity = self.decoder_intensity(feats)
-        intensity = self.sinh(intensity)
+        intensity = self.norm(intensity)
         timer.check("rf_hyperspectral_decode")
         return dict(intensity=intensity)

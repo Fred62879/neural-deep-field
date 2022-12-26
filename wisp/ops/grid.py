@@ -71,10 +71,10 @@ class HashGridInterpolate(torch.autograd.Function):
     # TODO(ttakikawa): This class should also support the 2D case... which also means I have to write another kernel!
 
     @staticmethod
-    def forward(ctx, coords, resolutions, codebook_bitwidth, space_dim, lod_idx, *codebook):
+    def forward(ctx, coords, resolutions, codebook_bitwidth, grid_dim, lod_idx, *codebook):
         # TODO(ttakikawa): Make the kernel use the LOD
         feats_out = wisp_C.ops.hashgrid_interpolate_cuda(
-            coords.contiguous().float(), codebook, resolutions, codebook_bitwidth, space_dim
+            coords.contiguous().float(), codebook, resolutions, codebook_bitwidth, grid_dim
         ).contiguous()
 
         ctx.save_for_backward(coords)
@@ -84,7 +84,7 @@ class HashGridInterpolate(torch.autograd.Function):
         ctx.codebook_size = 2**codebook_bitwidth
         ctx.codebook_bitwidth = codebook_bitwidth
         ctx.feature_dim = codebook[0].shape[-1]
-        ctx.space_dim = space_dim
+        ctx.grid_dim = grid_dim
         return feats_out
 
     @staticmethod
@@ -93,17 +93,17 @@ class HashGridInterpolate(torch.autograd.Function):
         resolutions = ctx.resolutions
         codebook_size = ctx.codebook_size
         feature_dim = ctx.feature_dim
-        space_dim = ctx.space_dim
+        grid_dim = ctx.grid_dim
         codebook_shapes = ctx.codebook_shapes
         codebook_bitwidth = ctx.codebook_bitwidth
 
         grad_codebook = wisp_C.ops.hashgrid_interpolate_backward_cuda(
             coords.contiguous(), grad_output.contiguous(),
             resolutions, [c_[0] for c_ in codebook_shapes],
-            codebook_bitwidth, feature_dim, space_dim)
+            codebook_bitwidth, feature_dim, grid_dim)
         return (None, None, None, None, None, *grad_codebook)
 
-def hashgrid(coords, resolutions, codebook_bitwidth, space_dim, lod_idx, codebook):
+def hashgrid(coords, resolutions, codebook_bitwidth, grid_dim, lod_idx, codebook):
     """The hashgrid function accleerated with CUDA.
 
     Args:
@@ -118,5 +118,5 @@ def hashgrid(coords, resolutions, codebook_bitwidth, space_dim, lod_idx, codeboo
     """
     batch, num_samples, dim = coords.shape
     feats = HashGridInterpolate.apply(coords.reshape(-1, dim).contiguous(), resolutions,
-                                      codebook_bitwidth, space_dim, lod_idx, *[_c for _c in codebook])
+                                      codebook_bitwidth, grid_dim, lod_idx, *[_c for _c in codebook])
     return feats.reshape(batch, num_samples, codebook[0].shape[1] * len(resolutions))

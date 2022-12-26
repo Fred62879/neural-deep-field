@@ -178,7 +178,7 @@ void hashgrid_interpolate_cuda_impl(
     int32_t resolution,
     int32_t lod_idx,
     int32_t num_lods,
-    int8_t  space_dim,
+    int8_t  grid_dim,
     at::Tensor coords,
     at::Tensor codebook,
     at::Tensor feats){
@@ -188,13 +188,13 @@ void hashgrid_interpolate_cuda_impl(
     const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats));
     auto stream = at::cuda::getCurrentCUDAStream();
 
-    if (space_dim == 2)
+    if (grid_dim == 2)
       hashgrid_interpolate_cuda_kernel_2d<<<(num_coords + num_threads - 1) / num_threads, num_threads, 0, stream>>>
-        (num_coords, codebook_size, feature_dim, resolution, lod_idx, num_lods, space_dim,
+        (num_coords, codebook_size, feature_dim, resolution, lod_idx, num_lods, grid_dim,
          coords.data_ptr<float>(), codebook.data_ptr<float>(), feats.data_ptr<float>());
-    else if (space_dim == 3)
+    else if (grid_dim == 3)
       hashgrid_interpolate_cuda_kernel_3d<<<(num_coords + num_threads - 1) / num_threads, num_threads, 0, stream>>>
-      (num_coords, codebook_size, feature_dim, resolution, lod_idx, num_lods, space_dim,
+      (num_coords, codebook_size, feature_dim, resolution, lod_idx, num_lods, grid_dim,
        coords.data_ptr<float>(), codebook.data_ptr<float>(), feats.data_ptr<float>());
 
 }
@@ -211,7 +211,7 @@ hashgrid_interpolate_backward_cuda_kernel_2d(
     const int32_t resolution,
     const int32_t lod_idx,
     const int32_t num_lods,
-    const int8_t  space_dim,
+    const int8_t  grid_dim,
     const float* coords,
     const float* grad_output, // N, feature_dim*num_lods
     float* grad_codebook // codebook_size, feature_dim
@@ -260,7 +260,7 @@ hashgrid_interpolate_backward_cuda_kernel_3d(
     const int32_t resolution,
     const int32_t lod_idx,
     const int32_t num_lods,
-    const int8_t  space_dim,
+    const int8_t  grid_dim,
     const float* coords,
     const float* grad_output, // N, feature_dim*num_lods
     float* grad_codebook // codebook_size, feature_dim
@@ -315,7 +315,7 @@ void hashgrid_interpolate_backward_cuda_impl(
     int32_t resolution,
     int32_t lod_idx,
     int32_t num_lods,
-    int8_t  space_dim,
+    int8_t  grid_dim,
     at::Tensor coords,
     at::Tensor grad_output,
     at::Tensor grad_codebook){
@@ -325,14 +325,14 @@ void hashgrid_interpolate_backward_cuda_impl(
     const at::cuda::OptionalCUDAGuard device_guard(at::device_of(grad_codebook));
     auto stream = at::cuda::getCurrentCUDAStream();
 
-    if (space_dim == 2)
+    if (grid_dim == 2)
       hashgrid_interpolate_backward_cuda_kernel_2d<<<(num_coords + num_threads - 1) / num_threads, num_threads, 0, stream>>>
-        (num_coords, codebook_size, feature_dim, resolution, lod_idx, num_lods, space_dim,
+        (num_coords, codebook_size, feature_dim, resolution, lod_idx, num_lods, grid_dim,
          coords.data_ptr<float>(), grad_output.data_ptr<float>(), grad_codebook.data_ptr<float>());
 
-    else if (space_dim == 3)
+    else if (grid_dim == 3)
       hashgrid_interpolate_backward_cuda_kernel_3d<<<(num_coords + num_threads - 1) / num_threads, num_threads, 0, stream>>>
-        (num_coords, codebook_size, feature_dim, resolution, lod_idx, num_lods, space_dim,
+        (num_coords, codebook_size, feature_dim, resolution, lod_idx, num_lods, grid_dim,
          coords.data_ptr<float>(), grad_output.data_ptr<float>(), grad_codebook.data_ptr<float>());
 }
 

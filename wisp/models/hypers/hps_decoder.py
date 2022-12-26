@@ -3,9 +3,9 @@ import torch
 import torch.nn as nn
 
 from wisp.utils import PerfTimer
-from wisp.models.layers import get_layer_class, Fn
 from wisp.models.decoders import BasicDecoder, Siren
 from wisp.models.activations import get_activation_class
+from wisp.models.layers import get_layer_class, Normalization
 from wisp.models.hypers.hps_converter import HyperSpectralConverter
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
 
@@ -16,20 +16,31 @@ class HyperSpectralDecoder(nn.Module):
 
         super(HyperSpectralDecoder, self).__init__()
 
-        '''
         self.convert = HyperSpectralConverter(**kwargs)
 
         # encode ra/dec coords first and then combine with wave
         if kwargs["hps_convert_method"] == "add":
             assert(kwargs["wave_embed_dim"] == kwargs["coords_embed_dim"])
             input_dim = kwargs["wave_embed_dim"]
+
         elif kwargs["hps_convert_method"] == "concat":
-            input_dim = kwargs["wave_embed_dim"] + kwargs["coords_embed_dim"]
+            if kwargs["coords_embed_method"] == "positional":
+                assert(kwargs["hps_decod_activation_type"] == "relu")
+                coords_embed_dim = kwargs["coords_embed_dim"]
+
+            elif kwargs["coords_embed_method"] == "grid":
+                assert(kwargs["hps_decod_activation_type"] == "relu")
+                coords_embed_dim = kwargs["feature_dim"]
+                if kwargs["multiscale_type"] == 'cat':
+                    coords_embed_dim *= kwargs["num_lods"]
+
+            input_dim = kwargs["wave_embed_dim"] + coords_embed_dim
+
         else:
             # coords and wave are not embedded
             input_dim = 3
-        '''
 
+        '''
         # encode ra/dec coords with wave together
         if kwargs["quantize_latent"]:
             input_dim = kwargs["qtz_latent_dim"]
@@ -47,6 +58,7 @@ class HyperSpectralDecoder(nn.Module):
         else:
             assert(kwargs["hps_decod_activation_type"] == "sin")
             input_dim = 3
+        '''
 
         if kwargs["hps_decod_activation_type"] == "relu":
             self.decode = BasicDecoder(
@@ -64,8 +76,8 @@ class HyperSpectralDecoder(nn.Module):
 
         else: raise ValueError("Unrecognized hyperspectral decoder activation type.")
 
+        self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.integrate = HyperSpectralIntegrator(**kwargs)
-        self.sinh = Fn(torch.sinh)
 
     def forward(self, data, **kwargs):
         """ @Param
@@ -79,17 +91,15 @@ class HyperSpectralDecoder(nn.Module):
         latents = data["latents"]
         scaler = None if "scaler" not in data else data["scaler"]
         redshift = None if "redshift" not in data else data["redshift"]
-        #codebook_loss = None if "loss"not in data else data["codebook_loss"]
-        #embed_ids = None if "embed_ids" not in data else data["embed_ids"]
 
-        #hyperspectral_coords = self.convert(kwargs["wave"], latents, redshift=redshift)
-        hyperspectral_coords = latents
+        hyperspectral_coords = self.convert(kwargs["wave"], latents, redshift=redshift)
+        #hyperspectral_coords = latents
 
         spectra = self.decode(hyperspectral_coords)
-        spectra = self.sinh(spectra)
+        spectra = self.norm(spectra)
         if scaler is not None: spectra *= scaler
+        data["spectra"] = spectra
 
         intensity = self.integrate(spectra[...,0], **kwargs)
-        intensity = self.sinh(intensity)
         data["intensity"] = intensity
         return data

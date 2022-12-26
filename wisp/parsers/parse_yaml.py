@@ -98,6 +98,7 @@ def define_cmd_line_args():
 
     global_group.add_argument("--config", type=str, help="Path to config file to replace defaults.")
 
+    global_group.add_argument("--debug", action="store_true")
     global_group.add_argument("--verbose", action="store_true")
     global_group.add_argument("--exp-name", type=str, help="Experiment name.")
     global_group.add_argument("--operations", nargs="+", type=str, choices=["train","infer"])
@@ -114,6 +115,7 @@ def define_cmd_line_args():
     ###################
     grid_group = parser.add_argument_group("grid")
 
+    grid_group.add_argument("--grid-dim", type=int, help="Dimension of grid (2 for image, 3 for shape).")
     grid_group.add_argument("--grid-type", type=str, default="OctreeGrid",
                             choices=["None", "OctreeGrid", "CodebookOctreeGrid", "TriplanarGrid", "HashGrid"],
                             help="Type of grid to use.")
@@ -178,7 +180,7 @@ def define_cmd_line_args():
                           help="Path to pretrained model weights.")
     net_group.add_argument("--position-input", action="store_true",
                           help="Use position as input.")
-    net_group.add_argument("--output-norm-cho", type=str,
+    net_group.add_argument("--mlp-output-norm-method", type=str,
                            choices=["identity","arcsinh","sinh"])
 
     net_group.add_argument("--siren-seed", type=int, default=1)
@@ -200,6 +202,7 @@ def define_cmd_line_args():
                            help="wave embedding method.")
     hps_group.add_argument("--hps-convert-method", type=str, choices=["add","concat"],
                            help="method to combine ra/dec coordinate with lambda.")
+
     hps_group.add_argument("--hps-decod-activation-type", type=str)
     hps_group.add_argument("--hps-decod-num-layers", type=int)
     hps_group.add_argument("--hps-decod-hidden-dim", type=int)

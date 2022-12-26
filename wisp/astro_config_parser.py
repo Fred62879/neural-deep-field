@@ -51,20 +51,21 @@ def get_pipelines_from_config(args, tasks=[]):
     """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # if args.dataset_type == 'astro':
-    #     nef = globals()[args.nef_type](**vars(args))
+    if args.debug:
+        pipeline = MLP_All('siren',(2,256,5,3,False,24,6,8,0,torch.FloatTensor))
 
-    #     quantz, hyper_decod = None, None
-    #     if args.space_dim == 3:
-    #         if args.quantize_latent:
-    #             quantz = LatentQuantizer(**vars(args))
-    #         hyper_decod = HyperSpectralDecoder(**vars(args))
+    elif args.dataset_type == 'astro':
+        nef = globals()[args.nef_type](**vars(args))
 
-    #     pipeline = AstroPipeline(nef, quantz, hyper_decod)
-    # else:
-    #     raise ValueError(f"{args.dataset_type} unrecognized dataset_type")
+        quantz, hyper_decod = None, None
+        if args.space_dim == 3:
+            if args.quantize_latent:
+                quantz = LatentQuantizer(**vars(args))
+            hyper_decod = HyperSpectralDecoder(**vars(args))
 
-    pipeline = MLP_All('siren',(2,256,5,3,False,24,6,8,0,torch.FloatTensor))
+        pipeline = AstroPipeline(nef, quantz, hyper_decod)
+    else:
+        raise ValueError(f"{args.dataset_type} unrecognized dataset_type")
 
     log.info(pipeline)
     pipeline.to(device)

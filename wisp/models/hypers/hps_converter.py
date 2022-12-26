@@ -46,8 +46,8 @@ class HyperSpectralConverter(nn.Module):
               convert RA/DEC (original state or embedded) to hyperspectral coordinates.
 
             @Param
-              wave:   lambda values used for casting [1,bsz,num_samples,1]
-              latent: embedded 2D coords [bsz,2 or coords_embed_dim]
+              wave:  lambda values used for casting [1,bsz,num_samples,1]
+              radec: embedded 2D coords [bsz,1,2 or coords_embed_dim]
             @Return
               hps_coords: ra/dec/wave coords
                           if convert method is add, then [bsz,num_samples,embed_dim]
@@ -67,7 +67,7 @@ class HyperSpectralConverter(nn.Module):
             # assert 2D coords are not embedded as well, should use siren in this case
             assert(coords_embed_dim == 2)
 
-        radec = radec[:,None].tile(1,num_samples,1) # [bsz,num_samples,coords_embed_dim or 2]
+        radec = radec.tile(1,num_samples,1) # [bsz,num_samples,coords_embed_dim or 2]
 
         if self.convert_method == "add":
             assert(radec.shape == wave.shape)

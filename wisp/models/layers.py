@@ -109,19 +109,19 @@ def get_layer_class(layer_type):
         assert(False and "layer type does not exist")
 
 class Normalization(nn.Module):
-    def __init__(self, norm_cho):
+    def __init__(self, norm_method):
         super(Normalization, self).__init__()
-        self.init_norm_layer(norm_cho)
+        self.init_norm_layer(norm_method)
 
-    def init_norm_layer(self, norm_cho):
-        if norm_cho == 'identity':
+    def init_norm_layer(self, norm_method):
+        if norm_method == 'identity':
             self.norm = nn.Identity()
-        elif norm_cho == 'arcsinh':
+        elif norm_method == 'arcsinh':
             self.norm = Fn(torch.arcsinh)
-        elif norm_cho == 'sinh':
+        elif norm_method == 'sinh':
             self.norm = Fn(torch.sinh)
         else:
-            raise Exception('Unsupported normalization choice')
+            raise ValueError('Unsupported normalization method.')
 
     def forward(self, input):
         return self.norm(input)

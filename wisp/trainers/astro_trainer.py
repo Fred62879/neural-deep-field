@@ -142,8 +142,6 @@ class AstroTrainer(BaseTrainer):
         self.grad_fn = join(self.log_dir, 'gradient.png')
         self.train_loss_fn = join(self.log_dir, 'loss.npy')
         self.embed_map_fn = join(self.log_dir, 'embed_map.png')
-        #self.model_fns = [join(config['model_dir'], str(i) + '.pth')
-        #                       for i in range(config['num_model_smpls'])]
 
         if self.extra_args["resume_train"]:
             if self.extra_args["resume_log_dir"] is not None:
@@ -227,8 +225,6 @@ class AstroTrainer(BaseTrainer):
                 if self.train_data_loader_iter is None:
                     self.begin_epoch()
                 data = self.next_batch()
-                #print('got data', (data["coords"]).shape)
-                #print('got data', (data["pixels"]).shape)
                 self.iteration += 1
 
             except StopIteration:
@@ -306,7 +302,6 @@ class AstroTrainer(BaseTrainer):
 
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
-        #sampler_cls = SequentialSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
@@ -344,18 +339,17 @@ class AstroTrainer(BaseTrainer):
         # params.append({"params" : rest_params,
         #                "lr": self.lr})
 
-        # for name in params_dict:
-        #     if "grid" in name:
-        #         grid_params.append(params_dict[name])
-        #     else:
-        #         rest_params.append(params_dict[name])
+        for name in params_dict:
+            if "grid" in name:
+                grid_params.append(params_dict[name])
+            else:
+                rest_params.append(params_dict[name])
 
-        # params.append({"params" : grid_params,
-        #                "lr": self.lr * self.grid_lr_weight})
-        # params.append({"params" : rest_params,
-        #                "lr": self.hps_lr})
-        # self.optimizer = self.optim_cls(params, **self.optim_params)
-        self.optimizer = self.optim_cls(self.pipeline.parameters(), **self.optim_params)
+        params.append({"params" : grid_params,
+                       "lr": self.lr * self.grid_lr_weight})
+        params.append({"params" : rest_params,
+                       "lr": self.hps_lr})
+        self.optimizer = self.optim_cls(params, **self.optim_params)
         print(self.optimizer)
 
     #############
@@ -364,9 +358,6 @@ class AstroTrainer(BaseTrainer):
 
     def end_epoch(self):
         self.post_epoch()
-
-        #if self.extra_args["infer_during_train"]:
-        #    infer(args, model_id, checkpoint)
 
         if self.extra_args["valid_every"] > -1 and \
            self.epoch % self.extra_args["valid_every"] == 0 and \
@@ -404,7 +395,6 @@ class AstroTrainer(BaseTrainer):
 
         # save model
         if self.save_every > -1 and self.epoch % self.save_every == 0: # and self.epoch != 0:
-            #epoch in set(extra_args["smpl_epochs"])
             self.save_model()
 
         self.timer.check("post_epoch done")
@@ -430,50 +420,41 @@ class AstroTrainer(BaseTrainer):
     def calculate_loss(self, data):
         total_loss = 0
 
-        #ret = forward(self, self.pipeline, data, self.quantize_latent,
-        #              self.plot_embed_map, self.spectra_supervision)
-        #recon_pixels = ret["intensity"]
-
-        recon_pixels = self.pipeline(data["coords"].to(self.device))
+        ret = forward(self, self.pipeline, data, self.quantize_latent,
+                      self.plot_embed_map, self.spectra_supervision)
+        recon_pixels = ret["intensity"]
         gt_pixels = data["pixels"][0].to(self.device)
 
-        # if self.extra_args["weight_train"]:
-        #     weights = data["weights"].to(self.device)
-        #     gt_pixels *= weights
-        #     recon_pixels *= weights
+        if self.extra_args["weight_train"]:
+            weights = data["weights"].to(self.device)
+            gt_pixels *= weights
+            recon_pixels *= weights
 
-        # # i) reconstruction loss (taking inpaint into account)
-        # if self.spectral_inpaint:
-        #     mask = data["cur_mask"].to(self.device)
-        #     recon_loss = self.loss(gt_pixels, recon_pixels, mask)
-        # else:
-        #     recon_loss = self.loss(gt_pixels, recon_pixels)
-        # self.log_dict["recon_loss"] += recon_loss.item()
-
-        # # ii) spectra loss
-        # if self.spectra_supervision:
-        #     lo = self.extra_args["trusted_spectra_wave_id_lo"]
-        #     hi = self.extra_args["trusted_spectra_wave_id_hi"] + 1
-        #     recon_spectra = ret["spectra"][:,lo:hi]
-        #     spectra_loss = self.spectra_loss(self.gt_spectra, recon_spectra)
-        #     self.log_dict["spectra_loss"] += spectra_loss.item()
-        # else:
-        #     spectra_loss, recon_spectra = 0, None
-
-        # # iii) latent quantization codebook loss
-        # if self.quantize_latent:
-        #     cdbk_loss = ret["codebook_loss"]
-        #     self.log_dict["codebook_loss"] += cdbk_loss.item()
-        # else: cdbk_loss = 0
-
-        #total_loss = recon_loss + spectra_loss + cdbk_loss
-
-        recon_loss = self.loss(gt_pixels, recon_pixels)
-        recon_pixels = gt_pixels
+        # i) reconstruction loss (taking inpaint into account)
+        if self.spectral_inpaint:
+            mask = data["cur_mask"].to(self.device)
+            recon_loss = self.loss(gt_pixels, recon_pixels, mask)
+        else:
+            recon_loss = self.loss(gt_pixels, recon_pixels)
         self.log_dict["recon_loss"] += recon_loss.item()
-        total_loss = recon_loss
-        recon_spectra, embed_ids, latents = [None]*3
 
+        # ii) spectra loss
+        if self.spectra_supervision:
+            lo = self.extra_args["trusted_spectra_wave_id_lo"]
+            hi = self.extra_args["trusted_spectra_wave_id_hi"] + 1
+            recon_spectra = ret["spectra"][:,lo:hi]
+            spectra_loss = self.spectra_loss(self.gt_spectra, recon_spectra)
+            self.log_dict["spectra_loss"] += spectra_loss.item()
+        else:
+            spectra_loss, recon_spectra = 0, None
+
+        # iii) latent quantization codebook loss
+        if self.quantize_latent:
+            cdbk_loss = ret["codebook_loss"]
+            self.log_dict["codebook_loss"] += cdbk_loss.item()
+        else: cdbk_loss = 0
+
+        total_loss = recon_loss + spectra_loss + cdbk_loss
         self.log_dict["total_loss"] += total_loss.item()
 
         embed_ids, latents = None, None
@@ -491,21 +472,15 @@ class AstroTrainer(BaseTrainer):
             @Param:
               data (dict): Dictionary of the input batch from the DataLoader.
         """
-        #cur_batch_sz = self.select_cur_batch_data(batch, save_data)
-        #if self.dim == 3: self.sample_wave_trans(cur_batch_sz)
-
-        self.optimizer.zero_grad() #set_to_none=True)
+        self.optimizer.zero_grad(set_to_none=True)
         self.timer.check("zero grad")
 
-        #with torch.cuda.amp.autocast():
-        total_loss, recon_pixels, recon_spectra, embed_ids, latents = self.calculate_loss(data)
+        with torch.cuda.amp.autocast():
+            total_loss, recon_pixels, recon_spectra, embed_ids, latents = self.calculate_loss(data)
 
-        #self.scaler.scale(total_loss).backward()
-        #self.scaler.step(self.optimizer)
-        #self.scaler.update()
-
-        total_loss.backward()
-        self.optimizer.step()
+        self.scaler.scale(total_loss).backward()
+        self.scaler.step(self.optimizer)
+        self.scaler.update()
         self.timer.check("backward and step")
 
         #plot_grad_flow(self.model.named_parameters(), self.args.grad_fn)
@@ -575,9 +550,6 @@ class AstroTrainer(BaseTrainer):
                         log_images_to_wandb(f"{key}/{d}", out[key].T, self.epoch)
 
     def save_local(self):
-        # after data saving is done, init pixel ids again to only use fraction of pixels
-        #num_batches = module.init_pixel_ids()
-        #if save_model: model_id += 1
         if self.save_latent:
             fname = join(self.latent_dir, str(self.epoch))
             np.save(fname, np.array(self.latents))

@@ -92,8 +92,8 @@ class TransData:
         self.full_nsmpl = len(self.full_wave)
 
         if self.sample_method == "mixture":
-            self.trans_data = (self.full_norm_wave, self.full_trans, self.full_distrib, encd_ids)
-            #self.trans_data = (self.full_norm_wave.to(self.device), self.full_trans.to(self.device), self.full_distrib.to(self.device), encd_ids.to(self.device))
+            #self.trans_data = (self.full_norm_wave, self.full_trans, self.full_distrib, encd_ids)
+            self.trans_data = (self.full_norm_wave.to(self.device), self.full_trans.to(self.device), self.full_distrib.to(self.device), encd_ids.to(self.device))
         elif self.sample_method == "bandwise":
             self.trans_data = self.load_bandwise_wave_trans(norm_wave, trans)
         elif self.sample_method == "hardcode":

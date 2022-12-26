@@ -1,5 +1,6 @@
 
 global:
+    debug: False
     verbose: True
     exp_name: 'test-ngp-nerf'
     tasks: ['train','save_recon_during_train'] #,'infer','recon_img']
@@ -14,12 +15,11 @@ optimizer:
     hps_lr: 1e-5
 
 dataset:
-    space_dim: 2
+    space_dim: 3
     dataset_type: 'astro'
     load_fits_data_cache: True
     dataset_path: '../../data/pdr3'
-    gt_img_norm_cho: 'identity'     # identity/arcsinh/linear/clip(0,1)
-    output_norm_cho: 'sinh'   # identity/arcsinh/sinh
+    gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
 
     use_full_fits: False
@@ -58,6 +58,7 @@ net:
     nef_type: 'NeuralHyperSpectral'
 
     # decoder
+    mlp_output_norm_method: 'sinh'
     hidden_dim: 256
     num_layers: 3
     out_dim: 5
@@ -73,6 +74,7 @@ embedder:
     embedder_type: 'positional'
 
 grid:
+    grid_dim: 2
     grid_type: 'HashGrid'
     interpolation_type: 'linear'
     multiscale_type: 'cat'
@@ -86,11 +88,11 @@ grid:
 
 hyperspectral:
     coords_embed_dim: 4000
-    coords_embed_method: 'none'
-    wave_embed_dim: 2000
-    wave_embed_method: 'none'
-    hps_convert_method: 'add'
-    hps_decod_activation_type: 'sin'
+    coords_embed_method: 'grid'
+    wave_embed_dim: 10
+    wave_embed_method: 'positional'
+    hps_convert_method: 'concat'
+    hps_decod_activation_type: 'relu'
     hps_decod_num_layers: 1
     hps_decod_hidden_dim: 64
     hps_decod_layer_type: 'none'

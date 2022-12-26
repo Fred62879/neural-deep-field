@@ -141,10 +141,10 @@ def forward(class_obj, pipeline, data, quantize_latent=False, plot_embd_map=Fals
             }
         elif trans_sample_method == "mixture":
             net_args = {
-                "coords": data["coords"].to(class_obj.device),
-                "wave":   data["wave"].to(class_obj.device),
-                "trans":  data["trans"].to(class_obj.device),
-                "nsmpl":  data["nsmpl"].to(class_obj.device)
+                "coords": data["coords"], #.to(class_obj.device),
+                "wave":   data["wave"], #.to(class_obj.device),
+                "trans":  data["trans"], #.to(class_obj.device),
+                "nsmpl":  data["nsmpl"] #.to(class_obj.device)
             }
         else: raise ValueError("Unrecognized transmission sampling method.")
     else: raise Exception("Unsupported space dimension.")

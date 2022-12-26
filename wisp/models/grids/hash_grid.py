@@ -33,7 +33,7 @@ class HashGrid(BLASGrid):
 
     def __init__(self,
         feature_dim        : int,
-        space_dim          : int   = 3,
+        grid_dim           : int   = 3,
         interpolation_type : str   = 'linear',
         multiscale_type    : str   = 'cat',
         feature_std        : float = 0.0,
@@ -47,7 +47,7 @@ class HashGrid(BLASGrid):
         Args:
             dim (int): The dimension of the output data
             feature_dim (int): The dimension of the features stored on the grid.
-            space_dim (int): The dimension of the data space (2 for image, 3 for shapes).
+            grid_dim (int): The dimension of the grid (2 for image, 3 for shapes).
             interpolation_type (str): The type of interpolation function.
             multiscale_type (str): The type of multiscale aggregation. Usually 'sum' or 'cat'.
                                    Note that 'cat' will change the decoder input dimension.
@@ -61,7 +61,7 @@ class HashGrid(BLASGrid):
             (void): Initializes the class.
         """
         super().__init__()
-        self.space_dim = space_dim
+        self.grid_dim = grid_dim
         self.feature_dim = feature_dim
         self.interpolation_type = interpolation_type
         self.multiscale_type = multiscale_type
@@ -113,7 +113,7 @@ class HashGrid(BLASGrid):
 
         self.codebook = nn.ParameterList([])
         for res in resolutions:
-            num_pts = res ** self.space_dim
+            num_pts = res ** self.grid_dim
             fts = torch.zeros(min(self.codebook_size, num_pts), self.feature_dim)
             fts += torch.randn_like(fts) * self.feature_std
             self.codebook.append(nn.Parameter(fts))
@@ -139,7 +139,7 @@ class HashGrid(BLASGrid):
         batch, num_samples, _ = coords.shape
 
         feats = grid_ops.hashgrid(coords, self.resolutions, self.codebook_bitwidth,
-                                  self.space_dim, lod_idx, self.codebook)
+                                  self.grid_dim, lod_idx, self.codebook)
 
         if self.multiscale_type == 'cat':
             return feats
