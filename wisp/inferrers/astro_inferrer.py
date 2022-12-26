@@ -186,6 +186,8 @@ class AstroInferrer(BaseInferrer):
               for i in range(self.num_metrics) ]
             [ np.save(self.metric_fnames_z[i], self.metrics_zscale[i])
               for i in range(self.num_metrics) ]
+            log.info(f"metrics: {np.round(self.metrics[:,-1,0], 3)}")
+            log.info(f"zscale metrics: {np.round(self.metrics_zscale[:,-1,0], 3)}")
 
     def pre_inferrence_selected_coords_partial_model(self):
         pass

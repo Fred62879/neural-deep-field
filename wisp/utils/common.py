@@ -121,15 +121,11 @@ def forward(class_obj, pipeline, data, quantize_latent=False, plot_embd_map=Fals
         net_args = {"coords": data["coords"].to(class_obj.device) }
 
     elif class_obj.space_dim == 3:
-        requested_channels = {"latents"}
-        # if class_obj.quantize_latent:
-        #     requested_channels.append("cdbk_loss")
-        #     if class_obj.plot_embd_map:
-        #         requested_channels.append("embd_ids")
-        #         requested_channels.append("latents")
-        # if class_obj.spectra_supervision:
-        #     requested_channels.append("recon_spectra")
-        # requested_channels = set(requested_channels)
+        requested_channels = ["latents"]
+        if class_obj.quantize_latent:
+            requested_channels.append("scaler")
+            requested_channels.append("redshift")
+        requested_channels = set(requested_channels)
 
         trans_sample_method = class_obj.extra_args["trans_sample_method"]
         if trans_sample_method == "hardcode":

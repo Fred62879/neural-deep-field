@@ -48,7 +48,6 @@ class AstroPipeline(nn.Module):
         # quantize latent variables
         if self.quantz is not None:
             ret = self.quantz(ret)
-            # scaler, redshift, latent, embd_id
 
         # convert RA/DEC latents to hyperspectral intermediates and decode
         if self.hyper_decod is not None:

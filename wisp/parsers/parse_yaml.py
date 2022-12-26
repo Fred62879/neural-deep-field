@@ -178,6 +178,8 @@ def define_cmd_line_args():
                           help="Path to pretrained model weights.")
     net_group.add_argument("--position-input", action="store_true",
                           help="Use position as input.")
+    net_group.add_argument("--output-norm-cho", type=str,
+                           choices=["identity","arcsinh","sinh"])
 
     net_group.add_argument("--siren-seed", type=int, default=1)
     net_group.add_argument("--siren-first-w0", type=int, default=30)
@@ -210,6 +212,21 @@ def define_cmd_line_args():
     hps_group.add_argument("--hps-siren-hidden-w0", type=int, default=30)
     hps_group.add_argument("--hps-siren-coords-scaler", type=int, default=1)
     hps_group.add_argument("--hps-siren-last-linear", action="store_true")
+
+    ###################
+    # Quantization arguments
+    ###################
+    qtz_group = parser.add_argument_group("quantization")
+
+    qtz_group.add_argument("--quantize-latent", action="store_true")
+    qtz_group.add_argument("--generate-scaler", action="store_true")
+    qtz_group.add_argument("--generate-redshift", action="store_true")
+
+    qtz_group.add_argument("--qtz-latent-dim", type=int)
+    qtz_group.add_argument("--qtz-num-embed", type=int)
+    qtz_group.add_argument("--qtz-beta", type=float, help="codebook loss weight")
+    qtz_group.add_argument("--qtz-calculate-loss", action="store_true")
+    qtz_group.add_argument("--qtz-seed", type=int)
 
     ###################
     # Arguments for dataset
@@ -439,23 +456,23 @@ def define_cmd_line_args():
 
     infer_group.add_argument("--infer-log_fname", type=str)
     infer_group.add_argument("--infer-batch-size", type=int, default=4096)
-    infer_group.add_argument("--infer_use_all_wave", action="store_true", default=False,
+    infer_group.add_argument("--infer-use-all-wave", action="store_true", default=False,
                              help="should set this to true, implementation assumes infer with all lambda")
 
-    infer_group.add_argument("--to_HDU", action="store_true", default=False,
+    infer_group.add_argument("--to-HDU", action="store_true", default=False,
                              help="generate HDU files for reconstructed image")
-    infer_group.add_argument("--recon_norm", action="store_true", default=False)
-    infer_group.add_argument("--recon_restore", action="store_true", default=False)
-    infer_group.add_argument("--metric_options", nargs="+", choices=["mse","psnr","ssim"])
+    infer_group.add_argument("--recon-norm", action="store_true", default=False)
+    infer_group.add_argument("--recon-restore", action="store_true", default=False)
+    infer_group.add_argument("--metric-options", nargs="+", choices=["mse","psnr","ssim"])
 
     # these three args, if specified, directs reconstructing smaller cutouts than train image
     # Note, if recon_img is included as inferrence tasks, we always reconstruct the full train image
     # regardless of whether these three are given or not
-    infer_group.add_argument("--recon_cutout_fits_ids", nargs="+", type=str,
+    infer_group.add_argument("--recon-cutout-fits-ids", nargs="+", type=str,
                              help="id of tiles to generate reconstructed cutout")
-    infer_group.add_argument("--recon_cutout_sizes", nargs="+", type=list,
+    infer_group.add_argument("--recon-cutout-sizes", nargs="+", type=list,
                              help="list of sizes of each cutout for each tile")
-    infer_group.add_argument("--recon_cutout_start_pos", nargs="+", type=list,
+    infer_group.add_argument("--recon-cutout-start-pos", nargs="+", type=list,
                              help="list of start (r/c) positions of each cutout for each tile")
 
     ###################
@@ -534,126 +551,6 @@ def define_cmd_line_args():
     #                    help="ratio of inpaint band pixels used for training per epoch")
     inpaint_group.add_argument("--relative_train_bands", nargs="+", type=int)
     inpaint_group.add_argument("--relative_inpaint_bands", nargs="+", type=int)
-
-    ##############
-    # Argumnet for monte carlo
-    ##############
-    mc_group = parser.add_argument_group("monte_carlo")
-
-    # II) net args
-    mc_group.add_argument("--avg_per_band", action="store_true", default=False)
-
-    # i) pe coord (before encoder)
-    mc_group.add_argument("--pe_coord", action="store_true", default=False,
-                        help="positional encode coord before encoder")
-    mc_group.add_argument("--coord_pe_cho", type=str, default="pe")
-    mc_group.add_argument("--coord_pe_dim", type=int, default=1)
-    mc_group.add_argument("--coord_pe_seed", type=int, default=0)
-    mc_group.add_argument("--coord_pe_omega", type=float, default=1.0)
-    mc_group.add_argument("--coord_pe_sigma", type=float, default=1.0)
-    mc_group.add_argument("--coord_pe_bias",action="store_true",default=False)
-
-    # ii) encoder relevant
-    mc_group.add_argument("--encode", action="store_true", default=False)
-    mc_group.add_argument("--encoder_output_scaler", action="store_true", default=False,
-                        help="use 2nd to last value in latent to scale pixel val")
-    mc_group.add_argument("--encoder_output_redshift", action="store_true", default=False,
-                        help="use last value in latent as redshift")
-
-    mc_group.add_argument("--latent_dim", type=int, default=32)
-    mc_group.add_argument("--encoder_dim_hidden", type=int, default=5)
-    mc_group.add_argument("--encoder_num_hidden_layers", type=int, default=1)
-
-    mc_group.add_argument("--encoder_cho", type=str, default="siren")
-    mc_group.add_argument("--encoder_coords_scaler", type=int, default=1)
-    mc_group.add_argument("--encoder_mlp_seed", type=int, default=0)
-    mc_group.add_argument("--encoder_first_w0", type=int, default=30)
-    mc_group.add_argument("--encoder_hidden_w0", type=int, default=30)
-    mc_group.add_argument("--encoder_siren_last_linr", action="store_true",default=False)
-    mc_group.add_argument("--encoder_mfn_w_scale", type=int, default=10)
-    mc_group.add_argument("--encoder_mfn_omega", type=int, default=150)
-    mc_group.add_argument("--encoder_mfn_alpha", type=int, default=6)
-    mc_group.add_argument("--encoder_mfn_beta", type=int, default=1)
-    mc_group.add_argument("--encoder_pe_cho", type=str, default="rand_gaus")
-    mc_group.add_argument("--encoder_pe_omega", type=int, default=1)
-    mc_group.add_argument("--encoder_pe_sigma", type=int, default=1)
-    mc_group.add_argument("--encoder_pe_dim", type=int, default=4000)
-    mc_group.add_argument("--encoder_pe_min_deg", type=int, default=0)
-    mc_group.add_argument("--encoder_pe_max_deg", type=int, default=1500)
-
-    # ~ quantizer
-    mc_group.add_argument("--quantize_latent", action="store_true", default=False)
-    mc_group.add_argument("--cdbk_seed", type=int, default=0)
-    mc_group.add_argument("--vae_beta", type=float, default=1)
-    mc_group.add_argument("--num_embd", type=int, default=100)
-    mc_group.add_argument("--plot_latent", action="store_true", default=False,
-                        help="plot latent variable in latent space - up to 3")
-    mc_group.add_argument("--plot_latent_embd", action="store_true", default=False,
-                        help="plot latent with embd in latent space - up to 3")
-
-    # iii) pe wave
-    mc_group.add_argument("--pe_wave", action="store_true", default=False,
-                        help="positional encode lambda before concat with latent coord")
-    mc_group.add_argument("--wave_pe_cho", type=str, )
-    mc_group.add_argument("--wave_pe_seed", type=int, default=0)
-    mc_group.add_argument("--wave_pe_dim", type=int, default=1000)
-    mc_group.add_argument("--wave_pe_min_deg", type=int, default=0)
-    mc_group.add_argument("--wave_pe_max_deg", type=int, default=10)
-    mc_group.add_argument("--wave_pe_sigma", type=float, default=1.0)
-    mc_group.add_argument("--wave_pe_omega", type=int, default=4100//2)
-    mc_group.add_argument("--wave_pe_num_hid_layers", type=int, default=5)
-    mc_group.add_argument("--wave_pe_bias", action="store_true", default=False)
-
-    # iv) main mlp
-    mc_group.add_argument("--mc_cho", type=str, )
-    mc_group.add_argument("--mlp_seed", type=int, default=0)
-    mc_group.add_argument("--mlp_cho", type=str, )
-    mc_group.add_argument("--output_norm_cho", type=str, default="sinh")
-    mc_group.add_argument("--integration_cho", type=str, default="dot_product")
-
-    mc_group.add_argument("--coord_dim", type=int, default=2)
-    mc_group.add_argument("--wave_dim", type=int, default=1)
-    mc_group.add_argument("--mlp_dim_hidden", type=int, default=512)
-    mc_group.add_argument("--mlp_num_hidden_layers", type=int, default=3)
-
-    mc_group.add_argument("--pe_cho", type=str, )
-    mc_group.add_argument("--pe_seed", type=int, default=0)
-    mc_group.add_argument("--pe_dim", type=int, default=1000)
-    mc_group.add_argument("--pe_min_deg", type=int, default=0)
-    mc_group.add_argument("--pe_max_deg", type=int, default=10)
-    mc_group.add_argument("--pe_sigma", type=float, default=1.0)
-    mc_group.add_argument("--pe_omega", type=int, default=4100//2)
-    mc_group.add_argument("--pe_num_hid_layers", type=int, default=5)
-    mc_group.add_argument("--pe_bias", action="store_true", default=False)
-
-    mc_group.add_argument("--ipe", action="store_true", default=False)
-    mc_group.add_argument("--ipe_cho", type=str, default="None")
-    mc_group.add_argument("--ipe_schedule_steps", nargs="+", type=int)
-    mc_group.add_argument("--ipe_sigma_schedules", nargs="+", type=float)
-    #mc_group.add_argument("--ipe_sigma_infer_cho", type=int, default=0)
-    mc_group.add_argument("--ipe_covar_eps", type=float, default=1e-4)
-    mc_group.add_argument("--ipe_default_sigma", type=float, default=0.1)
-    mc_group.add_argument("--ipe_rand_schedule_pow_lo", type=int, default=-4)
-    mc_group.add_argument("--ipe_rand_schedule_pow_hi", type=int, default=-2)
-    mc_group.add_argument("--ipe_rand_schedule_infer_pow", type=int, default=-2)
-
-    mc_group.add_argument("--gaus_schedule", action="store_true",default=False)
-    mc_group.add_argument("--gaus_schedule_steps", nargs="+", type=int)
-    mc_group.add_argument("--gaus_omega_schedules", nargs="+", type=int)
-
-    mc_group.add_argument("--mfn_num_layers", type=int, default=3)
-    mc_group.add_argument("--mfn_w_scale", type=float, default=1)
-    mc_group.add_argument("--mfn_omega", type=float, default=1)
-    mc_group.add_argument("--mfn_alpha", type=float, default=1)
-    mc_group.add_argument("--mfn_beta", type=float, default=1)
-    mc_group.add_argument("--mfn_bias", action="store_true", default=True)
-    mc_group.add_argument("--mfn_output_act", action="store_true", default=False)
-
-    mc_group.add_argument("--first_w0", type=int, default=30)
-    mc_group.add_argument("--hidden_w0", type=int, default=30)
-    mc_group.add_argument("--coords_scaler", type=int, default=1)
-    mc_group.add_argument("--siren_num_hid_layers", type=int, default=3)
-    mc_group.add_argument("--last_linear", action="store_true", default=True)
 
     ###############
     # Argument for experiment

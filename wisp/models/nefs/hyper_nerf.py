@@ -4,8 +4,9 @@ import torch
 from wisp.models.grids import *
 from wisp.utils import PerfTimer
 from wisp.models.nefs import BaseNeuralField
-from wisp.models.decoders import BasicDecoder
 from wisp.models.layers import get_layer_class, Fn
+from wisp.models.decoders import BasicDecoder, Siren
+#from wisp.models.siren import Siren
 from wisp.models.activations import get_activation_class
 from wisp.models.embedders import get_positional_embedder, RandGaus
 
@@ -15,8 +16,14 @@ class NeuralHyperSpectral(BaseNeuralField):
         In hyperspectral setup, output is embedded latent variables.
         Otherwise, output is decoded pixel intensities.
 
-        Discrete from how the base_nef works,
+        Different from how the base_nef works,
           here we use either the positional encoding or the grid for embedding.
+
+        Usage:
+          2D: embedding (positional/grid) -- relu -- sinh
+              no embedding -- siren
+          3D: embedding (positional/grid)
+              no embedding
     """
 
     def init_embedder(self):
@@ -46,10 +53,11 @@ class NeuralHyperSpectral(BaseNeuralField):
         else:
             raise NotImplementedError
 
-        self.grid = grid_class \
-            (self.feature_dim, space_dim=self.space_dim, base_lod=self.base_lod, num_lods=self.num_lods,
-             interpolation_type=self.interpolation_type,
-             multiscale_type=self.multiscale_type, **self.kwargs)
+        self.grid = grid_class(
+            self.feature_dim, space_dim=self.space_dim,
+            base_lod=self.base_lod, num_lods=self.num_lods,
+            interpolation_type=self.interpolation_type,
+            multiscale_type=self.multiscale_type, **self.kwargs)
 
         self.grid.init_from_geometric(
             self.kwargs["min_grid_res"], self.kwargs["max_grid_res"], self.num_lods)
@@ -62,36 +70,54 @@ class NeuralHyperSpectral(BaseNeuralField):
     def init_decoder(self):
         """ Initializes the decoder object.
         """
-        # hyperspectral setup doesn't need decoder
-        if self.space_dim == 3: return
-
+        # set decoder input dimension
         if self.kwargs["coords_embed_method"] == "positional":
-            assert(kwargs["activation_type"] == "relu")
+            assert(self.activation_type == "relu")
             input_dim = self.kwargs["coords_embed_dim"]
-
         elif self.kwargs["coords_embed_method"] == "grid":
-            assert(kwargs["activation_type"] == "relu")
+            assert(self.activation_type == "relu")
             input_dim = self.effective_feature_dim
         else:
-            assert(kwargs["activation_type"] == "sin")
-            input_dim = 2
+            assert(self.activation_type == "sin")
+            input_dim = self.space_dim
 
-        if kwargs["activation_type"] == "relu":
-            self.decoder_intensity = BasicDecoder \
-                (input_dim, self.output_dim, get_activation_class(self.activation_type),
-                 True, layer=get_layer_class(self.layer_type), num_layers=self.num_layers+1,
-                 hidden_dim=self.hidden_dim, skip=[])
+        # set decoder output dimension
+        if self.kwargs["quantize_latent"]:
+            output_dim = self.kwargs["qtz_latent_dim"] + \
+                self.kwargs["generate_scaler"] + self.kwargs["generate_redshift"]
+        else:
+            output_dim = self.output_dim
 
-        elif kwargs["activation_type"] == "sin":
-            self.decode = Siren(
-                input_dim, self.output_dim, self.num_layers, self.hidden_dim,
-                kwargs["siren_first_w0"], kwargs["siren_hidden_w0"],
-                kwargs["siren_seed"], kwargs["siren_coords_scaler"],
-                kwargs["siren_last_linear"])
+        # intialize decoder
+        if self.space_dim == 3 and self.kwargs["quantize_latent"]:
+            self.decoder_latent = BasicDecoder(
+                input_dim, output_dim,
+                get_activation_class(self.activation_type),
+                True, layer=get_layer_class(self.layer_type),
+                num_layers=self.num_layers+1,
+                hidden_dim=self.hidden_dim, skip=[])
 
-        else: raise ValueError("Unrecognized hyperspectral decoder activation type.")
+        elif self.activation_type == "relu":
+            self.decoder_intensity = BasicDecoder(
+                input_dim, output_dim,
+                get_activation_class(self.activation_type),
+                True, layer=get_layer_class(self.layer_type),
+                num_layers=self.num_layers+1,
+                hidden_dim=self.hidden_dim, skip=[])
 
-        self.sin = Fn(torch.sinh)
+        elif self.activation_type == "sin":
+            # self.decoder_intensity = Siren(
+            #     input_dim, output_dim, self.num_layers, self.hidden_dim,
+            #     self.kwargs["siren_first_w0"], self.kwargs["siren_hidden_w0"],
+            #     self.kwargs["siren_seed"], self.kwargs["siren_coords_scaler"],
+            #     self.kwargs["siren_last_linear"])
+            #dim_in, dim_hidden, dim_out, num_hidden_layers, last_linr, \
+            #first_w0, hidden_w0, coords_scaler, seed, float_tensor
+            self.decoder_intensity = Siren((2,256,5,3,False,24,6,8,0,torch.FloatTensor.cuda))
+
+        else: raise ValueError("Unrecognized decoder activation type.")
+
+        self.sinh = Fn(torch.sinh)
 
     def get_nef_type(self):
         return 'hyperspectral'
@@ -101,7 +127,14 @@ class NeuralHyperSpectral(BaseNeuralField):
             For hyperspectral setup, we need latent embedding as output.
             Otherwise, we need pixel intensity values as output.
         """
-        channels = ["intensity"] if self.space_dim == 2 else ["latents"]
+        if self.space_dim == 2:
+            channels = ["intensity"]
+        else:
+            channels = ["latents"]
+            if self.kwargs["quantize_latent"]:
+                channels.append("scaler")
+                channels.append("redshift")
+
         self._register_forward_function( self.hyperspectral, channels )
 
     def hyperspectral(self, coords, pidx=None, lod_idx=None):
@@ -147,7 +180,21 @@ class NeuralHyperSpectral(BaseNeuralField):
 
         if self.space_dim == 3:
             feats = feats.reshape(batch, num_samples, -1)
-            return dict(latents=feats)
+            if not self.kwargs["quantize_latent"]:
+                return dict(latents=feats)
+
+            latents = self.decoder_latent(feats)
+            if self.kwargs["generate_scaler"]:
+                if self.kwargs["generate_redshift"]:
+                    scaler = latents[...,-2:-1]
+                    redshift = latents[...,-1:]
+                    latents = latents[...,:-2]
+                else:
+                    redshift = None
+                    scaler = latents[...,-1:]
+                    latents = latents[...,:-1]
+            else: redshift, scaler = None, None
+            return dict(latents=latents, scaler=scaler, redshift=redshift)
 
         intensity = self.decoder_intensity(feats)
         intensity = self.sinh(intensity)

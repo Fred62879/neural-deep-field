@@ -28,30 +28,6 @@ from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 
 
 class AstroTrainer(BaseTrainer):
-    """ Trainer class for astro dataset.
-        The default overall flow:
-
-        init()
-        |- set_renderer()
-        |- set_logger()
-
-        train():
-            for every epoch:
-                pre_epoch()
-
-                iterate()
-                    pre_step()
-                    step()
-                    post_step()
-
-                post_epoch()
-                |- log_tb()
-                |- save_model()
-                |- render_tb()
-                |- resample_dataset()
-
-        validate()
-    """
 
     def __init__(self, pipeline, dataset, num_epochs, batch_size,
                  optim_cls, lr, weight_decay, grid_lr_weight, optim_params, log_dir, device,
@@ -182,6 +158,7 @@ class AstroTrainer(BaseTrainer):
                            self.extra_args['relative_train_bands'],
                            self.extra_args['relative_inpaint_bands'])
         self.loss = loss
+        print(self.loss)
 
     def resume_train(self):
         try:
@@ -218,35 +195,6 @@ class AstroTrainer(BaseTrainer):
         if self.extra_args["log_gpu_every"] != -1:
             nvidia_smi.nvmlShutdown()
 
-    def iterate(self):
-        """ Advances the training by one training step (batch). """
-        if self.scene_state.optimization.running:
-            iter_start_time = time.time()
-            self.scene_state.optimization.iteration = self.iteration
-            try:
-                if self.train_data_loader_iter is None:
-                    self.begin_epoch()
-                data = self.next_batch()
-                #print('got data', (data["coords"]).shape)
-                #print('got data', (data["pixels"]).shape)
-                self.iteration += 1
-
-            except StopIteration:
-                self.end_epoch()
-                self.begin_epoch()
-                data = self.next_batch()
-
-            self.pre_step()
-            self.step(data)
-            self.post_step()
-
-            iter_end_time = time.time()
-            self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
-
-    def next_batch(self):
-        """ Actually iterate the data loader. """
-        return next(self.train_data_loader_iter)
-
     #############
     # begin epoch
     #############
@@ -262,17 +210,6 @@ class AstroTrainer(BaseTrainer):
         self.train_data_loader_iter = iter(self.train_data_loader)
 
     def pre_epoch(self):
-        self.loss_lods = list(range(0, self.extra_args["num_lods"]))
-
-        if self.extra_args["grow_every"] > 0:
-            self.grow()
-
-        if self.extra_args["only_last"]:
-            self.loss_lods = self.loss_lods[-1:]
-
-        if self.extra_args["resample"] and self.epoch % self.extra_args["resample_every"] == 0:
-            self.resample_dataset()
-
         if self.extra_args["save_local_every"] > -1 and self.epoch % self.extra_args["save_local_every"] == 0:
             #if self.epoch == 0 or (self.epoch + 1) % args.loss_smpl_intvl == 0
             self.save_data_to_local = True
@@ -287,7 +224,6 @@ class AstroTrainer(BaseTrainer):
         self.timer.check("pre_epoch done")
 
     def init_log_dict(self):
-        """ Custom log dict. """
         super().init_log_dict()
         self.log_dict["recon_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
@@ -306,7 +242,6 @@ class AstroTrainer(BaseTrainer):
 
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
-        #sampler_cls = SequentialSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
@@ -319,42 +254,6 @@ class AstroTrainer(BaseTrainer):
         )
 
     def init_optimizer(self):
-        params_dict = { name : param for name, param
-                        in self.pipeline.named_parameters() }
-        params = []
-        hps_params, decoder_params, grid_params, rest_params = [],[],[],[]
-
-        # for name in params_dict:
-        #     if "hyper_decod" in name:
-        #         hps_params.append(params_dict[name])
-        #     elif "decoder" in name:
-        #         decoder_params.append(params_dict[name])
-        #     elif "grid" in name:
-        #         grid_params.append(params_dict[name])
-        #     else:
-        #         rest_params.append(params_dict[name])
-
-        # params.append({"params": hps_params,
-        #                "lr": self.hps_lr})
-        # params.append({"params" : decoder_params,
-        #                "lr": self.lr,
-        #                "weight_decay": self.weight_decay})
-        # params.append({"params" : grid_params,
-        #                "lr": self.lr * self.grid_lr_weight})
-        # params.append({"params" : rest_params,
-        #                "lr": self.lr})
-
-        # for name in params_dict:
-        #     if "grid" in name:
-        #         grid_params.append(params_dict[name])
-        #     else:
-        #         rest_params.append(params_dict[name])
-
-        # params.append({"params" : grid_params,
-        #                "lr": self.lr * self.grid_lr_weight})
-        # params.append({"params" : rest_params,
-        #                "lr": self.hps_lr})
-        # self.optimizer = self.optim_cls(params, **self.optim_params)
         self.optimizer = self.optim_cls(self.pipeline.parameters(), **self.optim_params)
         print(self.optimizer)
 

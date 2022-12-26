@@ -2,12 +2,15 @@
 global:
     verbose: True
     exp_name: 'test-ngp-nerf'
-    tasks: ['train','save_recon_during_train','infer','recon_img']
+    tasks: ['train','save_recon_during_train'] #,'infer','recon_img']
     #tasks: ['infer','recon_img']
 
 optimizer:
-    optimizer_type: 'rmsprop'
-    lr: 0.001
+    optimizer_type: 'adam'
+    lr: 1e-3
+    b1: 0.5
+    b2: 0.999
+    weight_decay: 1e-5
     hps_lr: 1e-5
 
 dataset:
@@ -45,13 +48,69 @@ dataset:
     # filters: [g,r,i,z,y,nb387,nb816,nb921,u,us]
     # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y,NB0387,NB0816,NB0921,u,uS]
 
-    wave_lo: 6000
-    wave_hi: 8000
     plot_trans: True
     trans_sample_method: 'mixture'
     trans_threshold: 1e-3
     hardcode_num_trans_samples: 40
     gt_spectra_cho: -1
+
+net:
+    nef_type: 'NeuralHyperSpectral'
+
+    # decoder
+    hidden_dim: 256
+    num_layers: 3
+    out_dim: 5
+    activation_type: "sin"
+
+    siren_seed: 0
+    siren_first_w0: 24
+    siren_hidden_w0: 6
+    siren_coords_scaler: 8
+    siren_last_linear: False
+
+embedder:
+    embedder_type: 'positional'
+
+grid:
+    grid_type: 'HashGrid'
+    interpolation_type: 'linear'
+    multiscale_type: 'cat'
+    feature_dim: 2
+    feature_std: 0.01
+    num_lods: 10  # max / min = b**l
+    tree_type: 'geometric'
+    min_grid_res: 1
+    max_grid_res: 256
+    codebook_bitwidth: 22
+
+hyperspectral:
+    coords_embed_dim: 4000
+    coords_embed_method: 'none'
+    wave_embed_dim: 2000
+    wave_embed_method: 'none'
+    hps_convert_method: 'add'
+    hps_decod_activation_type: 'sin'
+    hps_decod_num_layers: 1
+    hps_decod_hidden_dim: 64
+    hps_decod_layer_type: 'none'
+    integration_method: 'dot_prod'
+
+    hps_siren_seed: 0
+    hps_siren_first_w0: 24
+    hps_siren_hidden_w0: 6
+    hps_siren_coords_scaler: 8
+    hps_siren_last_linear: False
+
+qtz:
+    quantize_latent: False
+    generate_scaler: False
+    generate_redshift: False
+    qtz_latent_dim: 16
+    qtz_num_embed: 4
+    qtz_beta: 0.1
+    qtz_calculate_loss: True
+    qtz_seed: 1
 
 trainer:
     trainer_type: 'AstroTrainer'
@@ -60,10 +119,10 @@ trainer:
     num_epochs: 2000
     batch_size: 4096000
     valid_every: -1
-    save_every: 100
+    save_every: 400
     render_tb_every: -1
-    log_tb_every: 100
-    log_gpu_every: 100
+    log_tb_every: 400
+    log_gpu_every: -1
     save_local_every: 400
     save_as_new: True
     #train_pixl_ratio_per_epoch: 1e-6
@@ -100,58 +159,14 @@ infer:
     # each fits may have multiple cutouts
     #recon_cutout_sizes: [ [64], [32] ]
     #recon_cutout_start_pos: [ [[0,0]], [[0,0]] ] #[86,188]
+
+    # recon spectra
+    wave_lo: 6000
+    wave_hi: 8000
    
 test:
     is_test: False
     fake_spectra_cho: -1
-
-net:
-    nef_type: 'NeuralHyperSpectral'
-
-    # decoder
-    hidden_dim: 64
-    num_layers: 1
-    out_dim: 5
-    activation_type: "relu"
-
-    siren_seed: 0
-    siren_first_w0: 24
-    siren_hidden_w0: 6
-    siren_coords_scaler: 8
-    siren_last_linear: False
-
-embedder:
-    embedder_type: 'positional'
-
-grid:
-    grid_type: 'HashGrid'
-    interpolation_type: 'linear'
-    multiscale_type: 'cat'
-    feature_dim: 4
-    feature_std: 0.01
-    num_lods: 12
-    tree_type: 'geometric'
-    min_grid_res: 1
-    max_grid_res: 64
-    codebook_bitwidth: 22
-
-hyperspectral:
-    coords_embed_dim: 4000
-    coords_embed_method: 'none'
-    wave_embed_dim: 2000
-    wave_embed_method: 'none'
-    hps_convert_method: 'add'
-    hps_decod_activation_type: 'sin'
-    hps_decod_num_layers: 3
-    hps_decod_hidden_dim: 256
-    hps_decod_layer_type: 'none'
-    integration_method: 'dot_prod'
-
-    hps_siren_seed: 0
-    hps_siren_first_w0: 24
-    hps_siren_hidden_w0: 6
-    hps_siren_coords_scaler: 8
-    hps_siren_last_linear: False
 
 inpaint:
     inpaint_cho: 'no_inpaint' # 'spectral_inpaint'

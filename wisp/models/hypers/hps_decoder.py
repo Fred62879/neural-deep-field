@@ -31,7 +31,10 @@ class HyperSpectralDecoder(nn.Module):
         '''
 
         # encode ra/dec coords with wave together
-        if kwargs["coords_embed_method"] == "grid":
+        if kwargs["quantize_latent"]:
+            input_dim = kwargs["qtz_latent_dim"]
+
+        elif kwargs["coords_embed_method"] == "grid":
             assert(kwargs["hps_decod_activation_type"] == "relu")
             input_dim = kwargs["feature_dim"]
             if kwargs["multiscale_type"] == 'cat':
@@ -76,6 +79,8 @@ class HyperSpectralDecoder(nn.Module):
         latents = data["latents"]
         scaler = None if "scaler" not in data else data["scaler"]
         redshift = None if "redshift" not in data else data["redshift"]
+        #codebook_loss = None if "loss"not in data else data["codebook_loss"]
+        #embed_ids = None if "embed_ids" not in data else data["embed_ids"]
 
         #hyperspectral_coords = self.convert(kwargs["wave"], latents, redshift=redshift)
         hyperspectral_coords = latents

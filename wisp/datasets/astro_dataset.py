@@ -31,7 +31,11 @@ class AstroDataset(Dataset):
         self.root = dataset_path
         self.transform = transform
         self.dataset_num_workers = dataset_num_workers
-        self.unbatched_fields = {"wave","trans","nsmpl"}
+
+        self.space_dim = kwargs["space_dim"]
+        if self.space_dim == 3:
+            self.unbatched_fields = {"wave","trans","nsmpl"}
+        else: self.unbatched_fields = set()
 
     def init(self):
         """ Initializes the dataset.
@@ -58,9 +62,11 @@ class AstroDataset(Dataset):
             self.num_rows, self.num_cols = self.fits_dataset.get_img_sizes()
 
             if self.require_full_coords:
-                self.data['coords'] = self.fits_dataset.get_coords()
+                #self.data['coords'] = self.fits_dataset.get_coords().to(self.device)
+                self.coords = self.fits_dataset.get_coords().to(self.device)[:,None]
             if self.require_pixels:
-                self.data['pixels'] = self.fits_dataset.get_pixels()
+                #self.data['pixels'] = self.fits_dataset.get_pixels().to(self.device)
+                self.pixels = self.fits_dataset.get_pixels().to(self.device)
             if self.require_weights:
                 self.data['weights'] = self.fits_dataset.get_weights()
             if self.require_masks:
@@ -115,7 +121,8 @@ class AstroDataset(Dataset):
 
     def get_num_coords(self):
         """ Get number of all coordinates. """
-        return self.data["coords"].shape[0]
+        #return self.data["coords"].shape[0]
+        return self.coords.shape[0]
 
     def get_zscale_ranges(self, fits_id=None):
         return self.fits_dataset.get_zscale_ranges(fits_id)
@@ -130,31 +137,33 @@ class AstroDataset(Dataset):
 
     def __getitem__(self, idx : list):
         """ Sample data from requried fields using given index. """
-        out = {}
+        # out = {}
 
-        requested_fields = set(self.dataset_fields)
-        batched_fields = list(requested_fields - self.unbatched_fields)
+        # requested_fields = set(self.dataset_fields)
+        # batched_fields = list(requested_fields - self.unbatched_fields)
 
-        for field in batched_fields:
-            out[field] = self.data[field][idx]
-            #print(field, out[field].shape)
+        # for field in batched_fields:
+        #     out[field] = self.data[field][idx]
 
-        # fields that are not batched (we do monte carlo sampling at every step)
-        if len(requested_fields.intersection(self.unbatched_fields)) != 0:
-            batch_size = len(idx)
-            out["wave"], out["trans"], out["nsmpl"] = \
-                self.trans_dataset.sample_wave_trans(batch_size, self.num_samples)
-            #print(out["wave"].shape)
-            #print(out["trans"].shape)
-            #print(out["nsmpl"].shape)
+        # # fields that are not batched (we do monte carlo sampling at every step)
+        # if len(requested_fields.intersection(self.unbatched_fields)) != 0:
+        #     batch_size = len(idx)
+        #     out["wave"], out["trans"], out["nsmpl"] = \
+        #         self.trans_dataset.sample_wave_trans(batch_size, self.num_samples)
+        #     out["wave"] = out["wave"][...,None]
 
-        out["coords"] = out["coords"][:,None].tile(1, self.num_samples,1)
-        out["wave"] = out["wave"][...,None]
-        #print(out["coords"].shape, out["wave"].shape)
-        out["coords"] = torch.cat((out["coords"], out["wave"]), dim=-1)
+        #     out["coords"] = out["coords"][:,None].tile(1, self.num_samples,1)
+        #     out["coords"] = torch.cat((out["coords"], out["wave"]), dim=-1)
+        # else:
+        #     out["coords"] = out["coords"][:,None]
 
-        if self.transform is not None:
-            out = self.transform(out)
+        # if self.transform is not None:
+        #     out = self.transform(out)
+        # return out
+
+        out = {"coords": self.coords[idx],
+               "pixels": self.pixels[idx]
+               }
         return out
 
     ############
