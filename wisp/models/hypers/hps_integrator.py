@@ -17,13 +17,17 @@ class HyperSpectralIntegrator(nn.Module):
               mixture integration has nsmpl_within_bands as an forward parameter.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, integrate=True, **kwargs):
         super(HyperSpectralIntegrator, self).__init__()
 
         self.num_bands = kwargs["num_bands"]
         self.uniform_sample = kwargs["uniform_sample_trans"]
-        self.integration_method = kwargs["integration_method"]
         self.trans_sample_method = kwargs["trans_sample_method"]
+
+        if not integrate:
+            self.integration_method = "identity"
+        else:
+            self.integration_method = kwargs["integration_method"]
 
         if self.trans_sample_method == "hardcode":
             self.nsmpl = kwargs["hardcode_num_trans_samples"]

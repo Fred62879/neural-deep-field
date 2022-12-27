@@ -95,12 +95,6 @@ def restore_unmasked(recon, gt, mask):
     recon = recon.reshape((-1,sz,sz))
     return recon
 
-def get_gt_spectra_pix_pos(fn, ra, dec):
-    #get_gt_spectra_pix_pos('../../data/pdr3_input/pdr3_dud/calexp-HSC-I-9812-1%2C7.fits',149.373750, 2.776508)
-    id = 0 if 'Mega-u' in fn else 1
-    header = fits.open(fn)[id].header
-    return worldToPix(header, ra, dec)
-
 def worldToPix(header, ra, dec):
     w = WCS(header)
     sc = SkyCoord(ra, dec, unit='deg')
@@ -121,6 +115,7 @@ def forward(class_obj, pipeline, data, quantize_latent=False, plot_embd_map=Fals
         net_args = {"coords": data["coords"].to(class_obj.device) }
 
     elif class_obj.space_dim == 3:
+        # channels for nerf
         requested_channels = ["latents"]
         if class_obj.quantize_latent:
             requested_channels.append("scaler")
@@ -147,6 +142,10 @@ def forward(class_obj, pipeline, data, quantize_latent=False, plot_embd_map=Fals
                 "nsmpl":  data["nsmpl"] #.to(class_obj.device)
             }
         else: raise ValueError("Unrecognized transmission sampling method.")
+
+        if spectra_supervision:
+            net_args["full_wave"] = data["full_wave"]
+
     else: raise Exception("Unsupported space dimension.")
     return pipeline(channels=requested_channels, **net_args)
 

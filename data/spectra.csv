@@ -1,0 +1,7 @@
+footprint,tile_id,subtile_id,ra,dec,spectra_fname
+str,str,str,float32,float32,str
+9812,1,5,149.408493,2.325505,spec1d.mn44.012.lid_736
+9812,1,5,149.38211,2.4109753,spec1d.mn44.046.serendip
+9812,1,5,149.3744965,2.4152501,spec1d.mn44.067.1943
+9812,1,5,149.3820953,2.409508,spec1d.mn44.046.MIPS_35174
+9812,1,5,149.3755035,2.423475,spec1d.mn44.043.MIPS_30328

@@ -8,7 +8,7 @@ from pathlib import Path
 from os.path import exists, join
 from wisp.inferrers import BaseInferrer
 from wisp.utils.plot import plot_horizontally
-from wisp.utils.fits_data import recon_img_and_evaluate
+from wisp.datasets.fits_data import recon_img_and_evaluate
 from wisp.utils.common import forward, load_model_weights
 
 
@@ -39,7 +39,12 @@ class AstroInferrer(BaseInferrer):
 
         super().__init__(pipelines, dataset, device, extra_args, info=info)
 
-        self.full_pipeline = pipelines[0]
+        if "full" in pipelines:
+            self.full_pipeline = pipelines["full"]
+        if "partial" in pipelines:
+            self.partial_pipeline = pipelines["partial"]
+        if "modified" in pipelines:
+            self.modified_pipeline = pipelines["modified"]
 
         self.set_log_path()
         self.select_models()
@@ -112,19 +117,26 @@ class AstroInferrer(BaseInferrer):
         log.info(f"inferrence group tasks: {self.group_tasks}.")
 
     def configure_dataset(self):
-        """ Configure dataset for inferrence. """
+        """ Configure dataset (batched fields and len) for inferrence. """
         if self.infer_all_coords_full_model or self.infer_all_coords_modified_model:
             fields = ['coords']
             if self.recon_img: fields.append('pixels')
             length = self.dataset.get_num_coords()
 
         elif self.infer_selected_coords_partial_model:
-            fields = ['spectra_coords','gt_spectra']
-            length = len(self.dataset.get_num_spectra_coords())
+            # selected coords can be accessed directly from dataset
+            # don't need dataloader iteration
+            if self.plot_spectrum:
+                fields.append("spectra_dummy_data")
+            if self.spectra_supervision:
+                fields.append("spectra_supervision_data")
+            elif self.recon_spectra:
+                fields.append("spectra_recon_data")
 
         else: raise Exception("Unrecgonized group inferrence task.")
 
-        if self.space_dim == 3: fields.extend(['wave','trans'])
+        if self.space_dim == 3: fields.extend(['trans_data'])
+
         self.dataset.set_dataset_length(length)
         self.dataset.set_dataset_fields(fields)
 
@@ -172,13 +184,13 @@ class AstroInferrer(BaseInferrer):
             self.calculate_metrics = self.recon_img and \
                 not self.recon_flat_trans and self.metric_options is not None
 
-        if self.calculate_metrics:
-            self.metrics = np.zeros((self.num_metrics, 0, num_fits, self.num_bands))
-            self.metrics_zscale = np.zeros((self.num_metrics, 0, num_fits, self.num_bands))
-            self.metric_fnames = [ join(self.metric_dir, f"{option}.npy")
-                                   for option in self.metric_options ]
-            self.metric_fnames_z = [ join(self.metric_dir, f"{option}_zscale.npy")
-                                     for option in self.metric_options ]
+            if self.calculate_metrics:
+                self.metrics = np.zeros((self.num_metrics, 0, num_fits, self.num_bands))
+                self.metrics_zscale = np.zeros((self.num_metrics, 0, num_fits, self.num_bands))
+                self.metric_fnames = [ join(self.metric_dir, f"{option}.npy")
+                                       for option in self.metric_options ]
+                self.metric_fnames_z = [ join(self.metric_dir, f"{option}_zscale.npy")
+                                         for option in self.metric_options ]
 
     def post_inferrence_all_coords_full_model(self):
         if self.calculate_metrics:
@@ -279,11 +291,6 @@ class AstroInferrer(BaseInferrer):
         """
         # load model checkpoint into model
         load_model_weights(self.full_pipeline, checkpoint)
-        # if model_id == self.num_models - 1:
-        #     for k,v in self.full_pipeline.state_dict().items():
-        #         if "embedder" in k and "bias" not in k:
-        #             print(v.T)
-
         self.full_pipeline.eval()
 
         # run one epoch for inferrence
@@ -308,7 +315,6 @@ class AstroInferrer(BaseInferrer):
             if self.plot_residue_heatmap:
                 gt_fname = class_obj.gt_imgs_fnames[id]
 
-                #recon_fname =
                 resid = class_obj.gt_imgs[fits_id] - recon
                 fname = join(recon_dir, f"resid_{model_id}.png")
                 heat_all(resid, fn=fname)

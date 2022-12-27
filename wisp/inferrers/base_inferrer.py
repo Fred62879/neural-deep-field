@@ -68,7 +68,7 @@ class BaseInferrer(ABC):
             batch_size=self.batch_size,
             sampler=BatchSampler(
                 SequentialSampler(self.dataset), batch_size=self.batch_size, drop_last=False),
-            pin_memory=True,
+            #pin_memory=True,
             num_workers=0
         )
 

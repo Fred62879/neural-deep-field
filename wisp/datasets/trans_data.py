@@ -13,6 +13,9 @@ class TransData:
 
     def __init__(self, dataset_path, device, **kwargs):
 
+        if kwargs["space_dim"] != 3:
+            return
+
         self.kwargs = kwargs
         self.device = device
         self.verbose = kwargs["verbose"]
@@ -27,7 +30,7 @@ class TransData:
         self.wave_hi = kwargs["wave_hi"]
         self.u_scale = kwargs["u_band_scale"]
         self.trans_threshold = kwargs["trans_threshold"]
-        self.smpl_interval = kwargs["trans_smpl_interval"]
+        self.smpl_interval = kwargs["trans_sample_interval"]
         assert(self.smpl_interval == 10)
 
         self.set_log_path(dataset_path)
@@ -86,24 +89,43 @@ class TransData:
         self.full_wave, self.full_trans, self.full_distrib, encd_ids = \
             self.load_full_wave_trans(wave, trans)
 
-        lo, hi = min(self.full_wave), max(self.full_wave)
-        self.full_norm_wave = (self.full_wave - lo) / (hi - lo)
-
         self.full_nsmpl = len(self.full_wave)
+        lo, hi = min(self.full_wave), max(self.full_wave)
+        self.full_norm_wave = ((self.full_wave - lo) / (hi - lo)).to(self.device)
 
         if self.sample_method == "mixture":
-            #self.trans_data = (self.full_norm_wave, self.full_trans, self.full_distrib, encd_ids)
-            self.trans_data = (self.full_norm_wave.to(self.device), self.full_trans.to(self.device), self.full_distrib.to(self.device), encd_ids.to(self.device))
+            #self.trans_data = (full_norm_wave, self.full_trans, self.full_distrib, encd_ids)
+            self.trans_data = (self.full_norm_wave,
+                               self.full_trans.to(self.device),
+                               self.full_distrib.to(self.device),
+                               encd_ids.to(self.device))
+
         elif self.sample_method == "bandwise":
             self.trans_data = self.load_bandwise_wave_trans(norm_wave, trans)
+
         elif self.sample_method == "hardcode":
-            self.trans_data = self.load_hdcd_wave_trans(self.trans_dir, hdcd_wave, hdcd_trans)
+            self.trans_data = self.load_hdcd_wave_trans(
+                self.trans_dir, hdcd_wave, hdcd_trans)
         else:
             raise ValueError("Unrecognized transmission sampling method.")
 
     #############
     # getters
     #############
+
+    def get_bound_id(self, wave_range):
+        """ Get id of lambda values in full wave that tightly bounds given range.
+            full_wave[id_lo] >= wave_lo
+            full_wave[id_hi] <= wave_hi (before adding 1)
+        """
+        wave_lo, wave_hi = wave_range
+        wave_hi = int(min(wave_hi, int(torch.max(self.full_wave))))
+        wave_id_hi = torch.argmin((self.full_wave < wave_hi).type(torch.uint8))
+        wave_id_lo = torch.argmax((self.full_wave >= wave_lo).type(torch.uint8))
+        return [wave_id_lo, wave_id_hi + 1]
+
+    def get_full_norm_wave(self):
+        return self.full_norm_wave
 
     def sample_wave_trans(self, batch_size, num_samples):
         """ Sample lambda and transmission data for given sampling methods.
@@ -356,7 +378,6 @@ def batch_sample_trans(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, 
     if use_all_wave:
         # use all lambda [bsz,nsmpl_full]
         ids = torch.arange(nsmpl_full)
-        #ids = np.arange(0, nsmpl_full)
         ids = ids[None,:].tile((bsz,1))
     else:
         # sample #nsmpl lambda [bsz,nsmpl]
@@ -380,7 +401,7 @@ def batch_sample_trans(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, 
     # sort sampled waves (True only for spectrum plotting)
     if sort: ids, _ = torch.sort(ids, dim=1) # [bsz,nsmpls]
 
-    smpl_wave = wave[ids] # [bsz,nsmpls]
+    smpl_wave = wave[ids][...,None] # [bsz,nsmpls,1]
     smpl_trans = torch.stack([cur_trans[ids] for cur_trans in trans])
     smpl_trans = smpl_trans.permute(1,0,2)   # [bsz,nbands,nsmpls]
     return smpl_wave, smpl_trans, ids, avg_nsmpl

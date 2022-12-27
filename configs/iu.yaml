@@ -3,8 +3,9 @@ global:
     debug: False
     verbose: True
     exp_name: 'test-ngp-nerf'
-    tasks: ['train','save_recon_during_train'] #,'infer','recon_img']
-    #tasks: ['infer','recon_img']
+    tasks: ['train','spectra_supervision']
+    #tasks: ['train','save_recon_during_train','infer','recon_img']
+    #tasks: ['infer','recon_spectra'] #'recon_img']
 
 optimizer:
     optimizer_type: 'adam'
@@ -23,10 +24,12 @@ dataset:
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
 
     use_full_fits: False
-    # always pick exactly one cutout from one tile
+
+    # if don't use full fits, we can select cutout from tiles
+    # the order of the following 5 fields corresponds to each other
+    fits_footprints: ['9812'] #,'9812']
     fits_tile_ids: ['1'] #,'1']
     fits_subtile_ids: ['5'] #['5','7']
-    fits_footprints: ['9812'] #,'9812']
     fits_cutout_sizes: [ 64 ]
     fits_cutout_start_pos: [[86,188]] #,[240,270] ]
 
@@ -52,7 +55,7 @@ dataset:
     trans_sample_method: 'mixture'
     trans_threshold: 1e-3
     hardcode_num_trans_samples: 40
-    gt_spectra_cho: -1
+    trans_sample_interval: 10
 
 net:
     nef_type: 'NeuralHyperSpectral'
@@ -91,7 +94,7 @@ hyperspectral:
     coords_embed_method: 'grid'
     wave_embed_dim: 10
     wave_embed_method: 'positional'
-    hps_convert_method: 'concat'
+    hps_combine_method: 'concat'
     hps_decod_activation_type: 'relu'
     hps_decod_num_layers: 1
     hps_decod_hidden_dim: 64
@@ -139,15 +142,15 @@ trainer:
     train_use_all_wave: False
     #permute_pixls_train: True
 
-    # spectra supervision
     num_trans_samples: 40
     uniform_sample_trans: True
     mixture_avg_per_band: True
-    spectra_supervision: False
-    trans_smpl_interval: 10
+
+    # spectra supervision
     trusted_wave_lo: 6000
     trusted_wave_hi: 8000
-    spectra_supervision_cho: 1
+    gt_spectra_choices: [0]
+    num_supervision_spectra: 1
 
 infer:
     inferrer_type: 'AstroInferrer'

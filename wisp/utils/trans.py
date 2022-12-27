@@ -4,10 +4,10 @@ import torch
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.interpolate as interpolate
+
 
 from os.path import exists, join
-from astropy.convolution import convolve, Gaussian1DKernel
+
 
 
 ########################

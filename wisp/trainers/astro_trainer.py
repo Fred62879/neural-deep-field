@@ -15,13 +15,15 @@ import torch.nn as nn
 import logging as log
 
 from pathlib import Path
+from functools import partial
 from os.path import exists, join
 from torch.utils.data import BatchSampler, SequentialSampler, \
     RandomSampler, DataLoader
 
 from wisp.datasets import default_collate
+from wisp.loss import spectra_supervision_loss
 from wisp.utils.common import get_gpu_info, forward
-from wisp.utils.fits_data import recon_img_and_evaluate
+from wisp.datasets.fits_data import recon_img_and_evaluate
 from wisp.utils.plot import plot_gt_recon, plot_horizontally
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
@@ -58,8 +60,8 @@ class AstroTrainer(BaseTrainer):
                  exp_name=None, info=None, scene_state=None, extra_args=None,
                  render_tb_every=-1, save_every=-1, using_wandb=False):
 
-        self.hps_lr = extra_args["hps_lr"]
         self.use_all_pixels = False
+        self.hps_lr = extra_args["hps_lr"]
         self.shuffle_dataloader = True # pre-epoch requires this
 
         super().__init__(pipeline, dataset, num_epochs, batch_size, optim_cls,
@@ -88,15 +90,15 @@ class AstroTrainer(BaseTrainer):
 
     def set_training_mechanism(self):
         """ Set training mechanism. """
+        tasks = set(self.extra_args["tasks"])
+
         self.verbose = self.extra_args["verbose"]
         self.space_dim = self.extra_args["space_dim"]
         self.cuda = "cuda" in str(self.device)
         self.weight_train = self.extra_args["weight_train"]
-        self.spectra_supervision = self.space_dim == 3 \
-            and self.extra_args['spectra_supervision']
 
-        tasks = set(self.extra_args["tasks"])
         self.spectral_inpaint = self.space_dim == 3 and 'spectral_inpaint' in tasks
+        self.spectra_supervision = self.space_dim == 3 and "spectra_supervision" in tasks
 
         # save all train image reconstruction in original size
         self.save_recon = "save_recon_during_train" in tasks
@@ -124,11 +126,15 @@ class AstroTrainer(BaseTrainer):
         self.dataset.set_dataset_length(length)
 
         fields = ['coords','pixels']
-        if self.weight_train: fields.append('weights')
-        if self.space_dim == 3: fields.extend(['wave','trans'])
-        if self.spectral_inpaint: pass
-        if self.spectra_supervision: pass
-        self.dataset.set_dataset_fields(fields)
+        if self.weight_train:
+            fields.append('weights')
+        if self.space_dim == 3:
+            fields.append('trans_data')
+        if self.spectral_inpaint:
+            pass
+        if self.spectra_supervision:
+            fields.append("spectra_supervision_data")
+        self.dataset.set_dataset_fields(set(fields))
 
     def set_log_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
@@ -180,32 +186,6 @@ class AstroTrainer(BaseTrainer):
                            self.extra_args['relative_train_bands'],
                            self.extra_args['relative_inpaint_bands'])
         self.loss = loss
-
-    def resume_train(self):
-        try:
-            assert(exists(self.pretrained_model_fname))
-            if self.verbose:
-                log.info(f'saved model found, loading {self.pretrained_model_fname}')
-            checkpoint = torch.load(self.pretrained_model_fname)
-
-            self.pipeline.load_state_dict(checkpoint['model_state_dict'])
-            self.pipeline.eval()
-
-            if "cuda" in str(self.device):
-                self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-                for state in self.optimizer.state.values():
-                    for k, v in state.items():
-                        if torch.is_tensor(v):
-                            state[k] = v.cuda()
-            else:
-                self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-
-            if self.verbose: log.info("resume training")
-
-        except Exception as e:
-            if self.verbose:
-                log.info(e)
-                log.info("start training from begining")
 
     #############
     # Train loops
@@ -423,10 +403,10 @@ class AstroTrainer(BaseTrainer):
         ret = forward(self, self.pipeline, data, self.quantize_latent,
                       self.plot_embed_map, self.spectra_supervision)
         recon_pixels = ret["intensity"]
-        gt_pixels = data["pixels"][0].to(self.device)
+        gt_pixels = data["pixels"][0] #.to(self.device)
 
         if self.extra_args["weight_train"]:
-            weights = data["weights"].to(self.device)
+            weights = data["weights"] #.to(self.device)
             gt_pixels *= weights
             recon_pixels *= weights
 
@@ -440,10 +420,9 @@ class AstroTrainer(BaseTrainer):
 
         # ii) spectra loss
         if self.spectra_supervision:
-            lo = self.extra_args["trusted_spectra_wave_id_lo"]
-            hi = self.extra_args["trusted_spectra_wave_id_hi"] + 1
+            (lo, hi) = data["trusted_wave_range_id"]
             recon_spectra = ret["spectra"][:,lo:hi]
-            spectra_loss = self.spectra_loss(self.gt_spectra, recon_spectra)
+            spectra_loss = self.spectra_loss(data["gt_spectra"], recon_spectra)
             self.log_dict["spectra_loss"] += spectra_loss.item()
         else:
             spectra_loss, recon_spectra = 0, None
@@ -502,6 +481,32 @@ class AstroTrainer(BaseTrainer):
     #############
     # Helper methods
     #############
+
+    def resume_train(self):
+        try:
+            assert(exists(self.pretrained_model_fname))
+            if self.verbose:
+                log.info(f'saved model found, loading {self.pretrained_model_fname}')
+            checkpoint = torch.load(self.pretrained_model_fname)
+
+            self.pipeline.load_state_dict(checkpoint['model_state_dict'])
+            self.pipeline.eval()
+
+            if "cuda" in str(self.device):
+                self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                for state in self.optimizer.state.values():
+                    for k, v in state.items():
+                        if torch.is_tensor(v):
+                            state[k] = v.cuda()
+            else:
+                self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+            if self.verbose: log.info("resume training")
+
+        except Exception as e:
+            if self.verbose:
+                log.info(e)
+                log.info("start training from begining")
 
     def log_cli(self):
         """ Controls CLI logging.

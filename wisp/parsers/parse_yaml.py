@@ -108,8 +108,10 @@ def define_cmd_line_args():
     global_group.add_argument("--tasks", nargs="+", type=str,
                               choices=["train","spectral_inpaint","spatial_inpaint","plot_embd_map_during_train",
                                        "save_latent_during_train","save_recon_during_train","infer_during_train",
-                                       "infer","recon_img","recon_flat","recon_spectra","plot_centerize_spectrum"
-                                       "recon_cdbk_spectra","plot_embd_map","plot_latent_embd"])
+                                       "infer","recon_img","recon_flat","recon_spectra","plot_dummy_spectrum"
+                                       "recon_cdbk_spectra","plot_embd_map","plot_latent_embd"],
+                              help="recon_spectra: reconstruct gt spectra, \
+                              plot_dummy_spectrum: plot spectra without gt")
     ###################
     # Grid arguments
     ###################
@@ -200,7 +202,7 @@ def define_cmd_line_args():
     hps_group.add_argument("--wave-embed-dim", type=int, help="wave embedding dimension.")
     hps_group.add_argument("--wave-embed-method", type=str, choices=["positional"],
                            help="wave embedding method.")
-    hps_group.add_argument("--hps-convert-method", type=str, choices=["add","concat"],
+    hps_group.add_argument("--hps-combine-method", type=str, choices=["add","concat"],
                            help="method to combine ra/dec coordinate with lambda.")
 
     hps_group.add_argument("--hps-decod-activation-type", type=str)
@@ -247,7 +249,7 @@ def define_cmd_line_args():
     data_group.add_argument("--space-dim", type=int)
     #data_group.add_argument("--load-cache", action="store_true")
 
-    #data_group.add_argument("--fits-choice-id", type=str, help="uid that identifies each selection of fits files")
+    # fits data
     data_group.add_argument("--num-fits",type=int, help="number of chosen FITS files")
     data_group.add_argument("--fits-tile-ids", nargs="+", help="tile id of chosen FITS files")
     data_group.add_argument("--fits-subtile-ids", nargs="+", help="subid of chose FITS files")
@@ -274,6 +276,7 @@ def define_cmd_line_args():
     data_group.add_argument("--infer-pixels-norm", type=str,
                             choices=["identity","arcsinh"])
 
+    # trans data
     data_group.add_argument("--trans-sample-method", type=str,
                             choices=["hardcode","bandwise","mixture"])
     data_group.add_argument("--gt-spectra-cho", type=int)
@@ -287,7 +290,7 @@ def define_cmd_line_args():
     data_group.add_argument("--trans-threshold",type=float, default=1e-3,
                             help="smallest transmission value that we keep, \
                             range of transmission below this will be converted to 0.")
-    data_group.add_argument("--trans-smpl-interval",type=int, default=10,
+    data_group.add_argument("--trans-sample-interval",type=int, default=10,
                             help="discretization interval for transmission data, default 10.")
     data_group.add_argument("--plot-trans", action="store_true")
 
@@ -394,8 +397,11 @@ def define_cmd_line_args():
     train_group.add_argument("--mixture-avg-per-band", action="store_true",
                             help="for mixture sampling method, whether average pixel values \
                             with number of samples falling within each band")
-    train_group.add_argument("--spectra-supervision", action="store_true")
-    train_group.add_argument("--spectra-supervision-cho", type=int, default=0)
+
+    train_group.add_argument("--num-supervision-spectra", type=int,
+                             help="number of gt spectra used for supervision.")
+    train_group.add_argument("--gt-spectra-choices", type=int, nargs='+',
+                             help="id of chosen gt spectra for supervision/recon etc.")
     train_group.add_argument("--trusted-wave-lo", type=int, default=6000)
     train_group.add_argument("--trusted-wave-hi", type=int, default=8000)
 

@@ -2,29 +2,23 @@
 import torch
 import torch.nn as nn
 
-from wisp.models.embedders.pe import RandGausLinr
-
 
 class HyperSpectralConverter(nn.Module):
+    """ Processing module, no weights to update here.
+    """
 
-    def __init__(self, **kwargs):
+    def __init__(self, wave_embedder, **kwargs):
+        """ @Param:
+              wave_embedder: embedder network for lambda.
+        """
         super(HyperSpectralConverter, self).__init__()
 
         self.kwargs = kwargs
         self.verbose = kwargs["verbose"]
-        self.convert_method = kwargs["hps_convert_method"]
+        self.combine_method = kwargs["hps_combine_method"]
+
         self.wave_embed_method = kwargs["wave_embed_method"]
-
-        if self.wave_embed_method is not None:
-            self.init_embedder()
-
-    def init_embedder(self):
-        pe_dim = self.kwargs["wave_embed_dim"]
-        sigma = 1
-        omega = 1
-        pe_bias = True
-        self.embedder = RandGausLinr((1, pe_dim, sigma, omega, pe_bias, self.verbose))
-        self.decoder_input_dim = pe_dim
+        self.wave_embedder = wave_embedder
 
     def shift_wave(self, wave, redshift):
         if wave.ndim == 3:
@@ -41,39 +35,47 @@ class HyperSpectralConverter(nn.Module):
             raise Exception("Wrong wave dimension when doing wave shifting.")
         return wave
 
-    def forward(self, wave, radec, redshift=None):
-        """ Process wave (refshifting, embedding, if required) and
-              convert RA/DEC (original state or embedded) to hyperspectral coordinates.
-
+    def combine_spatial_spectral(self, spatial, spectral):
+        """ Combine spatial with spectral latent variables.
             @Param
-              wave:  lambda values used for casting [1,bsz,num_samples,1]
-              radec: embedded 2D coords [bsz,1,2 or coords_embed_dim]
+              spatial:   [bsz,num_samples,2 or embed_dim]
+              spectral:  [bsz,num_samples,1 or embed_dim]
             @Return
-              hps_coords: ra/dec/wave coords
-                          if convert method is add, then [bsz,num_samples,embed_dim]
-                          if concat, then [bsz,num_samples, coords_embed_dim+wave_embed_dim]
+              if add:    [bsz,num_samples,embed_dim]
+              if concat: [bsz,num_samples,3 or spa_embed_dim+spe_embed_dim]
         """
-        wave = wave[0,:,:] # [bsz,num_samples,1]  # replace ***********
+        if self.combine_method == "add":
+            assert(spatial.shape == spectral.shape)
+            hps_latents = spatial + spectral # [...,embed_dim]
+        elif self.combine_method == "concat":
+            hps_latents = torch.cat((spatial, spectral), dim=-1)
+        else:
+            raise ValueError("Unrecognized spatial-spectral combination method.")
+        return hps_latents
+
+    def forward(self, wave, latents, redshift=None):
+        """ Process wave (refshifting, embedding, if required) and
+              combine with RA/DEC (original state or embedded) to hyperspectral latents.
+            @Param
+              wave:    lambda values used for casting.   [1,bsz,num_samples,1]
+              latents: (original or embedded) 2D coords. [bsz,1,2 or coords_embed_dim]
+            @Return
+              hps_latents: ra/dec/wave coords
+        """
+        wave = wave[0] # [bsz,num_samples,1]  # replace ***********
         num_samples = wave.shape[-2]
-        coords_embed_dim = radec.shape[-1]
+        coords_embed_dim = latents.shape[-1]
 
         if redshift is not None:
             wave = self.shift_wave(wave, redshift)
 
         if self.wave_embed_method == "positional":
             assert(coords_embed_dim != 2)
-            wave = self.embedder(wave) # [bsz,num_samples,wave_embed_dim]
+            wave = self.wave_embedder(wave) # [bsz,num_samples,wave_embed_dim]
         else:
             # assert 2D coords are not embedded as well, should use siren in this case
             assert(coords_embed_dim == 2)
 
-        radec = radec.tile(1,num_samples,1) # [bsz,num_samples,coords_embed_dim or 2]
-
-        if self.convert_method == "add":
-            assert(radec.shape == wave.shape)
-            hyperspectral_coords = radec + wave # [...,embed_dim]
-        elif self.convert_method == "concat":
-            hyperspectral_coords = torch.cat((radec, wave), dim=-1) # [...,c_embed_dim+w_embed_dim]
-        else:
-            raise ValueError("Unrecognized converting method.")
-        return hyperspectral_coords
+        latents = latents.tile(1,num_samples,1) # [bsz,nsamples,embed_dim or 2]
+        hps_latents = self.combine_spatial_spectral(latents, wave)
+        return hps_latents
