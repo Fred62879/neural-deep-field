@@ -23,7 +23,6 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
 from wisp.datasets import default_collate
 from wisp.loss import spectra_supervision_loss
 from wisp.utils.common import get_gpu_info, forward
-from wisp.datasets.fits_data import recon_img_and_evaluate
 from wisp.utils.plot import plot_gt_recon, plot_horizontally
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
@@ -112,8 +111,7 @@ class AstroTrainer(BaseTrainer):
         else: self.save_cropped_recon = False
 
         # latent quantization
-        self.quantize_latent = self.extra_args["quantize_latent"] #and \
-            #(self.extra_args["use_ngp"] or self.extra_args["encode"])
+        self.quantize_latent = self.extra_args["quantize_latent"]
         if self.quantize_latent:
             self.plot_embed_map = "plot_embed_map_during_train" in tasks
             self.save_latent =  "save_latent_during_train" in tasks or "plot_latent_embed" in task
@@ -134,7 +132,7 @@ class AstroTrainer(BaseTrainer):
             pass
         if self.spectra_supervision:
             fields.append("spectra_supervision_data")
-        self.dataset.set_dataset_fields(set(fields))
+        self.dataset.set_dataset_fields(fields)
 
     def set_log_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
@@ -564,7 +562,7 @@ class AstroTrainer(BaseTrainer):
             np.save(fname, np.array(self.embed_ids))
 
         if self.save_recon or self.save_cropped_recon:
-            kwargs = {
+            re_args = {
                 "fname": str(self.epoch),
                 "dir": self.recon_dir,
                 "verbose": self.verbose,
@@ -574,7 +572,7 @@ class AstroTrainer(BaseTrainer):
                 "recon_flat_trans": False,
                 "calculate_metrics": False
             }
-            _, _ = recon_img_and_evaluate(self.smpl_pixels, self.dataset, **kwargs)
+            _, _ = self.dataset.restore_evaluate_tiles(self.smpl_pixels, **re_args)
 
             if self.save_cropped_recon:
                 for i, fits_id in enumerate(self.extra_args["recon_cutout_fits_ids"]):

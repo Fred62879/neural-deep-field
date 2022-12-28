@@ -7,8 +7,6 @@ import logging as log
 from pathlib import Path
 from os.path import exists, join
 from wisp.inferrers import BaseInferrer
-from wisp.utils.plot import plot_horizontally
-from wisp.datasets.fits_data import recon_img_and_evaluate
 from wisp.utils.common import forward, load_model_weights
 
 
@@ -79,25 +77,27 @@ class AstroInferrer(BaseInferrer):
     def summarize_inferrence_tasks(self):
         """ Group similar inferrence tasks (tasks using same dataset and same model) together.
         """
-        self.spectra_supervision = self.space_dim == 3 \
-            and self.extra_args['spectra_supervision']
-        self.quantize_latent = self.extra_args["quantize_latent"] and \
-            (self.extra_args["use_ngp"] or self.extra_args["encode"])
+        tasks = set(self.extra_args["tasks"])
+
+        self.quantize_latent = "quantize_latent" in self.tasks
 
         # infer all coords using original model
-        self.recon_img = "recon_img" in self.tasks
-        self.recon_flat_trans = "recon_flat_trans" in self.tasks
-        self.plot_embd_map = "plot_embd_map_during_recon" in self.tasks \
+        self.recon_img = "recon_img" in tasks
+        self.recon_HSI = "recon_HSI" in self.tasks
+        self.recon_flat_trans = "recon_flat_trans" in tasks
+        self.plot_embd_map = "plot_embd_map_during_recon" in tasks \
             and self.space_dim == 3 and self.quantize_latent
-        self.plot_embd_latent_distrib = "plot_embd_latent_distrib" in self.tasks \
+        self.plot_embd_latent_distrib = "plot_embd_latent_distrib" in tasks \
             and self.space_dim == 3 and self.quantize_latent
 
         # infer all coords using modified model
-        self.recon_cdbk_spectra = "recon_cdbk_spectra" in self.tasks \
+        self.spectra_supervision = self.space_dim == 3 \
+            and "spectra_supervision" in tasks
+        self.recon_cdbk_spectra = "recon_cdbk_spectra" in tasks \
             and self.space_dim == 3 and self.quantize_latent
 
         # infer selected coords using partial model
-        self.recon_spectra = "recon_spectra" in self.tasks and self.space_dim == 3
+        self.recon_spectra = "recon_spectra" in tasks and self.space_dim == 3
 
         # keep only tasks required to perform
         self.group_tasks = []
@@ -117,7 +117,8 @@ class AstroInferrer(BaseInferrer):
         log.info(f"inferrence group tasks: {self.group_tasks}.")
 
     def configure_dataset(self):
-        """ Configure dataset (batched fields and len) for inferrence. """
+        """ Configure dataset (batched fields and len) for inferrence.
+        """
         if self.infer_all_coords_full_model or self.infer_all_coords_modified_model:
             fields = ['coords']
             if self.recon_img: fields.append('pixels')
@@ -222,9 +223,9 @@ class AstroInferrer(BaseInferrer):
 
         if self.recon_img:
             self.to_HDU_now = self.extra_args["to_HDU"] and model_id == self.num_models
-            self.recon_HSI_now = "recon_HSI" in self.tasks and model_id == self.num_models
+            self.recon_HSI_now = self.recon_HSI and model_id == self.num_models
             self.recon_flat_trans_now = self.recon_flat_trans and model_id == self.num_models
-            if self.recon_flat_trans_now: self.num_bands = 1
+            #if self.recon_flat_trans_now: self.num_bands = 1
             self.recon_pixels = []
 
         if self.plot_embd_map:
@@ -235,7 +236,7 @@ class AstroInferrer(BaseInferrer):
 
     def post_checkpoint_all_coords_full_model(self, model_id):
         if self.recon_img:
-            kwargs = {
+            re_args = {
                 "fname": str(model_id),
                 "dir": self.recon_dir,
                 "metric_options": self.metric_options,
@@ -246,8 +247,8 @@ class AstroInferrer(BaseInferrer):
                 "recon_norm": self.extra_args["recon_norm"],
                 "recon_flat_trans": self.recon_flat_trans_now
             }
-            cur_metrics, cur_metrics_zscale = recon_img_and_evaluate(
-                self.recon_pixels, self.dataset, **kwargs)
+            cur_metrics, cur_metrics_zscale = self.dataset.restore_evaluate_tiles(
+                self.recon_pixels, **re_args)
 
             if self.calculate_metrics:
                 # add metrics for current checkpoint
@@ -280,7 +281,7 @@ class AstroInferrer(BaseInferrer):
         pass
 
     #############
-    # Task I:Infer all coords
+    # Infer all coords
     #############
 
     def infer_all_coords(self, model_id, checkpoint):
@@ -299,9 +300,8 @@ class AstroInferrer(BaseInferrer):
             with torch.no_grad():
                 ret = forward(self, self.full_pipeline, data, self.quantize_latent,
                               self.plot_embd_map, self.spectra_supervision)
-
-            if self.recon_img: self.recon_pixels.extend( ret["intensity"] )
-            if self.plot_embd_map: self.embd_ids.extend( ret["embd_ids"] )
+            if self.recon_img: self.recon_pixels.extend(ret["intensity"])
+            if self.plot_embd_map: self.embd_ids.extend(ret["embd_ids"])
 
     # Plot embd map
     def plot_embd_map(self):
@@ -329,7 +329,7 @@ class AstroInferrer(BaseInferrer):
         plot_embd_map(embd_ids, embd_map_fn)
 
     #############
-    # Task II:Recon spectra
+    # Recon spectra
     #############
 
     def recon_spectra(self, checkpoint):

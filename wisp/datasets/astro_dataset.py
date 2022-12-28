@@ -61,7 +61,7 @@ class AstroDataset(Dataset):
         self.dataset_length = length
 
     def set_dataset_fields(self, fields):
-        self.requested_fields = fields
+        self.requested_fields = set(fields)
 
     ############
     # Getters
@@ -176,5 +176,9 @@ class AstroDataset(Dataset):
     # Utilities
     ############
 
-    def restore_evaluate_tiles(self, pixels, func=None, kwargs=None):
-        return self.fits_dataset.restore_evaluate_tiles(pixels, func=func, kwargs=kwargs)
+    def restore_evaluate_tiles(self, recon_pixels, **re_args):
+        """ Restore multiband image save locally and calculate metrics.
+            @Return:
+               metrics(_z): metrics of current model [n_metrics,1,ntiles,nbands]
+        """
+        return self.fits_dataset.restore_evaluate_tiles(recon_pixels, **re_args)

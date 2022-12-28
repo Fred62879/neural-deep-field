@@ -3,9 +3,9 @@ global:
     debug: False
     verbose: True
     exp_name: 'test-ngp-nerf'
-    tasks: ['train','spectra_supervision']
+    #tasks: ['train','spectra_supervision','recon_spectra']
     #tasks: ['train','save_recon_during_train','infer','recon_img']
-    #tasks: ['infer','recon_spectra'] #'recon_img']
+    tasks: ['infer','recon_img']
 
 optimizer:
     optimizer_type: 'adam'

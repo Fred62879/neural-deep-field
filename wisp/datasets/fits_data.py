@@ -528,7 +528,58 @@ class FITSData:
     # Utilities
     ############
 
-    def restore_evaluate_one_tile(self, index, fits_id, num_pixels_acc, pixels, func, kwargs):
+    def evaluate(self, fits_id, recon_tile, **re_args):
+        """ Image evaluation function (e.g. saving, metric calculation).
+            @Param:
+              fits_id:     id of current fits tile to evaluate
+              recon_tile:  restored fits tile [nbands,sz,sz]
+            @Return:
+              metrics(_z): metrics of current model for current fits tile, [n_metrics,1,nbands]
+        """
+        dir = re_args["dir"]
+        fname = re_args["fname"]
+        verbose = re_args["verbose"]
+
+        #if denorm_args is not None: recon_tile *= denorm_args
+        recon_max = np.round(np.max(recon_tile, axis=(1,2)), 1)
+        if verbose: log.info(f"recon. pixel max {recon_max}")
+
+        # save locally
+        np_fname = join(dir, f"{fits_id}_{fname}.npy")
+        #if restore_args["recon_norm"]: recon_fname += "_norm"
+        #if restore_args["recon_flat_trans"]: recon_fname += "_flat"
+        np.save(np_fname, recon_tile)
+
+        # generate fits file
+        if re_args["to_HDU"]:
+            fits_fname = join(dir, f"{fits_id}_{fname}.fits")
+            generate_hdu(class_obj.headers[fits_id], recon_tile, fits_fname)
+
+        # if mask is not None: # inpaint: fill unmasked pixels with gt value
+        #     recon = restore_unmasked(recon, np.copy(gt), mask)
+        #     if fn is not None:
+        #         np.save(fn + "_restored.npy", recon)
+
+        # plot recon tile
+        png_fname = join(dir, f"{fits_id}_{fname}.png")
+        zscale_ranges = self.get_zscale_ranges(fits_id)
+        plot_horizontally(recon_tile, png_fname, zscale_ranges=zscale_ranges)
+
+        # calculate metrics
+        if re_args["calculate_metrics"]:
+            gt_fname = self.gt_img_fnames[fits_id] + ".npy"
+            gt_tile = np.load(gt_fname)
+            gt_max = np.round(np.max(gt_tile, axis=(1,2)), 1)
+            if verbose: log.info(f"GT. pixel max {gt_max}")
+
+            metrics = calculate_metrics(
+                recon_tile, gt_tile, re_args["metric_options"])[:,None]
+            metrics_zscale = calculate_metrics(
+                recon_tile, gt_tile, re_args["metric_options"], zscale=True)[:,None]
+            return metrics, metrics_zscale
+        return None, None
+
+    def restore_evaluate_one_tile(self, index, fits_id, num_pixels_acc, pixels, **re_args):
         if self.use_full_fits:
             num_rows, num_cols = self.num_rows[fits_id], self.num_cols[fits_id]
         else: num_rows, num_cols = self.fits_cutout_sizes[index], self.fits_cutout_sizes[index]
@@ -536,32 +587,29 @@ class FITSData:
 
         cur_tile = np.array(pixels[num_pixels_acc : num_pixels_acc + cur_num_pixels]).T. \
             reshape((self.num_bands, num_rows, num_cols))
-
-        cur_metrics, cur_metrics_zscale = func(self, fits_id, cur_tile, **kwargs)
-
+        cur_metrics, cur_metrics_zscale = self.evaluate(fits_id, cur_tile, **re_args)
         num_pixels_acc += cur_num_pixels
         return num_pixels_acc, cur_metrics, cur_metrics_zscale
 
-    def restore_evaluate_tiles(self, pixels, func, kwargs):
-        """ Restore original FITS/cutouts given flattened pixels.
-            Perform given func (e.g. metric calculation) on each restored FITS/cutout image.
+    def restore_evaluate_tiles(self, pixels, **re_args):
+        """ Restore original FITS/cutouts from given flattened pixels.
+            Then evaluate (metric calculation) each restored FITS/cutout image.
             @Param
                pixels: flattened pixels, [npixels, nbands]
             @Return
-               pixels: list of np array of size [nbands,nrows,ncols]
+               pixels: list of np array of size [nbands,nrows,ncols] (saved locally)
+               metrics(_z): metrics for all tiles of current model [n_metrics,1,ntiles,nbands]
         """
         elem_type = type(pixels)
-
         if type(pixels) is list:
             pixels = torch.stack(pixels)
-
         if type(pixels).__module__ == "torch":
             if pixels.device != "cpu":
                 pixels = pixels.detach().cpu()
             pixels = pixels.numpy()
 
-        if kwargs["calculate_metrics"]:
-            metric_options = kwargs["metric_options"]
+        if re_args["calculate_metrics"]:
+            metric_options = re_args["metric_options"]
             metrics = np.zeros((len(metric_options), 0, self.num_bands))
             metrics_zscale = np.zeros((len(metric_options), 0, self.num_bands))
         else: metrics, metrics_zscale = None, None
@@ -569,81 +617,15 @@ class FITSData:
         num_pixels_acc = 0
         for index, fits_id in enumerate(self.fits_ids):
             num_pixels_acc, cur_metrics, cur_metrics_zscale = self.restore_evaluate_one_tile(
-                index, fits_id, num_pixels_acc, pixels, func, kwargs)
+                index, fits_id, num_pixels_acc, pixels, **re_args)
 
-            if kwargs["calculate_metrics"]:
+            if re_args["calculate_metrics"]:
                 metrics = np.concatenate((metrics, cur_metrics), axis=1)
                 metrics_zscale = np.concatenate((metrics_zscale, cur_metrics_zscale), axis=1)
 
-        return metrics, metrics_zscale
+        if metrics is not None and metrics_zscale is not None:
+            return metrics[:,None], metrics_zscale[:,None]
+        return None, None
 
 # FITS class ends
 #################
-
-def recon_img_and_evaluate(recon_pixels, dataset, **kwargs):
-    """ Reconstruct multiband image save locally and calculate metrics.
-        @Return:
-           metrics(_z): metrics of current model [n_metrics,1,ntiles,nbands]
-    """
-    recon_fname = join(kwargs["dir"], kwargs["fname"])
-    if kwargs["recon_norm"]: recon_fname += "_norm"
-    if kwargs["recon_flat_trans"]: recon_fname += "_flat"
-
-    # get metrics for all recon tiles using current model
-    metrics, metrics_zscale = dataset.restore_evaluate_tiles(
-        recon_pixels, func=evaluate_func, kwargs=kwargs)
-    if metrics is not None and metrics_zscale is not None:
-        return metrics[:,None], metrics_zscale[:,None]
-    return None, None
-
-def evaluate_func(class_obj, fits_id, recon_tile, **kwargs):
-    """ Image evaluation function (e.g. saving, metric calculation),
-          passed to astro_dataset class and performed after
-          images being restored to the original shape.
-        @Param:
-          class_obj:   class object, FITSData class
-          fits_id:     id of current fits tile to recon and evaluate
-          recon_tile:  restored recon tile [nbands,sz,sz]
-        @Return:
-          metrics(_z): metrics of current model for current fits tile, [n_metrics,1,nbands]
-    """
-    #if denorm_args is not None: recon *= denorm_args
-    verbose = kwargs["verbose"]
-    fname = kwargs["fname"]
-    dir = kwargs["dir"]
-
-    # restore flattened pixels to original shape
-    # a group of tiles are saved locally as soon as restore finished
-    # don"t wait until all tiles are restored to save RAM
-    np_fname = join(dir, f"{fits_id}_{fname}.npy")
-    np.save(np_fname, recon_tile)
-
-    if kwargs["to_HDU"]: # generate fits image
-        fits_fname = join(dir, f"{fits_id}_{fname}.fits")
-        generate_hdu(class_obj.headers[fits_id], recon_tile, fits_fname)
-
-    # if mask is not None: # inpaint: fill unmasked pixels with gt value
-    #     recon = restore_unmasked(recon, np.copy(gt), mask)
-    #     if fn is not None:
-    #         np.save(fn + "_restored.npy", recon)
-
-    # plot recon tile
-    png_fname = join(dir, f"{fits_id}_{fname}.png")
-    zscale_ranges = class_obj.get_zscale_ranges(fits_id)
-    plot_horizontally(recon_tile, png_fname, zscale_ranges=zscale_ranges)
-    recon_max = np.round(np.max(recon_tile, axis=(1,2)), 1)
-    if verbose: log.info(f"recon. pixel max {recon_max}")
-
-    # calculate metrics
-    if kwargs["calculate_metrics"]:
-        gt_fname = class_obj.gt_img_fnames[fits_id] + ".npy"
-        gt_tile = np.load(gt_fname)
-        gt_max = np.round(np.max(gt_tile, axis=(1,2)), 1)
-        if verbose: log.info(f"GT. pixel max {gt_max}")
-
-        metrics = calculate_metrics(
-            recon_tile, gt_tile, kwargs["metric_options"])[:,None]
-        metrics_zscale = calculate_metrics(
-            recon_tile, gt_tile, kwargs["metric_options"], zscale=True)[:,None]
-        return metrics, metrics_zscale
-    return None, None
