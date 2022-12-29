@@ -50,6 +50,7 @@ def get_pipelines_from_config(args, tasks=[]):
     """ Utility function to get the pipelines from the parsed config.
     """
     pipelines = {}
+    tasks = set(tasks)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if args.debug:
@@ -68,7 +69,8 @@ def get_pipelines_from_config(args, tasks=[]):
         pipeline = AstroPipeline(nef, quantz, hyper_decod)
         pipelines["full"] = pipeline
 
-        if "recon_spectra" in tasks:
+        if len( tasks.intersection({"recon_gt_spectra","recon_gt_spectra_w_supervision",
+                                    "recon_dummy_spectra"}) ) != 0:
             identity_decod = HyperSpectralDecoder(integrate=False, **vars(args))
             partial_pipeline = AstroPipeline(nef, quantz, identity_decod)
             pipelines["partial"] = partial_pipeline

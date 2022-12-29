@@ -3,9 +3,10 @@ global:
     debug: False
     verbose: True
     exp_name: 'test-ngp-nerf'
-    #tasks: ['train','spectra_supervision','recon_spectra']
+    #tasks: ['train','spectra_supervision','recon_gt_spectra_w_supervision']
     #tasks: ['train','save_recon_during_train','infer','recon_img']
-    tasks: ['infer','recon_img']
+    #tasks: ['infer','recon_img']
+    tasks: ['infer','recon_gt_spectra_w_supervision']
 
 optimizer:
     optimizer_type: 'adam'
@@ -44,12 +45,18 @@ dataset:
     filter_ids: [0,1,2,3,4]
     filters: [g,r,i,z,y]
     sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y]
+    plot_labels: ['g', 'r', 'i', 'z', 'y']
+    plot_colors: ['green','red','blue','gray','yellow']
+    plot_styles: ['solid','solid','solid','solid','solid']
 
     # num_bands: 10
     # sensor_collection_name: '10'
     # filter_ids: [0,1,2,3,4,5,6,7,8,9]
     # filters: [g,r,i,z,y,nb387,nb816,nb921,u,us]
     # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y,NB0387,NB0816,NB0921,u,uS]
+    # plot_labels: ['g', 'r', 'i', 'z', 'y', 'nb387', 'nb816', 'nb921','u','u*']
+    # plot_colors: ['green','red','blue','gray','yellow','gray','red','blue','yellow','blue']    
+    # plot_styles: ['solid','solid','solid','solid','solid','dashed','dashed','dashed','dashdot','dashdot']
 
     plot_trans: True
     trans_sample_method: 'mixture'
@@ -155,8 +162,10 @@ trainer:
 infer:
     inferrer_type: 'AstroInferrer'
     infer_batch_size: 409600
-    to_HDU: True
     infer_use_all_wave: True # enforced
+
+    # recon img
+    to_HDU: True
     #infer_log_fname: '20221219-175517'
     metric_options: ['mse','ssim','psnr']
 
@@ -166,8 +175,12 @@ infer:
     #recon_cutout_start_pos: [ [[0,0]], [[0,0]] ] #[86,188]
 
     # recon spectra
-    wave_lo: 6000
-    wave_hi: 8000
+    trusted_wave_lo: 6000
+    trusted_wave_hi: 8000
+
+    plot_spectrum_average: False
+    plot_spectrum_with_trans: False
+    infer_spectra_individually: True
    
 test:
     is_test: False

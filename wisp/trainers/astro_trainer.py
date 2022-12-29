@@ -97,7 +97,7 @@ class AstroTrainer(BaseTrainer):
         self.weight_train = self.extra_args["weight_train"]
 
         self.spectral_inpaint = self.space_dim == 3 and 'spectral_inpaint' in tasks
-        self.spectra_supervision = self.space_dim == 3 and "spectra_supervision" in tasks
+        self.spectra_supervision = self.space_dim == 3 and "recon_gt_spectra_w_supervision" in tasks
 
         # save all train image reconstruction in original size
         self.save_recon = "save_recon_during_train" in tasks
@@ -120,9 +120,6 @@ class AstroTrainer(BaseTrainer):
 
     def configure_dataset(self):
         """ Configure dataset with selected fields and set length accordingly. """
-        length = self.dataset.get_num_coords()
-        self.dataset.set_dataset_length(length)
-
         fields = ['coords','pixels']
         if self.weight_train:
             fields.append('weights')
@@ -131,7 +128,12 @@ class AstroTrainer(BaseTrainer):
         if self.spectral_inpaint:
             pass
         if self.spectra_supervision:
-            fields.append("spectra_supervision_data")
+            fields.append("gt_spectra_data_w_supervision")
+
+        length = self.dataset.get_num_coords()
+
+        self.dataset.set_state("fits")
+        self.dataset.set_dataset_length(length)
         self.dataset.set_dataset_fields(fields)
 
     def set_log_path(self):

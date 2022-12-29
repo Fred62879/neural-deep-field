@@ -2,10 +2,10 @@
 import csv
 import torch
 import numpy as np
-import scipy.interpolate as interpolate
 
 from astropy.io import fits
 from os.path import join, exists
+from scipy.interpolate import interp1d
 from wisp.utils.common import worldToPix
 from astropy.convolution import convolve, Gaussian1DKernel
 
@@ -22,12 +22,15 @@ class SpectraData:
         self.load_accessory_data()
         self.load_spectra()
 
+        # set state variable for ease of dataloading
+        self.state = "gt"
+
     def require_any_data(self, tasks):
-        self.recon_spectra = "recon_spectra" in tasks
-        self.plot_dummy_spectrum = "plot_dummy_spectrum" in tasks
-        self.spectra_supervision = "spectra_supervision" in tasks
-        return self.recon_spectra or self.plot_dummy_spectrum or \
-            self.spectra_supervision
+        self.recon_gt_spectra = "recon_gt_spectra" in tasks
+        self.recon_dummy_spectra = "recon_dummy_spectra" in tasks
+        self.recon_gt_spectra_w_supervision = "recon_gt_spectra_w_supervision" in tasks
+        return self.recon_dummy_spectra or self.recon_gt_spectra or \
+            self.recon_gt_spectra_w_supervision
 
     def set_path(self, dataset_path):
         input_path = join(dataset_path, "input")
@@ -47,14 +50,60 @@ class SpectraData:
         """ Load gt and/or dummy spectra data.
         """
         self.data = {}
-        if self.plot_dummy_spectrum:
-            self.load_dummy_spectra()
-        if self.spectra_supervision or self.recon_spectra:
+        if self.recon_gt_spectra_w_supervision or self.recon_gt_spectra:
             self.load_gt_spectra()
+        if self.recon_dummy_spectra:
+            self.load_dummy_spectra()
 
-    ################
+    #############
+    # Setters
+    #############
+
+    def set_state(self, state):
+        """ Set state that controls:
+              i) whether load gt ("gt") or dummy spectra data ("dummy")
+        """
+        self.state = state
+
+    #############
+    # Getters
+    #############
+
+    def get_num_spectra_coords(self):
+        return self.get_spectra_coords().shape[0]
+
+    def get_spectra_coords(self):
+        if self.state == "gt":
+            return self.data["gt_spectra_coords"]
+        if self.state == "dummy":
+            return self.data["dummy_spectra_coords"]
+        raise ValueError("Unrecognized spectra dataset state.")
+
+    def get_recon_spectra_wave(self):
+        """ Get lambda values for spectrum plotting. """
+        if self.state == "gt":
+            return self.data["gt_recon_wave"]
+        if self.state == "dummy":
+            return self.data["dummy_recon_wave"]
+        raise ValueError("Unrecognized spectra dataset state.")
+
+    def get_gt_spectra(self):
+        return self.data["gt_spectra"]
+
+    def get_gt_spectra_wave(self):
+        """ Get lambda values for spectrum plotting. """
+        return self.data["gt_spectra_wave"]
+
+    def get_trusted_wave_bound_id(self):
+        return self.data["trusted_wave_bound_id"]
+
+    def get_supervision_gt_spectra(self):
+        """ Get gt spectra (GPU tensor) for training. """
+        return self.data["supervision_gt_spectra"]
+
+    #############
     # Helpers
-    ################
+    #############
 
     def load_dummy_spectra(self):
         """ Load hardcoded spectra positions for pixels without gt spectra.
@@ -86,24 +135,25 @@ class SpectraData:
         self.data["dummy_spectra_coords"] = coords
 
     def load_gt_spectra(self):
-        """ Load gt spectra data depending on given tasks.
-            We support loading only one of two sets of data to avoid confusion.
+        """ Load gt spectra data. Note that:
+              During training, we only consider w/ supervision
+              During inferrence, the two options give same coords but different spectra
 
-            i) spectra supervision data (used for training and inferrence):
+            i) spectra data (w/ supervision) (used for training and inferrence):
                gt spectra
                spectra coords
-            ii) centerize gt spectra data (for spectrum plotting only)
+           ii) spectra data (w/ o/ supervision) (for spectrum plotting only)
                   (coord with gt spectra located at center of cutout)
-                gt spectra
-                spectra coords
+               gt spectra
+               spectra coords
         """
         choices = self.kwargs["gt_spectra_choices"]
         source_spectra_data = read_spectra_data(self.spectra_data_fname)
 
         smpl_interval = self.kwargs["trans_sample_interval"]
-        wave_range = [self.kwargs["trusted_wave_lo"], self.kwargs["trusted_wave_hi"]]
+        wave_bound = [self.kwargs["trusted_wave_lo"], self.kwargs["trusted_wave_hi"]]
 
-        spectra = []
+        recon_waves, gt_waves, spectra = [], [], []
         coords = torch.zeros(len(choices), 2)
         for i, choice in enumerate(choices):
             footprint = source_spectra_data["footprint"][choice]
@@ -111,25 +161,31 @@ class SpectraData:
             subtile_id = source_spectra_data["subtile_id"][choice]
             fits_id = f"{footprint}{tile_id}{subtile_id}"
 
-            # generate gt spectra fnames
+            # load gt spectra data
             fname = join(self.spectra_path, fits_id,
                          source_spectra_data["spectra_fname"][choice] + ".npy")
+            if self.recon_gt_spectra_w_supervision:
+                recon_wave, gt_wave, gt_spectra = get_gt_spectra(
+                    fname, wave_bound, smpl_interval, True)
+            else:
+                recon_wave, gt_wave, gt_spectra = get_gt_spectra(
+                    fname, wave_bound, smpl_interval)
 
-            # load gt spectra data
-            gt_spectra = load_supervision_gt_spectra(fname, wave_range, smpl_interval)
+            gt_waves.append(gt_wave)
+            recon_waves.append(recon_wave)
             spectra.append(gt_spectra)
 
             # get coords of gt spectra pixels
             coords[i] = self.get_gt_spectra_pixel_coords(source_spectra_data, choice)
 
-            # get id bound of trusted wave range
-            if self.spectra_supervision:
-                self.data["trusted_wave_range_id"] = self.trans_obj.get_bound_id(wave_range)
-
-        self.data["gt_spectra"] = torch.FloatTensor(np.array(spectra))
+        self.data["gt_spectra"] = spectra
+        self.data["gt_spectra_wave"] = gt_waves
+        self.data["gt_recon_wave"] = recon_waves
         self.data["gt_spectra_coords"] = torch.FloatTensor(coords).to(self.device)
-        if self.spectra_supervision:
-            self.data["supervision_gt_spectra"] = torch.FloatTensor(spectra).to(self.device)
+        self.data["trusted_wave_bound_id"] = self.trans_obj.get_bound_id(wave_bound)
+
+        if self.recon_gt_spectra_w_supervision:
+            self.data["supervision_gt_spectra"] = torch.FloatTensor(np.array(spectra)).to(self.device)
 
     def get_gt_spectra_pixel_coords(self, spectra_data, choice):
         """ Get coordinate of pixel with gt spectra. We can either
@@ -190,63 +246,12 @@ class SpectraData:
             count += size * (r - start_r) + c - start_c
         return count
 
-    def load_spectrum_plotting_data(self):
-        if not config["plot_spectrum"] and not config["plot_cdbk_spectrum"]:
-            return
-
-        config["spectrum_labels"] = ["g", "r", "i", "z", "y", "nb387", "nb816", "nb921","u","u*"]
-        config["spectrum_colors"] = ["green","red","blue","gray","yellow","gray","red","blue","yellow","blue"]
-        config["spectrum_styles"] = ["solid","solid","solid","solid","solid","dashed","dashed","dashed","dashdot","dashdot"]
-
-        # get coordinates (pixl id or ra/dec form) for all specified spectra pixel
-        # together with the corspd gt spectra data filename
-        if config["is_test"]:
-            fn = "fake_spectrum"+config["sensor_collection_name"]+str(config["fake_spectra_cho"])+".npy"
-            config["spectra_coords"] = [{"coords": config["fake_coord"],"radec":False}]
-            config["gt_spectra_fns"] = [join(config["spectra_dir"], fn)]
-
-        elif config["spectra_supervision"]:
-            add_spectra_supervision_args(config)
-
-        elif config["plot_centerize_spectrum"]:
-            add_centerize_gt_spectra_args(config)
-
-        else: # hardcode pixel r/c position to plot spectrum w/o gt spectra
-            pass
-
-    #############
-    # Getters
-    #############
-
-    def get_num_spectra_coords(self):
-        return self.get_spectra_coords().shape[0]
-
-    def get_dummy_spectra_coords(self):
-        return self.data["dummy_spectra_coords"]
-
-    def get_spectra_coords(self):
-        return self.data["gt_spectra_coords"]
-
-    def get_supervision_gt_spectra(self):
-        return self.data["supervision_gt_spectra"]
-
-    def get_gt_spectra(self):
-        return self.data["gt_spectra"]
-
-    def get_trusted_wave_range_id(self):
-        return self.data["trusted_wave_range_id"]
-
 # SpectraData class ends
 #############
 
-#############
-# Utilities
-#############
-
 def read_spectra_data(fname):
-    data = {}
-    colnames = None
-    datatypes = None
+    data, colnames, datatypes = {}, None, None
+
     with open(fname) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
         line_count = 0
@@ -276,36 +281,34 @@ def convolve_spectra(spectra, std=50, border=True):
         return nume / denom
     return convolve(spectra, kernel)
 
-def process_gt_spectra(gt_fname):
-    """ Process gt spectra for spectrum plotting.
-    """
-    gt = np.load(gt_fname)
-    gt_wave, gt_spectra = gt[:,0], gt[:,1]
-    lo, hi = np.min(gt_spectra), np.max(gt_spectra)
-    if hi != lo:
-        gt_spectra = (gt_spectra - lo) / (hi - lo)
-    gt_spectra = convolve_spectra(gt_spectra)
-    return gt_wave, gt_spectra
-
-def load_supervision_gt_spectra(fname, wave_range, smpl_interval):
-    """ Load gt spectra (intensity values) for spectra supervision.
-        Interpolate original spectra data to have same discretization value as trans data.
+def get_gt_spectra(fname, wave_bound, smpl_interval, interpolate=False):
+    """ Load gt spectra (intensity values) for spectra supervision and/or spectrum plotting.
+        Smooth the gt spectra (with significantly larger discretization value than trans).
+        If requried, interpolate with same discretization value as trans data.
         @Param
           fname: filename of np array that stores gt spectra data
-          wave_range: trusted wave lower and upper bound (range that we interpolate)
+          wave_bound: trusted wave lower and upper bound (range that we interpolate)
           smpl_interval: discretization interval of transmission data.
+        @Return
+          recon_wave: wave for recon spectra (same as gt_wave if do interpolation)
+          gt_wave/spectra: spectra data with corresponding lambda values
     """
     gt = np.load(fname)
     gt_wave, gt_spectra = gt[:,0], gt[:,1]
     gt_spectra = convolve_spectra(gt_spectra)
-    f_gt = interpolate.interp1d(gt_wave, gt_spectra)
 
     # assume lo, hi is within range of gt wave
-    (lo, hi) = wave_range
-    trusted_wave = np.arange(lo, hi + 1, smpl_interval)
-    smpl_spectra = f_gt(trusted_wave)
-    smpl_spectra /= np.max(smpl_spectra)
-    return smpl_spectra
+    (lo, hi) = wave_bound
+    recon_wave = np.arange(lo, hi + 1, smpl_interval)
+
+    if interpolate:
+        f_gt = interp1d(gt_wave, gt_spectra)
+        smpl_spectra = f_gt(recon_wave)
+        smpl_spectra /= np.max(smpl_spectra)
+        return recon_wave, recon_wave, smpl_spectra
+
+    gt_spectra /= np.max(gt_spectra)
+    return recon_wave, gt_wave, gt_spectra
 
 def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
     gt = np.load(gt_fn)
@@ -323,10 +326,9 @@ def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
     gt_spectra_intp = f(wave)
     return wave, gt_spectra_intp, gen_spectra
 
-#############
-# Plotting functions
-#############
 
+############# abandoned
+'''
 def plot_spectrum(model_id, i, spectrum_dir, spectra, spectrum_wave,
                   orig_wave, orig_transms, colors, lbs, styles):
     """ Plot spectrum with sensor transmission as background.
@@ -415,34 +417,4 @@ def recon_spectrum_(model_id, batch_coords, covars, spectrum_wave, orig_wave,
             plot_spectrum_gt(model_id, i, gt_fns[i], spectrum_dir, spectra, spectrum_wave, orig_wave,
                              orig_transms, args.spectrum_colors, args.spectrum_labels, args.spectrum_styles)
     return np.array(sams)
-
-'''
-## abandoned
-def generate_spectra(mc_cho, coord, covar, net, trans_args, get_eltws_prod=False):
-    """ Generate spectra profile for spectrum plotting
-        @Param
-          coord:  [bsz,3] / [bsz,nbands,nsmpl_per_band,2] / [bsz,nsmpl,2]
-        @Return
-          output: [bsz,nsmpl]
-    """
-    bsz = len(coord) # bsz/1
-    if mc_cho == "mc_hardcode":
-        net_args = [coord, covar, None]
-    elif mc_cho == "mc_bandwise":
-        wave, trans = trans_args # [bsz,nsmpl,1]/[nbands,nsmpl]
-        net_args = [coord, covar, wave[:bsz], trans]
-    elif mc_cho == "mc_mixture":
-        #wave = trans_args[0][:bsz] # [bsz,nsmpl,1]
-        wave = trans_args[0] # [nsmpl,1]
-        net_args = [coord, covar, wave, None, None]
-    else:
-        raise("Unsupported monte carlo choice")
-
-    with torch.no_grad():
-        (spectra, _, _, _, _) = net(net_args)
-
-    if spectra.ndim == 3: # bandwise
-        spectra = spectra.flatten(1,2)
-    spectra = spectra.detach().cpu().numpy() # [bsz,nsmpl]
-    return spectra
 '''

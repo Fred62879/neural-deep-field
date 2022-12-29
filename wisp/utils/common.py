@@ -108,7 +108,7 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
     #coords = reshape_coords(coords, args, infer=infer, spectrum=spectrum, coord_wave=coord_wave)
     return coords
 
-def forward(class_obj, pipeline, data, quantize_latent=False, plot_embd_map=False, spectra_supervision=False):
+def forward(class_obj, pipeline, data, quantize_latent, plot_embd_map, spectra_supervision):
     if class_obj.space_dim == 2:
         requested_channels = {"intensity"}
         #print("forward", data["coords"].shape)

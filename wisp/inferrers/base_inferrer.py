@@ -58,6 +58,17 @@ class BaseInferrer(ABC):
         self.selected_model_fnames = []
         self.group_tasks = []
 
+        self.summarize_inferrence_tasks()
+        self.generate_inferrence_funcs()
+
+    @abstractmethod
+    def summarize_inferrence_tasks(self):
+        self.group_tasks = []
+
+    @abstractmethod
+    def generate_inferrence_funcs(self):
+        self.infer_funcs = {}
+
     #############
     # Dataloader
     #############
@@ -84,7 +95,7 @@ class BaseInferrer(ABC):
         """ Select dataset based on current inferrence task.
             Then re-init dataloader.
         """
-        self.configure_dataset()
+        self._configure_dataset()
         self.init_dataloader()
         self.reset_data_iterator()
         self.fits_ids = self.dataset.get_fits_ids()
@@ -156,3 +167,9 @@ class BaseInferrer(ABC):
           self.pre_checkpoint,
           self.run_checkpoint,
           self.post_checkpoint ) = self.infer_funcs[group_task]
+
+    @abstractmethod
+    def _configure_dataset(self):
+        """ Configure data fields and dataset size based on current task.
+        """
+        pass

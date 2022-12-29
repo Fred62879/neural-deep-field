@@ -19,7 +19,7 @@ class HyperSpectralDecoder(nn.Module):
 
         self.kwargs = kwargs
         self.scale = scale
-        self.spectra_supervision = "spectra_supervision" in kwargs["tasks"]
+        self.spectra_supervision = "recon_gt_spectra_w_supervision" in kwargs["tasks"]
         if self.spectra_supervision:
             self.num_spectra_coords = kwargs["num_supervision_spectra"]
 
@@ -144,10 +144,13 @@ class HyperSpectralDecoder(nn.Module):
               spectra:   reconstructed spectra
         """
         latents = data["latents"]
+        batch_size = latents.shape[0]
+
         scaler = None if "scaler" not in data or not self.scale else data["scaler"]
         redshift = None if "redshift" not in data or not self.scale else data["redshift"]
 
         if self.spectra_supervision:
+            print(latents.shape)
             full_wave = kwargs["full_wave"][:,None,:,None].tile(1,self.num_spectra_coords,1,1) # ****** replace
             data["spectra"] = self.reconstruct_supervision_spectra(
                 latents, full_wave, scaler, redshift)
@@ -157,8 +160,10 @@ class HyperSpectralDecoder(nn.Module):
             scaler = None if scaler is None else scaler[:-self.num_spectra_coords]
             redshift = None if redshift is None else redshift[:-self.num_spectra_coords]
 
-        hps_latents = self.convert(kwargs["wave"], latents, redshift=redshift)
-        spectra = self.reconstruct_spectra(hps_latents, scaler)
-        intensity = self.inte(spectra[...,0], **kwargs)
-        data["intensity"] = intensity
+        if batch_size > self.num_spectra_coords:
+            hps_latents = self.convert(kwargs["wave"], latents, redshift=redshift)
+            spectra = self.reconstruct_spectra(hps_latents, scaler)
+            intensity = self.inte(spectra[...,0], **kwargs)
+            data["intensity"] = intensity
+
         return data

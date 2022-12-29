@@ -108,10 +108,8 @@ def define_cmd_line_args():
     global_group.add_argument("--tasks", nargs="+", type=str,
                               choices=["train","spectral_inpaint","spatial_inpaint","plot_embd_map_during_train",
                                        "save_latent_during_train","save_recon_during_train","infer_during_train",
-                                       "infer","recon_img","recon_flat","recon_spectra","plot_dummy_spectrum"
-                                       "recon_cdbk_spectra","plot_embd_map","plot_latent_embd"],
-                              help="recon_spectra: reconstruct gt spectra, \
-                              plot_dummy_spectrum: plot spectra without gt")
+                                       "infer","recon_img","recon_flat","recon_gt_spectra","recon_gt_spectra_w_supervision",
+                                       "recon_dummy_spectra","recon_cdbk_spectra","plot_embd_map","plot_latent_embd"])
     ###################
     # Grid arguments
     ###################
@@ -463,7 +461,7 @@ def define_cmd_line_args():
     infer_group.add_argument("--inferrer-type", type=str, help="Inferrer class to use",
                              choices=["AstroInferrer"])
 
-    infer_group.add_argument("--infer-log_fname", type=str)
+    infer_group.add_argument("--infer-log-fname", type=str)
     infer_group.add_argument("--infer-batch-size", type=int, default=4096)
     infer_group.add_argument("--infer-use-all-wave", action="store_true", default=False,
                              help="should set this to true, implementation assumes infer with all lambda")
@@ -483,6 +481,14 @@ def define_cmd_line_args():
                              help="list of sizes of each cutout for each tile")
     infer_group.add_argument("--recon-cutout-start-pos", nargs="+", type=list,
                              help="list of start (r/c) positions of each cutout for each tile")
+
+    infer_group.add_argument("--plot-spectrum-average", action="store_true")
+    infer_group.add_argument("--plot-spectrum-with-trans", action="store_true")
+    infer_group.add_argument("--infer-spectra-individually", action="store_true")
+
+    infer_group.add_argument("--plot-labels", nargs="+", type=str)
+    infer_group.add_argument("--plot-colors", nargs="+", type=str)
+    infer_group.add_argument("--plot-styles", nargs="+", type=str)
 
     ###################
     # Arguments for renderer
