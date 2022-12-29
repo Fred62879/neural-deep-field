@@ -15,10 +15,6 @@ class BaseInferrer(ABC):
     """
 
     def __init__(self, pipelines, dataset, device, extra_args, info=None):
-
-        # inferrence tasks to perform
-        self.tasks = set(extra_args["tasks"])
-
         self.device = device
         self.dataset = dataset
         self.pipelines = pipelines
@@ -76,9 +72,9 @@ class BaseInferrer(ABC):
     def init_dataloader(self):
         self.infer_data_loader = DataLoader(
             self.dataset,
-            batch_size=self.batch_size,
+            batch_size=1, #self.batch_size,
             sampler=BatchSampler(
-                SequentialSampler(self.dataset), batch_size=self.batch_size, drop_last=False),
+                SequentialSampler(self.dataset), batch_size=self.batch_size, drop_last=True),
             #pin_memory=True,
             num_workers=0
         )

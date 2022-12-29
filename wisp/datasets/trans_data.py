@@ -40,6 +40,12 @@ class TransData:
     # Initializations
     #############
 
+    def init_trans(self):
+        self.data = {}
+        self.preprocess_wave_trans()
+        self.load_full_wave_trans()
+        self.load_sampling_trans_data()
+
     def set_log_path(self, dataset_path):
         input_path = join(dataset_path, "input")
         source_trans_path = join(input_path, "transmission")
@@ -70,64 +76,32 @@ class TransData:
 
         self.flat_trans_fname = join(self.trans_dir, "flat_trans")
 
-    def init_trans(self):
-        bands = self.kwargs["filters"]
-        band_ids = self.kwargs["filter_ids"]
-
-        if not exists(self.processed_wave_fname) or not exists(self.processed_trans_fname):
-            source_wave, source_trans = self.load_source_wave_trans()
-            wave, trans, integration = self.preprocess_wave_trans(source_wave, source_trans)
-        else:
-            with open(self.processed_wave_fname, "rb") as fp:
-                wave = pickle.load(fp)
-            with open(self.processed_trans_fname, "rb") as fp:
-                trans = pickle.load(fp)
-            integration = integrate_trans(wave, trans)
-            if self.verbose:
-                log.info(f"trans integration value: { np.round(integration, 2) }")
-
-        self.full_wave, self.full_trans, self.full_distrib, encd_ids = \
-            self.load_full_wave_trans(wave, trans)
-
-        self.full_nsmpl = len(self.full_wave)
-        lo, hi = min(self.full_wave), max(self.full_wave)
-        self.full_norm_wave = ((self.full_wave - lo) / (hi - lo)).to(self.device)
-
-        if self.sample_method == "mixture":
-            #self.trans_data = (full_norm_wave, self.full_trans, self.full_distrib, encd_ids)
-            self.trans_data = (self.full_norm_wave,
-                               self.full_trans.to(self.device),
-                               self.full_distrib.to(self.device),
-                               encd_ids.to(self.device))
-
-        elif self.sample_method == "bandwise":
-            self.trans_data = self.load_bandwise_wave_trans(norm_wave, trans)
-
-        elif self.sample_method == "hardcode":
-            self.trans_data = self.load_hdcd_wave_trans(
-                self.trans_dir, hdcd_wave, hdcd_trans)
-        else:
-            raise ValueError("Unrecognized transmission sampling method.")
-
     #############
     # getters
     #############
 
-    def get_bound_id(self, wave_range):
-        """ Get id of lambda values in full wave that tightly bounds given range.
-            full_wave[id_lo] >= wave_lo
-            full_wave[id_hi] <= wave_hi (before adding 1)
-        """
-        wave_lo, wave_hi = wave_range
-        wave_hi = int(min(wave_hi, int(torch.max(self.full_wave))))
-        wave_id_hi = torch.argmin((self.full_wave < wave_hi).type(torch.uint8))
-        wave_id_lo = torch.argmax((self.full_wave >= wave_lo).type(torch.uint8))
-        return [wave_id_lo, wave_id_hi + 1]
+    def get_source_wave(self):
+        return self.data["wave"]
+
+    def get_source_trans(self):
+        return self.data["trans"]
+
+    def get_full_wave(self):
+        return self.data["full_wave"]
 
     def get_full_norm_wave(self):
-        return self.full_norm_wave
+        return self.data["full_norm_wave"]
 
-    def sample_wave_trans(self, batch_size, num_samples):
+    def get_num_samples_within_bands(self):
+        return np.load(self.nsmpl_within_bands_fname)
+
+    def get_band_coverage_range(self):
+        return np.load(self.band_coverage_range_fname)
+
+    def get_full_wave_bound(self):
+        return ( min(self.data["full_wave"]), max(self.data["full_wave"]) )
+
+    def sample_wave_trans(self, batch_size, num_samples, infer=False):
         """ Sample lambda and transmission data for given sampling methods.
             @Return
               wave:  [bsz,nsmpl,1]/[bsz,nbands,nsmpl,1]
@@ -135,7 +109,13 @@ class TransData:
               nsmpl: [bsz,nbands]/None
         """
         nsmpl_within_each_band = None
-        if self.sample_method == "hardcode":
+
+        if infer:
+            smpl_trans = self.data["full_trans"] #[None,...].tile(batch_size,1,1)
+            smpl_wave = self.data["full_norm_wave"][None,:,None].tile(batch_size,1,1)
+            nsmpl_within_each_band = self.data["nsmpl_within_bands"] #[None,...].tile(batch_size,1)
+
+        elif self.sample_method == "hardcode":
             smpl_wave, smpl_trans = None, self.trans
 
         elif self.sample_method == "bandwise":
@@ -153,26 +133,21 @@ class TransData:
         if exists(self.flat_trans_fname):
             flat_trans = np.load(self.flat_trans_fname)
         else:
-            range = self.full_wave[-1] - self.full_wave[0]
+            range = self.data["full_wave"][-1] - self.data["full_wave"][0]
             avg_inte = np.mean(integration)
-            lo = min([min(cur_wave) for cur_wave in self.wave])
-            hi = max([max(cur_wave) for cur_wave in self.wave])
+            lo = min([min(cur_wave) for cur_wave in self.data["wave"]])
+            hi = max([max(cur_wave) for cur_wave in self.data["wave"]])
 
-            flat_trans = np.full((self.full_nsmpl), avg_inte/range).reshape(1,-1)
+            full_nsmpl = len(self.data["full_wave"])
+            flat_trans = np.full((full_nsmpl), avg_inte/range).reshape(1,-1)
             np.save(self.flat_trans_fname, flat_trans)
             if self.plot:
-                plt.plot(self.full_wave, full_trans.T)
-                plt.plot(self.full_wave, flat_trans.T)
+                plt.plot(self.data["full_wave"], self.data["full_trans"].T)
+                plt.plot(self.data["full_wave"], flat_trans.T)
                 plt.savefig(self.flat_trans_fname)
                 plt.close()
 
-        self.flat_trans = flat_trans
-
-    def get_num_samples_within_bands(self):
-        return np.load(self.nsmpl_within_bands_fname)
-
-    def get_band_coverage_range(self):
-        return np.load(self.band_coverage_range_fname)
+        self.data["flat_trans"] = flat_trans
 
     #############
     # Helper methods
@@ -235,40 +210,57 @@ class TransData:
         source_trans = { filter:source_trans[i] for filter, i in zip(self.filters,self.filter_ids) }
         return source_wave, source_trans
 
-    def preprocess_wave_trans(self, source_wave, source_trans):
+    def preprocess_wave_trans(self):
         """ Preprocess source wave and transmission.
         """
-        # transmission trimming
-        wave, trans = trim_wave_trans(source_wave, source_trans, self.filters, self.trans_threshold)
+        if exists(self.processed_wave_fname) and exists(self.processed_trans_fname):
+            with open(self.processed_wave_fname, "rb") as fp:
+                wave = pickle.load(fp)
+            with open(self.processed_trans_fname, "rb") as fp:
+                trans = pickle.load(fp)
+        else:
+            source_wave, source_trans = self.load_source_wave_trans()
 
-        # unify discretization interval as 10 for all bands
-        if 'us' in self.filters: downsample_us(wave, trans)
-        if 'u' in self.filters: interpolate_u_band(wave, trans, self.smpl_interval)
-        scale_trans(trans, source_trans, self.filters)
-        wave, trans = map2list(wave, trans, self.filters)
+            # transmission trimming
+            wave, trans = trim_wave_trans(
+                source_wave, source_trans, self.filters, self.trans_threshold)
 
-        integration = integrate_trans(wave, trans)
+            # unify discretization interval as 10 for all bands
+            if 'us' in self.filters: downsample_us(wave, trans)
+            if 'u' in self.filters: interpolate_u_band(wave, trans, self.smpl_interval)
+            scale_trans(trans, source_trans, self.filters)
+            wave, trans = map2list(wave, trans, self.filters)
+
+        # coverage range of lambda (in angstrom) for each band [nbands]
         band_coverage_range = [cur_wave[-1] - cur_wave[0] for cur_wave in wave]
+        np.save(self.band_coverage_range_fname, band_coverage_range)
+
+        # number of lambda samples for each band [nbands]
         nsmpl_within_bands = count_avg_nsmpl(wave, trans, self.trans_threshold)
         np.save(self.nsmpl_within_bands_fname, nsmpl_within_bands)
 
+        integration = integrate_trans(wave, trans)
         if self.verbose:
             log.info(f"trans integration value: { np.round(integration, 2) }")
             log.info(f"sensor cover range: { band_coverage_range }")
 
-        return wave, trans, integration
+        self.data["wave"] = wave
+        self.data["trans"] = trans
+        self.data["integration"] = integration
+        self.data["band_coverage_range"] = band_coverage_range
+        self.data["nsmpl_within_bands"] = torch.FloatTensor(nsmpl_within_bands).to(self.device)
 
-    def load_full_wave_trans(self, wave, trans):
+    def load_full_wave_trans(self):
         """ Load wave, trans, and distribution for mixture sampling.
         """
         if not exists(self.full_wave_fname) or not exists(self.full_trans_fname) \
            or (not self.uniform_sample and not exists(self.full_distrib_fname)):
 
             # average all bands to get probability for mixture sampling
-            trans_pdf = pnormalize(trans)
+            trans_pdf = pnormalize(self.data["trans"])
 
-            full_wave, distrib = average(wave, trans_pdf)
-            trans_dict = convert_to_dict(wave, trans)
+            full_wave, distrib = average(self.data["wave"], trans_pdf)
+            trans_dict = convert_to_dict(self.data["wave"], self.data["trans"])
             full_trans, encd_ids = convert_trans(full_wave, trans_dict)
 
             np.save(self.encd_ids_fname, encd_ids)
@@ -282,15 +274,34 @@ class TransData:
             if not self.uniform_sample:
                 distrib = np.load(self.full_distrib_fname)
 
+        lo, hi = min(full_wave), max(full_wave)
+        full_norm_wave = ((full_wave - lo) / (hi - lo))
+
         if self.uniform_sample:
             distrib = np.ones(len(full_wave)).astype(np.float64)
             distrib /= len(distrib)
 
-        distrib = torch.FloatTensor(distrib)
-        encd_ids = torch.FloatTensor(encd_ids)
-        full_wave = torch.FloatTensor(full_wave)
-        full_trans = torch.FloatTensor(full_trans)
-        return full_wave, full_trans, distrib, encd_ids
+        self.data["full_wave"] = full_wave
+        self.data["distrib"] = torch.FloatTensor(distrib).to(self.device)
+        self.data["encd_ids"] = torch.FloatTensor(encd_ids).to(self.device)
+        self.data["full_trans"] = torch.FloatTensor(full_trans).to(self.device)
+        self.data["full_norm_wave"] = torch.FloatTensor(full_norm_wave).to(self.device)
+
+    def load_sampling_trans_data(self):
+        """ Get trans data depending on sampling method.
+        """
+        if self.sample_method == "mixture":
+            self.trans_data = (self.data["full_norm_wave"],self.data["full_trans"],
+                               self.data["distrib"],self.data["encd_ids"])
+
+        elif self.sample_method == "bandwise":
+            self.trans_data = self.load_bandwise_wave_trans(norm_wave, trans)
+
+        elif self.sample_method == "hardcode":
+            self.trans_data = self.load_hdcd_wave_trans(
+                self.trans_dir, hdcd_wave, hdcd_trans)
+        else:
+            raise ValueError("Unrecognized transmission sampling method.")
 
     def load_bandwise_wave_trans(self, wave, trans):
         """ Load wave, trans, and distribution for bandwise sampling.
@@ -347,12 +358,20 @@ class TransData:
         trans = torch.FloatTensor(trans)
         return wave, trans, None
 
+    #############
+    # Utilities
+    #############
+
+    def plot_trans(self):
+        trans = self.get_source_trans()
+        wave = self.get_source_wave()
+        for j, (cur_wave, cur_trans) in enumerate(zip(wave, trans)):
+            plt.plot(cur_wave, cur_trans, color=self.kwargs["plot_colors"][j],
+                     label=self.kwargs["plot_labels"][j],
+                     linestyle=self.kwargs["plot_styles"][j])
+
 # TransData class ends
 #################
-
-#############
-# Utilities
-#############
 
 def increment_repeat(counts, ids):
     bins = torch.bincount(ids)
@@ -648,4 +667,4 @@ def average(wave, trans):
         full_wave.append(key)
         avg = sum(pdf[key])/len(pdf[key])
         distrib.append(avg)
-    return full_wave, np.array(distrib)
+    return np.array(full_wave), np.array(distrib)

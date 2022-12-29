@@ -106,10 +106,11 @@ def define_cmd_line_args():
     global_group.add_argument("--perf", action="store_true", help="Use high-level profiling for the trainer.")
 
     global_group.add_argument("--tasks", nargs="+", type=str,
-                              choices=["train","spectral_inpaint","spatial_inpaint","plot_embd_map_during_train",
+                              choices=["train","spectra_supervision","plot_embd_map_during_train",
                                        "save_latent_during_train","save_recon_during_train","infer_during_train",
-                                       "infer","recon_img","recon_flat","recon_gt_spectra","recon_gt_spectra_w_supervision",
-                                       "recon_dummy_spectra","recon_cdbk_spectra","plot_embd_map","plot_latent_embd"])
+                                       "infer","recon_img","recon_flat","recon_gt_spectra","recon_dummy_spectra",
+                                       "recon_cdbk_spectra","plot_embd_map","plot_latent_embd",
+                                       "spectral_inpaint","spatial_inpaint",])
     ###################
     # Grid arguments
     ###################
@@ -292,6 +293,10 @@ def define_cmd_line_args():
                             help="discretization interval for transmission data, default 10.")
     data_group.add_argument("--plot-trans", action="store_true")
 
+    # spectra data
+    data_group.add_argument("--gt-spectra-choices", type=int, nargs='+',
+                             help="id of chosen gt spectra for supervision/recon etc.")
+
     # SDF Dataset
     data_group.add_argument("--sample-mode", type=str, nargs="*",
                             default=["rand", "near", "near", "trace", "trace"],
@@ -381,12 +386,12 @@ def define_cmd_line_args():
     # train_group.add_argument("--masked_pixl_ratio_per_epoch", type=float, default=1,
     #                          help="ratio of masked pixels used for spectral inpaint training per epoch")
 
-    train_group.add_argument("--resume-train", action="store_true", default=False)
-    train_group.add_argument("--resume-log_dir", type=str)
-    train_group.add_argument("--pretrained_model_name", type=str)
-    train_group.add_argument("--weight-train", action="store_true", default=False)
-    train_group.add_argument("--train-use-all-wave", action="store_true", default=False)
-    # train_group.add_argument("--cutout_based_train", action="store_true", default=False)
+    train_group.add_argument("--weight-train", action="store_true")
+    train_group.add_argument("--train-use-all-wave", action="store_true")
+    # train_group.add_argument("--cutout_based_train", action="store_true")
+    train_group.add_argument("--resume-train", action="store_true")
+    train_group.add_argument("--resume-log-dir", type=str)
+    train_group.add_argument("--pretrained-model-name", type=str)
 
     train_group.add_argument("--num-trans-samples", type=int, default=40,
                              help="# transmission to sample at each training iteration.")
@@ -397,11 +402,10 @@ def define_cmd_line_args():
                             with number of samples falling within each band")
 
     train_group.add_argument("--num-supervision-spectra", type=int,
-                             help="number of gt spectra used for supervision.")
-    train_group.add_argument("--gt-spectra-choices", type=int, nargs='+',
-                             help="id of chosen gt spectra for supervision/recon etc.")
-    train_group.add_argument("--trusted-wave-lo", type=int, default=6000)
-    train_group.add_argument("--trusted-wave-hi", type=int, default=8000)
+                             help="# of gt spectra used for supervision \
+                             (always select the first n spectra).")
+    train_group.add_argument("--spectra-neighbour-size", type=int,
+                             help="size of neighbourhood to average when calculating spectra.")
 
     # TODO (ttakikawa): Only used for SDFs, but also should support RGB etc
     train_group.add_argument("--log-2d", action="store_true",

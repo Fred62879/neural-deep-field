@@ -1,24 +1,21 @@
 
+import re
 import os
 import torch
-import pickle
-import random
 import nvidia_smi
 import numpy as np
-import matplotlib.pyplot as plt
 
-from tqdm import tqdm
+from os.path import join
 from astropy.io import fits
 from astropy.wcs import WCS
-from functools import reduce
-from os.path import exists, join
-from astropy.nddata import Cutout2D
-from astroquery.svo_fps import SvoFps
 from astropy.coordinates import SkyCoord
-#from unagi import filters as unagi_filters
-from wisp.utils.plot import plot_embd_map
-from wisp.utils.numerical import normalize, calculate_metrics
 
+
+def sorted_nicely(list):
+    """ Sort the given iterable in the way that humans expect."""
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
+    return sorted(list, key = alphanum_key)
 
 def get_grid(rlo, rhi, clo, chi):
     ''' Generates 2d grid. '''
@@ -108,7 +105,7 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
     #coords = reshape_coords(coords, args, infer=infer, spectrum=spectrum, coord_wave=coord_wave)
     return coords
 
-def forward(class_obj, pipeline, data, quantize_latent, plot_embd_map, spectra_supervision):
+def forward(class_obj, pipeline, data, quantize_latent, plot_embd_map, spectra_supervision_train):
     if class_obj.space_dim == 2:
         requested_channels = {"intensity"}
         #print("forward", data["coords"].shape)
@@ -143,8 +140,9 @@ def forward(class_obj, pipeline, data, quantize_latent, plot_embd_map, spectra_s
             }
         else: raise ValueError("Unrecognized transmission sampling method.")
 
-        if spectra_supervision:
+        if spectra_supervision_train:
             net_args["full_wave"] = data["full_wave"]
+            net_args["spectra_supervision_train"] = True
 
     else: raise Exception("Unsupported space dimension.")
     return pipeline(channels=requested_channels, **net_args)
@@ -176,7 +174,7 @@ def load_model(model, optimizer, modelDir, model_smpl_intvl, cuda, verbose):
         nmodels = len(os.listdir(modelDir))
         if nmodels < 1: raise ValueError("No saved models found")
 
-        modelnm = os.path.join(modelDir, str(nmodels-1)+'.pth')
+        modelnm = join(modelDir, str(nmodels-1)+'.pth')
         if verbose:
             print(f'= Saved model found, loading {modelnm}')
         checkpoint = torch.load(modelnm)

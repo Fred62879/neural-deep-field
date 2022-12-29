@@ -251,8 +251,8 @@ class RandGaus(nn.Module):
     def init_mapping(self, seed):
         mapping = nn.Linear(1, self.pe_dim, bias=self.bias)
         mapping.weight = nn.Parameter(self.randmz_weights(seed),requires_grad=False)
-        print('weight', mapping.weight.isnan().any())
-        print(mapping.weight)
+        #print('weight', mapping.weight.isnan().any())
+        #print(mapping.weight)
         return mapping
 
     def randmz_weights(self, seed):
@@ -344,8 +344,8 @@ class RandGausLinr(nn.Module): # pe8
     def init_mapping(self, seed):
         mapping = nn.Linear(1, self.pe_dim, bias=self.bias)
         mapping.weight = nn.Parameter(self.randmz_weights(), requires_grad=False)
-        print('weight', mapping.weight.isnan().any())
-        print(mapping.weight)
+        #print('weight', mapping.weight.isnan().any())
+        #print(mapping.weight)
         return mapping
 
     def randmz_weights(self):

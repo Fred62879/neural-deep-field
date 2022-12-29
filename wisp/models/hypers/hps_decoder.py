@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from wisp.utils import PerfTimer
-from wisp.models.embedders.pe import RandGausLinr
+from wisp.models.embedders.pe import RandGaus
 from wisp.models.decoders import BasicDecoder, Siren
 from wisp.models.activations import get_activation_class
 from wisp.models.layers import get_layer_class, Normalization
@@ -19,15 +19,16 @@ class HyperSpectralDecoder(nn.Module):
 
         self.kwargs = kwargs
         self.scale = scale
-        self.spectra_supervision = "recon_gt_spectra_w_supervision" in kwargs["tasks"]
-        if self.spectra_supervision:
-            self.num_spectra_coords = kwargs["num_supervision_spectra"]
+        self.num_supervision_spectra_coords = 0
 
         wave_embedder = self.init_wave_embedder()
         self.convert = HyperSpectralConverter(wave_embedder, **kwargs)
         self.decod = self.init_decoder()
         self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
+
+        self.num_supervision_spectra_coords = self.kwargs["num_supervision_spectra"] * \
+            self.kwargs["spectra_neighbour_size"] ** 2
 
     def init_wave_embedder(self):
         wave_embed_method = self.kwargs["wave_embed_method"]
@@ -36,7 +37,8 @@ class HyperSpectralDecoder(nn.Module):
             sigma = 1
             omega = 1
             pe_bias = True
-            embedder = RandGausLinr((1, pe_dim, sigma, omega, pe_bias, False))
+            seed = 0
+            embedder = RandGaus((1, pe_dim, omega, sigma, pe_bias, seed, False))
         else:
             raise ValueError("Unrecognized wave embedding method.")
         return embedder
@@ -114,11 +116,11 @@ class HyperSpectralDecoder(nn.Module):
               redshift: corresponding redshift values of each wave.
         """
         # slice spectra data
-        spectra_latents = latents[-self.num_spectra_coords:]
-        spectra_scaler = None if scaler is None else \
-            scaler[-self.num_spectra_coords:]
-        spectra_redshift = None if redshift is None else \
-            redshift[-self.num_spectra_coords:]
+        spectra_scaler = None if scaler is None \
+            else scaler[-self.num_supervision_spectra_coords:]
+        spectra_redshift = None if redshift is None \
+            else redshift[-self.num_supervision_spectra_coords:]
+        spectra_latents = latents[-self.num_supervision_spectra_coords:]
 
         # generate hyperspectral latents
         spectra_hps_latents = self.convert(wave, spectra_latents, redshift=spectra_redshift)
@@ -127,14 +129,14 @@ class HyperSpectralDecoder(nn.Module):
         recon_spectra = self.reconstruct_spectra(spectra_hps_latents, spectra_scaler)
         return recon_spectra
 
-    def forward(self, data, **kwargs):
+    def forward(self, data, **net_args):
         """ @Param
               data: output from nerf, including:
                     latents:  (embedded or original) coords. [bsz,num_samples,coords_embed_dim or 2 or 3]
                     scaler:   (if perform quantization) unique scaler value for each coord. [bsz,1]
                     redshift: (if perform quantization) unique redshift value for each coord. [bsz,1]
 
-              kwargs (includes other data):
+              net_args (includes other data):
                     wave: lambda values, used to convert ra/dec to hyperspectral latents. [bsz,num_samples]
                     trans: corresponding transmission values of lambda. [bsz,num_samples]
                     full_wave: not None if do spectra supervision. [num_spectra_coords,full_num_samples]
@@ -144,26 +146,44 @@ class HyperSpectralDecoder(nn.Module):
               spectra:   reconstructed spectra
         """
         latents = data["latents"]
+        #print('hps_decoder',latents.shape)
         batch_size = latents.shape[0]
 
         scaler = None if "scaler" not in data or not self.scale else data["scaler"]
         redshift = None if "redshift" not in data or not self.scale else data["redshift"]
 
-        if self.spectra_supervision:
-            print(latents.shape)
-            full_wave = kwargs["full_wave"][:,None,:,None].tile(1,self.num_spectra_coords,1,1) # ****** replace
+        #print("spectra_supervision_train" in net_args)
+        #print(net_args["spectra_supervision_train"])
+
+        spectra_supervision = "spectra_supervision_train" in net_args and \
+            net_args["spectra_supervision_train"]
+
+        if spectra_supervision:
+            full_wave = net_args["full_wave"][:,None,:,None].tile(
+                1,self.num_supervision_spectra_coords,1,1) # ****** replace
+
             data["spectra"] = self.reconstruct_supervision_spectra(
                 latents, full_wave, scaler, redshift)
 
             # slice out spectra supervision data
-            latents = latents[:-self.num_spectra_coords]
-            scaler = None if scaler is None else scaler[:-self.num_spectra_coords]
-            redshift = None if redshift is None else redshift[:-self.num_spectra_coords]
+            latents = latents[:-self.num_supervision_spectra_coords]
+            scaler = None if scaler is None else scaler[:-self.num_supervision_spectra_coords]
+            redshift = None if redshift is None else redshift[:-self.num_supervision_spectra_coords]
 
-        if batch_size > self.num_spectra_coords:
-            hps_latents = self.convert(kwargs["wave"], latents, redshift=redshift)
+        # still have coords to forward other than spectra supervision training coords
+        #print(batch_size, self.num_supervision_spectra_coords)
+
+        if not spectra_supervision or batch_size > self.num_supervision_spectra_coords:
+            #print(net_args["wave"].shape)
+            hps_latents = self.convert(net_args["wave"], latents, redshift=redshift)
+            #print(hps_latents.shape)
             spectra = self.reconstruct_spectra(hps_latents, scaler)
-            intensity = self.inte(spectra[...,0], **kwargs)
+            #print(spectra.shape)
+            intensity = self.inte(spectra[...,0], **net_args)
+            #print(intensity.shape)
+
+            if not spectra_supervision:
+                data["spectra"] = spectra
             data["intensity"] = intensity
 
         return data

@@ -2,6 +2,7 @@
 import csv
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
 
 from astropy.io import fits
 from os.path import join, exists
@@ -11,8 +12,8 @@ from astropy.convolution import convolve, Gaussian1DKernel
 
 
 class SpectraData:
-    def __init__(self, fits_obj, trans_obj, dataset_path, tasks, device, **kwargs):
-        if not self.require_any_data(tasks): return
+    def __init__(self, fits_obj, trans_obj, dataset_path, device, **kwargs):
+        if not self.require_any_data(kwargs["tasks"]): return
 
         self.kwargs = kwargs
         self.device = device
@@ -22,15 +23,13 @@ class SpectraData:
         self.load_accessory_data()
         self.load_spectra()
 
-        # set state variable for ease of dataloading
-        self.state = "gt"
-
     def require_any_data(self, tasks):
+        tasks = set(tasks)
         self.recon_gt_spectra = "recon_gt_spectra" in tasks
         self.recon_dummy_spectra = "recon_dummy_spectra" in tasks
-        self.recon_gt_spectra_w_supervision = "recon_gt_spectra_w_supervision" in tasks
-        return self.recon_dummy_spectra or self.recon_gt_spectra or \
-            self.recon_gt_spectra_w_supervision
+        self.spectra_supervision_train = "spectra_supervision" in tasks
+        return self.recon_gt_spectra or self.recon_dummy_spectra or \
+            self.spectra_supervision_train
 
     def set_path(self, dataset_path):
         input_path = join(dataset_path, "input")
@@ -46,66 +45,84 @@ class SpectraData:
         self.fits_cutout_sizes = self.fits_obj.get_fits_cutout_sizes()
         self.fits_cutout_start_pos = self.fits_obj.get_fits_cutout_start_pos()
 
+        self.full_wave = self.trans_obj.get_full_wave()
+        self.full_wave_bound = self.trans_obj.get_full_wave_bound()
+
     def load_spectra(self):
         """ Load gt and/or dummy spectra data.
         """
         self.data = {}
-        if self.recon_gt_spectra_w_supervision or self.recon_gt_spectra:
-            self.load_gt_spectra()
+        if self.spectra_supervision_train or self.recon_gt_spectra:
+            self.load_gt_spectra_data()
         if self.recon_dummy_spectra:
-            self.load_dummy_spectra()
-
-    #############
-    # Setters
-    #############
-
-    def set_state(self, state):
-        """ Set state that controls:
-              i) whether load gt ("gt") or dummy spectra data ("dummy")
-        """
-        self.state = state
+            self.load_dummy_spectra_data()
+        self.load_plot_spectra_data()
 
     #############
     # Getters
     #############
 
-    def get_num_spectra_coords(self):
-        return self.get_spectra_coords().shape[0]
+    def get_supervision_spectra(self):
+        """ Get gt spectra (with same wave range as recon) for supervision.
+        """
+        return self.data["supervision_spectra"]
+
+    def get_num_gt_spectra(self):
+        """ Get number of gt spectra (doesn't count neighbours).
+        """
+        if self.recon_gt_spectra or self.spectra_supervision_train:
+            return len(self.kwargs["gt_spectra_choices"])
+        return 0
+
+    def get_gt_spectra_coords(self):
+        """ Get coords of all (not only supervision) gt spectra.
+        """
+        if self.spectra_supervision_train:
+            return self.data["gt_spectra_coords"]
+        return None
 
     def get_spectra_coords(self):
-        if self.state == "gt":
-            return self.data["gt_spectra_coords"]
-        if self.state == "dummy":
-            return self.data["dummy_spectra_coords"]
-        raise ValueError("Unrecognized spectra dataset state.")
+        """ Get coords of all selected spectra (gt & dummy, incl. neighbours).
+        """
+        return self.data["spectra_coords"]
+
+    def get_spectra_coord_ids(self):
+        """ Get pixel id of all selected spectra (correspond to coords).
+        """
+        return self.data["spectra_coord_ids"]
+
+    def get_num_spectra_coords(self):
+        """ Get number of coords of all selected spectra
+            (gt & dummy, incl. neighbours).
+        """
+        return self.get_spectra_coords().shape[0]
+
+    def get_recon_wave_bound_ids(self):
+        """ Get ids of boundary lambda of recon spectra
+            (for supervision and plotting).
+        """
+        return self.data["recon_wave_bound_ids"]
 
     def get_recon_spectra_wave(self):
-        """ Get lambda values for spectrum plotting. """
-        if self.state == "gt":
-            return self.data["gt_recon_wave"]
-        if self.state == "dummy":
-            return self.data["dummy_recon_wave"]
-        raise ValueError("Unrecognized spectra dataset state.")
+        """ Get lambda values (for plotting).
+        """
+        return self.data["recon_wave"]
 
     def get_gt_spectra(self):
+        """ Get gt spectra (for plotting).
+        """
         return self.data["gt_spectra"]
 
     def get_gt_spectra_wave(self):
-        """ Get lambda values for spectrum plotting. """
+        """ Get lambda values (for plotting).
+        """
         return self.data["gt_spectra_wave"]
-
-    def get_trusted_wave_bound_id(self):
-        return self.data["trusted_wave_bound_id"]
-
-    def get_supervision_gt_spectra(self):
-        """ Get gt spectra (GPU tensor) for training. """
-        return self.data["supervision_gt_spectra"]
 
     #############
     # Helpers
     #############
 
-    def load_dummy_spectra(self):
+    def load_dummy_spectra_data(self):
         """ Load hardcoded spectra positions for pixels without gt spectra.
             Can be used to compare with codebook spectrum.
         """
@@ -134,7 +151,7 @@ class SpectraData:
 
         self.data["dummy_spectra_coords"] = coords
 
-    def load_gt_spectra(self):
+    def load_gt_spectra_data(self):
         """ Load gt spectra data. Note that:
               During training, we only consider w/ supervision
               During inferrence, the two options give same coords but different spectra
@@ -148,46 +165,87 @@ class SpectraData:
                spectra coords
         """
         choices = self.kwargs["gt_spectra_choices"]
+        smpl_interval = self.kwargs["trans_sample_interval"]
         source_spectra_data = read_spectra_data(self.spectra_data_fname)
 
-        smpl_interval = self.kwargs["trans_sample_interval"]
-        wave_bound = [self.kwargs["trusted_wave_lo"], self.kwargs["trusted_wave_hi"]]
+        all_coords, all_ids = [], []
+        recon_bound_ids = []
+        recon_waves, gt_waves = [], []
+        spectra, supervision_spectra = [], []
 
-        recon_waves, gt_waves, spectra = [], [], []
-        coords = torch.zeros(len(choices), 2)
         for i, choice in enumerate(choices):
             footprint = source_spectra_data["footprint"][choice]
             tile_id = source_spectra_data["tile_id"][choice]
             subtile_id = source_spectra_data["subtile_id"][choice]
             fits_id = f"{footprint}{tile_id}{subtile_id}"
 
+            # get (neighbour) coord & id of pixel(s) with gt spectra
+            coords, ids = self.get_gt_spectra_pixel_coords(
+                source_spectra_data, choice, self.kwargs["spectra_neighbour_size"])
+            all_ids.append(ids)       # [num_neighbours,1]
+            all_coords.append(coords) # [num_neighbours,2]
+
+            # get range of wave that we reconstruct spectra
+            recon_wave_bound = [source_spectra_data["trusted_wave_lo"][choice],
+                                source_spectra_data["trusted_wave_hi"][choice]]
+            (lo, hi) = recon_wave_bound
+            recon_wave = np.arange(lo, hi + 1, smpl_interval)
+            recon_wave_bound_id = get_bound_id(recon_wave_bound, self.full_wave)
+            recon_waves.append(recon_wave)
+            recon_bound_ids.append(recon_wave_bound_id)
+
             # load gt spectra data
             fname = join(self.spectra_path, fits_id,
                          source_spectra_data["spectra_fname"][choice] + ".npy")
-            if self.recon_gt_spectra_w_supervision:
-                recon_wave, gt_wave, gt_spectra = get_gt_spectra(
-                    fname, wave_bound, smpl_interval, True)
-            else:
-                recon_wave, gt_wave, gt_spectra = get_gt_spectra(
-                    fname, wave_bound, smpl_interval)
+            gt_wave, gt_spectra, gt_spectra_for_supervision = load_gt_spectra(
+                fname, self.full_wave_bound, recon_wave_bound, smpl_interval,
+                interpolate=self.spectra_supervision_train)
 
             gt_waves.append(gt_wave)
-            recon_waves.append(recon_wave)
             spectra.append(gt_spectra)
-
-            # get coords of gt spectra pixels
-            coords[i] = self.get_gt_spectra_pixel_coords(source_spectra_data, choice)
+            if self.spectra_supervision_train:
+                supervision_spectra.append(gt_spectra_for_supervision)
 
         self.data["gt_spectra"] = spectra
         self.data["gt_spectra_wave"] = gt_waves
         self.data["gt_recon_wave"] = recon_waves
-        self.data["gt_spectra_coords"] = torch.FloatTensor(coords).to(self.device)
-        self.data["trusted_wave_bound_id"] = self.trans_obj.get_bound_id(wave_bound)
+        self.data["gt_spectra_coord_ids"] = all_ids  # [num_coords,num_neighbours,1]
+        self.data["recon_wave_bound_ids"] = recon_bound_ids
 
-        if self.recon_gt_spectra_w_supervision:
-            self.data["supervision_gt_spectra"] = torch.FloatTensor(np.array(spectra)).to(self.device)
+        # [num_coords,num_neighbours,1,2]
+        self.data["gt_spectra_coords"] = torch.stack(all_coords).type(
+            torch.FloatTensor).to(self.device)[:,:,None]
+        self.data["gt_spectra_coords"] = self.data["gt_spectra_coords"].view(-1,1,2)
 
-    def get_gt_spectra_pixel_coords(self, spectra_data, choice):
+        if self.spectra_supervision_train:
+            n = self.kwargs["num_supervision_spectra"]
+            self.data["supervision_spectra"] = torch.FloatTensor(
+                np.array(supervision_spectra)).to(self.device)[:n]
+
+    def load_plot_spectra_data(self):
+        wave = []
+        if self.recon_gt_spectra or self.spectra_supervision_train:
+            wave.extend(self.data["gt_recon_wave"])
+        if self.recon_dummy_spectra:
+            wave.extend(self.data["dummy_recon_wave"])
+        self.data["recon_wave"] = wave
+
+        ids = []
+        if self.recon_gt_spectra or self.spectra_supervision_train:
+            ids.extend(self.data["gt_spectra_coord_ids"])
+        if self.recon_dummy_spectra:
+            ids.extend(self.data["dummy_spectra_coord_ids"])
+        self.data["spectra_coord_ids"] = np.array(ids)
+
+        # get all spectra (gt and dummy) coords for inferrence
+        coords = []
+        if self.recon_gt_spectra or self.spectra_supervision_train:
+            coords.extend(self.data["gt_spectra_coords"])
+        if self.recon_dummy_spectra:
+            coords.extend(self.data["dummy_spectra_coords"])
+        self.data["spectra_coords"] = torch.stack(coords)
+
+    def get_gt_spectra_pixel_coords(self, spectra_data, choice, neighbour_size):
         """ Get coordinate of pixel with gt spectra. We can either
              i) directly normalize the given ra/dec with coordinates range or
             ii) get pixel id based on ra/dec and index from loaded coordinates.
@@ -197,11 +255,14 @@ class SpectraData:
               be inaccurate and method ii) is more reliable.
             However, if given ra/dec is not within loaded coordinates, we
               can only use method i)
+
+           Neighbour_Size specify the neighbourhood of the given spectra to average.
         """
         ra, dec = spectra_data["ra"][choice], spectra_data["dec"][choice]
         footprint = spectra_data["footprint"][choice]
         tile_id = spectra_data["tile_id"][choice]
         subtile_id = spectra_data["subtile_id"][choice]
+        fits_id = footprint + tile_id + subtile_id
 
         # ra/dec values from spectra data may not be exactly the same as real coords
         # this normalized ra/dec may thsu be slightly different from real coords
@@ -217,34 +278,43 @@ class SpectraData:
         # index coord from original coords array to get accurate coord
         # this only works if spectra coords is included in the loaded coords
         (r, c) = worldToPix(header, ra, dec)
-        pixel_id = self.get_pixel_id(footprint, tile_id, subtile_id, r, c)
-        coord_accurate = self.fits_obj.get_coord(pixel_id)
-        return coord_accurate
+        pixel_ids = self.fits_obj.get_pixel_ids(fits_id, r, c, neighbour_size)
+        coords_accurate = self.fits_obj.get_coord(pixel_ids)
+        return coords_accurate, pixel_ids
 
-    def get_pixel_id(self, footprint, tile_id, subtile_id, r, c):
-        """ Get global id of given position based on its
-              local r/c position in given fits tile.
+    #############
+    # Utilities
+    #############
+
+    def plot_spectrum(self, fname, recon_spectra):
+        """ Plot given spectra.
+            @Param
+              recon_spectra: [num_spectra,num_neighbours,full_num_smpl]
         """
-        fits_id = footprint + tile_id + subtile_id
-        i, count, found = 0, 0, False
+        for i, cur_spectra in enumerate(recon_spectra):
+            (lo, hi) = self.get_recon_wave_bound_ids()[i]
+            cur_spectra = cur_spectra[...,lo:hi]
 
-        # count total number of pixels before the given tile
-        for cur_fits_id in self.fits_ids:
-            if cur_fits_id == fits_id: found = True; break
-            if self.use_full_fits:
-                count += self.num_rows[cur_fits_id] * self.num_cols[cur_fits_id]
-            else: count += self.fits_cutout_sizes[i]**2
-            i += 1
-        assert(found)
+            if self.kwargs["plot_spectrum_average"]:
+                cur_spectra = np.mean(cur_spectra, axis=0)
+            else: cur_spectra = cur_spectra[0]
+            cur_spectra /= np.max(cur_spectra)
 
-        # count number of pixels before given position in given tile
-        if self.use_full_fits:
-            count += r * self.num_cols[fits_id] + c
-        else:
-            (start_r, start_c) = self.fits_cutout_start_pos[i]
-            size = self.fits_cutout_sizes[i]
-            count += size * (r - start_r) + c - start_c
-        return count
+            if self.kwargs["plot_spectrum_with_trans"]:
+                self.trans_obj.plot_trans()
+
+            plt.plot(self.get_recon_spectra_wave()[i], cur_spectra,
+                     color="black", label="spectrum")
+
+            if i < self.get_num_gt_spectra():
+                cur_gt_spectra = self.get_gt_spectra()[i]
+                cur_gt_spectra_wave = self.get_gt_spectra_wave()[i]
+                cur_gt_spectra /= np.max(cur_gt_spectra)
+                plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
+
+            plt.savefig(f"{fname}_spectra{i}.png")
+            plt.close()
+
 
 # SpectraData class ends
 #############
@@ -281,34 +351,63 @@ def convolve_spectra(spectra, std=50, border=True):
         return nume / denom
     return convolve(spectra, kernel)
 
-def get_gt_spectra(fname, wave_bound, smpl_interval, interpolate=False):
-    """ Load gt spectra (intensity values) for spectra supervision and/or spectrum plotting.
-        Smooth the gt spectra (with significantly larger discretization value than trans).
+def get_bound_id(wave_bound, full_wave):
+    """ Get id of lambda values in full wave that tightly bounds given range.
+        full_wave[id_lo] >= wave_lo
+        full_wave[id_hi] <= wave_hi (before adding 1)
+    """
+    if type(full_wave).__module__ == "torch":
+        full_wave = full_wave.numpy()
+
+    wave_lo, wave_hi = wave_bound
+    wave_hi = int(min(wave_hi, int(max(full_wave))))
+    wave_id_hi = np.argmin((full_wave < wave_hi))
+    wave_id_lo = np.argmax((full_wave >= wave_lo))
+    return [wave_id_lo, wave_id_hi + 1]
+
+def load_gt_spectra(fname, trans_wave_bound, recon_wave_bound, smpl_interval, interpolate=False):
+    """ Load gt spectra (intensity values) for spectra supervision and
+          spectrum plotting. Also smooth the gt spectra which has significantly
+          larger discretization values than the transmission data.
         If requried, interpolate with same discretization value as trans data.
+
         @Param
-          fname: filename of np array that stores gt spectra data
-          wave_bound: trusted wave lower and upper bound (range that we interpolate)
-          smpl_interval: discretization interval of transmission data.
+          fname: filename of np array that stores the gt spectra data.
+          trans_wave_bound: lower and upper lambda value for the transmission data.
+          recon_wave_bound: bound for wave range of the reconstructed spectra.
+          smpl_interval: discretization values of the transmission data.
         @Return
-          recon_wave: wave for recon spectra (same as gt_wave if do interpolation)
-          gt_wave/spectra: spectra data with corresponding lambda values
+          gt_wave/spectra: spectra data with the corresponding lambda values.
+          gt_spectra_for_supervision:
+            None if not interpolate
+            o.w. gt spectra data tightly bounded by recon wave bound.
+                 we range of it is identical to that of recon spectra and thus
+                 can be directly compare with.
     """
     gt = np.load(fname)
     gt_wave, gt_spectra = gt[:,0], gt[:,1]
     gt_spectra = convolve_spectra(gt_spectra)
-
-    # assume lo, hi is within range of gt wave
-    (lo, hi) = wave_bound
-    recon_wave = np.arange(lo, hi + 1, smpl_interval)
+    gt_spectra_for_supervision = None
 
     if interpolate:
         f_gt = interp1d(gt_wave, gt_spectra)
-        smpl_spectra = f_gt(recon_wave)
-        smpl_spectra /= np.max(smpl_spectra)
-        return recon_wave, recon_wave, smpl_spectra
+
+        # make sure wave range to interpolate stay within gt wave range
+        (lo, hi) = trans_wave_bound
+        lo = max(lo, min(gt_wave))
+        hi = min(hi, max(gt_wave))
+
+        # new gt wave range with same discretization value as trans
+        gt_wave = np.arange(lo, hi + 1, smpl_interval)
+
+        # interpolate new gt wave to get interpolated spectra
+        gt_spectra = f_gt(gt_wave)
+
+        (lo, hi) = get_bound_id(recon_wave_bound, gt_wave)
+        gt_spectra_for_supervision = gt_spectra[lo:hi]
 
     gt_spectra /= np.max(gt_spectra)
-    return recon_wave, gt_wave, gt_spectra
+    return gt_wave, gt_spectra, gt_spectra_for_supervision
 
 def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
     gt = np.load(gt_fn)
@@ -325,96 +424,3 @@ def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
     f = interpolate.interp1d(gt_wave, gt_spectra)
     gt_spectra_intp = f(wave)
     return wave, gt_spectra_intp, gen_spectra
-
-
-############# abandoned
-'''
-def plot_spectrum(model_id, i, spectrum_dir, spectra, spectrum_wave,
-                  orig_wave, orig_transms, colors, lbs, styles):
-    """ Plot spectrum with sensor transmission as background.
-        spectra [bsz,nsmpl]
-    """
-    for j, cur_spectra in enumerate(spectra):
-        for k, trans in enumerate(orig_transms):
-            plt.plot(orig_wave, trans, color=colors[k], label=lbs[k], linestyle=styles[k])
-
-        if spectrum_wave.ndim == 3: # bandwise
-            cur_s_wave = spectrum_wave[j].flatten()
-            cur_s_wave, ids = torch.sort(cur_s_wave)
-            cur_spectra = cur_spectra[ids]
-        else:
-            cur_s_wave = spectrum_wave
-
-        plot_fn = join(spectrum_dir, str(model_id) + "_" + str(i) + "_" + str(j) + ".png")
-        plt.plot(cur_s_wave, cur_spectra/np.max(cur_spectra), color="black", label="spectrum")
-        #plt.xlabel("wavelength");plt.ylabel("intensity");plt.legend(loc="upper right")
-        plt.title("Spectrum for pixel{}".format(i))
-        plt.savefig(plot_fn);plt.close()
-
-def plot_spectrum_gt(model_id, i, gt_fn, spectrum_dir, spectra, spectrum_wave,
-                     orig_wave, orig_transms, colors, lbs, styles):
-    def helper(nm, cur_spectra):
-        for j, trans in enumerate(orig_transms):
-            plt.plot(orig_wave, trans, color=colors[j], label=lbs[j], linestyle=styles[j])
-
-        if spectrum_wave.ndim == 3: # bandwise
-            cur_s_wave = spectrum_wave[i].flatten()
-            cur_s_wave, ids = torch.sort(cur_s_wave)
-            cur_spectra = cur_spectra[ids]
-        else:
-            cur_s_wave = spectrum_wave
-
-        plot_fn = join(spectrum_dir, "gt_" + nm)
-        plt.plot(cur_s_wave, cur_spectra/np.max(cur_spectra), color="black", label="spectrum")
-        plt.plot(gt_wave, gt_spectra/np.max(gt_spectra),label="gt")
-        plt.savefig(plot_fn);plt.close()
-
-        """
-        wave, gt_spectra_ol, gen_spectra_ol = overlay_spectrum(gt_fn, cur_s_wave, spectra)
-        print(gt_spectra_ol.shape, gen_spectra_ol.shape)
-        sam = calculate_sam_spectrum(gt_spectra_ol/np.max(gt_spectra_ol), gen_spectra_ol/np.max(gen_spectra_ol))
-        cur_sam.append(sam)
-        """
-
-    cur_sam = []
-    avg_spectra = np.mean(spectra, axis=0)
-    gt_wave, gt_spectra = process_gt_spectra(gt_fn)
-    helper(str(model_id) + "_" + str(i), avg_spectra)
-    return cur_sam
-
-def recon_spectrum_(model_id, batch_coords, covars, spectrum_wave, orig_wave,
-                    orig_transms, net, trans_args, spectrum_dir, args):
-    """ Generate spectra for pixels specified by coords using given net
-        Save, plot spectrum, and calculate metrics
-        @Param
-          coords: list of n arrays, each array can be of size
-                  [bsz,nsmpl,3] / [bsz,nbands,nsmpl_per_band,2] / [bsz,nsmpl,2]
-    """
-    sams = []
-    wave_fn = join(spectrum_dir, "wave.npy")
-    np.save(wave_fn, spectrum_wave)
-    gt_fns = args.gt_spectra_fns
-
-    wave_hi = int(min(args.wave_hi, int(np.max(spectrum_wave))))
-    id_lo = np.argmax(spectrum_wave > args.wave_lo)
-    id_hi = np.argmin(spectrum_wave < wave_hi)
-    spectrum_wave = spectrum_wave[id_lo:id_hi]
-
-    for i, coord in enumerate(batch_coords):
-        print(coord)
-        spectra = generate_spectra(args.mc_cho, coord, None, net, trans_args) # None is covar[i]
-        #np.save(join(spectrum_dir, str(model_id) + "_" + str(i)), spectra)
-
-        if args.mc_cho == "mc_hardcode":
-            pix = np.load(args.hdcd_trans_fn)@spectra[0] / args.num_trans_smpl
-        else: pix = np.load(args.full_trans_fn)@spectra[0] / np.load(args.nsmpl_within_bands_fn)
-
-        spectra = spectra[:,id_lo:id_hi]
-        if gt_fns is None:
-            plot_spectrum(model_id, i, spectrum_dir, spectra, spectrum_wave, orig_wave, orig_transms,
-                          args.spectrum_colors, args.spectrum_labels, args.spectrum_styles)
-        else:
-            plot_spectrum_gt(model_id, i, gt_fns[i], spectrum_dir, spectra, spectrum_wave, orig_wave,
-                             orig_transms, args.spectrum_colors, args.spectrum_labels, args.spectrum_styles)
-    return np.array(sams)
-'''

@@ -59,10 +59,10 @@ class AstroInferrer(BaseInferrer):
         if self.verbose: log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
-                ["model_dir","recon_dir","metric_dir", "spectrum_dir",
-                 "cdbk_spectrum_dir", "embd_map_dir","latent_dir",
+                ["model_dir","recon_dir","metric_dir", "spectra_dir",
+                 "cdbk_spectra_dir", "embd_map_dir","latent_dir",
                  "latent_embd_dir"],
-                ["models","recons","metrics","spectrum","cdbk_spectrum",
+                ["models","recons","metrics","spectra","cdbk_spectra",
                  "embd_map","latent","latent_embd_dir"]
         ):
             path = join(self.log_dir, cur_pname)
@@ -80,35 +80,37 @@ class AstroInferrer(BaseInferrer):
         """
         tasks = set(self.extra_args["tasks"])
 
-        self.quantize_latent = "quantize_latent" in self.tasks
+        self.quantize_latent = "quantize_latent" in tasks
 
         # infer all coords using original model
         self.recon_img = "recon_img" in tasks
-        self.recon_HSI = "recon_HSI" in self.tasks
+        self.recon_HSI = "recon_HSI" in tasks
         self.recon_flat_trans = "recon_flat_trans" in tasks
+
         self.plot_embd_map = "plot_embd_map_during_recon" in tasks \
-            and self.space_dim == 3 and self.quantize_latent
+            and self.quantize_latent and self.space_dim == 3
         self.plot_embd_latent_distrib = "plot_embd_latent_distrib" in tasks \
-            and self.space_dim == 3 and self.quantize_latent
+            and self.quantize_latent and self.space_dim == 3
 
         # infer all coords using modified model
         self.recon_cdbk_spectra = "recon_cdbk_spectra" in tasks \
-            and self.space_dim == 3 and self.quantize_latent
+            and self.quantize_latent and self.space_dim == 3
 
         # infer selected coords using partial model
         self.recon_gt_spectra = "recon_gt_spectra" in tasks and self.space_dim == 3
         self.recon_dummy_spectra = "recon_dummy_spectra" in tasks and self.space_dim == 3
-        self.recon_gt_spectra_w_supervision = "recon_gt_spectra_w_supervision" in tasks and self.space_dim == 3
-        assert(not (self.recon_gt_spectra and self.recon_gt_spectra_w_supervision) )
 
         # keep only tasks required to perform
         self.group_tasks = []
+
         if self.recon_img or self.recon_flat_trans or self.recon_cdbk_spectra \
            or self.plot_embd_map or self.plot_embd_latent_distrib:
             self.group_tasks.append("infer_all_coords_full_model")
+
         if self.recon_cdbk_spectra:
             self.group_tasks.append("infer_all_coords_modified_model")
-        if self.recon_dummy_spectra or self.recon_gt_spectra or self.recon_gt_spectra_w_supervision:
+
+        if self.recon_dummy_spectra or self.recon_gt_spectra:
             self.group_tasks.append("infer_selected_coords_partial_model")
 
         # set all grouped tasks to False, only required tasks will be toggled afterwards
@@ -153,8 +155,10 @@ class AstroInferrer(BaseInferrer):
 
     def pre_inferrence_all_coords_full_model(self):
         num_fits = self.dataset.get_num_fits()
-        num_coords = self.dataset.get_num_coords()
-        self.num_batches = int(np.ceil(num_coords / self.batch_size))
+        self.batch_size = self.extra_args["infer_batch_size"]
+        # num_coords = self.dataset.get_num_coords()
+        # self.num_batches = int(np.ceil(num_coords / self.batch_size))
+        # if self.drop_last: self.num_batches -= 1
 
         if self.recon_img:
             self.metric_options = self.extra_args["metric_options"]
@@ -180,14 +184,13 @@ class AstroInferrer(BaseInferrer):
             log.info(f"zscale metrics: {np.round(self.metrics_zscale[:,-1,0], 3)}")
 
     def pre_inferrence_selected_coords_partial_model(self):
-        if self.recon_gt_spectra or self.recon_gt_spectra_w_supervision:
-            self.spectra_task = "gt"
-        else: self.spectra_task = "dummy"
-        num_coords = self.dataset.get_num_spectra_coords()
-
-        if self.extra_args["infer_spectra_individually"]:
-            self.num_batches = num_coords
-        else: self.num_batches = int(np.ceil(num_coords / self.batch_size))
+        self.num_spectra = self.dataset.get_num_spectra_coords()
+        if not self.extra_args["infer_spectra_individually"]:
+            # self.num_batches = int(np.ceil(num_coords / self.batch_size))
+            self.batch_size = self.extra_args["infer_batch_size"]
+        else:
+            # self.num_batches = num_coords
+            self.batch_size = self.extra_args["spectra_neighbour_size"]**2
 
     def post_inferrence_selected_coords_partial_model(self):
         pass
@@ -245,19 +248,19 @@ class AstroInferrer(BaseInferrer):
     def pre_checkpoint_selected_coords_partial_model(self, model_id):
         self.reset_dataloader()
         self.recon_spectra = []
-        self.gt_spectra = []
-        self.gt_spectra_wave = []
-        self.recon_spectra_wave = []
 
     def run_checkpoint_selected_coords_partial_model(self, model_id, checkpoint):
         self.infer_spectra(model_id, checkpoint)
 
     def post_checkpoint_selected_coords_partial_model(self, model_id):
-        if self.extra_args["plot_spectrum_with_trans"]:
-            self.colors = self.extra_args["plot_colors"]
-            self.labels = self.extra_args["plot_labels"]
-            self.styles = self.extra_args["plot_styles"]
-        self.plot_spectrum(model_id)
+        self.recon_spectra = torch.stack(self.recon_spectra).view(
+            self.dataset.get_num_gt_spectra(),
+            self.extra_args["spectra_neighbour_size"]**2, -1
+        ).detach().cpu().numpy()
+        #print(self.recon_spectra.shape)
+
+        fname = join(self.spectra_dir, f"model_{model_id}")
+        self.dataset.plot_spectrum(fname, self.recon_spectra)
         #self.calculate_recon_spectra_pixel_values()
 
     def pre_checkpoint_all_coords_modified_model(self, model_id):
@@ -284,16 +287,19 @@ class AstroInferrer(BaseInferrer):
         load_model_weights(self.full_pipeline, checkpoint)
         self.full_pipeline.eval()
 
-        # run one epoch for inferrence
-        for i in range(self.num_batches):
-            data = self.next_batch()
-            with torch.no_grad():
-                ret = forward(self, self.full_pipeline, data, self.quantize_latent,
-                              self.plot_embd_map, self.recon_gt_spectra_w_supervision)
-            if self.recon_img: self.recon_pixels.extend(ret["intensity"])
-            if self.plot_embd_map: self.embd_ids.extend(ret["embd_ids"])
+        while True:
+            try:
+                data = self.next_batch()
+                with torch.no_grad():
+                    ret = forward(self, self.full_pipeline, data, self.quantize_latent,
+                                  self.plot_embd_map, False)
+                if self.recon_img: self.recon_pixels.extend(ret["intensity"])
+                if self.plot_embd_map: self.embd_ids.extend(ret["embd_ids"])
 
-    # Plot embd map
+            except StopIteration:
+                log.info("all coords inferrence done")
+                break
+
     def plot_embd_map(self):
         if self.plot_embd_map: embd_map_fname = self.embd_map_fname
 
@@ -326,54 +332,22 @@ class AstroInferrer(BaseInferrer):
         load_model_weights(self.partial_pipeline, checkpoint)
         self.partial_pipeline.eval()
 
-        for i in range(self.num_batches):
-            data = self.next_batch()
+        while True:
+            try:
+                data = self.next_batch()
+                with torch.no_grad():
+                    spectra = forward(
+                        self, self.partial_pipeline, data, self.quantize_latent,
+                        self.plot_embd_map, False)["intensity"]
 
-            with torch.no_grad():
-                spectra = forward(
-                    self, self.partial_pipeline, data, self.quantize_latent,
-                    self.plot_embd_map, self.recon_gt_spectra_w_supervision)["spectra"]
+                if spectra.ndim == 3: # bandwise
+                    spectra = spectra.flatten(1,2) # [bsz,nsmpl]
+                self.recon_spectra.extend(spectra)
+                #print('generated spectra',spectra.shape)
 
-            if spectra.ndim == 3: # bandwise
-                spectra = spectra.flatten(1,2) # [bsz,nsmpl]
-
-            (lo, hi) = data["trusted_wave_bound_id"]
-            spectra = spectra[...,lo:hi]
-
-            self.recon_spectra.extend(spectra)
-            self.recon_wave.extend(data["gt_recon_wave"][0])
-
-            if spectra_task == "gt":
-                print(data["gt_spectra_wave"][0].shape)
-                self.gt_spectra.extend(data["spectra"][0])
-                self.gt_spectra_wave.extend(data["gt_spectra_wave"][0])
-
-        print('****', len(self.recon_spectra_wave))
-
-    def plot_spectrum(self, model_id):
-        recon_spectra = torch.stack(self.recon_spectra).detach().cpu().numpy()
-
-        for i, cur_spectra in enumerate(recon_spectra):
-            if self.extra_args["plot_spectrum_average"]:
-                cur_spectra = np.mean(cur_spectra, axis=0)
-            cur_spectra /= np.max(cur_spectra)
-
-            if self.extra_args["plot_spectrum_with_trans"]:
-                for j, cur_trans in enumerate(self.trans):
-                    plt.plot(self.full_wave, cur_trans, color=self.colors[j],
-                             label=self.labels[j], linestyle=self.styles[j])
-
-            plt.plot(self.recon_spectra_wave[i], cur_spectra,
-                     color="black", label="spectrum")
-
-            if self.recon_gt_spectra or self.recon_gt_spectra_w_supervision:
-                cur_gt_spectra = self.gt_spectra[i]
-                cur_gt_spectra_wave = self.gt_spectra_wave[i]
-                cur_gt_spectra /= np.max(cur_gt_spectra)
-                plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
-
-            fname = join(self.spectra_dir, f"model_{model_id}_spectra_{i}")
-            plt.savefig(fname);plt.close()
+            except StopIteration:
+                log.info("spectra inferrence done")
+                break
 
     def calculate_recon_spectra_pixel_values(self):
         for fits_id in self.fits_ids:
@@ -395,8 +369,6 @@ class AstroInferrer(BaseInferrer):
     def _configure_dataset(self):
         """ Configure dataset (batched fields and len) for inferrence.
         """
-        fields = []
-
         if self.infer_all_coords_full_model or self.infer_all_coords_modified_model:
             state = "fits"
             fields = ['coords']
@@ -405,19 +377,14 @@ class AstroInferrer(BaseInferrer):
 
         elif self.infer_selected_coords_partial_model:
             state = "spectra"
-
-            if self.recon_gt_spectra_w_supervision or self.recon_gt_spectra:
-                fields= ["coords","spectra","gt_spectra_wave","gt_recon_wave"]
-                length = self.dataset.get_num_gt_spectra_coords()
-
-            elif self.recon_dummy_spectra:
-                fields = ["coords","dummy_recon_wave"]
-                length = self.dataset.get_num_dummy_spectra_coords()
+            fields = ["coords"]
+            length = self.dataset.get_num_spectra_coords()
 
         else: raise Exception("Unrecgonized group inferrence task.")
 
         if self.space_dim == 3: fields.extend(['trans_data'])
 
+        self.dataset.set_dataset_mode("infer")
         self.dataset.set_dataset_state(state)
         self.dataset.set_dataset_length(length)
         self.dataset.set_dataset_fields(fields)

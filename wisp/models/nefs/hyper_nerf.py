@@ -35,7 +35,8 @@ class NeuralHyperSpectral(BaseNeuralField):
         pe_bias = True
         verbose = False
         seed = 0
-        self.embedder = RandGaus((self.space_dim, pe_dim, omega, sigma, pe_bias, seed, verbose))
+        input_dim = 2
+        self.embedder = RandGaus((input_dim, pe_dim, omega, sigma, pe_bias, seed, verbose))
 
     def init_grid(self):
         """ Initialize the grid object. """
@@ -153,14 +154,18 @@ class NeuralHyperSpectral(BaseNeuralField):
         """
         timer = PerfTimer(activate=False, show_memory=True)
 
-        coords = coords[0] # ****** replace
+        #print('nef coords',coords.shape)
         if coords.ndim == 2:
             batch, _ = coords.shape
         elif coords.ndim == 3:
             batch, num_samples, _ = coords.shape
+        elif coords.ndim == 4: # **** replace
+            _, _, num_samples, dim = coords.shape
+            coords = coords.view(-1,num_samples,dim)
+            batch = coords.shape[0]
         else:
             raise Exception("Wrong coordinate dimension.")
-
+        #print('nef coords',coords.shape)
         timer.check("rf_hyperspectral_preprocess")
 
         # embed 2D coords into high-dimensional vectors with PE or the grid

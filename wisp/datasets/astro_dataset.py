@@ -15,7 +15,6 @@ class AstroDataset(Dataset):
     """
     def __init__(self,
                  device                   : str,
-                 tasks                    : list,
                  dataset_path             : str,
                  dataset_num_workers      : int      = -1,
                  transform                : Callable = None,
@@ -28,45 +27,46 @@ class AstroDataset(Dataset):
         self.kwargs = kwargs
 
         self.device = device
-        self.tasks = set(tasks)
         self.root = dataset_path
         self.transform = transform
         self.dataset_num_workers = dataset_num_workers
 
         self.space_dim = kwargs["space_dim"]
+        self.nsmpls = kwargs["num_trans_samples"]
 
         if self.space_dim == 3:
-            self.unbatched_fields = {"trans_data","gt_spectra_data_w_supervision"}
+            self.unbatched_fields = {"trans_data","spectra_supervision_data"}
         else:
             self.unbatched_fields = set()
 
     def init(self):
         """ Initializes the dataset.
-            Load only needed data based on given tasks.
+            Load only needed data based on given tasks (in kwargs).
         """
-        #if "test" in self.tasks:
-        #    self.test_dataset = TestData(self.root, **kwargs)
-
-        self.fits_dataset = FITSData(self.root, self.tasks, self.device, **self.kwargs)
+        self.fits_dataset = FITSData(self.root, self.device, **self.kwargs)
         self.trans_dataset = TransData(self.root, self.device, **self.kwargs)
         self.spectra_dataset = SpectraData(self.fits_dataset, self.trans_dataset,
-                                           self.root, self.tasks, self.device, **self.kwargs)
+                                           self.root, self.device, **self.kwargs)
         # randomly initialize
         self.state = "fits"
+        self.mode = "train"
         self.set_dataset_length(1000)
 
     ############
     # Setters
     ############
 
+    def set_dataset_mode(self, mode):
+        """ Set dataset to be in train or infer mode, which determines
+              i) number of transmission samples (use all samples for inferrence)
+        """
+        self.mode = mode
+
     def set_dataset_state(self, state):
         """ Set dataset state that controls:
               i) whether load fits coords ("fits") or spectra coords ("spectra")
         """
         self.state = state
-
-    def set_spectra_dataset_state(self, state):
-        self.spectra_dataset.set_state(state)
 
     def set_dataset_length(self, length):
         self.dataset_length = length
@@ -89,37 +89,44 @@ class AstroDataset(Dataset):
 
     def get_num_coords(self):
         """ Get number of all coordinates. """
-        return self.get_coords().shape[0]
-
-    def get_num_gt_spectra_coords(self):
-        """ Get number of selected coords with gt spectra. """
-        return self.spectra_dataset.get_num_gt_spectra_coords()
-
-    def get_num_dummy_spectra_coords(self):
-        """ Get number of selected coords with dummy spectra. """
-        return self.spectra_dataset.get_num_dummy_spectra_coords()
+        return self.fits_dataset.get_num_coords()
 
     def get_zscale_ranges(self, fits_id=None):
         return self.fits_dataset.get_zscale_ranges(fits_id)
 
-    # def get_coords(self):
-    #     return self.fits_dataset.get_coords()
+    def get_spectra_coord_ids(self):
+        """ Get id of spectra pixel (in context of all coords). """
+        return self.spectra_dataset.get_spectra_coord_ids()
 
-    # def get_pixels(self):
-    #     return self.fits_dataset.get_pixels()
+    def get_num_spectra_coords(self):
+        """ Get number of selected coords to recon spectra. """
+        return self.spectra_dataset.get_num_spectra_coords()
 
-    # def get_weights(self):
-    #     return self.fits_dataset.get_weights()
+    '''
+    def get_gt_spectra(self):
+        return self.spectra_dataset.get_gt_spectra()
 
-    def get_spectra_coords(self):
-        return self.spectra_dataset.get_spectra_coords()
+    def get_gt_spectra_wave(self):
+        return self.spectra_dataset.get_gt_spectra_wave()
+
+    def get_recon_spectra_wave(self):
+        return self.spectra_dataset.get_recon_spectra_wave()
+
+    def get_recon_wave_bound_ids(self):
+        return self.spectra_dataset.get_recon_wave_bound_ids()
+    '''
+
+    def get_num_gt_spectra(self):
+        return self.spectra_dataset.get_num_gt_spectra()
 
     def get_batched_data(self, field, idx):
         if field == "coords":
             if self.state == "fits":
                 data = self.fits_dataset.get_coords()
+                #print("input coord",data.shape)
             elif self.state == "spectra":
                 data = self.spectra_dataset.get_spectra_coords()
+                #print("input coord",data.shape)
 
         elif field == "pixels":
             data = self.fits_dataset.get_pixels()
@@ -127,13 +134,6 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_weights()
         elif field == "masks":
             data = self.fits_dataset.get_mask()
-
-        elif field == "spectra":
-            data = self.spectra_dataset.get_gt_spectra()
-        elif field == "gt_spectra_wave":
-            data = self.spectra_dataset.get_gt_spectra_wave()
-        elif field == "recon_wave":
-            data = self.spectra_dataset.get_recon_spectra_wave()
         else:
             raise ValueError("Unrecognized data field.")
         return data[idx]
@@ -142,19 +142,25 @@ class AstroDataset(Dataset):
         """ Get transmission data (wave, trans, nsmpl etc.).
             These are not batched, we do monte carlo sampling at every step.
         """
+        infer = self.mode == "infer"
         out["wave"], out["trans"], out["nsmpl"] = \
-                self.trans_dataset.sample_wave_trans(batch_size, self.kwargs["num_trans_samples"])
+                self.trans_dataset.sample_wave_trans(batch_size, self.nsmpls, infer=infer)
 
     def get_spectra_data(self, out):
-        """ Get unbatched spectra data (only during spectral supervision training).
+        """ Get unbatched spectra data (only for spectra supervision training).
         """
-        assert("coords" in out)
-        spectra_coords = self.spectra_dataset.get_gt_spectra_coords()[:,None]
+        # get only supervision spectra (not all gt spectra)
+        out["gt_spectra"] = self.spectra_dataset.get_supervision_spectra()
+
+        # get all coords to plot all gt spectra (not only supervision spectra)
+        spectra_coords = self.spectra_dataset.get_gt_spectra_coords()
+        if "coords" in out:
+            out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
+        else: out["coords"] = spectra_coords
+        #print(spectra_coords.shape, out["coords"].shape)
 
         out["full_wave"] = self.trans_dataset.get_full_norm_wave()
-        out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
-        out["spectra"] = self.spectra_dataset.get_supervision_gt_spectra() # GPU tensor
-        out["trusted_wave_bound_id"] = self.spectra_dataset.get_trusted_wave_bound_id()
+        out["recon_wave_bound_ids"] = self.spectra_dataset.get_recon_wave_bound_ids()
 
     def __len__(self):
         """ Length of the dataset in number of pixels """
@@ -180,8 +186,9 @@ class AstroDataset(Dataset):
 
         if "trans_data" in self.requested_fields:
             self.get_trans_data(len(idx), out)
+            #print(out["wave"].shape, out["trans"].shape)
 
-        if "gt_spectra_data_w_supervision" in self.requested_fields:
+        if "spectra_supervision_data" in self.requested_fields:
             self.get_spectra_data(out)
 
         if self.transform is not None:
@@ -199,3 +206,6 @@ class AstroDataset(Dataset):
                metrics(_z): metrics of current model [n_metrics,1,ntiles,nbands]
         """
         return self.fits_dataset.restore_evaluate_tiles(recon_pixels, **re_args)
+
+    def plot_spectrum(self, fname, recon_spectra):
+        self.spectra_dataset.plot_spectrum(fname, recon_spectra)

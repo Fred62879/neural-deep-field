@@ -3,10 +3,11 @@ global:
     debug: False
     verbose: True
     exp_name: 'test-ngp-nerf'
-    #tasks: ['train','spectra_supervision','recon_gt_spectra_w_supervision']
+    tasks: ['train','hps_cube_fit','save_recon_during_train','plot_spectra_during_train','spectra_supervision','infer','recon_img','recon_gt_spectra']
     #tasks: ['train','save_recon_during_train','infer','recon_img']
     #tasks: ['infer','recon_img']
-    tasks: ['infer','recon_gt_spectra_w_supervision']
+    #tasks: ['train','spectra_supervision','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
+    #tasks: ['infer','recon_gt_spectra']
 
 optimizer:
     optimizer_type: 'adam'
@@ -64,6 +65,8 @@ dataset:
     hardcode_num_trans_samples: 40
     trans_sample_interval: 10
 
+    gt_spectra_choices: [0]
+
 net:
     nef_type: 'NeuralHyperSpectral'
 
@@ -97,14 +100,14 @@ grid:
     codebook_bitwidth: 22
 
 hyperspectral:
-    coords_embed_dim: 4000
-    coords_embed_method: 'grid'
-    wave_embed_dim: 10
+    coords_embed_dim: 1000
+    coords_embed_method: 'positional'
+    wave_embed_dim: 1000
     wave_embed_method: 'positional'
     hps_combine_method: 'concat'
     hps_decod_activation_type: 'relu'
-    hps_decod_num_layers: 1
-    hps_decod_hidden_dim: 64
+    hps_decod_num_layers: 3
+    hps_decod_hidden_dim: 256
     hps_decod_layer_type: 'none'
     integration_method: 'dot_prod'
 
@@ -128,22 +131,21 @@ trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 2000
-    batch_size: 4096000
+    num_epochs: 20
+    batch_size: 2048
     valid_every: -1
-    save_every: 400
+    save_every: 10
     render_tb_every: -1
-    log_tb_every: 400
+    log_tb_every: 10
     log_gpu_every: -1
-    save_local_every: 400
+    save_local_every: 10
     save_as_new: True
     #train_pixl_ratio_per_epoch: 1e-6
     #masked_pixl_ratio_per_epoch: 1
-    #num_model_checkpoint: 10
 
     loss_cho: l1
     weight_train: False
-    resume_train: False
+    resume_train: True
     #resume_log_dir: '20221220-194546'
     #pretrained_model_name: 'model-ep800-it2.pth'
     train_use_all_wave: False
@@ -154,14 +156,12 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    trusted_wave_lo: 6000
-    trusted_wave_hi: 8000
-    gt_spectra_choices: [0]
     num_supervision_spectra: 1
+    spectra_neighbour_size: 2
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_batch_size: 409600
+    infer_batch_size: 128
     infer_use_all_wave: True # enforced
 
     # recon img
@@ -175,11 +175,8 @@ infer:
     #recon_cutout_start_pos: [ [[0,0]], [[0,0]] ] #[86,188]
 
     # recon spectra
-    trusted_wave_lo: 6000
-    trusted_wave_hi: 8000
-
-    plot_spectrum_average: False
-    plot_spectrum_with_trans: False
+    plot_spectrum_average: True
+    plot_spectrum_with_trans: True
     infer_spectra_individually: True
    
 test:

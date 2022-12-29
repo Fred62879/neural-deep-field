@@ -48,6 +48,7 @@ class HyperSpectralConverter(nn.Module):
             assert(spatial.shape == spectral.shape)
             hps_latents = spatial + spectral # [...,embed_dim]
         elif self.combine_method == "concat":
+            #print(spatial.shape, spectral.shape)
             hps_latents = torch.cat((spatial, spectral), dim=-1)
         else:
             raise ValueError("Unrecognized spatial-spectral combination method.")

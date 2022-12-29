@@ -18,13 +18,12 @@ from wisp.utils.numerical import normalize_coords, normalize, \
 class FITSData:
     """ Data class for FITS files. """
 
-    def __init__(self, dataset_path, tasks, device, **kwargs):
-        self.tasks = tasks
+    def __init__(self, dataset_path, device, **kwargs):
         self.kwargs = kwargs
         self.load_weights = kwargs["weight_train"]
         self.spectral_inpaint = self.kwargs["inpaint_cho"] == "spectral_inpaint"
 
-        if not self.require_any_data(): return
+        if not self.require_any_data(kwargs["tasks"]): return
 
         self.device = device
         self.verbose = kwargs["verbose"]
@@ -50,15 +49,17 @@ class FITSData:
     # Initializations
     #############
 
-    def require_any_data(self):
+    def require_any_data(self, tasks):
         """ Find all required data based on given self.tasks. """
-        self.require_coords = len(self.tasks.intersection({
-            "train","recon_img","recon_flat",
-            "recon_gt_spectra_w_supervision","recon_gt_spectra"})) != 0
+        tasks = set(tasks)
 
-        self.require_weights = "train" in self.tasks and self.load_weights
-        self.require_pixels = len(self.tasks.intersection({"train","recon_img"})) != 0
-        self.require_masks = "train" in self.tasks and self.spectral_inpaint
+        self.require_coords = len(tasks.intersection({
+            "train","recon_img","recon_flat",
+            "spectra_supervision","recon_gt_spectra"})) != 0
+
+        self.require_weights = "train" in tasks and self.load_weights
+        self.require_pixels = len(tasks.intersection({"train","recon_img"})) != 0
+        self.require_masks = "train" in tasks and self.spectral_inpaint
 
         return self.require_coords or self.require_pixels or \
             self.require_weights or self.require_masks
@@ -485,6 +486,9 @@ class FITSData:
     def get_num_cols(self):
         return self.num_cols
 
+    def get_num_coords(self):
+        return self.data["coords"].shape[0]
+
     def get_fits_cutout_sizes(self):
         return self.fits_cutout_sizes
 
@@ -504,6 +508,7 @@ class FITSData:
         return self.data["coords"][idx]
 
     def get_coords(self):
+        """ Get all coords [n,1,2] """
         return self.data["coords"]
 
     def get_mask(self):
@@ -527,6 +532,70 @@ class FITSData:
     ############
     # Utilities
     ############
+
+    def calculate_local_id(self, r, c, index, fits_id):
+        """ Count number of pixels before given position in given tile.
+        """
+        if self.use_full_fits:
+            r_lo, c_lo = 0, 0
+            total_cols = self.num_cols[fits_id]
+        else:
+            (r_lo, c_lo) = self.fits_cutout_start_pos[index]
+            total_cols = self.fits_cutout_sizes[index]
+
+        local_id = total_cols * (r - r_lo) + c - c_lo
+        return local_id
+
+    def calculate_global_offset(self, fits_id):
+        """ Count total number of pixels before the given tile.
+            Assume given fits_id is included in loaded fits ids which
+              is sorted in alphanumerical order.
+            @Return
+               id: index of given fits id inside all loaded tiles
+               base_count: total # pixels before current tile
+        """
+        id, base_count, found = 0, 0, False
+
+        # count total number of pixels before the given tile
+        for cur_fits_id in self.fits_ids:
+            if cur_fits_id == fits_id: found = True; break
+            if self.use_full_fits:
+                base_count += self.num_rows[cur_fits_id] * self.num_cols[cur_fits_id]
+            else: base_count += self.fits_cutout_sizes[i]**2
+            id += 1
+
+        assert(found)
+        return id, base_count
+
+    def calculate_neighbour_ids(self, base_count, r, c, neighbour_size, index, fits_id):
+        """ Get global id of coords within neighbour_size of given coord (specified by r/c).
+            For neighbour_size being: 2, 3, 4, the collected ids:
+            . .   . . .   . . . .
+            . *   . * .   . . . .
+                  . . .   . . * .
+                          . . . .
+        """
+        ids = []
+        offset = neighbour_size // 2
+        for i in range(r - offset, r + (neighbour_size - offset)):
+            for j in range(c - offset, c + (neighbour_size - offset)):
+                local_id = self.calculate_local_id(i, j, index, fits_id)
+                ids.append(base_count + local_id)
+        return ids
+
+    def get_pixel_ids(self, fits_id, r, c, neighbour_size):
+        """ Get global id of given position based on its
+              local r/c position in given fits tile.
+            If neighbour_size is > 1, also find id of neighbour pixels within neighbour_size.
+        """
+        index, base_count = self.calculate_global_offset(fits_id)
+        if neighbour_size <= 1:
+            local_id = self.calculate_local_id(index, r, c, fits_id)
+            ids = [local_id + base_count]
+        else:
+            ids = self.calculate_neighbour_ids(base_count, r, c, neighbour_size, index, fits_id)
+        print("neighbouring pixel", ids)
+        return ids
 
     def evaluate(self, fits_id, recon_tile, **re_args):
         """ Image evaluation function (e.g. saving, metric calculation).

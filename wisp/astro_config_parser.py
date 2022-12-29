@@ -66,15 +66,17 @@ def get_pipelines_from_config(args, tasks=[]):
                 quantz = LatentQuantizer(**vars(args))
             hyper_decod = HyperSpectralDecoder(**vars(args))
 
+        # pipeline for training and inferrence
         pipeline = AstroPipeline(nef, quantz, hyper_decod)
         pipelines["full"] = pipeline
 
-        if len( tasks.intersection({"recon_gt_spectra","recon_gt_spectra_w_supervision",
-                                    "recon_dummy_spectra"}) ) != 0:
+        # pipeline for spectra inferrence
+        if len( tasks.intersection({"recon_gt_spectra","recon_dummy_spectra"}) ) != 0:
             identity_decod = HyperSpectralDecoder(integrate=False, **vars(args))
             partial_pipeline = AstroPipeline(nef, quantz, identity_decod)
             pipelines["partial"] = partial_pipeline
 
+        # pipeline for codebook spectra inferrence
         if "recon_cdbk_spectra" in tasks:
             no_scale_decod = HyperSpectralDecoder(integrate=False, scale=False, **vars(args))
             modified_pipeline = AstroPipeline(nef, quantz, no_scale_decod)
@@ -83,6 +85,6 @@ def get_pipelines_from_config(args, tasks=[]):
         raise ValueError(f"{args.dataset_type} unrecognized dataset_type")
 
     for _, pipeline in pipelines.items():
-        log.info(pipeline)
+        #log.info(pipeline)
         pipeline.to(device)
     return device, pipelines
