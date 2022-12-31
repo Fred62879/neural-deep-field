@@ -32,8 +32,8 @@ dataset:
     fits_footprints: ['9812'] #,'9812']
     fits_tile_ids: ['1'] #,'1']
     fits_subtile_ids: ['5'] #['5','7']
-    fits_cutout_sizes: [ 64 ]
-    fits_cutout_start_pos: [[86,188]] #,[240,270] ]
+    fits_cutout_sizes: [ 256 ]
+    fits_cutout_start_pos: [[1908,708]] #[[86,188]]
 
     # num_bands: 1
     # sensor_collection_name: '1_y'
@@ -65,7 +65,7 @@ dataset:
     hardcode_num_trans_samples: 40
     trans_sample_interval: 10
 
-    gt_spectra_choices: [0]
+    gt_spectra_choices: [1,2,3,4]
 
 net:
     nef_type: 'NeuralHyperSpectral'
@@ -145,7 +145,7 @@ trainer:
 
     loss_cho: l1
     weight_train: False
-    resume_train: True
+    resume_train: False
     #resume_log_dir: '20221220-194546'
     #pretrained_model_name: 'model-ep800-it2.pth'
     train_use_all_wave: False
@@ -157,7 +157,7 @@ trainer:
 
     # spectra supervision
     num_supervision_spectra: 1
-    spectra_neighbour_size: 2
+    spectra_neighbour_size: 3
 
 infer:
     inferrer_type: 'AstroInferrer'
