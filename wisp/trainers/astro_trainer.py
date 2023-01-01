@@ -99,7 +99,7 @@ class AstroTrainer(BaseTrainer):
         self.quantize_latent = self.extra_args["quantize_latent"]
         if self.quantize_latent:
             self.plot_embed_map = "plot_embed_map_during_train" in tasks
-            self.save_latents =  "save_latent_during_train" in tasks or "plot_latent_embed" in task
+            self.save_latents =  "save_latent_during_train" in tasks or "plot_latent_embed" in tasks
         else:
             self.plot_embed_map, self.save_latents = False, False
 
@@ -262,8 +262,8 @@ class AstroTrainer(BaseTrainer):
             self.save_data_to_local = True
             if self.save_latents: self.latents = []
             if self.plot_embed_map: self.embed_ids = []
-            if self.save_recon: self.smpl_pixels = []
-            if self.plot_spectra: self.spectra = []
+            if self.plot_spectra: self.smpl_spectra = []
+            if self.save_recon or self.save_cropped_recon: self.smpl_pixels = []
 
             # re-init dataloader to make sure pixels are in order
             self.shuffle_dataloader = False
@@ -340,7 +340,7 @@ class AstroTrainer(BaseTrainer):
         self.timer.check("zero grad")
 
         with torch.cuda.amp.autocast():
-            total_loss, recon_pixels, recon_spectra, embed_ids, latents = self.calculate_loss(data)
+            total_loss, recon_pixels, ret = self.calculate_loss(data)
 
         self.scaler.scale(total_loss).backward()
         self.scaler.step(self.optimizer)
@@ -349,24 +349,14 @@ class AstroTrainer(BaseTrainer):
 
         #plot_grad_flow(self.model.named_parameters(), self.args.grad_fn)
         if self.save_data_to_local:
-            if self.save_latents: self.latents = latents
-            if self.plot_embed_map: self.embed_ids = embed_ids
-            if self.save_recon: self.recon_pixels = recon_pixels
-            if self.plot_spectra: self.recon_spectra = recon_spectra
+            recon_spectra, embed_ids, latents = self.get_data_to_save(ret)
+            if self.save_latents: self.latents.extend(latents)
+            if self.plot_embed_map: self.embed_ids.extend(embed_ids)
+            if self.plot_spectra: self.smpl_spectra.extend(recon_spectra)
+            if self.save_recon or self.save_cropped_recon: self.smpl_pixels.extend(recon_pixels)
 
     def post_step(self):
-        if self.save_data_to_local:
-            if self.save_latents:
-                self.latents.extend(self.latents) #.detach().cpu().numpy())
-
-            if self.plot_embed_map:
-                self.embed_ids.extend(self.embed_ids) #.detach().cpu().numpy())
-
-            if self.save_recon or self.save_cropped_recon:
-                self.smpl_pixels.extend(self.recon_pixels) #.detach().cpu().numpy())
-
-            if self.plot_spectra:
-                self.spectra.append(self.recon_spectra)
+        pass
 
     #############
     # Helper methods
@@ -522,9 +512,6 @@ class AstroTrainer(BaseTrainer):
             spectra_loss = self.spectra_loss(gt_spectra, recon_spectra)
             self.log_dict["spectra_loss"] += spectra_loss.item()
 
-        if self.plot_spectra:
-            recon_spectra = ret["spectra"][...,0]
-
         # iii) latent quantization codebook loss
         if self.quantize_latent:
             cdbk_loss = ret["codebook_loss"]
@@ -533,16 +520,22 @@ class AstroTrainer(BaseTrainer):
 
         total_loss = recon_loss + spectra_loss + cdbk_loss
         self.log_dict["total_loss"] += total_loss.item()
-
-        embed_ids, latents = None, None
-        if self.quantize_latent:
-            if self.plot_embed_map:
-                embed_ids = ret["embed_ids"]
-            if self.save_latents:
-                latents = ret["latents"]
-
         self.timer.check("loss")
-        return total_loss, recon_pixels, recon_spectra, embed_ids, latents
+
+        return total_loss, recon_pixels, ret
+
+    def get_data_to_save(self, ret):
+        if self.plot_spectra:
+            recon_spectra = ret["spectra"][...,0]
+        else: recon_spectra = None
+
+        if self.quantize_latent:
+            if self.save_latents: latents = ret["latents"]
+            if self.plot_embed_map: embed_ids = ret["embed_ids"]
+        else:
+            embed_ids, latents = None, None
+
+        return recon_spectra, embed_ids, latents
 
     def validate(self):
         pass

@@ -51,7 +51,8 @@ class LatentQuantizer(nn.Module):
         return codebook_loss
 
     def forward(self, input):
-        z, scaler, redshift = input["latents"], input["scaler"], input["redshift"]
+        z, scaler, redshift = data["latents"], data["scaler"], data["redshift"]
+        if self.kwargs["print_shape"]: print('qtz ', z.shape)
 
         z_q, min_embed_ids = self.quantize(z)
         if self.calculate_loss:
@@ -60,8 +61,11 @@ class LatentQuantizer(nn.Module):
 
         # straight-through estimator
         z_q = z + (z_q - z).detach()
-        return dict(latents=z_q, scaler=scaler, redshift=redshift,
-                    codebook_loss=loss, min_embed_ids=min_embed_ids)
+        data["latents"] = z_q
+        data["codebook_loss"] = loss
+        data["min_embed_ids"] = min_embed_ids
+        #return dict(latents=z_q, scaler=scaler, redshift=redshift,
+        #            codebook_loss=loss, min_embed_ids=min_embed_ids)
 
 """
 class LatentQuantizer(nn.Module):

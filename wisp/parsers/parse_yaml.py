@@ -100,17 +100,28 @@ def define_cmd_line_args():
 
     global_group.add_argument("--debug", action="store_true")
     global_group.add_argument("--verbose", action="store_true")
+    global_group.add_argument("--print-shape", action="store_true")
     global_group.add_argument("--exp-name", type=str, help="Experiment name.")
     global_group.add_argument("--operations", nargs="+", type=str, choices=["train","infer"])
     global_group.add_argument("--detect-anomaly", action="store_true", help="Turn on anomaly detection.")
     global_group.add_argument("--perf", action="store_true", help="Use high-level profiling for the trainer.")
 
     global_group.add_argument("--tasks", nargs="+", type=str,
-                              choices=["train","spectra_supervision","plot_embd_map_during_train",
-                                       "save_latent_during_train","save_recon_during_train","infer_during_train",
-                                       "infer","recon_img","recon_flat","recon_gt_spectra","recon_dummy_spectra",
-                                       "recon_cdbk_spectra","plot_embd_map","plot_latent_embd",
-                                       "spectral_inpaint","spatial_inpaint",])
+                              choices=["train","spectra_supervision","plot_embed_map_during_train",
+                                       "save_latent_during_train","save_recon_during_train",
+                                       "plot_spectra_during_train","infer_during_train",
+                                       "infer","recon_img","recon_flat","recon_gt_spectra",
+                                       "recon_dummy_spectra","recon_cdbk_spectra",
+                                       "plot_embed_map","plot_latent_embed","spectral_inpaint",
+                                       "spatial_inpaint",])
+    ###################
+    # General global network things
+    ###################
+    net_group = parser.add_argument_group("net")
+
+    net_group.add_argument("--mlp-output-norm-method", type=str,
+                           choices=["identity","arcsinh","sinh"])
+
     ###################
     # Grid arguments
     ###################
@@ -156,33 +167,34 @@ def define_cmd_line_args():
     embedder_group.add_argument("--embedder-type", type=str, default="none", choices=["none", "positional", "fourier"])
 
     ###################
-    # Decoder arguments (and general global network things)
+    # Nef arguments
     ###################
-    net_group = parser.add_argument_group("net")
+    nef_group = parser.add_argument_group("net")
 
-    net_group.add_argument("--nef-type", type=str, help="The neural field class to be used.")
-    net_group.add_argument("--use-ngp", action="store_true",
-                           help="use ngp to spatially encode 2D coordinates")
-    net_group.add_argument("--layer-type", type=str, default="none",
+    nef_group.add_argument("--nef-type", type=str,
+                           help="The neural field class to be used.")
+    nef_group.add_argument("--layer-type", type=str, default="none",
                             choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
-    net_group.add_argument("--activation-type", type=str, default="relu", choices=["relu", "sin"])
-    net_group.add_argument("--decoder-type", type=str, default="basic", choices=["none", "basic"])
-    net_group.add_argument("--embed_coords_with_pe", action="store_true")
+    nef_group.add_argument("--coords-embed-dim", type=int,
+                           help="ra/dec coordinate embedding dimension.")
+    nef_group.add_argument("--coords-embed-method", type=str,
+                           choices=["positional","grid"],
+                           help="ra/dec coordinate embedding method.")
+    nef_group.add_argument("--activation-type", type=str,
+                           default="relu", choices=["relu", "sin"])
+    nef_group.add_argument("--decoder-type", type=str,
+                           default="basic", choices=["none", "basic"])
 
-    net_group.add_argument("--num-layers", type=int, default=1,
+    nef_group.add_argument("--num-layers", type=int, default=1,
                           help="Number of layers for the decoder")
-    net_group.add_argument("--hidden-dim", type=int, default=128,
+    nef_group.add_argument("--hidden-dim", type=int, default=128,
                           help="Network width")
-    net_group.add_argument("--out-dim", type=int, default=1,
+    nef_group.add_argument("--out-dim", type=int, default=1,
                           help="output dimension")
-    net_group.add_argument("--skip", type=int, default=None,
+    nef_group.add_argument("--skip", type=int, default=None,
                           help="Layer to have skip connection.")
-    net_group.add_argument("--pretrained", type=str,
-                          help="Path to pretrained model weights.")
-    net_group.add_argument("--position-input", action="store_true",
-                          help="Use position as input.")
-    net_group.add_argument("--mlp-output-norm-method", type=str,
-                           choices=["identity","arcsinh","sinh"])
+    # net_group.add_argument("--pretrained", type=str, help="Path to pretrained model weights.")
+    # net_group.add_argument("--position-input", action="store_true", help="Use position as input.")
 
     net_group.add_argument("--siren-seed", type=int, default=1)
     net_group.add_argument("--siren-first-w0", type=int, default=30)
@@ -195,9 +207,6 @@ def define_cmd_line_args():
     ###################
     hps_group = parser.add_argument_group("hyperspectral")
 
-    hps_group.add_argument("--coords-embed-dim", type=int, help="ra/dec coordinate embedding dimension.")
-    hps_group.add_argument("--coords-embed-method", type=str, choices=["positional","grid"],
-                           help="ra/dec coordinate embedding method.")
     hps_group.add_argument("--wave-embed-dim", type=int, help="wave embedding dimension.")
     hps_group.add_argument("--wave-embed-method", type=str, choices=["positional"],
                            help="wave embedding method.")

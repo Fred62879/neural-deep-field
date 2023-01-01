@@ -21,12 +21,10 @@ class HyperSpectralConverter(nn.Module):
         self.wave_embedder = wave_embedder
 
     def shift_wave(self, wave, redshift):
-        if self.kwargs["print_shape"]: print('hps_converter, shift wave', wave.shape)
-        if self.kwargs["print_shape"]: print('hps_converter, shift wave', redshift.shape)
         if wave.ndim == 3:
             nsmpl = wave.shape[1] # [bsz,nsmpl,1]
             redshift = torch.exp(redshift) - 0.1
-            wave += redshift.tile(1,nsmpl,1)
+            wave += redshift[:,:,None].tile(1,nsmpl,1)
             #wave /= (1 + redshift[:,:,None].tile(1,nsmpl,1))
         elif wave.ndim == 4:
             nsmpl = wave.shape[2] # [bsz,nbands,nsmpl,1]
@@ -65,7 +63,7 @@ class HyperSpectralConverter(nn.Module):
             @Return
               hps_latents: ra/dec/wave coords
         """
-        if self.kwargs["print_shape"]: print('hps_converter',latents.shape)
+        if self.kwargs["print_shape"]: print('',ents.shape)
         wave = wave[0] # [bsz,num_samples,1]  # **** replace
         num_samples = wave.shape[-2]
         coords_embed_dim = latents.shape[-1]
@@ -80,9 +78,6 @@ class HyperSpectralConverter(nn.Module):
             # assert 2D coords are not embedded as well, should use siren in this case
             assert(coords_embed_dim == 2)
 
-        if self.kwargs["print_shape"]: print('hps_converter, embedded wave', wave.shape)
-
         latents = latents.tile(1,num_samples,1) # [bsz,nsamples,embed_dim or 2]
-        if self.kwargs["print_shape"]: print('hps_converter, latents',latents.shape)
         hps_latents = self.combine_spatial_spectral(latents, wave)
         return hps_latents

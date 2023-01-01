@@ -2,6 +2,7 @@
 global:
     debug: False
     verbose: True
+    print_shape: True
     exp_name: 'test-ngp-nerf'
 
     #tasks: ['infer','recon_img']
@@ -9,7 +10,7 @@ global:
     #tasks: ['train','save_recon_during_train','infer','recon_img']
     #tasks: ['infer','recon_gt_spectra']
 
-    tasks: ['train','hps_cube_fit','save_recon_during_train','plot_spectra_during_train','spectra_supervision','infer','recon_img','recon_gt_spectra']
+    tasks: ['train','hps_cube_fit','plot_embed_map_during_train','save_latent_during_train','save_recon_during_train','plot_spectra_during_train','spectra_supervision','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
     #tasks: ['infer','recon_img','recon_gt_spectra']
 
 optimizer:
@@ -71,14 +72,16 @@ dataset:
     gt_spectra_choices: [0] #[1,2,3,4]
 
 net:
+    mlp_output_norm_method: 'sinh'
+
+nef:
     nef_type: 'NeuralHyperSpectral'
 
     # decoder
-    mlp_output_norm_method: 'sinh'
-    hidden_dim: 256
-    num_layers: 3
+    hidden_dim: 64
+    num_layers: 1
     out_dim: 5
-    activation_type: "sin"
+    activation_type: "relu"
 
     siren_seed: 0
     siren_first_w0: 24
@@ -122,9 +125,9 @@ hyperspectral:
 
 qtz:
     quantize_latent: True
-    generate_scaler: False
-    generate_redshift: False
-    qtz_latent_dim: 16
+    generate_scaler: True
+    generate_redshift: True
+    qtz_latent_dim: 8
     qtz_num_embed: 4
     qtz_beta: 0.1
     qtz_calculate_loss: True

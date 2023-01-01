@@ -39,26 +39,30 @@ class HyperSpectralDecoder(nn.Module):
             raise ValueError("Unrecognized wave embedding method.")
         return embedder
 
+    def get_input_coords_dim(self):
+        """ Infer the dimension of the input RA/DEC coordinate.
+        """
+        if self.kwargs["quantize_latent"]:
+            coords_dim = self.kwargs["qtz_latent_dim"]
+        elif self.kwargs["coords_embed_method"] == "positional":
+            coords_dim = self.kwargs["coords_embed_dim"]
+        elif self.kwargs["coords_embed_method"] == "grid":
+            coords_dim = self.kwargs["feature_dim"]
+            if self.kwargs["multiscale_type"] == 'cat':
+                coords_dim *= self.kwargs["num_lods"]
+        else: raise Exception("Cannot infer coords dimension.")
+        return coords_dim
+
     def init_decoder(self):
         # encode ra/dec coords first and then combine with wave
+        coords_dim = self.get_input_coords_dim()
+
         if self.kwargs["hps_combine_method"] == "add":
-            assert(self.kwargs["wave_embed_dim"] == self.kwargs["coords_embed_dim"])
+            assert(self.kwargs["wave_embed_dim"] == coords_dim)
             input_dim = self.kwargs["wave_embed_dim"]
-
         elif self.kwargs["hps_combine_method"] == "concat":
-            if self.kwargs["coords_embed_method"] == "positional":
-                assert(self.kwargs["hps_decod_activation_type"] == "relu")
-                coords_embed_dim = self.kwargs["coords_embed_dim"]
-
-            elif self.kwargs["coords_embed_method"] == "grid":
-                assert(self.kwargs["hps_decod_activation_type"] == "relu")
-                coords_embed_dim = self.kwargs["feature_dim"]
-                if self.kwargs["multiscale_type"] == 'cat':
-                    coords_embed_dim *= self.kwargs["num_lods"]
-
-            input_dim = self.kwargs["wave_embed_dim"] + coords_embed_dim
-        else:
-            # coords and wave are not embedded
+            input_dim = self.kwargs["wave_embed_dim"] + coords_dim
+        else: # coords and wave are not embedded
             input_dim = 3
 
         '''
@@ -99,6 +103,7 @@ class HyperSpectralDecoder(nn.Module):
         return decoder
 
     def reconstruct_spectra(self, coords, scaler):
+        if self.kwargs["print_shape"]: print('hps_decoder', coords.shape)
         spectra = self.decod(coords)
         if scaler is not None: spectra *= scaler
         spectra = self.norm(spectra)
@@ -120,8 +125,15 @@ class HyperSpectralDecoder(nn.Module):
         spectra_scaler = None if scaler is None else scaler[-num_spectra_coords:]
         spectra_redshift = None if redshift is None else redshift[-num_spectra_coords:]
 
+        if self.kwargs["print_shape"]: print('hps_decoder', spectra_latents.shape)
+        if self.kwargs["print_shape"] and scaler is not None:
+            print('hps_decoder', spectra_scaler.shape)
+        if self.kwargs["print_shape"] and redshift is not None:
+            print('hps_decoder', spectra_redshift.shape)
+
         # generate hyperspectral latents
         full_wave = net_args["full_wave"][:,None,:,None].tile(1,num_spectra_coords,1,1)
+        if self.kwargs["print_shape"]: print('hps_decoder, full wave', full_wave.shape)
         spectra_hps_latents = self.convert(full_wave, spectra_latents, redshift=spectra_redshift)
 
         # generate spectra
@@ -152,30 +164,29 @@ class HyperSpectralDecoder(nn.Module):
               spectra:   reconstructed spectra
         """
         latents = data["latents"]
-        #print('hps_decoder',latents.shape)
+        if self.kwargs["print_shape"]: print('hps_decoder',latents.shape)
 
         scaler = None if "scaler" not in data or not self.scale else data["scaler"]
         redshift = None if "redshift" not in data or not self.scale else data["redshift"]
-
-        #print("spectra_supervision_train" in net_args)
-        #print(net_args["spectra_supervision_train"])
 
         train_with_full_wave = "spectra_supervision_train" in net_args and \
             net_args["spectra_supervision_train"]
         if train_with_full_wave:
             latents, scaler, redshift = self.train_with_full_wave(
                 data, latents, scaler, redshift, **net_args)
-            #print('supervision', latents.shape)
+            if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
         # still have latents to decode besides full wave training latents (e.g. spectra supervision)
         if latents.shape[0] > 0:
-            #print(net_args["wave"].shape)
+
             hps_latents = self.convert(net_args["wave"], latents, redshift=redshift)
-            #print(hps_latents.shape)
+            if self.kwargs["print_shape"]: print('hps_decoder', hps_latents.shape)
+
             spectra = self.reconstruct_spectra(hps_latents, scaler)
-            #print(spectra.shape)
+            if self.kwargs["print_shape"]: print('hps_decoder', spectra.shape)
+
             intensity = self.inte(spectra[...,0], **net_args)
-            #print(intensity.shape)
+            if self.kwargs["print_shape"]: print('hps_decoder', intensity.shape)
 
             if "spectra" not in data:
                 data["spectra"] = spectra

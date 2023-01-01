@@ -154,7 +154,8 @@ class NeuralHyperSpectral(BaseNeuralField):
         """
         timer = PerfTimer(activate=False, show_memory=True)
 
-        #print('nef coords',coords.shape)
+        if self.kwargs["print_shape"]: print('hyper nef',coords.shape)
+
         if coords.ndim == 2:
             batch, _ = coords.shape
         elif coords.ndim == 3:
@@ -165,7 +166,8 @@ class NeuralHyperSpectral(BaseNeuralField):
             batch = coords.shape[0]
         else:
             raise Exception("Wrong coordinate dimension.")
-        #print('nef coords',coords.shape)
+
+        if self.kwargs["print_shape"]: print('hyper nef', coords.shape)
         timer.check("rf_hyperspectral_preprocess")
 
         # embed 2D coords into high-dimensional vectors with PE or the grid
