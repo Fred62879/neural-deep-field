@@ -471,9 +471,7 @@ class AstroTrainer(BaseTrainer):
             self.dataset.get_num_gt_spectra(),
             self.extra_args["spectra_neighbour_size"]**2, -1))
 
-        #print('during train, plot spectra', self.spectra.shape)
-        fname = join(self.spectra_dir, f"epoch_{self.epoch}")
-        self.dataset.plot_spectrum(fname, self.spectra)
+        self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.spectra)
 
     def save_model(self):
         if self.extra_args["save_as_new"]:

@@ -467,8 +467,9 @@ def define_cmd_line_args():
 
     infer_group.add_argument("--infer-log-fname", type=str)
     infer_group.add_argument("--infer-batch-size", type=int, default=4096)
-    infer_group.add_argument("--infer-use-all-wave", action="store_true", default=False,
+    infer_group.add_argument("--infer-use-all-wave", action="store_true",
                              help="should set this to true, implementation assumes infer with all lambda")
+    infer_group.add_argument("--infer-last-model-only", action="store_true")
 
     infer_group.add_argument("--to-HDU", action="store_true", default=False,
                              help="generate HDU files for reconstructed image")
@@ -486,7 +487,7 @@ def define_cmd_line_args():
     infer_group.add_argument("--recon-cutout-start-pos", nargs="+", type=list,
                              help="list of start (r/c) positions of each cutout for each tile")
 
-    infer_group.add_argument("--plot-spectrum-average", action="store_true")
+    infer_group.add_argument("--average-spectra", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-trans", action="store_true")
     infer_group.add_argument("--infer-spectra-individually", action="store_true")
 

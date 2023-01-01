@@ -495,9 +495,6 @@ class FITSData:
     def get_fits_cutout_start_pos(self):
         return self.fits_cutout_start_pos
 
-    #def get_img_sizes(self):
-    #    return self.num_rows, self.num_cols
-
     def get_pixels(self):
         return self.data["pixels"]
 
@@ -594,7 +591,7 @@ class FITSData:
             ids = [local_id + base_count]
         else:
             ids = self.calculate_neighbour_ids(base_count, r, c, neighbour_size, index, fits_id)
-        print("neighbouring pixel", ids)
+        #print("neighbouring pixel", ids)
         return ids
 
     def evaluate(self, fits_id, recon_tile, **re_args):

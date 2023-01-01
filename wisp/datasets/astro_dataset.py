@@ -84,49 +84,27 @@ class AstroDataset(Dataset):
     def get_num_fits(self):
         return len(self.get_fits_ids())
 
-    def get_img_sizes (self):
-        return self.fits_dataset.get_img_sizes()
-
     def get_num_coords(self):
-        """ Get number of all coordinates. """
         return self.fits_dataset.get_num_coords()
 
     def get_zscale_ranges(self, fits_id=None):
         return self.fits_dataset.get_zscale_ranges(fits_id)
 
     def get_spectra_coord_ids(self):
-        """ Get id of spectra pixel (in context of all coords). """
         return self.spectra_dataset.get_spectra_coord_ids()
-
-    def get_num_spectra_coords(self):
-        """ Get number of selected coords to recon spectra. """
-        return self.spectra_dataset.get_num_spectra_coords()
-
-    '''
-    def get_gt_spectra(self):
-        return self.spectra_dataset.get_gt_spectra()
-
-    def get_gt_spectra_wave(self):
-        return self.spectra_dataset.get_gt_spectra_wave()
-
-    def get_recon_spectra_wave(self):
-        return self.spectra_dataset.get_recon_spectra_wave()
-
-    def get_recon_wave_bound_ids(self):
-        return self.spectra_dataset.get_recon_wave_bound_ids()
-    '''
 
     def get_num_gt_spectra(self):
         return self.spectra_dataset.get_num_gt_spectra()
+
+    def get_num_spectra_coords(self):
+        return self.spectra_dataset.get_num_spectra_coords()
 
     def get_batched_data(self, field, idx):
         if field == "coords":
             if self.state == "fits":
                 data = self.fits_dataset.get_coords()
-                #print("input coord",data.shape)
             elif self.state == "spectra":
                 data = self.spectra_dataset.get_spectra_coords()
-                #print("input coord",data.shape)
 
         elif field == "pixels":
             data = self.fits_dataset.get_pixels()
@@ -152,23 +130,28 @@ class AstroDataset(Dataset):
         # get only supervision spectra (not all gt spectra)
         out["gt_spectra"] = self.spectra_dataset.get_supervision_spectra()
 
-        # get all coords to plot all gt spectra (not only supervision spectra)
-        spectra_coords = self.spectra_dataset.get_gt_spectra_coords()
+        # get all coords to plot all spectra (gt, dummy, incl. neighbours)
+        # the first #num_supervision_spectra are gt coords for supervision
+        # **TODO** get only gt spectra coords used for supervision
+        # spectra_coords = self.spectra_dataset.get_supervision_spectra_coords()
+        spectra_coords = self.spectra_dataset.get_spectra_coords()
         if "coords" in out:
             out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
-        else: out["coords"] = spectra_coords
-        #print(spectra_coords.shape, out["coords"].shape)
+        else:
+            out["coords"] = spectra_coords
 
+        out["num_spectra_coords"] = len(spectra_coords)
         out["full_wave"] = self.trans_dataset.get_full_norm_wave()
         out["recon_wave_bound_ids"] = self.spectra_dataset.get_recon_wave_bound_ids()
 
     def __len__(self):
-        """ Length of the dataset in number of pixels """
+        """ Length of the dataset in number of coords.
+        """
         return self.dataset_length
 
     def __getitem__(self, idx : list):
         """ Sample data from requried fields using given index.
-            Needed for training and all coords inferrence.
+            Also get unbatched data (trans, spectra etc.).
         """
         # if self.kwargs["debug"]:
         #     out = {"coords": self.coords[idx],
@@ -179,17 +162,17 @@ class AstroDataset(Dataset):
         #     return out
 
         out = {}
+        batch_size = len(idx)
         batched_fields = self.requested_fields - self.unbatched_fields
 
         for field in batched_fields:
             out[field] = self.get_batched_data(field, idx)
 
-        if "trans_data" in self.requested_fields:
-            self.get_trans_data(len(idx), out)
-            #print(out["wave"].shape, out["trans"].shape)
-
         if "spectra_supervision_data" in self.requested_fields:
             self.get_spectra_data(out)
+
+        if "trans_data" in self.requested_fields:
+            self.get_trans_data(len(idx), out)
 
         if self.transform is not None:
             out = self.transform(out)
@@ -207,5 +190,5 @@ class AstroDataset(Dataset):
         """
         return self.fits_dataset.restore_evaluate_tiles(recon_pixels, **re_args)
 
-    def plot_spectrum(self, fname, recon_spectra):
-        self.spectra_dataset.plot_spectrum(fname, recon_spectra)
+    def plot_spectrum(self, spectra_dir, name, recon_spectra):
+        self.spectra_dataset.plot_spectrum(spectra_dir, name, recon_spectra)

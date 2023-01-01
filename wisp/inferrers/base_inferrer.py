@@ -23,6 +23,7 @@ class BaseInferrer(ABC):
         self.space_dim = extra_args["space_dim"]
         self.num_bands = extra_args["num_bands"]
         self.batch_size = extra_args["infer_batch_size"]
+        self.infer_last_model_only = extra_args["infer_last_model_only"]
 
         self.info = info
         self.extra_args = extra_args

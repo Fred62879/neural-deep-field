@@ -74,28 +74,30 @@ class SpectraData:
             return len(self.kwargs["gt_spectra_choices"])
         return 0
 
+    '''
     def get_gt_spectra_coords(self):
         """ Get coords of all (not only supervision) gt spectra.
         """
         if self.spectra_supervision_train:
             return self.data["gt_spectra_coords"]
         return None
+    '''
 
     def get_spectra_coords(self):
         """ Get coords of all selected spectra (gt & dummy, incl. neighbours).
         """
         return self.data["spectra_coords"]
 
-    def get_spectra_coord_ids(self):
-        """ Get pixel id of all selected spectra (correspond to coords).
-        """
-        return self.data["spectra_coord_ids"]
-
     def get_num_spectra_coords(self):
         """ Get number of coords of all selected spectra
             (gt & dummy, incl. neighbours).
         """
         return self.get_spectra_coords().shape[0]
+
+    def get_spectra_coord_ids(self):
+        """ Get pixel id of all selected spectra (correspond to coords).
+        """
+        return self.data["spectra_coord_ids"]
 
     def get_recon_wave_bound_ids(self):
         """ Get ids of boundary lambda of recon spectra
@@ -279,6 +281,7 @@ class SpectraData:
         # this only works if spectra coords is included in the loaded coords
         (r, c) = worldToPix(header, ra, dec)
         pixel_ids = self.fits_obj.get_pixel_ids(fits_id, r, c, neighbour_size)
+        print(ra, dec, r, c)
         coords_accurate = self.fits_obj.get_coord(pixel_ids)
         return coords_accurate, pixel_ids
 
@@ -286,7 +289,7 @@ class SpectraData:
     # Utilities
     #############
 
-    def plot_spectrum(self, fname, recon_spectra):
+    def plot_spectrum(self, spectra_dir, name, recon_spectra):
         """ Plot given spectra.
             @Param
               recon_spectra: [num_spectra,num_neighbours,full_num_smpl]
@@ -295,7 +298,7 @@ class SpectraData:
             (lo, hi) = self.get_recon_wave_bound_ids()[i]
             cur_spectra = cur_spectra[...,lo:hi]
 
-            if self.kwargs["plot_spectrum_average"]:
+            if self.kwargs["average_spectra"]:
                 cur_spectra = np.mean(cur_spectra, axis=0)
             else: cur_spectra = cur_spectra[0]
             cur_spectra /= np.max(cur_spectra)
@@ -312,9 +315,9 @@ class SpectraData:
                 cur_gt_spectra /= np.max(cur_gt_spectra)
                 plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
 
-            plt.savefig(f"{fname}_spectra{i}.png")
+            fname = join(spectra_dir, f"spectra_{i}_{name}.png")
+            plt.savefig(fname)
             plt.close()
-
 
 # SpectraData class ends
 #############

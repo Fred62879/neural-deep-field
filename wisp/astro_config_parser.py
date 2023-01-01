@@ -69,6 +69,7 @@ def get_pipelines_from_config(args, tasks=[]):
         # pipeline for training and inferrence
         pipeline = AstroPipeline(nef, quantz, hyper_decod)
         pipelines["full"] = pipeline
+        log.info(pipeline)
 
         # pipeline for spectra inferrence
         if len( tasks.intersection({"recon_gt_spectra","recon_dummy_spectra"}) ) != 0:
@@ -85,6 +86,5 @@ def get_pipelines_from_config(args, tasks=[]):
         raise ValueError(f"{args.dataset_type} unrecognized dataset_type")
 
     for _, pipeline in pipelines.items():
-        #log.info(pipeline)
         pipeline.to(device)
     return device, pipelines

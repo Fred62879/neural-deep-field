@@ -143,6 +143,7 @@ def forward(class_obj, pipeline, data, quantize_latent, plot_embd_map, spectra_s
         if spectra_supervision_train:
             net_args["full_wave"] = data["full_wave"]
             net_args["spectra_supervision_train"] = True
+            net_args["num_spectra_coords"] = data["num_spectra_coords"]
 
     else: raise Exception("Unsupported space dimension.")
     return pipeline(channels=requested_channels, **net_args)

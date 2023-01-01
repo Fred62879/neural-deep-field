@@ -19,16 +19,12 @@ class HyperSpectralDecoder(nn.Module):
 
         self.kwargs = kwargs
         self.scale = scale
-        self.num_supervision_spectra_coords = 0
 
         wave_embedder = self.init_wave_embedder()
         self.convert = HyperSpectralConverter(wave_embedder, **kwargs)
         self.decod = self.init_decoder()
         self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
-
-        self.num_supervision_spectra_coords = self.kwargs["num_supervision_spectra"] * \
-            self.kwargs["spectra_neighbour_size"] ** 2
 
     def init_wave_embedder(self):
         wave_embed_method = self.kwargs["wave_embed_method"]
@@ -108,26 +104,34 @@ class HyperSpectralDecoder(nn.Module):
         spectra = self.norm(spectra)
         return spectra
 
-    def reconstruct_supervision_spectra(self, latents, wave, scaler, redshift):
-        """ Reconstruct gt spectra.
-            @Param
-              latetns: (original or embedded) ra/dec coords.
-              wave: all lambda values. [num_spectra_coords,full_num_samples,1]
-              redshift: corresponding redshift values of each wave.
+    def train_with_full_wave(self, data, latents, scaler, redshift, **net_args):
+        """ During training, some latents will be decoded, combining with full wave.
+            Currently only supports spectra coords (incl. gt, dummy that requires
+              spectrum plotting during training time).
+            Latents that require full wave are in the front of the tensor.
+            **TODO** pass only supervision gt spectra here (get rid of non-supervision
+              gt, and dummy coords).
         """
-        # slice spectra data
-        spectra_scaler = None if scaler is None \
-            else scaler[-self.num_supervision_spectra_coords:]
-        spectra_redshift = None if redshift is None \
-            else redshift[-self.num_supervision_spectra_coords:]
-        spectra_latents = latents[-self.num_supervision_spectra_coords:]
+        #num_spectra_coords = net_args["num_supervision_spectra_coords"] * self.spectra_neighbour_area
+        num_spectra_coords = net_args["num_spectra_coords"]
+
+        # get data that requires full wave
+        spectra_latents = latents[-num_spectra_coords:]
+        spectra_scaler = None if scaler is None else scaler[-num_spectra_coords:]
+        spectra_redshift = None if redshift is None else redshift[-num_spectra_coords:]
 
         # generate hyperspectral latents
-        spectra_hps_latents = self.convert(wave, spectra_latents, redshift=spectra_redshift)
+        full_wave = net_args["full_wave"][:,None,:,None].tile(1,num_spectra_coords,1,1)
+        spectra_hps_latents = self.convert(full_wave, spectra_latents, redshift=spectra_redshift)
 
         # generate spectra
-        recon_spectra = self.reconstruct_spectra(spectra_hps_latents, spectra_scaler)
-        return recon_spectra
+        data["spectra"] = self.reconstruct_spectra(spectra_hps_latents, spectra_scaler)
+
+        # leave only latents that require sampled wave
+        latents = latents[:-num_spectra_coords]
+        scaler = None if scaler is None else scaler[:-num_spectra_coords]
+        redshift = None if redshift is None else redshift[:-num_spectra_coords]
+        return latents, scaler, redshift
 
     def forward(self, data, **net_args):
         """ @Param
@@ -140,6 +144,8 @@ class HyperSpectralDecoder(nn.Module):
                     wave: lambda values, used to convert ra/dec to hyperspectral latents. [bsz,num_samples]
                     trans: corresponding transmission values of lambda. [bsz,num_samples]
                     full_wave: not None if do spectra supervision. [num_spectra_coords,full_num_samples]
+                    spectra_supervision_train: bool, indicates whether currently doing training with supervision
+                    num_spectra_coords:
 
             @Return (add new fields to input data)
               intensity: reconstructed pixel values
@@ -147,7 +153,6 @@ class HyperSpectralDecoder(nn.Module):
         """
         latents = data["latents"]
         #print('hps_decoder',latents.shape)
-        batch_size = latents.shape[0]
 
         scaler = None if "scaler" not in data or not self.scale else data["scaler"]
         redshift = None if "redshift" not in data or not self.scale else data["redshift"]
@@ -155,25 +160,15 @@ class HyperSpectralDecoder(nn.Module):
         #print("spectra_supervision_train" in net_args)
         #print(net_args["spectra_supervision_train"])
 
-        spectra_supervision = "spectra_supervision_train" in net_args and \
+        train_with_full_wave = "spectra_supervision_train" in net_args and \
             net_args["spectra_supervision_train"]
+        if train_with_full_wave:
+            latents, scaler, redshift = self.train_with_full_wave(
+                data, latents, scaler, redshift, **net_args)
+            #print('supervision', latents.shape)
 
-        if spectra_supervision:
-            full_wave = net_args["full_wave"][:,None,:,None].tile(
-                1,self.num_supervision_spectra_coords,1,1) # ****** replace
-
-            data["spectra"] = self.reconstruct_supervision_spectra(
-                latents, full_wave, scaler, redshift)
-
-            # slice out spectra supervision data
-            latents = latents[:-self.num_supervision_spectra_coords]
-            scaler = None if scaler is None else scaler[:-self.num_supervision_spectra_coords]
-            redshift = None if redshift is None else redshift[:-self.num_supervision_spectra_coords]
-
-        # still have coords to forward other than spectra supervision training coords
-        #print(batch_size, self.num_supervision_spectra_coords)
-
-        if not spectra_supervision or batch_size > self.num_supervision_spectra_coords:
+        # still have latents to decode besides full wave training latents (e.g. spectra supervision)
+        if latents.shape[0] > 0:
             #print(net_args["wave"].shape)
             hps_latents = self.convert(net_args["wave"], latents, redshift=redshift)
             #print(hps_latents.shape)
@@ -182,7 +177,7 @@ class HyperSpectralDecoder(nn.Module):
             intensity = self.inte(spectra[...,0], **net_args)
             #print(intensity.shape)
 
-            if not spectra_supervision:
+            if "spectra" not in data:
                 data["spectra"] = spectra
             data["intensity"] = intensity
 

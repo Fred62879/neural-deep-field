@@ -3,11 +3,14 @@ global:
     debug: False
     verbose: True
     exp_name: 'test-ngp-nerf'
-    tasks: ['train','hps_cube_fit','save_recon_during_train','plot_spectra_during_train','spectra_supervision','infer','recon_img','recon_gt_spectra']
-    #tasks: ['train','save_recon_during_train','infer','recon_img']
+
     #tasks: ['infer','recon_img']
-    #tasks: ['train','spectra_supervision','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
+
+    #tasks: ['train','save_recon_during_train','infer','recon_img']
     #tasks: ['infer','recon_gt_spectra']
+
+    tasks: ['train','hps_cube_fit','save_recon_during_train','plot_spectra_during_train','spectra_supervision','infer','recon_img','recon_gt_spectra']
+    #tasks: ['infer','recon_img','recon_gt_spectra']
 
 optimizer:
     optimizer_type: 'adam'
@@ -29,11 +32,11 @@ dataset:
 
     # if don't use full fits, we can select cutout from tiles
     # the order of the following 5 fields corresponds to each other
-    fits_footprints: ['9812'] #,'9812']
-    fits_tile_ids: ['1'] #,'1']
-    fits_subtile_ids: ['5'] #['5','7']
-    fits_cutout_sizes: [ 256 ]
-    fits_cutout_start_pos: [[1908,708]] #[[86,188]]
+    fits_footprints: ['9812']
+    fits_tile_ids: ['1']
+    fits_subtile_ids: ['5']
+    fits_cutout_sizes: [ 64 ] #256 ]
+    fits_cutout_start_pos: [[86,188]] #[[1750,550]]
 
     # num_bands: 1
     # sensor_collection_name: '1_y'
@@ -65,7 +68,7 @@ dataset:
     hardcode_num_trans_samples: 40
     trans_sample_interval: 10
 
-    gt_spectra_choices: [1,2,3,4]
+    gt_spectra_choices: [0] #[1,2,3,4]
 
 net:
     nef_type: 'NeuralHyperSpectral'
@@ -101,13 +104,13 @@ grid:
 
 hyperspectral:
     coords_embed_dim: 1000
-    coords_embed_method: 'positional'
-    wave_embed_dim: 1000
+    coords_embed_method: 'grid'
+    wave_embed_dim: 10
     wave_embed_method: 'positional'
     hps_combine_method: 'concat'
     hps_decod_activation_type: 'relu'
-    hps_decod_num_layers: 3
-    hps_decod_hidden_dim: 256
+    hps_decod_num_layers: 1
+    hps_decod_hidden_dim: 64
     hps_decod_layer_type: 'none'
     integration_method: 'dot_prod'
 
@@ -118,7 +121,7 @@ hyperspectral:
     hps_siren_last_linear: False
 
 qtz:
-    quantize_latent: False
+    quantize_latent: True
     generate_scaler: False
     generate_redshift: False
     qtz_latent_dim: 16
@@ -131,14 +134,14 @@ trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 20
-    batch_size: 2048
+    num_epochs: 2000
+    batch_size: 4096 #16384
     valid_every: -1
-    save_every: 10
+    save_every: 400
     render_tb_every: -1
-    log_tb_every: 10
+    log_tb_every: 400
     log_gpu_every: -1
-    save_local_every: 10
+    save_local_every: 400
     save_as_new: True
     #train_pixl_ratio_per_epoch: 1e-6
     #masked_pixl_ratio_per_epoch: 1
@@ -163,6 +166,7 @@ infer:
     inferrer_type: 'AstroInferrer'
     infer_batch_size: 128
     infer_use_all_wave: True # enforced
+    infer_last_model_only: False
 
     # recon img
     to_HDU: True
@@ -175,13 +179,9 @@ infer:
     #recon_cutout_start_pos: [ [[0,0]], [[0,0]] ] #[86,188]
 
     # recon spectra
-    plot_spectrum_average: True
+    average_spectra: True
     plot_spectrum_with_trans: True
     infer_spectra_individually: True
-   
-test:
-    is_test: False
-    fake_spectra_cho: -1
 
 inpaint:
     inpaint_cho: 'no_inpaint' # 'spectral_inpaint'

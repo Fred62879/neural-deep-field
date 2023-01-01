@@ -71,8 +71,10 @@ class AstroInferrer(BaseInferrer):
 
     def select_models(self):
         self.selected_model_fnames = os.listdir(self.model_dir)
-        self.num_models = len(self.selected_model_fnames)
         self.selected_model_fnames.sort()
+        if self.infer_last_model_only:
+            self.selected_model_fnames = self.selected_model_fnames[-1:]
+        self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
     def summarize_inferrence_tasks(self):
@@ -259,8 +261,7 @@ class AstroInferrer(BaseInferrer):
         ).detach().cpu().numpy()
         #print(self.recon_spectra.shape)
 
-        fname = join(self.spectra_dir, f"model_{model_id}")
-        self.dataset.plot_spectrum(fname, self.recon_spectra)
+        self.dataset.plot_spectrum(self.spectra_dir, model_id, self.recon_spectra)
         #self.calculate_recon_spectra_pixel_values()
 
     def pre_checkpoint_all_coords_modified_model(self, model_id):
