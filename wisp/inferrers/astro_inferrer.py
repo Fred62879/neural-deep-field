@@ -9,6 +9,8 @@ from pathlib import Path
 from os.path import exists, join
 from wisp.inferrers import BaseInferrer
 from wisp.utils.common import forward, load_model_weights
+from wisp.utils.plot import plot_horizontally, plot_embed_map, \
+    plot_latent_embed
 
 
 class AstroInferrer(BaseInferrer):
@@ -60,10 +62,10 @@ class AstroInferrer(BaseInferrer):
 
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","metric_dir", "spectra_dir",
-                 "cdbk_spectra_dir", "embd_map_dir","latent_dir",
-                 "latent_embd_dir"],
+                 "cdbk_spectra_dir", "embed_map_dir","latent_dir",
+                 "latent_embed_dir"],
                 ["models","recons","metrics","spectra","cdbk_spectra",
-                 "embd_map","latent","latent_embd_dir"]
+                 "embed_map","latents","latent_embed"]
         ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
@@ -81,17 +83,16 @@ class AstroInferrer(BaseInferrer):
         """ Group similar inferrence tasks (tasks using same dataset and same model) together.
         """
         tasks = set(self.extra_args["tasks"])
-
-        self.quantize_latent = "quantize_latent" in tasks
+        self.quantize_latent = self.extra_args["quantize_latent"]
 
         # infer all coords using original model
         self.recon_img = "recon_img" in tasks
         self.recon_HSI = "recon_HSI" in tasks
         self.recon_flat_trans = "recon_flat_trans" in tasks
 
-        self.plot_embd_map = "plot_embd_map_during_recon" in tasks \
+        self.plot_embed_map = "plot_embed_map" in tasks \
             and self.quantize_latent and self.space_dim == 3
-        self.plot_embd_latent_distrib = "plot_embd_latent_distrib" in tasks \
+        self.plot_latent_embed = "plot_latent_embed" in tasks \
             and self.quantize_latent and self.space_dim == 3
 
         # infer all coords using modified model
@@ -105,8 +106,8 @@ class AstroInferrer(BaseInferrer):
         # keep only tasks required to perform
         self.group_tasks = []
 
-        if self.recon_img or self.recon_flat_trans or self.recon_cdbk_spectra \
-           or self.plot_embd_map or self.plot_embd_latent_distrib:
+        if self.recon_img or self.recon_flat_trans or \
+           self.plot_embed_map or self.plot_latent_embed:
             self.group_tasks.append("infer_all_coords_full_model")
 
         if self.recon_cdbk_spectra:
@@ -217,23 +218,30 @@ class AstroInferrer(BaseInferrer):
             #if self.recon_flat_trans_now: self.num_bands = 1
             self.recon_pixels = []
 
-        if self.plot_embd_map:
-            self.embd_ids = []
+        if self.plot_embed_map:
+            self.embed_ids = []
 
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
-        self.infer_all_coords(model_id, checkpoint)
+        epoch = checkpoint["epoch_trained"]
+        model_state = checkpoint["model_state_dict"]
+        self.infer_all_coords(model_id, model_state)
+        if self.plot_latent_embed:
+            plot_latent_embed(epoch, self.latent_dir, self.latent_embed_dir, model_state)
 
     def post_checkpoint_all_coords_full_model(self, model_id):
         if self.recon_img:
             re_args = {
-                "fname": str(model_id),
+                "fname": model_id,
                 "dir": self.recon_dir,
                 "metric_options": self.metric_options,
                 "verbose": self.verbose,
+                "num_bands": self.extra_args["num_bands"],
+                "log_max": True,
+                "save_locally": True,
+                "plot_func": plot_horizontally,
+                "zscale": True,
                 "to_HDU": self.to_HDU_now,
-                "recon_HSI": self.recon_HSI_now,
                 "calculate_metrics": self.calculate_metrics,
-                "recon_norm": self.extra_args["recon_norm"],
                 "recon_flat_trans": self.recon_flat_trans_now
             }
             cur_metrics, cur_metrics_zscale = self.dataset.restore_evaluate_tiles(
@@ -241,25 +249,37 @@ class AstroInferrer(BaseInferrer):
 
             if self.calculate_metrics:
                 # add metrics for current checkpoint
-                self.metrics = np.concatenate((self.metrics, cur_metrics), axis=1)
-                self.metrics_zscale = np.concatenate((self.metrics_zscale, cur_metrics_zscale), axis=1)
+                self.metrics = np.concatenate((self.metrics, cur_metrics[:,None]), axis=1)
+                self.metrics_zscale = np.concatenate((
+                    self.metrics_zscale, cur_metrics_zscale[:,None]), axis=1)
 
-        if self.plot_embd_map:
-            self.plot_embd_map()
+        if self.plot_embed_map:
+            re_args = {
+                "fname": model_id,
+                "dir": self.embed_map_dir,
+                "verbose": self.verbose,
+                "num_bands": 1,
+                "log_max": False,
+                "save_locally": True,
+                "plot_func": plot_embed_map,
+                "zscale": False,
+                "to_HDU": False,
+                "calculate_metrics": False,
+            }
+            _, _ = self.dataset.restore_evaluate_tiles(self.embed_ids, **re_args)
 
     def pre_checkpoint_selected_coords_partial_model(self, model_id):
         self.reset_dataloader()
         self.recon_spectra = []
 
     def run_checkpoint_selected_coords_partial_model(self, model_id, checkpoint):
-        self.infer_spectra(model_id, checkpoint)
+        self.infer_spectra(model_id, checkpoint["model_state_dict"])
 
     def post_checkpoint_selected_coords_partial_model(self, model_id):
         self.recon_spectra = torch.stack(self.recon_spectra).view(
             self.dataset.get_num_gt_spectra(),
             self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()
-        #print(self.recon_spectra.shape)
 
         self.dataset.plot_spectrum(self.spectra_dir, model_id, self.recon_spectra)
         #self.calculate_recon_spectra_pixel_values()
@@ -269,7 +289,7 @@ class AstroInferrer(BaseInferrer):
         self.recon_cdbk_spectra(model_id, checkpoint)
 
     def run_checkpoint_all_coords_modified_model(self, model_id, checkpoint):
-        self.recon_cdbk_spectra(model_id, checkpoint)
+        self.recon_cdbk_spectra(model_id, checkpoint["model_state_dict"])
 
     def post_checkpoint_all_coords_modified_model(self, model_id):
         pass
@@ -292,38 +312,16 @@ class AstroInferrer(BaseInferrer):
             try:
                 data = self.next_batch()
                 with torch.no_grad():
-                    ret = forward(self, self.full_pipeline, data, self.quantize_latent,
-                                  self.plot_embd_map, False)
+                    ret = forward(
+                        self, self.full_pipeline, data,
+                        False, False, False, self.plot_embed_map)
+
                 if self.recon_img: self.recon_pixels.extend(ret["intensity"])
-                if self.plot_embd_map: self.embd_ids.extend(ret["embd_ids"])
+                if self.plot_embed_map: self.embed_ids.extend(ret["min_embed_ids"])
 
             except StopIteration:
                 log.info("all coords inferrence done")
                 break
-
-    def plot_embd_map(self):
-        if self.plot_embd_map: embd_map_fname = self.embd_map_fname
-
-        for fits_id in self.fits_ids:
-            metrics = np.zeros((len(self.metric_options), 0, self.num_bands))
-            metrics_zscale = np.zeros((len(self.metric_options), 0, self.num_bands))
-
-            # plot residue map between recon and gt
-            if self.plot_residue_heatmap:
-                gt_fname = class_obj.gt_imgs_fnames[id]
-
-                resid = class_obj.gt_imgs[fits_id] - recon
-                fname = join(recon_dir, f"resid_{model_id}.png")
-                heat_all(resid, fn=fname)
-
-        #if self.plot_embd_map:
-        sz = int(np.sqrt(num_pixels))
-        embd_ids = np.array(embd_ids).reshape((sz, sz))
-        plt.imshow(embd_ids, cmap="gray")
-        plt.savefig(embd_map_fn)
-        plt.close()
-        np.save(embd_map_fn, embd_ids)
-        plot_embd_map(embd_ids, embd_map_fn)
 
     #############
     # Infer spectra
@@ -338,13 +336,12 @@ class AstroInferrer(BaseInferrer):
                 data = self.next_batch()
                 with torch.no_grad():
                     spectra = forward(
-                        self, self.partial_pipeline, data, self.quantize_latent,
-                        self.plot_embd_map, False)["intensity"]
+                        self, self.partial_pipeline, data,
+                        False, False, False, False)["intensity"]
 
                 if spectra.ndim == 3: # bandwise
                     spectra = spectra.flatten(1,2) # [bsz,nsmpl]
                 self.recon_spectra.extend(spectra)
-                #print('generated spectra',spectra.shape)
 
             except StopIteration:
                 log.info("spectra inferrence done")

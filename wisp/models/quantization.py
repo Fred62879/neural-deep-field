@@ -15,6 +15,7 @@ class LatentQuantizer(nn.Module):
     def __init__(self, qtz_latent_dim, qtz_num_embed, qtz_beta, qtz_calculate_loss, qtz_seed, **kwargs):
         super(LatentQuantizer, self).__init__()
 
+        self.kwargs = kwargs
         self.beta = qtz_beta
         self.num_embed = qtz_num_embed
         self.latent_dim = qtz_latent_dim
@@ -50,8 +51,13 @@ class LatentQuantizer(nn.Module):
             torch.mean((z_q - z.detach())**2) * self.beta
         return codebook_loss
 
-    def forward(self, input):
-        z, scaler, redshift = data["latents"], data["scaler"], data["redshift"]
+    def forward(self, dataholder, ret, **kwargs):
+        """ Quantiza latent variables
+            @Param
+              dataholder: temporarily holds return data.
+              ret: return data from previous module (i.e. nef).
+        """
+        z, scaler, redshift = ret["latents"], ret["scaler"], ret["redshift"]
         if self.kwargs["print_shape"]: print('qtz ', z.shape)
 
         z_q, min_embed_ids = self.quantize(z)
@@ -61,11 +67,15 @@ class LatentQuantizer(nn.Module):
 
         # straight-through estimator
         z_q = z + (z_q - z).detach()
-        data["latents"] = z_q
-        data["codebook_loss"] = loss
-        data["min_embed_ids"] = min_embed_ids
-        #return dict(latents=z_q, scaler=scaler, redshift=redshift,
-        #            codebook_loss=loss, min_embed_ids=min_embed_ids)
+        if self.kwargs["print_shape"]: print('qtz, z_q ', z_q.shape)
+
+        ret["latents"] = z_q
+        if "codebook_loss" in kwargs["other_channels"]:
+            dataholder["codebook_loss"] = loss
+        if "latents" in kwargs["other_channels"]:
+            dataholder["latents_to_save"] = z
+        if "embed_ids" in kwargs["other_channels"]:
+            dataholder["min_embed_ids"] = min_embed_ids
 
 """
 class LatentQuantizer(nn.Module):

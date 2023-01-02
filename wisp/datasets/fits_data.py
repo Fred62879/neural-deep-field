@@ -607,31 +607,32 @@ class FITSData:
         verbose = re_args["verbose"]
 
         #if denorm_args is not None: recon_tile *= denorm_args
-        recon_max = np.round(np.max(recon_tile, axis=(1,2)), 1)
-        if verbose: log.info(f"recon. pixel max {recon_max}")
-
-        # save locally
-        np_fname = join(dir, f"{fits_id}_{fname}.npy")
-        #if restore_args["recon_norm"]: recon_fname += "_norm"
-        #if restore_args["recon_flat_trans"]: recon_fname += "_flat"
-        np.save(np_fname, recon_tile)
-
-        # generate fits file
-        if re_args["to_HDU"]:
-            fits_fname = join(dir, f"{fits_id}_{fname}.fits")
-            generate_hdu(class_obj.headers[fits_id], recon_tile, fits_fname)
-
         # if mask is not None: # inpaint: fill unmasked pixels with gt value
         #     recon = restore_unmasked(recon, np.copy(gt), mask)
         #     if fn is not None:
         #         np.save(fn + "_restored.npy", recon)
 
-        # plot recon tile
-        png_fname = join(dir, f"{fits_id}_{fname}.png")
-        zscale_ranges = self.get_zscale_ranges(fits_id)
-        plot_horizontally(recon_tile, png_fname, zscale_ranges=zscale_ranges)
+        if verbose and re_args["log_max"]:
+            recon_max = np.round(np.max(recon_tile, axis=(1,2)), 1)
+            log.info(f"recon. pixel max {recon_max}")
 
-        # calculate metrics
+        if re_args["save_locally"]:
+            np_fname = join(dir, f"{fits_id}_{fname}.npy")
+            #if restore_args["recon_norm"]: recon_fname += "_norm"
+            #if restore_args["recon_flat_trans"]: recon_fname += "_flat"
+            np.save(np_fname, recon_tile)
+
+        if re_args["to_HDU"]:
+            fits_fname = join(dir, f"{fits_id}_{fname}.fits")
+            generate_hdu(class_obj.headers[fits_id], recon_tile, fits_fname)
+
+        if "plot_func" in re_args:
+            png_fname = join(dir, f"{fits_id}_{fname}.png")
+            if re_args["zscale"]:
+                zscale_ranges = self.get_zscale_ranges(fits_id)
+                re_args["plot_func"](recon_tile, png_fname, zscale_ranges=zscale_ranges)
+            else: re_args["plot_func"](recon_tile, png_fname)
+
         if re_args["calculate_metrics"]:
             gt_fname = self.gt_img_fnames[fits_id] + ".npy"
             gt_tile = np.load(gt_fname)
@@ -652,7 +653,7 @@ class FITSData:
         cur_num_pixels = num_rows * num_cols
 
         cur_tile = np.array(pixels[num_pixels_acc : num_pixels_acc + cur_num_pixels]).T. \
-            reshape((self.num_bands, num_rows, num_cols))
+            reshape((re_args["num_bands"], num_rows, num_cols))
         cur_metrics, cur_metrics_zscale = self.evaluate(fits_id, cur_tile, **re_args)
         num_pixels_acc += cur_num_pixels
         return num_pixels_acc, cur_metrics, cur_metrics_zscale
@@ -689,9 +690,7 @@ class FITSData:
                 metrics = np.concatenate((metrics, cur_metrics), axis=1)
                 metrics_zscale = np.concatenate((metrics_zscale, cur_metrics_zscale), axis=1)
 
-        if metrics is not None and metrics_zscale is not None:
-            return metrics[:,None], metrics_zscale[:,None]
-        return None, None
+        return metrics, metrics_zscale
 
 # FITS class ends
 #################

@@ -105,33 +105,30 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
     #coords = reshape_coords(coords, args, infer=infer, spectrum=spectrum, coord_wave=coord_wave)
     return coords
 
-def forward(class_obj, pipeline, data, quantize_latent, plot_embd_map, spectra_supervision_train):
+def forward(class_obj, pipeline, data, spectra_supervision_train, save_spectra, save_latents, save_embed_ids):
+    net_args = {}
+    nef_channels = []
+    other_channels = []
+
     if class_obj.space_dim == 2:
-        requested_channels = {"intensity"}
-        #print("forward", data["coords"].shape)
-        net_args = {"coords": data["coords"].to(class_obj.device) }
+        nef_channels = ["intensity"]
+        net_args = {"coords": data["coords"] }
 
     elif class_obj.space_dim == 3:
-        # channels for nerf
-        requested_channels = ["latents"]
+        nef_channels = ["latents"]
         if class_obj.quantize_latent:
-            requested_channels.append("scaler")
-            requested_channels.append("redshift")
-        requested_channels = set(requested_channels)
+            nef_channels.extend(["scaler","redshift"])
+            other_channels.append("codebook_loss")
+        if save_spectra: other_channels.append("spectra")
+        if save_latents: other_channels.append("latents")
+        if save_embed_ids: other_channels.append("embed_ids")
 
-        trans_sample_method = class_obj.extra_args["trans_sample_method"]
-        if trans_sample_method == "hardcode":
-            net_args = {
-                "coords": data["coords"],
-                "trans": data["trans"]
-            }
-        elif trans_sample_method == "bandwise":
-            net_args = {
-                "coords": data["coords"].to(class_obj.device),
-                "wave": data["wave"].to(class_obj.device),
-                "trans": data["trans"].to(class_obj.device)
-            }
-        elif trans_sample_method == "mixture":
+        sample_method = class_obj.extra_args["trans_sample_method"]
+        if sample_method == "hardcode":
+            pass
+        elif sample_method == "bandwise":
+            pass
+        elif sample_method == "mixture":
             net_args = {
                 "coords": data["coords"], #.to(class_obj.device),
                 "wave":   data["wave"], #.to(class_obj.device),
@@ -140,13 +137,16 @@ def forward(class_obj, pipeline, data, quantize_latent, plot_embd_map, spectra_s
             }
         else: raise ValueError("Unrecognized transmission sampling method.")
 
+        net_args["spectra_supervision_train"] = spectra_supervision_train
         if spectra_supervision_train:
             net_args["full_wave"] = data["full_wave"]
-            net_args["spectra_supervision_train"] = True
             net_args["num_spectra_coords"] = data["num_spectra_coords"]
 
-    else: raise Exception("Unsupported space dimension.")
-    return pipeline(channels=requested_channels, **net_args)
+    else: raise ValueError("Unsupported space dimension.")
+
+    nef_channels = set(nef_channels)
+    other_channels = set(other_channels)
+    return pipeline(channels=nef_channels, other_channels=other_channels, **net_args)
 
 def load_partial_latent(model, pretrained_state, lo, hi):
     cur_state = model.state_dict()

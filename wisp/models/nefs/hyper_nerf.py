@@ -135,9 +135,7 @@ class NeuralHyperSpectral(BaseNeuralField):
         else:
             channels = ["latents"]
             if self.kwargs["quantize_latent"]:
-                channels.append("scaler")
-                channels.append("redshift")
-
+                channels.extend(["scaler","redshift"])
         self._register_forward_function( self.hyperspectral, channels )
 
     def hyperspectral(self, coords, pidx=None, lod_idx=None):
@@ -203,9 +201,12 @@ class NeuralHyperSpectral(BaseNeuralField):
                     scaler = latents[...,-1:]
                     latents = latents[...,:-1]
             else: redshift, scaler = None, None
-            return dict(latents=latents, scaler=scaler, redshift=redshift)
+            ret = dict(latents=latents, scaler=scaler, redshift=redshift)
 
-        intensity = self.decoder_intensity(feats)
-        intensity = self.norm(intensity)
+        else:
+            intensity = self.decoder_intensity(feats)
+            intensity = self.norm(intensity)
+            ret = dict(intensity=intensity)
+
         timer.check("rf_hyperspectral_decode")
-        return dict(intensity=intensity)
+        return ret

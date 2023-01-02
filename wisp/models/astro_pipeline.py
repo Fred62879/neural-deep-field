@@ -43,14 +43,16 @@ class AstroPipeline(nn.Module):
         self.hyper_decod: HyperSpectralDecoder = hyper_decod
 
     def forward(self, *args, **kwargs):
+        #print(kwargs["channels"],kwargs["other_channels"])
+        dataholder = {}
         ret = self.nef(*args, **kwargs)
 
         # quantize latent variables
         if self.quantz is not None:
-            ret = self.quantz(ret)
+            self.quantz(dataholder, ret, **kwargs)
 
         # convert RA/DEC latents to hyperspectral intermediates and decode
         if self.hyper_decod is not None:
-            ret = self.hyper_decod(ret, **kwargs)
+            ret = self.hyper_decod(dataholder, ret, **kwargs)
 
         return ret

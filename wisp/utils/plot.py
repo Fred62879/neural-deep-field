@@ -20,50 +20,51 @@ def plot_save(fname, x, y):
     plt.savefig(fname);
     plt.close()
 
-def plot_latent_embedding(model_id, smpl_latent_dir, out_dir,
-                          model_dict=None, plot_latent_only=False):
-
+def plot_latent_embed(fname, latent_dir, out_dir, model_dict=None, plot_latent_only=False):
     # plot latent variables only
-    latent = np.load(join(smpl_latent_dir, str(model_id)+'.npy'))
+    latent = np.load(join(latent_dir, f"{fname}.npy"))
     latent = latent.reshape((-1,latent.shape[-1]))
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
     ax.scatter(latent[:,0],latent[:,1],latent[:,2],marker='v',color='orange')
-    out_fn = join(out_dir, str(model_id)+'_latent.png')
-    plt.savefig(out_fn)
+    png_fn = join(out_dir, f"latent_{fname}")
+    plt.savefig(png_fn)
     plt.close()
 
     if plot_latent_only: return
 
     assert(model_dict is not None)
     for n,p in model_dict.items():
-        if 'codebook' in n:
-            embd = p.T
+        if "grid" not in n and "codebook" in n:
+            embed = p.T
             break
-    embd = np.array(embd.cpu())
 
-    # plot embddings only
+    embed = np.array(embed.cpu())
+
+    # plot embeddings only
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
-    ax.scatter(embd[:,0],embd[:,1],embd[:,2],marker='o',color='blue')
-    out_fn = join(out_dir, str(model_id)+'_embd.png')
-    plt.savefig(out_fn)
+    ax.scatter(embed[:,0],embed[:,1],embed[:,2],marker='o',color='blue')
+    png_fname = join(out_dir, f"embed_{fname}.png")
+    plt.savefig(png_fname)
     plt.close()
 
     # plot embeddings with latent variables
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
-    ax.scatter(embd[:,0],embd[:,1],embd[:,2],marker='o',color='blue')
+    ax.scatter(embed[:,0],embed[:,1],embed[:,2],marker='o',color='blue')
     ax.scatter(latent[:,0],latent[:,1],latent[:,2],marker='v',color='orange')
-    out_fn = join(out_dir, str(model_id)+'.png')
-    plt.savefig(out_fn)
+    png_fname = join(out_dir, f"{fname}")
+    plt.savefig(png_fname)
     plt.close()
 
-def plot_embd_map(embd_ids, embd_map_fn):
-    num_ids = len(set(list(embd_ids.flatten())))
-    embd_ids = np.clip(embd_ids, 0, 255)
-    plt.imshow(embd_ids, cmap='gray',origin='lower')
-    plt.savefig(embd_map_fn)
+def plot_embed_map(embed_ids, embed_map_fn):
+    if embed_ids.ndim == 3:
+        embed_ids = embed_ids[0]
+    #num_ids = len(set(list(embd_ids.flatten())))
+    embed_ids = np.clip(embed_ids, 0, 255)
+    plt.imshow(embed_ids, cmap='gray',origin='lower')
+    plt.savefig(embed_map_fn)
     plt.close()
 
 def plot_zscale(ax, data, vmin, vmax):

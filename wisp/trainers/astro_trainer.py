@@ -13,6 +13,7 @@ import nvidia_smi
 import numpy as np
 import torch.nn as nn
 import logging as log
+import matplotlib.pyplot as plt
 
 from pathlib import Path
 from functools import partial
@@ -22,7 +23,7 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
 
 from wisp.datasets import default_collate
 from wisp.loss import spectra_supervision_loss
-from wisp.utils.plot import plot_gt_recon, plot_horizontally
+from wisp.utils.plot import plot_horizontally, plot_embed_map
 from wisp.utils.common import get_gpu_info, forward, sorted_nicely
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
@@ -126,8 +127,9 @@ class AstroTrainer(BaseTrainer):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         if self.verbose: log.info(f"logging to {self.log_dir}")
 
-        for cur_path, cur_pname, in zip(["recon_dir","model_dir","spectra_dir"],
-                                        ["train_recons","models","train_spectra"]):
+        for cur_path, cur_pname, in zip(
+                ["model_dir","recon_dir","spectra_dir","embed_map_dir","latent_dir"],
+                ["models","train_recons","train_spectra","train_embed_maps","latents"]):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -180,17 +182,18 @@ class AstroTrainer(BaseTrainer):
             Otherwise, randomly select 10% coords.
         """
         length = self.dataset.get_num_coords()
+        '''
         if self.use_all_pixels:
             self.dataset.set_dataset_length(length)
         else:
             self.dataset.set_dataset_length(int(length*0.1))
-
+        '''
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
-            batch_size=1, #self.batch_size,
+            batch_size=1,
             #collate_fn=default_collate,
             sampler=BatchSampler(
                 sampler_cls(self.dataset), batch_size=self.batch_size, drop_last=True),
@@ -352,7 +355,7 @@ class AstroTrainer(BaseTrainer):
             recon_spectra, embed_ids, latents = self.get_data_to_save(ret)
             if self.save_latents: self.latents.extend(latents)
             if self.plot_embed_map: self.embed_ids.extend(embed_ids)
-            if self.plot_spectra: self.smpl_spectra.extend(recon_spectra)
+            if self.plot_spectra: self.smpl_spectra.append(recon_spectra)
             if self.save_recon or self.save_cropped_recon: self.smpl_pixels.extend(recon_pixels)
 
     def post_step(self):
@@ -404,65 +407,6 @@ class AstroTrainer(BaseTrainer):
             log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
         log.info(log_text)
 
-    def save_local(self):
-        if self.save_latents:
-            fname = join(self.latent_dir, str(self.epoch))
-            np.save(fname, np.array(self.latents))
-
-        if self.plot_embed_map:
-            fname = join(self.embed_map_dir, str(self.epoch))
-            np.save(fname, np.array(self.embed_ids))
-
-        if self.save_recon or self.save_cropped_recon:
-            self.restore_evaluate_tiles()
-
-        if self.plot_spectra:
-            self.plot_spectrum()
-
-    def restore_evaluate_tiles(self):
-        self.smpl_pixels = torch.stack(self.smpl_pixels).detach().cpu().numpy()
-        re_args = {
-            "fname": self.epoch,
-            "dir": self.recon_dir,
-            "verbose": self.verbose,
-            "to_HDU": False,
-            "recon_HSI": False,
-            "recon_norm": False,
-            "recon_flat_trans": False,
-            "calculate_metrics": False
-        }
-        _, _ = self.dataset.restore_evaluate_tiles(self.smpl_pixels, **re_args)
-
-        if self.save_cropped_recon:
-            for i, fits_id in enumerate(self.extra_args["recon_cutout_fits_ids"]):
-                zscale_ranges = self.dataset.get_zscale_ranges(fits_id)
-
-                np_fname = join(self.recon_dir, f"{fits_id}_{self.epoch}.npy")
-                recon = np.load(np_fname) # [nbands,sz,sz]
-
-                for (size, (r,c)) in zip(self.extra_args["recon_cutout_sizes"][i],
-                                         self.extra_args["recon_cutout_start_pos"][i]):
-                    fname = join(self.recon_dir, f"{fits_id}_{r}_{c}_{size}")
-                    np.save(fname, recon[:,r:r+size,c:c+size])
-                    plot_horizontally(recon[:,r:r+size,c:c+size], fname, zscale_ranges=zscale_ranges)
-
-    def plot_spectrum(self):
-        self.spectra = torch.stack(self.spectra)
-
-        if not self.spectra_supervision:
-            # all spectra are collected (no duplications) and we need
-            #   only selected ones (incl. neighbours)
-            self.spectra = self.spectra[self.selected_spectra_ids]
-        else:
-            # we get all spectra at each batch (duplications), thus average over batches
-            self.spectra = torch.mean(self.spectra, dim=0)
-
-        self.spectra = self.spectra.detach().cpu().numpy().reshape((
-            self.dataset.get_num_gt_spectra(),
-            self.extra_args["spectra_neighbour_size"]**2, -1))
-
-        self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.spectra)
-
     def save_model(self):
         if self.extra_args["save_as_new"]:
             fname = f"model-ep{self.epoch}-it{self.iteration}.pth"
@@ -472,7 +416,7 @@ class AstroTrainer(BaseTrainer):
         if self.verbose: log.info(f"Saving model checkpoint to: {model_fname}")
 
         checkpoint = {
-            "epoch_trained": self.epoch - 1, # 0 based
+            "epoch_trained": self.epoch,
             "model_state_dict": self.pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
         }
@@ -481,9 +425,11 @@ class AstroTrainer(BaseTrainer):
 
     def calculate_loss(self, data):
         total_loss = 0
+        ret = forward(self, self.pipeline, data, self.spectra_supervision,
+                      self.save_data_to_local and self.plot_spectra,
+                      self.save_data_to_local and self.save_latents,
+                      self.save_data_to_local and self.plot_embed_map)
 
-        ret = forward(self, self.pipeline, data, self.quantize_latent,
-                      self.plot_embed_map, self.spectra_supervision)
         recon_pixels = ret["intensity"]
         gt_pixels = data["pixels"][0] #.to(self.device)
 
@@ -522,20 +468,107 @@ class AstroTrainer(BaseTrainer):
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss")
 
+        print(ret.keys())
         return total_loss, recon_pixels, ret
 
     def get_data_to_save(self, ret):
-        if self.plot_spectra:
-            recon_spectra = ret["spectra"][...,0]
-        else: recon_spectra = None
-
-        if self.quantize_latent:
-            if self.save_latents: latents = ret["latents"]
-            if self.plot_embed_map: embed_ids = ret["embed_ids"]
-        else:
-            embed_ids, latents = None, None
-
+        latents = None if not self.save_latents else ret["latents_to_save"]
+        embed_ids = None if not self.plot_embed_map else ret["min_embed_ids"]
+        recon_spectra = None if not self.plot_spectra else ret["spectra"][...,0]
         return recon_spectra, embed_ids, latents
+
+    def save_local(self):
+        if self.save_latents:
+            fname = join(self.latent_dir, str(self.epoch))
+            self.latents = torch.stack(self.latents).detach().cpu().numpy()
+            np.save(fname, self.latents)
+
+        if self.plot_embed_map:
+            self.plot_save_embed_map()
+
+        if self.save_recon or self.save_cropped_recon:
+            self.restore_evaluate_tiles()
+
+        if self.plot_spectra:
+            self.plot_spectrum()
+
+    def plot_save_embed_map(self):
+        """ Plot embed ids and save locally.
+            Needs to subtract embed ids for spectra coords, if any.
+              (During training, we add extra spectra coords, refer to
+               astro_datasampler for details)
+        """
+        self.embed_ids = torch.stack(self.embed_ids).detach().cpu().numpy()
+        re_args = {
+            "fname": self.epoch,
+            "dir": self.embed_map_dir,
+            "verbose": self.verbose,
+            "num_bands": 1,
+            "log_max": False,
+            "save_locally": False,
+            "plot_func": plot_embed_map,
+            "zscale": False,
+            "to_HDU": False,
+            "recon_flat_trans": False,
+            "calculate_metrics": False
+        }
+        _, _ = self.dataset.restore_evaluate_tiles(self.embed_ids, **re_args)
+        if self.save_cropped_recon:
+            self.save_cropped_recon_locally(**re_args)
+
+    def restore_evaluate_tiles(self):
+        self.smpl_pixels = torch.stack(self.smpl_pixels).detach().cpu().numpy()
+        re_args = {
+            "fname": self.epoch,
+            "dir": self.recon_dir,
+            "verbose": self.verbose,
+            "num_bands": self.extra_args["num_bands"],
+            "log_max": True,
+            "save_locally": True,
+            "plot_func": plot_horizontally,
+            "zscale": True,
+            "to_HDU": False,
+            "recon_flat_trans": False,
+            "calculate_metrics": False
+        }
+        _, _ = self.dataset.restore_evaluate_tiles(self.smpl_pixels, **re_args)
+        if self.save_cropped_recon:
+            self.save_cropped_recon_locally(**re_args)
+
+    def plot_spectrum(self):
+        self.smpl_spectra = torch.stack(self.smpl_spectra)
+
+        if not self.spectra_supervision:
+            # smpl_spectra [bsz,num_samples]
+            # all spectra are collected (no duplications) and we need
+            #   only selected ones (incl. neighbours)
+            self.smpl_spectra = self.smpl_spectra[self.selected_spectra_ids]
+        else:
+            # smpl_spectra [bsz,num_spectra_coords,num_sampeles]
+            # we get all spectra at each batch (duplications), thus average over batches
+            self.smpl_spectra = torch.mean(self.smpl_spectra, dim=0)
+
+        self.smpl_spectra = self.smpl_spectra.detach().cpu().numpy().reshape((
+            self.dataset.get_num_gt_spectra(),
+            self.extra_args["spectra_neighbour_size"]**2, -1))
+
+        self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra)
+
+    def save_cropped_recon_locally(self, **re_args):
+        for i, fits_id in enumerate(self.extra_args["recon_cutout_fits_ids"]):
+            if re_args["zscale_ranges"]:
+                zscale_ranges = self.dataset.get_zscale_ranges(fits_id)
+
+            np_fname = join(re_args["dir"], f"{fits_id}_{self.epoch}.npy")
+            recon = np.load(np_fname) # [nbands,sz,sz]
+
+            for (size, (r,c)) in zip(self.extra_args["recon_cutout_sizes"][i],
+                                     self.extra_args["recon_cutout_start_pos"][i]):
+                fname = join(re_args["dir"], f"{fits_id}_{r}_{c}_{size}")
+                np.save(fname, recon[:,r:r+size,c:c+size])
+                if re_args["zscale"]:
+                    plot_horizontally(recon[:,r:r+size,c:c+size], fname, zscale_ranges=zscale_ranges)
+                else: re_args["plot_func"](recon[:,r:r+size,c:c+size], fname)
 
     def validate(self):
         pass
