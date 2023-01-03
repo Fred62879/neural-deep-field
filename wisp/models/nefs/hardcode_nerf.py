@@ -32,4 +32,4 @@ class HardcodeNef(BaseNeuralField):
               {"indensity": torch.FloatTensor }:
                 - Output intensity tensor of shape [batch, num_samples, 3]
         """
-        return dict(latents=coords[0]) # **** replace
+        return dict(latents=coords)

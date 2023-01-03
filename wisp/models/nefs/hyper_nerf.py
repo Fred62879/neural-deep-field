@@ -141,7 +141,7 @@ class NeuralHyperSpectral(BaseNeuralField):
     def hyperspectral(self, coords, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
-              coords (torch.FloatTensor): tensor of shape [1, batch, num_samples, 2/3]
+              coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2/3]
               pidx (torch.LongTensor): SPC point_hierarchy indices of shape [batch].
                                        Unused in the current implementation.
               lod_idx (int): index into active_lods. If None, will use the maximum LOD.
@@ -158,10 +158,6 @@ class NeuralHyperSpectral(BaseNeuralField):
             batch, _ = coords.shape
         elif coords.ndim == 3:
             batch, num_samples, _ = coords.shape
-        elif coords.ndim == 4: # **** replace
-            _, _, num_samples, dim = coords.shape
-            coords = coords.view(-1,num_samples,dim)
-            batch = coords.shape[0]
         else:
             raise Exception("Wrong coordinate dimension.")
 

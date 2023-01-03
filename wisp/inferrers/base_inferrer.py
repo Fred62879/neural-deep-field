@@ -73,7 +73,7 @@ class BaseInferrer(ABC):
     def init_dataloader(self):
         self.infer_data_loader = DataLoader(
             self.dataset,
-            batch_size=1,
+            batch_size=None,
             sampler=BatchSampler(
                 SequentialSampler(self.dataset), batch_size=self.batch_size, drop_last=True),
             #pin_memory=True,

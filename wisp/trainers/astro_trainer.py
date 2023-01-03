@@ -94,10 +94,10 @@ class AstroTrainer(BaseTrainer):
                 self.recon_cutout_sizes is not None and self.recon_cutout_start_pos is not None
         else: self.save_cropped_recon = False
 
-        self.plot_spectra = "plot_spectra_during_train" in tasks
+        self.plot_spectra = self.space_dim == 3 and "plot_spectra_during_train" in tasks
 
         # latent quantization
-        self.quantize_latent = self.extra_args["quantize_latent"]
+        self.quantize_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
         if self.quantize_latent:
             self.plot_embed_map = "plot_embed_map_during_train" in tasks
             self.save_latents =  "save_latent_during_train" in tasks or "plot_latent_embed" in tasks
@@ -193,7 +193,7 @@ class AstroTrainer(BaseTrainer):
 
         self.train_data_loader = DataLoader(
             self.dataset,
-            batch_size=1,
+            batch_size=None,
             #collate_fn=default_collate,
             sampler=BatchSampler(
                 sampler_cls(self.dataset), batch_size=self.batch_size, drop_last=True),
@@ -434,7 +434,7 @@ class AstroTrainer(BaseTrainer):
                       save_embed_ids=self.save_data_to_local and self.plot_embed_map)
 
         recon_pixels = ret["intensity"]
-        gt_pixels = data["pixels"][0] #.to(self.device)
+        gt_pixels = data["pixels"] #.to(self.device)
 
         if self.extra_args["weight_train"]:
             weights = data["weights"] #.to(self.device)
@@ -452,7 +452,7 @@ class AstroTrainer(BaseTrainer):
         # ii) spectra loss
         spectra_loss, recon_spectra = 0, None
         if self.spectra_supervision:
-            gt_spectra = data["gt_spectra"][0] # **** replace
+            gt_spectra = data["gt_spectra"]
 
             # todo: efficiently slice spectra with different bound
             (lo, hi) = data["recon_wave_bound_ids"][0]

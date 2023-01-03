@@ -125,14 +125,14 @@ class HyperSpectralIntegrator(nn.Module):
         return res
 
     def dot_prod_mix(self, spectra, **kwargs):
-        trans = kwargs["trans"][0] # **** replace ***********
+        trans = kwargs["trans"]
         if trans.ndim == 2:   # infer
             dp = torch.einsum("ij,kj->ik", spectra, trans)
         elif trans.ndim == 3: # train
             dp = torch.einsum("ij,ilj->il", spectra, trans)
         else:
             raise Exception("wrong dimension of transmission when doing integration")
-        dp /= kwargs["nsmpl"][0] # *** replace ***********
+        dp /= kwargs["nsmpl"]
         return dp
 
     # @trapezoid

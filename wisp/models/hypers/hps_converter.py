@@ -60,13 +60,12 @@ class HyperSpectralConverter(nn.Module):
         """ Process wave (refshifting, embedding, if required) and
               combine with RA/DEC (original state or embedded) to hyperspectral latents.
             @Param
-              wave:    lambda values used for casting.   [1,bsz,num_samples,1]
+              wave:    lambda values used for casting.   [bsz,num_samples,1]
               latents: (original or embedded) 2D coords. [bsz,1,2 or coords_embed_dim]
             @Return
               hps_latents: ra/dec/wave coords
         """
         if self.kwargs["print_shape"]: print('hps_converter',latents.shape)
-        wave = wave[0] # [bsz,num_samples,1]  # **** replace
         num_samples = wave.shape[-2]
         coords_embed_dim = latents.shape[-1]
 

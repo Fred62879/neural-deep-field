@@ -132,7 +132,8 @@ class HyperSpectralDecoder(nn.Module):
             print('hps_decoder', spectra_redshift.shape)
 
         # generate hyperspectral latents
-        full_wave = net_args["full_wave"][:,None,:,None].tile(1,num_spectra_coords,1,1)
+        if self.kwargs["print_shape"]: print(net_args["full_wave"].shape)
+        full_wave = net_args["full_wave"][None,:,None].tile(num_spectra_coords,1,1)
         if self.kwargs["print_shape"]: print('hps_decoder, full wave', full_wave.shape)
         spectra_hps_latents = self.convert(full_wave, spectra_latents, redshift=spectra_redshift)
 
