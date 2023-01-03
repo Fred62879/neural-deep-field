@@ -10,11 +10,7 @@ global:
     #tasks: ['train','save_recon_during_train','infer','recon_img']
     #tasks: ['infer','recon_gt_spectra']
 
-    #tasks: ['train','hps_cube_fit','plot_embed_map_during_train','save_latent_during_train','save_recon_during_train','plot_spectra_during_train','spectra_supervision','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
-    #tasks: ['infer','recon_img','recon_gt_spectra']
-    #tasks: ['infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
-
-    tasks: ['train','save_recon_during_train','save_latent_during_train']
+    tasks: ['train','hps_cube_fit','plot_embed_map_during_train','save_latent_during_train','save_recon_during_train','plot_spectra_during_train','spectra_supervision','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
 
 optimizer:
     optimizer_type: 'adam'

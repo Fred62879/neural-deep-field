@@ -105,7 +105,14 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
     #coords = reshape_coords(coords, args, infer=infer, spectrum=spectrum, coord_wave=coord_wave)
     return coords
 
-def forward(class_obj, pipeline, data, spectra_supervision_train, save_spectra, save_latents, save_embed_ids):
+def forward(class_obj, pipeline, data,
+            quantize_latent=False,
+            calculate_codebook_loss=False,
+            spectra_supervision_train=False,
+            save_spectra=False,
+            save_latents=False,
+            save_embed_ids=False):
+
     net_args = {}
     nef_channels = []
     other_channels = []
@@ -116,9 +123,12 @@ def forward(class_obj, pipeline, data, spectra_supervision_train, save_spectra, 
 
     elif class_obj.space_dim == 3:
         nef_channels = ["latents"]
-        if class_obj.quantize_latent:
+        if quantize_latent:
             nef_channels.extend(["scaler","redshift"])
-            other_channels.append("codebook_loss")
+
+            if calculate_codebook_loss:
+                other_channels.append("codebook_loss")
+
         if save_spectra: other_channels.append("spectra")
         if save_latents: other_channels.append("latents")
         if save_embed_ids: other_channels.append("embed_ids")
@@ -201,8 +211,9 @@ def load_model(model, optimizer, modelDir, model_smpl_intvl, cuda, verbose):
             print("= start training from begining")
         return 0, -1, model, optimizer
 
-def load_layer_weights(checkpoint, layer_name):
+def load_layer_weights(checkpoint, layer_identifier):
     for n, p in checkpoint.items():
-        if layer_name in n:
+        #if layer_name in n:
+        if layer_identifier(n):
             return p
     assert(False)

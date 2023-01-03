@@ -111,7 +111,7 @@ def define_cmd_line_args():
                                        "save_latent_during_train","save_recon_during_train",
                                        "plot_spectra_during_train","infer_during_train",
                                        "infer","recon_img","recon_flat","recon_gt_spectra",
-                                       "recon_dummy_spectra","recon_cdbk_spectra",
+                                       "recon_dummy_spectra","recon_codebook_spectra",
                                        "plot_embed_map","plot_latent_embed","spectral_inpaint",
                                        "spatial_inpaint",])
     ###################

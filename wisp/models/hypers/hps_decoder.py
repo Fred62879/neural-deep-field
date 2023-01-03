@@ -174,10 +174,13 @@ class HyperSpectralDecoder(nn.Module):
 
         # still have latents to decode besides full wave training latents (e.g. spectra supervision)
         if data["latents"].shape[0] > 0:
-            hps_latents = self.convert(net_args["wave"], data["latents"], redshift=data["redshift"])
+            scaler = None if "scaler" not in data else data["scaler"]
+            redshift = None if "redshift" not in data else data["redshift"]
+
+            hps_latents = self.convert(net_args["wave"], data["latents"], redshift=redshift)
             if self.kwargs["print_shape"]: print('hps_decoder', hps_latents.shape)
 
-            spectra = self.reconstruct_spectra(hps_latents, data["scaler"])
+            spectra = self.reconstruct_spectra(hps_latents, scaler)
             if self.kwargs["print_shape"]: print('hps_decoder', spectra.shape)
 
             intensity = self.inte(spectra[...,0], **net_args)

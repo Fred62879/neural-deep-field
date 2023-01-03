@@ -43,7 +43,6 @@ class AstroPipeline(nn.Module):
         self.hyper_decod: HyperSpectralDecoder = hyper_decod
 
     def forward(self, *args, **kwargs):
-        #print(kwargs["channels"],kwargs["other_channels"])
         dataholder = {}
         ret = self.nef(*args, **kwargs)
 

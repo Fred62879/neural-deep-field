@@ -11,3 +11,4 @@ from .neural_sdf import *
 from .nerf import *
 from .spc_field import *
 from .hyper_nerf import *
+from .hardcode_nerf import *

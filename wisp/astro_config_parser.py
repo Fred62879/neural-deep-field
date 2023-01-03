@@ -78,9 +78,10 @@ def get_pipelines_from_config(args, tasks=[]):
             pipelines["partial"] = partial_pipeline
 
         # pipeline for codebook spectra inferrence
-        if "recon_cdbk_spectra" in tasks:
-            no_scale_decod = HyperSpectralDecoder(integrate=False, scale=False, **vars(args))
-            modified_pipeline = AstroPipeline(nef, quantz, no_scale_decod)
+        if "recon_codebook_spectra" in tasks:
+            hardcode_nef = HardcodeNef(**vars(args))
+            hps_decod = HyperSpectralDecoder(integrate=False, scale=False, **vars(args))
+            modified_pipeline = AstroPipeline(hardcode_nef, None, hps_decod)
             pipelines["modified"] = modified_pipeline
     else:
         raise ValueError(f"{args.dataset_type} unrecognized dataset_type")

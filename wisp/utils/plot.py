@@ -11,15 +11,6 @@ from astropy.visualization import ZScaleInterval
 from wisp.utils.numerical import calculate_sam_spectrum
 
 
-#######################
-# basic plotting funcs
-#######################
-
-def plot_save(fname, x, y):
-    plt.plot(x, y)
-    plt.savefig(fname);
-    plt.close()
-
 def plot_latent_embed(fname, latent_dir, out_dir, model_dict=None, plot_latent_only=False):
     # plot latent variables only
     latent = np.load(join(latent_dir, f"{fname}.npy"))
@@ -115,6 +106,13 @@ def plot_horizontally(img, png_fname, zscale_ranges=None):
     plot_one_row(fig, 1, num_bands, 0, img, vmins, vmaxs, num_bands, cal_z_range=cal_z_range)
     fig.tight_layout()
     plt.savefig(png_fname)
+    plt.close()
+
+
+# not used
+def plot_save(fname, x, y):
+    plt.plot(x, y)
+    plt.savefig(fname);
     plt.close()
 
 def sdss_rgb(imgs, bands, scales=None, m = 0.02):

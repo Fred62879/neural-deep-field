@@ -119,9 +119,9 @@ class AstroTrainer(BaseTrainer):
         length = self.dataset.get_num_coords()
 
         self.dataset.set_dataset_mode("train")
-        self.dataset.set_dataset_state("fits")
         self.dataset.set_dataset_length(length)
         self.dataset.set_dataset_fields(fields)
+        self.dataset.set_dataset_coords_source("fits")
 
     def set_log_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
@@ -425,10 +425,13 @@ class AstroTrainer(BaseTrainer):
 
     def calculate_loss(self, data):
         total_loss = 0
-        ret = forward(self, self.pipeline, data, self.spectra_supervision,
-                      self.save_data_to_local and self.plot_spectra,
-                      self.save_data_to_local and self.save_latents,
-                      self.save_data_to_local and self.plot_embed_map)
+        ret = forward(self, self.pipeline, data,
+                      quantize_latent=self.quantize_latent,
+                      calculate_codebook_loss=self.quantize_latent,
+                      spectra_supervision_train=self.spectra_supervision,
+                      save_spectra=self.save_data_to_local and self.plot_spectra,
+                      save_latents=self.save_data_to_local and self.save_latents,
+                      save_embed_ids=self.save_data_to_local and self.plot_embed_map)
 
         recon_pixels = ret["intensity"]
         gt_pixels = data["pixels"][0] #.to(self.device)
@@ -468,7 +471,7 @@ class AstroTrainer(BaseTrainer):
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss")
 
-        print(ret.keys())
+        #print(ret.keys())
         return total_loss, recon_pixels, ret
 
     def get_data_to_save(self, ret):

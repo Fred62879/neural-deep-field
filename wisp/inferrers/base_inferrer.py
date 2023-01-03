@@ -73,7 +73,7 @@ class BaseInferrer(ABC):
     def init_dataloader(self):
         self.infer_data_loader = DataLoader(
             self.dataset,
-            batch_size=1, #self.batch_size,
+            batch_size=1,
             sampler=BatchSampler(
                 SequentialSampler(self.dataset), batch_size=self.batch_size, drop_last=True),
             #pin_memory=True,
@@ -89,13 +89,12 @@ class BaseInferrer(ABC):
         return next(self.infer_data_loader_iter)
 
     def reset_dataloader(self):
-        """ Select dataset based on current inferrence task.
+        """ Configure dataset based on current inferrence task.
             Then re-init dataloader.
         """
         self._configure_dataset()
         self.init_dataloader()
         self.reset_data_iterator()
-        self.fits_ids = self.dataset.get_fits_ids()
 
     #############
     # Inferrence steps

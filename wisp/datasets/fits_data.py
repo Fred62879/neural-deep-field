@@ -56,13 +56,15 @@ class FITSData:
         self.require_coords = len(tasks.intersection({
             "train","recon_img","recon_flat",
             "spectra_supervision","recon_gt_spectra"})) != 0
+        #"recon_codebook_spectra"})) != 0
 
         self.require_weights = "train" in tasks and self.load_weights
         self.require_pixels = len(tasks.intersection({"train","recon_img"})) != 0
         self.require_masks = "train" in tasks and self.spectral_inpaint
 
         return self.require_coords or self.require_pixels or \
-            self.require_weights or self.require_masks
+            self.require_weights or self.require_masks or \
+            "recon_codebook_spectra" in tasks
 
     def init(self):
         """ Load all needed data. """

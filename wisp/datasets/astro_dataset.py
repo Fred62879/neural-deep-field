@@ -43,12 +43,13 @@ class AstroDataset(Dataset):
         """ Initializes the dataset.
             Load only needed data based on given tasks (in kwargs).
         """
+        self.data = {}
         self.fits_dataset = FITSData(self.root, self.device, **self.kwargs)
         self.trans_dataset = TransData(self.root, self.device, **self.kwargs)
         self.spectra_dataset = SpectraData(self.fits_dataset, self.trans_dataset,
                                            self.root, self.device, **self.kwargs)
         # randomly initialize
-        self.state = "fits"
+        self.coords_source = "fits"
         self.mode = "train"
         self.set_dataset_length(1000)
 
@@ -62,17 +63,20 @@ class AstroDataset(Dataset):
         """
         self.mode = mode
 
-    def set_dataset_state(self, state):
-        """ Set dataset state that controls:
+    def set_dataset_coords_source(self, coords_source):
+        """ Set dataset source of coords that controls:
               i) whether load fits coords ("fits") or spectra coords ("spectra")
         """
-        self.state = state
+        self.coords_source = coords_source
 
     def set_dataset_length(self, length):
         self.dataset_length = length
 
     def set_dataset_fields(self, fields):
         self.requested_fields = set(fields)
+
+    def set_hardcode_data(self, field, data):
+        self.data[field] = data
 
     ############
     # Getters
@@ -101,10 +105,12 @@ class AstroDataset(Dataset):
 
     def get_batched_data(self, field, idx):
         if field == "coords":
-            if self.state == "fits":
+            if self.coords_source == "fits":
                 data = self.fits_dataset.get_coords()
-            elif self.state == "spectra":
+            elif self.coords_source == "spectra":
                 data = self.spectra_dataset.get_spectra_coords()
+            else:
+                data = self.data[self.coords_source]
 
         elif field == "pixels":
             data = self.fits_dataset.get_pixels()
@@ -190,5 +196,6 @@ class AstroDataset(Dataset):
         """
         return self.fits_dataset.restore_evaluate_tiles(recon_pixels, **re_args)
 
-    def plot_spectrum(self, spectra_dir, name, recon_spectra):
-        self.spectra_dataset.plot_spectrum(spectra_dir, name, recon_spectra)
+    def plot_spectrum(self, spectra_dir, name, recon_spectra, save_spectra=False):
+        self.spectra_dataset.plot_spectrum(
+            spectra_dir, name, recon_spectra, save_spectra=save_spectra)
