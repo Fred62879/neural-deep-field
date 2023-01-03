@@ -317,9 +317,9 @@ class FITSData:
             log.info(f"train pixels max {pixel_max}")
             log.info(f"train pixels min {pixel_min}")
 
-        self.data["pixels"] = torch.FloatTensor(pixels).to(self.device)
+        self.data["pixels"] = torch.FloatTensor(pixels) #.to(self.device)
         if self.load_weights:
-            self.data["weights"] = torch.FloatTensor(weights).to(self.device)
+            self.data["weights"] = torch.FloatTensor(weights) #.to(self.device)
 
     ##############
     # Load coords
@@ -364,7 +364,7 @@ class FITSData:
             np.save(self.coords_fname, coords)
             np.save(self.coords_range_fname, np.array(coords_range))
 
-        self.data["coords"] = torch.FloatTensor(coords).to(self.device)[:,None]
+        self.data["coords"] = torch.FloatTensor(coords)[:,None] #.to(self.device)
 
     def get_mgrid_np(self, sidelen, lo=0, hi=1, dim=2, indexing='ij', flat=True):
         """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version).
@@ -372,7 +372,7 @@ class FITSData:
         arrays = tuple(dim * [np.linspace(lo, hi, num=sidelen)])
         mgrid = np.stack(np.meshgrid(*arrays, indexing=indexing), axis=-1)
         if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
-        self.data["coords"] = torch.FloatTensor(mgrid).to(self.device)[:,None]
+        self.data["coords"] = torch.FloatTensor(mgrid)[:,None] #.to(self.device)
 
     def get_mgrid_tensor(self, sidelen, lo=0, hi=1, dim=2, flat=True):
         """ Generates a flattened grid of (x,y,...) coords in [-1,1] (Tensor version).
@@ -380,7 +380,7 @@ class FITSData:
         tensors = tuple(dim * [torch.linspace(lo, hi, steps=sidelen)])
         mgrid = torch.stack(torch.meshgrid(*tensors), dim=-1)
         if flat: mgrid = mgrid.reshape(-1, dim)
-        self.data["coords"] = mgrid.to(self.device)[:,None]
+        self.data["coords"] = mgrid[:,None] #.to(self.device)
 
     #############
     # Mask creation

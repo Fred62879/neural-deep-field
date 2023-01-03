@@ -188,9 +188,8 @@ class AstroTrainer(BaseTrainer):
         else:
             self.dataset.set_dataset_length(int(length*0.1))
         '''
-        #if self.shuffle_dataloader: sampler_cls = RandomSampler
-        #else: sampler_cls = SequentialSampler
-        sampler_cls = SequentialSampler
+        if self.shuffle_dataloader: sampler_cls = RandomSampler
+        else: sampler_cls = SequentialSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
@@ -228,21 +227,21 @@ class AstroTrainer(BaseTrainer):
         # params.append({"params" : rest_params,
         #                "lr": self.lr})
 
-        # for name in params_dict:
-        #     if "grid" in name:
-        #         grid_params.append(params_dict[name])
-        #     else:
-        #         rest_params.append(params_dict[name])
+        for name in params_dict:
+            if "grid" in name:
+                grid_params.append(params_dict[name])
+            else:
+                rest_params.append(params_dict[name])
 
-        # params.append({"params" : grid_params,
-        #                "lr": self.lr * self.grid_lr_weight})
-        # params.append({"params" : rest_params,
-        #                "lr": self.hps_lr})
-        #self.optimizer = self.optim_cls(params, **self.optim_params)
+        params.append({"params" : grid_params,
+                       "lr": self.lr * self.grid_lr_weight})
+        params.append({"params" : rest_params,
+                       "lr": self.hps_lr})
+        self.optimizer = self.optim_cls(params, **self.optim_params)
 
-        self.optimizer = torch.optim.Adam(
-            self.pipeline.parameters(), lr=self.hps_lr,
-            betas=(0.5, 0.999), weight_decay=1e-5)
+        # self.optimizer = torch.optim.Adam(
+        #     self.pipeline.parameters(), lr=self.hps_lr,
+        #     betas=(0.5, 0.999), weight_decay=1e-5)
 
         print(self.optimizer)
 
@@ -449,7 +448,7 @@ class AstroTrainer(BaseTrainer):
 
         # i) reconstruction loss (taking inpaint into account)
         if self.spectral_inpaint:
-            mask = data["cur_mask"].to(self.device)
+            mask = data["cur_mask"] #.to(self.device)
             recon_loss = self.loss(gt_pixels, recon_pixels, mask)
         else:
             recon_loss = self.loss(gt_pixels, recon_pixels)
@@ -458,7 +457,7 @@ class AstroTrainer(BaseTrainer):
         # ii) spectra loss
         spectra_loss, recon_spectra = 0, None
         if self.spectra_supervision:
-            gt_spectra = data["gt_spectra"]
+            gt_spectra = data["gt_spectra"] #.to(self.device)
 
             # todo: efficiently slice spectra with different bound
             (lo, hi) = data["recon_wave_bound_ids"][0]

@@ -223,13 +223,13 @@ class SpectraData:
 
         # [num_coords,num_neighbours,1,2]
         self.data["gt_spectra_coords"] = torch.stack(all_coords).type(
-            torch.FloatTensor).to(self.device)[:,:,None]
+            torch.FloatTensor)[:,:,None] #.to(self.device)
         self.data["gt_spectra_coords"] = self.data["gt_spectra_coords"].view(-1,1,2)
 
         if self.spectra_supervision_train:
             n = self.kwargs["num_supervision_spectra"]
             self.data["supervision_spectra"] = torch.FloatTensor(
-                np.array(supervision_spectra)).to(self.device)[:n]
+                np.array(supervision_spectra))[:n] #.to(self.device)
 
     def load_plot_spectra_data(self):
         wave = []

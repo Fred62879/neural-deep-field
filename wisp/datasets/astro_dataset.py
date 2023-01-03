@@ -190,7 +190,7 @@ class AstroDataset(Dataset):
     ############
 
     def restore_evaluate_tiles(self, recon_pixels, **re_args):
-        """ Restore multiband image save locally and calculate metrics.
+        """ Restore flattened image, save locally and/or calculate metrics.
             @Return:
                metrics(_z): metrics of current model [n_metrics,1,ntiles,nbands]
         """

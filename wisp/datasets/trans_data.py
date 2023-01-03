@@ -248,7 +248,7 @@ class TransData:
         self.data["trans"] = trans
         self.data["integration"] = integration
         self.data["band_coverage_range"] = band_coverage_range
-        self.data["nsmpl_within_bands"] = torch.FloatTensor(nsmpl_within_bands).to(self.device)
+        self.data["nsmpl_within_bands"] = torch.FloatTensor(nsmpl_within_bands) #.to(self.device)
 
     def load_full_wave_trans(self):
         """ Load wave, trans, and distribution for mixture sampling.
@@ -282,10 +282,10 @@ class TransData:
             distrib /= len(distrib)
 
         self.data["full_wave"] = full_wave
-        self.data["distrib"] = torch.FloatTensor(distrib).to(self.device)
-        self.data["encd_ids"] = torch.FloatTensor(encd_ids).to(self.device)
-        self.data["full_trans"] = torch.FloatTensor(full_trans).to(self.device)
-        self.data["full_norm_wave"] = torch.FloatTensor(full_norm_wave).to(self.device)
+        self.data["distrib"] = torch.FloatTensor(distrib) #.to(self.device)
+        self.data["encd_ids"] = torch.FloatTensor(encd_ids) #.to(self.device)
+        self.data["full_trans"] = torch.FloatTensor(full_trans) #.to(self.device)
+        self.data["full_norm_wave"] = torch.FloatTensor(full_norm_wave) #.to(self.device)
 
     def load_sampling_trans_data(self):
         """ Get trans data depending on sampling method.
