@@ -4,10 +4,9 @@ import torch
 from wisp.models.grids import *
 from wisp.utils import PerfTimer
 from wisp.models.nefs import BaseNeuralField
-from wisp.models.decoders import BasicDecoder, Siren
-#from wisp.models.siren import Siren
 from wisp.models.activations import get_activation_class
 from wisp.models.layers import get_layer_class, Normalization
+from wisp.models.decoders import BasicDecoder, MLP_Relu, Siren
 from wisp.models.embedders import get_positional_embedder, RandGaus
 
 
@@ -107,16 +106,18 @@ class NeuralHyperSpectral(BaseNeuralField):
                 True, layer=get_layer_class(self.layer_type),
                 num_layers=self.num_layers+1,
                 hidden_dim=self.hidden_dim, skip=[])
+            '''
+            self.decoder_intensity = MLP_Relu(
+                input_dim, self.hidden_dim, output_dim,
+                self.num_layers, 0)
+            '''
 
         elif self.activation_type == "sin":
-            # self.decoder_intensity = Siren(
-            #     input_dim, output_dim, self.num_layers, self.hidden_dim,
-            #     self.kwargs["siren_first_w0"], self.kwargs["siren_hidden_w0"],
-            #     self.kwargs["siren_seed"], self.kwargs["siren_coords_scaler"],
-            #     self.kwargs["siren_last_linear"])
-            #dim_in, dim_hidden, dim_out, num_hidden_layers, last_linr, \
-            #first_w0, hidden_w0, coords_scaler, seed, float_tensor
-            self.decoder_intensity = Siren((2,256,5,3,False,24,6,8,0,torch.FloatTensor.cuda))
+            self.decoder_intensity = Siren(
+                input_dim, output_dim, self.num_layers, self.hidden_dim,
+                self.kwargs["siren_first_w0"], self.kwargs["siren_hidden_w0"],
+                self.kwargs["siren_seed"], self.kwargs["siren_coords_scaler"],
+                self.kwargs["siren_last_linear"])
 
         else: raise ValueError("Unrecognized decoder activation type.")
 
@@ -161,9 +162,10 @@ class NeuralHyperSpectral(BaseNeuralField):
         else:
             raise Exception("Wrong coordinate dimension.")
 
-        if self.kwargs["print_shape"]: print('hyper nef', coords.shape)
         timer.check("rf_hyperspectral_preprocess")
 
+        #print('coords range',torch.min(coords), torch.max(coords))
+        #print(coords.T)
         # embed 2D coords into high-dimensional vectors with PE or the grid
         if self.kwargs["coords_embed_method"] == "positional":
             feats = self.embedder(coords) # [bsz,num_samples,coords_embed_dim]
@@ -178,6 +180,9 @@ class NeuralHyperSpectral(BaseNeuralField):
             timer.check("rf_hyperspectra_interpolate")
         else:
             feats = coords
+        feats = feats.view(batch,-1)
+
+        if self.kwargs["print_shape"]: print('hyper nef, features',feats.shape)
 
         timer.check("rf_hyperspectral_embedding")
 

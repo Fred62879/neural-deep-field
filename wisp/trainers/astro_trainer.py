@@ -188,8 +188,9 @@ class AstroTrainer(BaseTrainer):
         else:
             self.dataset.set_dataset_length(int(length*0.1))
         '''
-        if self.shuffle_dataloader: sampler_cls = RandomSampler
-        else: sampler_cls = SequentialSampler
+        #if self.shuffle_dataloader: sampler_cls = RandomSampler
+        #else: sampler_cls = SequentialSampler
+        sampler_cls = SequentialSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
@@ -227,17 +228,22 @@ class AstroTrainer(BaseTrainer):
         # params.append({"params" : rest_params,
         #                "lr": self.lr})
 
-        for name in params_dict:
-            if "grid" in name:
-                grid_params.append(params_dict[name])
-            else:
-                rest_params.append(params_dict[name])
+        # for name in params_dict:
+        #     if "grid" in name:
+        #         grid_params.append(params_dict[name])
+        #     else:
+        #         rest_params.append(params_dict[name])
 
-        params.append({"params" : grid_params,
-                       "lr": self.lr * self.grid_lr_weight})
-        params.append({"params" : rest_params,
-                       "lr": self.hps_lr})
-        self.optimizer = self.optim_cls(params, **self.optim_params)
+        # params.append({"params" : grid_params,
+        #                "lr": self.lr * self.grid_lr_weight})
+        # params.append({"params" : rest_params,
+        #                "lr": self.hps_lr})
+        #self.optimizer = self.optim_cls(params, **self.optim_params)
+
+        self.optimizer = torch.optim.Adam(
+            self.pipeline.parameters(), lr=self.hps_lr,
+            betas=(0.5, 0.999), weight_decay=1e-5)
+
         print(self.optimizer)
 
     def train(self):
@@ -471,7 +477,6 @@ class AstroTrainer(BaseTrainer):
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss")
 
-        #print(ret.keys())
         return total_loss, recon_pixels, ret
 
     def get_data_to_save(self, ret):

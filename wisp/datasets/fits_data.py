@@ -72,7 +72,8 @@ class FITSData:
 
         if self.require_coords:
             self.get_world_coords_all_fits()
-            self.data["coords"] = self.get_coords()[:,None] # [num_pixels,1,2]
+            #self.get_mgrid_np(64)
+            #self.get_mgrid_tensor(64)
 
         if self.require_pixels:
             self.load_all_fits()
@@ -324,20 +325,6 @@ class FITSData:
     # Load coords
     ##############
 
-    def get_mgrid_tensor(self, sidelen, lo=0, hi=1, dim=2, flat=True):
-        """ Generates a flattened grid of (x,y,...) coords in [-1,1] (Tensor version)."""
-        tensors = tuple(dim * [torch.linspace(lo, hi, steps=sidelen)])
-        mgrid = torch.stack(torch.meshgrid(*tensors), dim=-1)
-        if flat: mgrid = mgrid.reshape(-1, dim)
-        return mgrid
-
-    def get_mgrid_np(self, sidelen, lo=0, hi=1, dim=2, indexing="ij", flat=True):
-        """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version)."""
-        arrays = tuple(dim * [np.linspace(lo, hi, num=sidelen)])
-        mgrid = np.stack(np.meshgrid(*arrays, indexing=indexing), axis=-1)
-        if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
-        return mgrid
-
     def get_world_coords_one_fits(self, id, fits_id):
         """ Get ra/dec coords from one fits file and normalize.
             pix2world calculate coords in x-y order
@@ -362,7 +349,10 @@ class FITSData:
         return coords
 
     def get_world_coords_all_fits(self):
-        """ Get ra/dec coord from all fits files and normalize. """
+        """ Get ra/dec coord from all fits files and normalize.
+            @Return
+              coords [num_pixels,1,2]
+        """
         if exists(self.coords_fname):
             log.info("Loading coords from cache.")
             coords = np.load(self.coords_fname)
@@ -374,7 +364,23 @@ class FITSData:
             np.save(self.coords_fname, coords)
             np.save(self.coords_range_fname, np.array(coords_range))
 
-        self.data["coords"] = torch.FloatTensor(coords).to(self.device)  # [num_pixels,2]
+        self.data["coords"] = torch.FloatTensor(coords).to(self.device)[:,None]
+
+    def get_mgrid_np(self, sidelen, lo=0, hi=1, dim=2, indexing='ij', flat=True):
+        """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version).
+        """
+        arrays = tuple(dim * [np.linspace(lo, hi, num=sidelen)])
+        mgrid = np.stack(np.meshgrid(*arrays, indexing=indexing), axis=-1)
+        if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
+        self.data["coords"] = torch.FloatTensor(mgrid).to(self.device)[:,None]
+
+    def get_mgrid_tensor(self, sidelen, lo=0, hi=1, dim=2, flat=True):
+        """ Generates a flattened grid of (x,y,...) coords in [-1,1] (Tensor version).
+        """
+        tensors = tuple(dim * [torch.linspace(lo, hi, steps=sidelen)])
+        mgrid = torch.stack(torch.meshgrid(*tensors), dim=-1)
+        if flat: mgrid = mgrid.reshape(-1, dim)
+        self.data["coords"] = mgrid.to(self.device)[:,None]
 
     #############
     # Mask creation
@@ -615,7 +621,11 @@ class FITSData:
         #         np.save(fn + "_restored.npy", recon)
 
         if verbose and re_args["log_max"]:
+            #recon_min = np.round(np.min(recon_tile, axis=(1,2)), 1)
+            #recon_mean = np.round(np.mean(recon_tile, axis=(1,2)), 1)
             recon_max = np.round(np.max(recon_tile, axis=(1,2)), 1)
+            #log.info(f"recon. pixel min {recon_min}")
+            #log.info(f"recon. pixel mean {recon_mean}")
             log.info(f"recon. pixel max {recon_max}")
 
         if re_args["save_locally"]:

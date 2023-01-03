@@ -7,7 +7,7 @@ import torch.nn as nn
 class Siren(nn.Module):
 
     def __init__(self, dim_in, dim_out, num_layers, dim_hidden, first_w0,
-                 hidden_w0, seed, coords_scaler, last_linear=False):
+                 hidden_w0, seed, coords_scaler, last_linear=True):
 
         super(Siren, self).__init__()
 
@@ -24,7 +24,7 @@ class Siren(nn.Module):
 
         last_seed = num_layers + 1 + seed
         if last_linear:
-            final_layer = Linr_Layer(dim_hidden, dim_out, hidden_w0, last_seed, float_tensor)
+            final_layer = Linr_Layer(dim_hidden, dim_out, hidden_w0, last_seed)
         else:
             final_layer = Sine_Layer(dim_hidden, dim_out, is_first=False,
                                      w0=hidden_w0, seed=last_seed)
@@ -58,10 +58,8 @@ class Sine_Layer(nn.Module):
         self.init_weights(seed)
 
     def init_weights(self, seed):
-        std = 1/self.dim_in if self.is_first \
-            else np.sqrt(6 / self.dim_in) / self.w0
-        w = torch.empty((self.dim_out, self.dim_in), dtype=torch.float)\
-                 .uniform_(-std, std)
+        std = 1/self.dim_in if self.is_first else np.sqrt(6 / self.dim_in) / self.w0
+        w = torch.empty((self.dim_out, self.dim_in), dtype=torch.float).uniform_(-std, std)
         self.linear.weight = nn.Parameter(w)
 
     def forward(self, input):
@@ -69,14 +67,13 @@ class Sine_Layer(nn.Module):
 
 class Linr_Layer(nn.Module):
 
-    def __init__(self, dim_hidden, dim_out, hidden_w0, seed, float_tensor):
+    def __init__(self, dim_hidden, dim_out, hidden_w0, seed):
         super(Linr_Layer, self).__init__()
 
         self.layer = nn.Linear(dim_hidden, dim_out)
         std = np.sqrt(6 / dim_hidden) / hidden_w0
         torch.manual_seed(seed)
-        w = torch.empty((dim_out, dim_hidden)).\
-            uniform_(-std, std).type(float_tensor)
+        w = torch.empty((dim_out, dim_hidden), dtype=torch.float).uniform_(-std, std)
         self.layer.weight = nn.Parameter(w)
 
     def forward(self, input):
