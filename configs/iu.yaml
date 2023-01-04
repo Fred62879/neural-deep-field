@@ -3,14 +3,15 @@ global:
     debug: False
     verbose: True
     print_shape: False
+    dataloader_drop_last: True
     exp_name: 'test-ngp-nerf'
 
     #tasks: ['infer','recon_img']
 
-    tasks: ['train','save_recon_during_train','infer','recon_img']
+    tasks: ['train','save_recon_during_train','save_spectra_during_train','spectra_supervision','infer','recon_img','recon_spectra']
     #tasks: ['infer','recon_gt_spectra']
 
-    #tasks: ['train','hps_cube_fit','plot_embed_map_during_train','save_latent_during_train','save_recon_during_train','plot_spectra_during_train','spectra_supervision','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
+    #tasks: ['train','plot_embed_map_during_train','save_latent_during_train','save_recon_during_train','plot_spectra_during_train','spectra_supervision','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
     #tasks: ['infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
 
 optimizer:
@@ -22,7 +23,7 @@ optimizer:
     hps_lr: 1e-5
 
 dataset:
-    space_dim: 2
+    space_dim: 3
     dataset_type: 'astro'
     load_fits_data_cache: True
     dataset_path: '../../data/pdr3'
@@ -77,11 +78,14 @@ net:
 nef:
     nef_type: 'NeuralHyperSpectral'
 
+    coords_embed_dim: 8000
+    coords_embed_method: 'none'
+
     # decoder
-    hidden_dim: 512 
-    num_layers: 3
+    hidden_dim: 64
+    num_layers: 1
     out_dim: 5
-    activation_type: "sin"
+    activation_type: "relu"
 
     siren_seed: 1
     siren_first_w0: 24
@@ -106,14 +110,12 @@ grid:
     codebook_bitwidth: 22
 
 hyperspectral:
-    coords_embed_dim: 8000
-    coords_embed_method: 'none'
-    wave_embed_dim: 1000
-    wave_embed_method: 'positional'
+    wave_embed_dim: 4
+    wave_embed_method: 'none'
     hps_combine_method: 'concat'
-    hps_decod_activation_type: 'relu'
-    hps_decod_num_layers: 1
-    hps_decod_hidden_dim: 64
+    hps_decod_activation_type: 'sin'
+    hps_decod_num_layers: 2
+    hps_decod_hidden_dim: 128
     hps_decod_layer_type: 'none'
     integration_method: 'dot_prod'
 
@@ -124,7 +126,7 @@ hyperspectral:
     hps_siren_last_linear: False
 
 qtz:
-    quantize_latent: True
+    quantize_latent: False
     generate_scaler: True
     generate_redshift: True
     qtz_latent_dim: 3
@@ -137,17 +139,18 @@ trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 8000
+    num_epochs: 4000
     batch_size: 4096 #16384
     valid_every: -1
-    save_every: 800
+    save_every: 400
     render_tb_every: -1
-    log_tb_every: 800
+    log_tb_every: 400
     log_gpu_every: -1
-    save_local_every: 800
+    save_local_every: 400
     save_as_new: True
-    #train_pixl_ratio_per_epoch: 1e-6
+    train_pixel_ratio: 1
     #masked_pixl_ratio_per_epoch: 1
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks']
 
     loss_cho: l1
     weight_train: False

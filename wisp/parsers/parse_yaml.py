@@ -101,8 +101,8 @@ def define_cmd_line_args():
     global_group.add_argument("--debug", action="store_true")
     global_group.add_argument("--verbose", action="store_true")
     global_group.add_argument("--print-shape", action="store_true")
+    global_group.add_argument("--dataloader-drop-last", action="store_true")
     global_group.add_argument("--exp-name", type=str, help="Experiment name.")
-    global_group.add_argument("--operations", nargs="+", type=str, choices=["train","infer"])
     global_group.add_argument("--detect-anomaly", action="store_true", help="Turn on anomaly detection.")
     global_group.add_argument("--perf", action="store_true", help="Use high-level profiling for the trainer.")
 
@@ -387,11 +387,12 @@ def define_cmd_line_args():
                              help="Log to cli gpu usage at every N epoch.")
     train_group.add_argument("--save-local-every", type=int, default=100,
                              help="Save data to local every N epoch.")
+    train_group.add_argument("--gpu-data", nargs="+", type=str,
+                             help="data fields that can be added to gpu.")
 
     train_group.add_argument("--loss-cho",type=str, choices=["l1","l2"])
-    # train_group.add_argument("--num_model_checkpoint", type=int, default=5)
-    # train_group.add_argument("--train_pixl_ratio_per_epoch", type=float, default=1,
-    #                          help="ratio of (unmasked) pixels used for training per epoch")
+    train_group.add_argument("--train-pixel-ratio", type=float, default=1,
+                             help="ratio of (unmasked) pixels used for training per epoch")
     # train_group.add_argument("--masked_pixl_ratio_per_epoch", type=float, default=1,
     #                          help="ratio of masked pixels used for spectral inpaint training per epoch")
 

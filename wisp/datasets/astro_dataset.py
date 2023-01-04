@@ -138,8 +138,7 @@ class AstroDataset(Dataset):
 
         # get all coords to plot all spectra (gt, dummy, incl. neighbours)
         # the first #num_supervision_spectra are gt coords for supervision
-        # **TODO** get only gt spectra coords used for supervision
-        # spectra_coords = self.spectra_dataset.get_supervision_spectra_coords()
+        # the others are forwarded only for spectrum plotting
         spectra_coords = self.spectra_dataset.get_spectra_coords()
         if "coords" in out:
             out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)

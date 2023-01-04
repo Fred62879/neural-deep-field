@@ -9,6 +9,8 @@ from wisp.models.layers import get_layer_class, Normalization
 from wisp.models.decoders import BasicDecoder, MLP_Relu, Siren
 from wisp.models.embedders import get_positional_embedder, RandGaus
 
+from wisp.models.test.mlp import PEMLP
+
 
 class NeuralHyperSpectral(BaseNeuralField):
     """ Model for encoding RA/DEC coordinates.
@@ -73,7 +75,9 @@ class NeuralHyperSpectral(BaseNeuralField):
         if self.space_dim == 3 and not self.kwargs["quantize_latent"]:
             return
 
-        if self.kwargs["coords_embed_method"] == "positional":
+        if self.kwargs["quantize_latent"]:
+            input_dim = 2
+        elif self.kwargs["coords_embed_method"] == "positional":
             assert(self.activation_type == "relu")
             input_dim = self.kwargs["coords_embed_dim"]
         elif self.kwargs["coords_embed_method"] == "grid":
@@ -91,7 +95,7 @@ class NeuralHyperSpectral(BaseNeuralField):
             output_dim = self.output_dim
 
         # intialize decoder
-        if self.space_dim == 3 and self.kwargs["quantize_latent"]:
+        if self.kwargs["quantize_latent"]:
             self.decoder_latent = BasicDecoder(
                 input_dim, output_dim,
                 get_activation_class(self.activation_type),
@@ -106,11 +110,11 @@ class NeuralHyperSpectral(BaseNeuralField):
                 True, layer=get_layer_class(self.layer_type),
                 num_layers=self.num_layers+1,
                 hidden_dim=self.hidden_dim, skip=[])
-            '''
+            """
             self.decoder_intensity = MLP_Relu(
                 input_dim, self.hidden_dim, output_dim,
                 self.num_layers, 0)
-            '''
+            """
 
         elif self.activation_type == "sin":
             self.decoder_intensity = Siren(
@@ -121,7 +125,16 @@ class NeuralHyperSpectral(BaseNeuralField):
 
         else: raise ValueError("Unrecognized decoder activation type.")
 
+        if not self.kwargs["quantize_latent"]:
+            self.norm = Normalization(self.kwargs["mlp_output_norm_method"])
+
+    '''
+    def init_decoder(self):
+        pe_args = (2, 8000, 1, 1, True, True, 0)
+        mlp_args = (8000, 512, 5, 3, 0)
+        self.decoder_intensity = PEMLP('rand_gaus', pe_args, mlp_args)
         self.norm = Normalization(self.kwargs["mlp_output_norm_method"])
+    '''
 
     def get_nef_type(self):
         return 'hyperspectral'
@@ -211,3 +224,10 @@ class NeuralHyperSpectral(BaseNeuralField):
 
         timer.check("rf_hyperspectral_decode")
         return ret
+
+        '''
+        intensity = self.decoder_intensity(coords[:,0])
+        intensity = self.norm(intensity)
+        ret = dict(intensity=intensity)
+        return ret
+        '''

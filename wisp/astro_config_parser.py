@@ -39,7 +39,7 @@ def get_optimizer_from_config(args):
 def get_dataset_from_config(args):
     """ Utility function to get the dataset from the parsed config. """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    transform = AddToDevice(device)
+    transform = None #AddToDevice(device)
     if args.dataset_type == 'astro':
         dataset = AstroDataset(device=device, transform=transform, **vars(args))
         dataset.init()

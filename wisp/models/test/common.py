@@ -24,8 +24,7 @@ class MLP_Relu(nn.Module):
 
     # input:  [bsz,(nsmpl,)pe_dim]
     # output: [bsz,(nsmpl,)num_bands]
-    def forward(self, input):
-        (coords, _) = input
+    def forward(self, coords):
         return self.model(coords)
 
 class Normalization(nn.Module):

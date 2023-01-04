@@ -8,9 +8,8 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from os.path import exists, join
 from wisp.inferrers import BaseInferrer
-from wisp.utils.common import forward, load_model_weights, load_layer_weights
-from wisp.utils.plot import plot_horizontally, plot_embed_map, \
-    plot_latent_embed
+from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_latent_embed
+from wisp.utils.common import add_to_device, forward, load_model_weights, load_layer_weights
 
 
 class AstroInferrer(BaseInferrer):
@@ -333,6 +332,8 @@ class AstroInferrer(BaseInferrer):
         while True:
             try:
                 data = self.next_batch()
+                add_to_device(data, self.extra_args["gpu_data"], self.device)
+
                 with torch.no_grad():
                     ret = forward(
                         self, self.full_pipeline, data,
@@ -357,6 +358,8 @@ class AstroInferrer(BaseInferrer):
         while True:
             try:
                 data = self.next_batch()
+                add_to_device(data, self.extra_args["gpu_data"], self.device)
+
                 with torch.no_grad():
                     spectra = forward(
                         self, self.partial_pipeline, data,
@@ -393,6 +396,8 @@ class AstroInferrer(BaseInferrer):
         while True:
             try:
                 data = self.next_batch()
+                add_to_device(data, self.extra_args["gpu_data"], self.device)
+
                 with torch.no_grad():
                     spectra = forward(
                         self, self.modified_pipeline, data,

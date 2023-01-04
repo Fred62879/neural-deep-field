@@ -257,9 +257,8 @@ class RandGaus(nn.Module):
 
     def randmz_weights(self, seed):
         torch.manual_seed(seed)
-        weight = torch.empty(self.pe_dim).normal_(mean=0.,std=self.sigma**2)
+        weight = torch.empty((self.pe_dim,1), dtype=torch.float).normal_(mean=0.,std=self.sigma**2)
         weight = 2 * torch.pi * self.omega * weight
-        weight = torch.FloatTensor(weight[:,None])
         return weight
 
     ''' input:  [bsz,(nsmpl,)dim]

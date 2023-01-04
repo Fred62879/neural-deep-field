@@ -22,14 +22,12 @@ class PEMLP(nn.Module):
 
     ''' @Param
           coords [bsz,(nsmpl,)dim]
-          covar [bsz,(nsmpl,)3] / None
         @Return
           output:[bsz,(nsmpl,)dim_out]
     '''
-    def forward(self, input):
-        (coords, covar) = input
-        encd_coords = self.encd([coords, covar])
-        return self.mlp([encd_coords, None])
+    def forward(self, coords):
+        encd_coords = self.encd(coords)
+        return self.mlp(encd_coords)
 
 class SIREN(nn.Module):
     # Siren mlp

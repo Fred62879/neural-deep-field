@@ -81,15 +81,6 @@ class SpectraData:
             return len(self.kwargs["gt_spectra_choices"])
         return 0
 
-    '''
-    def get_gt_spectra_coords(self):
-        """ Get coords of all (not only supervision) gt spectra.
-        """
-        if self.spectra_supervision_train:
-            return self.data["gt_spectra_coords"]
-        return None
-    '''
-
     def get_spectra_coords(self):
         """ Get coords of all selected spectra (gt & dummy, incl. neighbours).
         """

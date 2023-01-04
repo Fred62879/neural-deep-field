@@ -11,6 +11,11 @@ from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 
 
+def add_to_device(data, valid_fields, device):
+    for field in valid_fields:
+        if field in data:
+            data[field] = data[field].to(device)
+
 def sorted_nicely(list):
     """ Sort the given iterable in the way that humans expect."""
     convert = lambda text: int(text) if text.isdigit() else text
@@ -150,6 +155,8 @@ def forward(class_obj, pipeline, data,
         net_args["spectra_supervision_train"] = spectra_supervision_train
         if spectra_supervision_train:
             net_args["full_wave"] = data["full_wave"]
+
+            # num of coords for gt, dummy (incl. neighbours) spectra
             net_args["num_spectra_coords"] = data["num_spectra_coords"]
 
     else: raise ValueError("Unsupported space dimension.")

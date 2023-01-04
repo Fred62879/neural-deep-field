@@ -349,6 +349,7 @@ class BaseTrainer(ABC):
             self.timer.check('validate')
 
         if self.epoch < self.num_epochs:
+            self.iteration = 1
             self.epoch += 1
         else:
             self.scene_state.optimization.running = False

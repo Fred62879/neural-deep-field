@@ -234,14 +234,13 @@ class Rand_Gaus(nn.Module):
     def __init__(self, pe_args):
         super(Rand_Gaus, self).__init__()
 
-        (dim, pe_dim, omega, sigma, pe_bias, float_tensor, verbose, seed) = pe_args
+        (dim, pe_dim, omega, sigma, pe_bias, verbose, seed) = pe_args
 
         self.dim = dim
         self.omega = omega
         self.sigma = sigma
         self.bias = pe_bias
         self.pe_dim = pe_dim//2
-        self.float_tensor = float_tensor
 
         self.mappings = nn.ModuleList([self.init_mapping(i + seed)
                                        for i in range(dim)])
@@ -255,15 +254,14 @@ class Rand_Gaus(nn.Module):
 
     def randmz_weights(self, seed):
         torch.manual_seed(seed)
-        weight = torch.empty(self.pe_dim).normal_(mean=0.,std=self.sigma**2)
+        weight = torch.empty(self.pe_dim, dtype=torch.float).normal_(mean=0.,std=self.sigma**2)
         weight = 2 * torch.pi * self.omega * weight
-        return weight.reshape((self.pe_dim, 1)).type(self.float_tensor)
+        return weight.reshape((self.pe_dim, 1))
 
     ''' input:  [bsz,(nsmpl,)dim]
         output: [bsz,(nsmpl,)pe_dim]
     '''
-    def forward(self, input):
-        (coords, _) = input
+    def forward(self, coords):
         encd_coords = self.mappings[0](coords[...,0:1])
         for i in range(1,self.dim):
             encd_coords += self.mappings[i](coords[...,i:i+1])

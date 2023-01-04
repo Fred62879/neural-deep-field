@@ -36,7 +36,7 @@ class HyperSpectralDecoder(nn.Module):
             seed = 0
             embedder = RandGaus((1, pe_dim, omega, sigma, pe_bias, seed, False))
         else:
-            raise ValueError("Unrecognized wave embedding method.")
+            embedder = None
         return embedder
 
     def get_input_coords_dim(self):
@@ -50,18 +50,21 @@ class HyperSpectralDecoder(nn.Module):
             coords_dim = self.kwargs["feature_dim"]
             if self.kwargs["multiscale_type"] == 'cat':
                 coords_dim *= self.kwargs["num_lods"]
-        else: raise Exception("Cannot infer coords dimension.")
+        else:
+            coords_dim = 2
         return coords_dim
 
     def init_decoder(self):
         # encode ra/dec coords first and then combine with wave
         coords_dim = self.get_input_coords_dim()
 
-        if self.kwargs["hps_combine_method"] == "add":
-            assert(self.kwargs["wave_embed_dim"] == coords_dim)
-            input_dim = self.kwargs["wave_embed_dim"]
-        elif self.kwargs["hps_combine_method"] == "concat":
-            input_dim = self.kwargs["wave_embed_dim"] + coords_dim
+        if self.kwargs["wave_embed_method"] == "positional":
+            if self.kwargs["hps_combine_method"] == "add":
+                assert(self.kwargs["wave_embed_dim"] == coords_dim)
+                input_dim = self.kwargs["wave_embed_dim"]
+            elif self.kwargs["hps_combine_method"] == "concat":
+                input_dim = self.kwargs["wave_embed_dim"] + coords_dim
+
         else: # coords and wave are not embedded
             input_dim = 3
 
@@ -117,18 +120,19 @@ class HyperSpectralDecoder(nn.Module):
             **TODO** pass only supervision gt spectra here (get rid of non-supervision
               gt, and dummy coords).
         """
-        #num_spectra_coords = net_args["num_supervision_spectra_coords"] * self.spectra_neighbour_area
         num_spectra_coords = net_args["num_spectra_coords"]
+        has_scaler = "scaler" in data and data["scaler"] is not None
+        has_redshift = "redshift" in data and data["redshift"] is not None
 
         # get data that requires full wave
         spectra_latents = data["latents"][-num_spectra_coords:]
-        spectra_scaler = None if data["scaler"] is None else data["scaler"][-num_spectra_coords:]
-        spectra_redshift = None if data["redshift"] is None else data["redshift"][-num_spectra_coords:]
+        spectra_scaler = None if not has_scaler else data["scaler"][-num_spectra_coords:]
+        spectra_redshift = None if not has_redshift else data["redshift"][-num_spectra_coords:]
 
         if self.kwargs["print_shape"]: print('hps_decoder', spectra_latents.shape)
-        if self.kwargs["print_shape"] and data["scaler"] is not None:
+        if self.kwargs["print_shape"] and spectra_scaler is not None:
             print('hps_decoder', spectra_scaler.shape)
-        if self.kwargs["print_shape"] and data["redshift"] is not None:
+        if self.kwargs["print_shape"] and spectra_redshift is not None:
             print('hps_decoder', spectra_redshift.shape)
 
         # generate hyperspectral latents
@@ -142,8 +146,8 @@ class HyperSpectralDecoder(nn.Module):
 
         # leave only latents that require sampled wave
         data["latents"] = data["latents"][:-num_spectra_coords]
-        if data["scaler"] is not None: data["scaler"] = data["scaler"][:-num_spectra_coords]
-        if data["redshift"] is not None: data["redshift"] = data["redshift"][:-num_spectra_coords]
+        if has_scaler:   data["scaler"]   = data["scaler"][:-num_spectra_coords]
+        if has_redshift: data["redshift"] = data["redshift"][:-num_spectra_coords]
 
     def forward(self, dataholder, data, **net_args):
         """ @Param
