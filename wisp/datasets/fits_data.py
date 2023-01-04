@@ -53,9 +53,8 @@ class FITSData:
         """ Find all required data based on given self.tasks. """
         tasks = set(tasks)
 
-        self.require_coords = len(tasks.intersection({
-            "train","recon_img","recon_flat",
-            "spectra_supervision","recon_gt_spectra"})) != 0
+        self.require_coords = self.kwargs["spectra_supervision"] or len(tasks.intersection({
+            "train","recon_img","recon_flat","recon_gt_spectra"})) != 0
         #"recon_codebook_spectra"})) != 0
 
         self.require_weights = "train" in tasks and self.load_weights

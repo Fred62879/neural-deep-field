@@ -9,10 +9,8 @@ from wisp.models.layers import get_layer_class, Normalization
 from wisp.models.decoders import BasicDecoder, MLP_Relu, Siren
 from wisp.models.embedders import get_positional_embedder, RandGaus
 
-from wisp.models.test.mlp import PEMLP
 
-
-class NeuralHyperSpectral(BaseNeuralField):
+class AstroNerf(BaseNeuralField):
     """ Model for encoding RA/DEC coordinates.
         In hyperspectral setup, output is embedded latent variables.
         Otherwise, output is decoded pixel intensities.
@@ -23,8 +21,6 @@ class NeuralHyperSpectral(BaseNeuralField):
         Usage:
           2D: embedding (positional/grid) -- relu -- sinh
               no embedding -- siren
-          3D: embedding (positional/grid)
-              no embedding
     """
 
     def init_embedder(self):
@@ -71,13 +67,7 @@ class NeuralHyperSpectral(BaseNeuralField):
     def init_decoder(self):
         """ Initializes the decoder object.
         """
-        # hyperspectral setup w.o/ quantization doesn't need decoder
-        if self.space_dim == 3 and not self.kwargs["quantize_latent"]:
-            return
-
-        if self.kwargs["quantize_latent"]:
-            input_dim = 2
-        elif self.kwargs["coords_embed_method"] == "positional":
+        if self.kwargs["coords_embed_method"] == "positional":
             assert(self.activation_type == "relu")
             input_dim = self.kwargs["coords_embed_dim"]
         elif self.kwargs["coords_embed_method"] == "grid":
@@ -87,34 +77,13 @@ class NeuralHyperSpectral(BaseNeuralField):
             assert(self.activation_type == "sin")
             input_dim = self.space_dim
 
-        # set decoder output dimension
-        if self.kwargs["quantize_latent"]:
-            output_dim = self.kwargs["qtz_latent_dim"] + \
-                self.kwargs["generate_scaler"] + self.kwargs["generate_redshift"]
-        else:
-            output_dim = self.output_dim
-
-        # intialize decoder
-        if self.kwargs["quantize_latent"]:
-            self.decoder_latent = BasicDecoder(
-                input_dim, output_dim,
-                get_activation_class(self.activation_type),
-                True, layer=get_layer_class(self.layer_type),
-                num_layers=self.num_layers+1,
-                hidden_dim=self.hidden_dim, skip=[])
-
-        elif self.activation_type == "relu":
+        if self.activation_type == "relu":
             self.decoder_intensity = BasicDecoder(
-                input_dim, output_dim,
+                input_dim, self.output_dim,
                 get_activation_class(self.activation_type),
                 True, layer=get_layer_class(self.layer_type),
                 num_layers=self.num_layers+1,
                 hidden_dim=self.hidden_dim, skip=[])
-            """
-            self.decoder_intensity = MLP_Relu(
-                input_dim, self.hidden_dim, output_dim,
-                self.num_layers, 0)
-            """
 
         elif self.activation_type == "sin":
             self.decoder_intensity = Siren(
@@ -125,22 +94,18 @@ class NeuralHyperSpectral(BaseNeuralField):
 
         else: raise ValueError("Unrecognized decoder activation type.")
 
-        if not self.kwargs["quantize_latent"]:
-            self.norm = Normalization(self.kwargs["mlp_output_norm_method"])
+        self.norm = Normalization(self.kwargs["mlp_output_norm_method"])
 
     def get_nef_type(self):
-        return 'hyperspectral'
+        return 'astro2d'
 
     def register_forward_functions(self):
         """ Register forward functions with the channels that they output.
-            For hyperspectral setup, we need latent embedding as output.
         """
         channels = ["intensity"]
-        if self.kwargs["quantize_latent"]:
-            channels.extend(["latents_to_save"])
         self._register_forward_function( self.hyperspectral, channels )
 
-    def hyperspectral(self, coords, wave, trans, nsmpl, rpidx=None, lod_idx=None):
+    def hyperspectral(self, coords, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
               coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2/3]
@@ -154,10 +119,16 @@ class NeuralHyperSpectral(BaseNeuralField):
         """
         timer = PerfTimer(activate=False, show_memory=True)
 
-        assert(coords.ndim == 3)
-        batch, num_samples, _ = coords.shape
+        if coords.ndim == 2:
+            batch, _ = coords.shape
+        elif coords.ndim == 3:
+            batch, num_samples, _ = coords.shape
+        else:
+            raise Exception("Wrong coordinate dimension.")
 
-        # embed 2D coords
+        timer.check("rf_hyperspectral_preprocess")
+
+        # embed 2D coords into high-dimensional vectors with PE or the grid
         if self.kwargs["coords_embed_method"] == "positional":
             feats = self.embedder(coords) # [bsz,num_samples,coords_embed_dim]
             timer.check("rf_hyperspectral_pe")
@@ -169,26 +140,13 @@ class NeuralHyperSpectral(BaseNeuralField):
             timer.check("rf_hyperspectra_interpolate")
         else:
             feats = coords
-        feats = feats.reshape(batch, num_samples, -1)
+        feats = feats.view(batch,-1)
 
-        if self.kwargs["quantize_latent"]:
-            latents = self.decoder_latent(feats)
-            if self.kwargs["generate_scaler"]:
-                if self.kwargs["generate_redshift"]:
-                    scaler = latents[...,-2:-1]
-                    redshift = latents[...,-1:]
-                    latents = latents[...,:-2]
-                else:
-                    redshift = None
-                    scaler = latents[...,-1:]
-                    latents = latents[...,:-1]
+        timer.check("rf_hyperspectral_embedding")
 
-            ret = self.quantz(ret, latents, scaler, redshift)
-            latents = ret["latents"]
-        else:
-            latents = feats
-            redshift, scaler = None, None
+        intensity = self.decoder_intensity(feats)
+        intensity = self.norm(intensity)
+        ret = dict(intensity=intensity)
 
-        ret = self.hyper_decod(dataholder, ret, **kwargs)
         timer.check("rf_hyperspectral_decode")
         return ret

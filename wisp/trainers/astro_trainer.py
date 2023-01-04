@@ -95,8 +95,8 @@ class AstroTrainer(BaseTrainer):
         self.save_recon = "save_recon_during_train" in tasks
         self.spectral_inpaint = self.space_dim == 3 and "spectral_inpaint" in tasks
         self.plot_spectra = self.space_dim == 3 and "plot_spectra_during_train" in tasks
-        self.spectra_supervision = self.space_dim == 3 and "spectra_supervision" in tasks
         self.quantize_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
+        self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
         self.plot_embed_map = self.quantize_latent and "plot_embed_map_during_train" in tasks
         self.save_latents =  self.quantize_latent and ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
 

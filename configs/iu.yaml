@@ -6,12 +6,13 @@ global:
     dataloader_drop_last: True
     exp_name: 'test-ngp-nerf'
 
+    #tasks: ['train','save_recon_during_train','infer','recon_img']
     #tasks: ['infer','recon_img']
 
-    tasks: ['train','save_recon_during_train','save_spectra_during_train','spectra_supervision','infer','recon_img','recon_spectra']
+    #tasks: ['train','save_recon_during_train','save_spectra_during_train','infer','recon_img','recon_spectra']
     #tasks: ['infer','recon_gt_spectra']
 
-    #tasks: ['train','plot_embed_map_during_train','save_latent_during_train','save_recon_during_train','plot_spectra_during_train','spectra_supervision','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
+    tasks: ['train','plot_embed_map_during_train','save_latent_during_train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
     #tasks: ['infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
 
 optimizer:
@@ -111,11 +112,11 @@ grid:
 
 hyperspectral:
     wave_embed_dim: 4
-    wave_embed_method: 'none'
+    wave_embed_method: 'positional'
     hps_combine_method: 'concat'
-    hps_decod_activation_type: 'sin'
-    hps_decod_num_layers: 2
-    hps_decod_hidden_dim: 128
+    hps_decod_activation_type: 'relu'
+    hps_decod_num_layers: 1
+    hps_decod_hidden_dim: 64
     hps_decod_layer_type: 'none'
     integration_method: 'dot_prod'
 
@@ -126,7 +127,7 @@ hyperspectral:
     hps_siren_last_linear: False
 
 qtz:
-    quantize_latent: False
+    quantize_latent: True
     generate_scaler: True
     generate_redshift: True
     qtz_latent_dim: 3
@@ -155,6 +156,7 @@ trainer:
     loss_cho: l1
     weight_train: False
     resume_train: False
+    spectra_supervision: False
     #resume_log_dir: '20221220-194546'
     #pretrained_model_name: 'model-ep800-it2.pth'
     train_use_all_wave: False

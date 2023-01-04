@@ -14,9 +14,9 @@ from astropy.convolution import convolve, Gaussian1DKernel
 
 class SpectraData:
     def __init__(self, fits_obj, trans_obj, dataset_path, device, **kwargs):
+        self.kwargs = kwargs
         if not self.require_any_data(kwargs["tasks"]): return
 
-        self.kwargs = kwargs
         self.device = device
         self.fits_obj = fits_obj
         self.trans_obj = trans_obj
@@ -26,9 +26,10 @@ class SpectraData:
 
     def require_any_data(self, tasks):
         tasks = set(tasks)
+        self.spectra_supervision_train = self.kwargs["spectra_supervision"]
+
         self.recon_gt_spectra = "recon_gt_spectra" in tasks
         self.recon_dummy_spectra = "recon_dummy_spectra" in tasks
-        self.spectra_supervision_train = "spectra_supervision" in tasks
         self.recon_codebook_spectra = "recon_codebook_spectra" in tasks
         return self.recon_gt_spectra or self.recon_dummy_spectra or \
             self.spectra_supervision_train or self.recon_codebook_spectra

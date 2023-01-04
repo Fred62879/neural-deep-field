@@ -32,11 +32,26 @@ class AstroPipeline(nn.Module):
         The 'Pipeline' classes are responsible for holding and orchestrating these components.
     """
 
-    def __init__(self, nef: BaseNeuralField):
+    def __init__(self, nef: BaseNeuralField,
+                 quantz: LatentQuantizer=None,
+                 hyper_decod: HyperSpectralDecoder=None):
 
         super().__init__()
 
         self.nef: BaseNeuralField = nef
+        self.quantz: LatentQuantizer = quantz
+        self.hyper_decod: HyperSpectralDecoder = hyper_decod
 
     def forward(self, *args, **kwargs):
-        return self.nef(*args, **kwargs)
+        dataholder = {}
+        ret = self.nef(*args, **kwargs)
+
+        # quantize latent variables
+        if self.quantz is not None:
+            self.quantz(dataholder, ret, **kwargs)
+
+        # convert RA/DEC latents to hyperspectral intermediates and decode
+        if self.hyper_decod is not None:
+            ret = self.hyper_decod(dataholder, ret, **kwargs)
+
+        return ret

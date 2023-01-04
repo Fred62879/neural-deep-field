@@ -107,7 +107,7 @@ def define_cmd_line_args():
     global_group.add_argument("--perf", action="store_true", help="Use high-level profiling for the trainer.")
 
     global_group.add_argument("--tasks", nargs="+", type=str,
-                              choices=["train","spectra_supervision","plot_embed_map_during_train",
+                              choices=["train","plot_embed_map_during_train",
                                        "save_latent_during_train","save_recon_during_train",
                                        "plot_spectra_during_train","infer_during_train",
                                        "infer","recon_img","recon_flat","recon_gt_spectra",
@@ -398,6 +398,7 @@ def define_cmd_line_args():
 
     train_group.add_argument("--weight-train", action="store_true")
     train_group.add_argument("--train-use-all-wave", action="store_true")
+    train_group.add_argument("--spectra-supervision", action="store_true")
     # train_group.add_argument("--cutout_based_train", action="store_true")
     train_group.add_argument("--resume-train", action="store_true")
     train_group.add_argument("--resume-log-dir", type=str)

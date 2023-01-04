@@ -1,4 +1,4 @@
-# (c) 2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
 #
 # NVIDIA CORPORATION & AFFILIATES and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -7,13 +7,11 @@
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
 import torch.nn as nn
-
 from wisp.models.nefs import BaseNeuralField
-from wisp.models.hypers import HyperSpectralDecoder
-from wisp.models.quantization import LatentQuantizer
+from wisp.tracers.base_tracer import BaseTracer
 
 
-class AstroPipeline(nn.Module):
+class Pipeline(nn.Module):
     """Base class for implementing neural field pipelines.
 
     Pipelines consist of several components:
@@ -29,14 +27,27 @@ class AstroPipeline(nn.Module):
         - A forward map (``self.tracer``) which is a function which will invoke the pipeline in
           some outer loop. Usually this consists of renderers which will output a RenderBuffer object.
 
-        The 'Pipeline' classes are responsible for holding and orchestrating these components.
+    The 'Pipeline' classes are responsible for holding and orchestrating these components.
     """
 
-    def __init__(self, nef: BaseNeuralField):
+    def __init__(self, nef: BaseNeuralField, tracer: BaseTracer = None):
+        """Initialize the Pipeline.
 
+        Args:
+            nef (nn.Module): Neural fields module.
+            tracer (nn.Module or None): Forward map module.
+        """
         super().__init__()
 
         self.nef: BaseNeuralField = nef
+        self.tracer: BaseTracer = tracer
 
     def forward(self, *args, **kwargs):
-        return self.nef(*args, **kwargs)
+        """The forward function will use the tracer (the forward model) if one is available.
+
+        Otherwise, it'll execute the neural field.
+        """
+        if self.tracer is not None:
+            return self.tracer(self.nef, *args, **kwargs)
+        else:
+            return self.nef(*args, **kwargs)
