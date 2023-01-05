@@ -76,19 +76,19 @@ dataset:
 net:
     #nef_type: 'AstroHyperSpectral'
     nef_type: 'AstroNerf'
-    coords_encode_method: 'positional'
-    wave_encode_method: 'positional'
+    coords_encode_method: 'none'
+    wave_encode_method: 'none'
     quantize_latent: True
     spectra_supervision: True
     mlp_output_norm_method: 'sinh'
 
 nef:
-    hidden_dim: 64
-    num_layers: 1
+    hidden_dim: 512
+    num_layers: 3
     out_dim: 5
-    activation_type: "relu"
+    activation_type: "sin"
 
-    siren_seed: 1
+    siren_seed: 0
     siren_first_w0: 24
     siren_hidden_w0: 6
     siren_coords_scaler: 8
@@ -150,7 +150,7 @@ trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 2000
+    num_epochs: 8000
     batch_size: 4096 #16384
     save_every: 400
     render_tb_every: -1

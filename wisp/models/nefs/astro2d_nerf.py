@@ -23,10 +23,11 @@ class AstroNerf(BaseNeuralField):
               no embedding -- siren
     """
     def __init__(self, **kwargs):
-        super(AstroNerf, self).__init__(**kwargs)
-
         self.kwargs = kwargs
         self.space_dim = kwargs["space_dim"]
+        self.num_bands = kwargs["num_bands"]
+
+        super(AstroNerf, self).__init__(**kwargs)
 
         self.init_encoder()
         self.init_decoder()
@@ -75,7 +76,7 @@ class AstroNerf(BaseNeuralField):
 
         elif self.activation_type == "sin":
             self.decoder = Siren(
-                input_dim, output_dim, self.num_layers, self.hidden_dim,
+                input_dim, self.num_bands, self.num_layers, self.hidden_dim,
                 self.kwargs["siren_first_w0"], self.kwargs["siren_hidden_w0"],
                 self.kwargs["siren_seed"], self.kwargs["siren_coords_scaler"],
                 self.kwargs["siren_last_linear"])
@@ -94,23 +95,22 @@ class AstroNerf(BaseNeuralField):
     def coords_to_pixel(self, coords, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
-              coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2/3]
+              coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2]
               pidx (torch.LongTensor): SPC point_hierarchy indices of shape [batch].
                                        Unused in the current implementation.
               lod_idx (int): index into active_lods. If None, will use the maximum LOD.
                              Currently interpolation doesn't use this.
             @Return
               {"indensity": torch.FloatTensor }:
-                - Output intensity tensor of shape [batch, num_samples, 3]
+                - Output intensity tensor of shape [batch, num_samples, num_bands]
         """
         timer = PerfTimer(activate=False, show_memory=True)
 
         batch, num_samples, _ = coords.shape
 
-        feats = self.coords_encoder(coords)
-        timer.check("rf_hyperspectral_encode")
+        coords = self.coords_encoder(coords)
 
-        intensity = self.decoder(feats)
+        intensity = self.decoder(coords).view(-1, self.num_bands)
         intensity = self.norm(intensity)
         timer.check("rf_hyperspectral_decode")
 

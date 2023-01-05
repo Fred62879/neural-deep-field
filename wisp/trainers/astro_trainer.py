@@ -167,8 +167,9 @@ class AstroTrainer(BaseTrainer):
     def init_dataloader(self):
         """ (Re-)Initialize dataloader.
         """
-        if self.shuffle_dataloader: sampler_cls = RandomSampler
-        else: sampler_cls = SequentialSampler
+        #if self.shuffle_dataloader: sampler_cls = RandomSampler
+        #else: sampler_cls = SequentialSampler
+        sampler_cls = SequentialSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
@@ -244,8 +245,8 @@ class AstroTrainer(BaseTrainer):
                     self.begin_epoch()
 
                 # we may not need to iterate thru all data at certain epochs
-                if self.iteration > self.num_iterations_cur_epoch:
-                    raise StopIteration
+                #if self.iteration > self.num_iterations_cur_epoch:
+                #    raise StopIteration
 
                 data = self.next_batch()
                 self.iteration += 1
@@ -478,6 +479,7 @@ class AstroTrainer(BaseTrainer):
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss")
         return total_loss, recon_pixels, ret
+        #return total_loss, gt_pixels, ret
 
     def log_cli(self):
         """ Controls CLI logging.
