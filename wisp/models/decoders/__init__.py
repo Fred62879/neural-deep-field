@@ -8,3 +8,4 @@
 
 from .siren import *
 from .basic_decoders import *
+from .quantized_decoder import *

@@ -6,14 +6,14 @@ global:
     dataloader_drop_last: True
     exp_name: 'test-ngp-nerf'
 
-    #tasks: ['train','save_recon_during_train','infer','recon_img']
+    tasks: ['train','save_recon_during_train','infer','recon_img']
     #tasks: ['infer','recon_img']
 
-    #tasks: ['train','save_recon_during_train','save_spectra_during_train','infer','recon_img','recon_spectra']
+    #tasks: ['train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
 
-    tasks: ['train','plot_embed_map_during_train','save_latent_during_train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
-    #tasks: ['infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed']
+    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra']
+    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed']
 
 optimizer:
     optimizer_type: 'adam'
@@ -24,7 +24,7 @@ optimizer:
     hps_lr: 1e-5
 
 dataset:
-    space_dim: 3
+    space_dim: 2
     dataset_type: 'astro'
     load_fits_data_cache: True
     dataset_path: '../../data/pdr3'
@@ -74,15 +74,15 @@ dataset:
     gt_spectra_choices: [0] #[1,2,3,4]
 
 net:
+    #nef_type: 'AstroHyperSpectral'
+    nef_type: 'AstroNerf'
+    coords_encode_method: 'positional'
+    wave_encode_method: 'positional'
+    quantize_latent: True
+    spectra_supervision: True
     mlp_output_norm_method: 'sinh'
 
 nef:
-    nef_type: 'NeuralHyperSpectral'
-
-    coords_embed_dim: 8000
-    coords_embed_method: 'none'
-
-    # decoder
     hidden_dim: 64
     num_layers: 1
     out_dim: 5
@@ -95,28 +95,48 @@ nef:
     siren_last_linear: True
 
 embedder:
-    embedder_type: 'positional'
+    coords_embed_bias: True
+    coords_embed_dim: 8000
+    coords_embed_omega: 1
+    coords_embed_sigma: 1
+
+    wave_embed_bias: True
+    wave_embed_dim: 4
+    wave_embed_omega: 1
+    wave_embed_sigma: 1
 
 grid:
     grid_dim: 2
     grid_type: 'HashGrid'
-    interpolation_type: 'linear'
-    multiscale_type: 'cat'
-    feature_dim: 2
-    feature_std: 0.01
-    num_lods: 10  # max / min = b**l
+    grid_interpolation_type: 'linear'
+    grid_multiscale_type: 'cat'
+    grid_feature_dim: 2
+    grid_feature_std: 0.01
+    grid_num_lods: 10  # max / min = b**l
     tree_type: 'geometric'
     min_grid_res: 1
     max_grid_res: 256
     codebook_bitwidth: 22
 
+qtz:
+    generate_scaler: True
+    generate_redshift: True
+
+    qtz_latent_dim: 3
+    qtz_num_embed: 4
+    qtz_beta: 0.1
+    qtz_seed: 1
+
+    qtz_decod_hidden_dim: 64
+    qtz_decod_num_hidden_layers: 1
+    qtz_decod_layer_type: 'none'
+    qtz_decod_activation_type: 'relu'
+
 hyperspectral:
-    wave_embed_dim: 4
-    wave_embed_method: 'positional'
     hps_combine_method: 'concat'
     hps_decod_activation_type: 'relu'
-    hps_decod_num_layers: 1
-    hps_decod_hidden_dim: 64
+    hps_decod_num_layers: 3
+    hps_decod_hidden_dim: 256
     hps_decod_layer_type: 'none'
     integration_method: 'dot_prod'
 
@@ -126,23 +146,12 @@ hyperspectral:
     hps_siren_coords_scaler: 8
     hps_siren_last_linear: False
 
-qtz:
-    quantize_latent: True
-    generate_scaler: True
-    generate_redshift: True
-    qtz_latent_dim: 3
-    qtz_num_embed: 4
-    qtz_beta: 0.1
-    qtz_calculate_loss: True
-    qtz_seed: 1
-
 trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 4000
+    num_epochs: 2000
     batch_size: 4096 #16384
-    valid_every: -1
     save_every: 400
     render_tb_every: -1
     log_tb_every: 400
@@ -156,7 +165,6 @@ trainer:
     loss_cho: l1
     weight_train: False
     resume_train: False
-    spectra_supervision: False
     #resume_log_dir: '20221220-194546'
     #pretrained_model_name: 'model-ep800-it2.pth'
     train_use_all_wave: False

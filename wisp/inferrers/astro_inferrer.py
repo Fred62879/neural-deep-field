@@ -41,10 +41,10 @@ class AstroInferrer(BaseInferrer):
 
         if "full" in pipelines:
             self.full_pipeline = pipelines["full"]
-        if "partial" in pipelines:
-            self.partial_pipeline = pipelines["partial"]
-        if "modified" in pipelines:
-            self.modified_pipeline = pipelines["modified"]
+        if "spectra_infer" in pipelines:
+            self.spectra_infer_pipeline = pipelines["spectra_infer"]
+        if "codebook" in pipelines:
+            self.codebook_pipeline = pipelines["codebook"]
 
         self.set_log_path()
         self.select_models()
@@ -352,8 +352,8 @@ class AstroInferrer(BaseInferrer):
                 break
 
     def infer_spectra(self, model_id, checkpoint):
-        load_model_weights(self.partial_pipeline, checkpoint)
-        self.partial_pipeline.eval()
+        load_model_weights(self.spectra_infer_pipeline, checkpoint)
+        self.spectra_infer_pipeline.eval()
 
         while True:
             try:
@@ -362,7 +362,7 @@ class AstroInferrer(BaseInferrer):
 
                 with torch.no_grad():
                     spectra = forward(
-                        self, self.partial_pipeline, data,
+                        self, self.spectra_infer_pipeline, data,
                         save_spectra=False,
                         save_latents=False,
                         save_embed_ids=False,
@@ -385,8 +385,8 @@ class AstroInferrer(BaseInferrer):
                 print("recon spectrum pixel", recon[args.spectrum_pos])
 
     def infer_codebook_spectra(self, model_id, checkpoint):
-        load_model_weights(self.modified_pipeline, checkpoint)
-        self.modified_pipeline.eval()
+        load_model_weights(self.codebook_pipeline, checkpoint)
+        self.codebook_pipeline.eval()
 
         codebook_latents = load_layer_weights(
             checkpoint, lambda n: "grid" not in n and "codebook" in n)
@@ -400,7 +400,7 @@ class AstroInferrer(BaseInferrer):
 
                 with torch.no_grad():
                     spectra = forward(
-                        self, self.modified_pipeline, data,
+                        self, self.codebook_pipeline, data,
                         save_spectra=False,
                         save_latents=False,
                         save_embed_ids=False,

@@ -60,7 +60,7 @@ class HyperSpectralIntegrator(nn.Module):
     def register_function(self):
         self.integrate = self.funcs[self.trans_sample_method][self.integration_method]
 
-    def forward(self, spectra, **kwargs):
+    def forward(self, spectra, trans, nsmpl):
         """ @Param
               spectra: [bsz,nsmpl]
               trans:   train [bsz,nbands,nsmpl]
@@ -70,20 +70,20 @@ class HyperSpectralIntegrator(nn.Module):
             @Return
               pixl_val [bsz,nbands]
         """
-        return self.integrate(spectra, **kwargs)
+        return self.integrate(spectra, trans, nsmpl)
 
     #############
     # Helper methods
     #############
 
-    def identity(self, spectra, **kwargs):
+    def identity(self, spectra, trans, nsmpl):
         return spectra
 
     # @dot product
-    def dot_prod_hdcd(self, spectra, **kwargs):
+    def dot_prod_hdcd(self, spectra, trans, nsmpl):
         return torch.einsum("ij,lj->il", spectra, kwargs["trans"]) / self.nsmpl
 
-    def dot_prod_nonuniform_bdws(self, spectra, **kwargs):
+    def dot_prod_nonuniform_bdws(self, spectra, trans, nsmpl):
         """ Wave is sampled according to the transmission function
               thus only need to sum up spectra values.
         """
@@ -119,46 +119,45 @@ class HyperSpectralIntegrator(nn.Module):
         res /= kwargs["nsmpl_within_each_band"]  # average pixel value
         return res
 
-    def dot_prod_bdws(self, spectra, **kwargs):
+    def dot_prod_bdws(self, spectra, trans, nsmpl):
         if self.unismpl: res = self.dot_prod_uniform_bdws(spectra, kwargs)
         else: res = self.dot_prod_nonuniform_bdws(spectra, kwargs)
         return res
 
-    def dot_prod_mix(self, spectra, **kwargs):
-        trans = kwargs["trans"]
+    def dot_prod_mix(self, spectra, trans, nsmpl):
         if trans.ndim == 2:   # infer
             dp = torch.einsum("ij,kj->ik", spectra, trans)
         elif trans.ndim == 3: # train
             dp = torch.einsum("ij,ilj->il", spectra, trans)
         else:
             raise Exception("wrong dimension of transmission when doing integration")
-        dp /= kwargs["nsmpl"]
+        dp /= nsmpl
         return dp
 
     # @trapezoid
-    def trapezoid_hdcd(self, spectra, **kwargs):
+    def trapezoid_hdcd(self, spectra, trans, nsmpl):
         return torch.stack([torch.trapezoid(spectra * trans)
                             for trans in transms]).T  / self.nsmpl
 
-    def trapezoid_bdws(self, spectra, **kwargs):
+    def trapezoid_bdws(self, spectra, trans, nsmpl):
         return torch.stack([torch.trapezoid(spectra[:,band] * trans[:,band])
                             for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]
 
-    def trapezoid_mix(self, spectra, **kwargs):
+    def trapezoid_mix(self, spectra, trans, nsmpl):
         return torch.stack([torch.trapezoid(spectra * kwargs["trans"][:,band])
                             for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]
     # @simpsons
-    def simpson_hdcd(self, spectra, **kwargs):
+    def simpson_hdcd(self, spectra, trans, nsmpl):
         # integration across all channels
         return torch.stack([self.simpson(spectra * trans)
                             for trans in transms]).T  / self.nsmpl
 
-    def simpson_bdws(self, spectra, **kwargs):
+    def simpson_bdws(self, spectra, trans, nsmpl):
         # integration across all channels
         return torch.stack([self.simpson(spectra[:,band] * trans[:,band])
                             for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]
 
-    def simpson_mix(self, spectra, **kwargs):
+    def simpson_mix(self, spectra, trans, nsmpl):
         # integration across all channels
         return torch.stack([self.simpson(spectra * kwargs["trans"][:,band])
                             for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]

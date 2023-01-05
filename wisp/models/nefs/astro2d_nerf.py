@@ -3,11 +3,11 @@ import torch
 
 from wisp.models.grids import *
 from wisp.utils import PerfTimer
+from wisp.models.encoders import Encoder
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.activations import get_activation_class
 from wisp.models.layers import get_layer_class, Normalization
 from wisp.models.decoders import BasicDecoder, MLP_Relu, Siren
-from wisp.models.embedders import get_positional_embedder, RandGaus
 
 
 class AstroNerf(BaseNeuralField):
@@ -22,55 +22,43 @@ class AstroNerf(BaseNeuralField):
           2D: embedding (positional/grid) -- relu -- sinh
               no embedding -- siren
     """
+    def __init__(self, **kwargs):
+        super(AstroNerf, self).__init__(**kwargs)
 
-    def init_embedder(self):
-        if self.kwargs["coords_embed_method"] != "positional": return
+        self.kwargs = kwargs
+        self.space_dim = kwargs["space_dim"]
 
-        pe_dim = self.kwargs["coords_embed_dim"]
-        sigma = 1
-        omega = 1
-        pe_bias = True
-        verbose = False
-        seed = 0
-        input_dim = 2
-        self.embedder = RandGaus((input_dim, pe_dim, omega, sigma, pe_bias, seed, verbose))
+        self.init_encoder()
+        self.init_decoder()
+        self.norm = Normalization(self.kwargs["mlp_output_norm_method"])
 
-    def init_grid(self):
-        """ Initialize the grid object. """
-        if self.kwargs["coords_embed_method"] != "grid": return
+        torch.cuda.empty_cache()
+        self._forward_functions = {}
+        self.register_forward_functions()
+        self.supported_channels = set([
+            channel for channels in self._forward_functions.values()
+            for channel in channels])
 
-        if self.grid_type == "OctreeGrid":
-            grid_class = OctreeGrid
-        elif self.grid_type == "CodebookOctreeGrid":
-            grid_class = CodebookOctreeGrid
-        elif self.grid_type == "TriplanarGrid":
-            grid_class = TriplanarGrid
-        elif self.grid_type == "HashGrid":
-            grid_class = HashGrid
-        else:
-            raise NotImplementedError
+    def init_encoder(self):
+        """ Initialize the encoder (positional encoding or grid interpolaton)
+              for both ra/dec coordinates and wave (lambda values).
+        """
+        coords_embedder_args = (
+            2, self.kwargs["coords_embed_dim"], self.kwargs["coords_embed_omega"],
+            self.kwargs["coords_embed_sigma"], self.kwargs["coords_embed_bias"],
+            self.kwargs["coords_embed_seed"])
 
-        self.grid = grid_class(
-            self.feature_dim, grid_dim=self.grid_dim,
-            base_lod=self.base_lod, num_lods=self.num_lods,
-            interpolation_type=self.interpolation_type,
-            multiscale_type=self.multiscale_type, **self.kwargs)
-
-        self.grid.init_from_geometric(
-            self.kwargs["min_grid_res"], self.kwargs["max_grid_res"], self.num_lods)
-
-        if self.multiscale_type == 'cat':
-            self.effective_feature_dim = self.grid.feature_dim * self.num_lods
-        else:
-            self.effective_feature_dim = self.grid.feature_dim
+        self.coords_encoder = Encoder(
+            encode_method=self.kwargs["coords_encode_method"],
+            embedder_args=coords_embedder_args, **self.kwargs)
 
     def init_decoder(self):
         """ Initializes the decoder object.
         """
-        if self.kwargs["coords_embed_method"] == "positional":
+        if self.kwargs["coords_encode_method"] == "positional":
             assert(self.activation_type == "relu")
             input_dim = self.kwargs["coords_embed_dim"]
-        elif self.kwargs["coords_embed_method"] == "grid":
+        elif self.kwargs["coords_encode_method"] == "grid":
             assert(self.activation_type == "relu")
             input_dim = self.effective_feature_dim
         else:
@@ -78,7 +66,7 @@ class AstroNerf(BaseNeuralField):
             input_dim = self.space_dim
 
         if self.activation_type == "relu":
-            self.decoder_intensity = BasicDecoder(
+            self.decoder = BasicDecoder(
                 input_dim, self.output_dim,
                 get_activation_class(self.activation_type),
                 True, layer=get_layer_class(self.layer_type),
@@ -86,15 +74,13 @@ class AstroNerf(BaseNeuralField):
                 hidden_dim=self.hidden_dim, skip=[])
 
         elif self.activation_type == "sin":
-            self.decoder_intensity = Siren(
+            self.decoder = Siren(
                 input_dim, output_dim, self.num_layers, self.hidden_dim,
                 self.kwargs["siren_first_w0"], self.kwargs["siren_hidden_w0"],
                 self.kwargs["siren_seed"], self.kwargs["siren_coords_scaler"],
                 self.kwargs["siren_last_linear"])
 
         else: raise ValueError("Unrecognized decoder activation type.")
-
-        self.norm = Normalization(self.kwargs["mlp_output_norm_method"])
 
     def get_nef_type(self):
         return 'astro2d'
@@ -103,9 +89,9 @@ class AstroNerf(BaseNeuralField):
         """ Register forward functions with the channels that they output.
         """
         channels = ["intensity"]
-        self._register_forward_function( self.hyperspectral, channels )
+        self._register_forward_function( self.coords_to_pixel, channels )
 
-    def hyperspectral(self, coords, pidx=None, lod_idx=None):
+    def coords_to_pixel(self, coords, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
               coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2/3]
@@ -119,34 +105,14 @@ class AstroNerf(BaseNeuralField):
         """
         timer = PerfTimer(activate=False, show_memory=True)
 
-        if coords.ndim == 2:
-            batch, _ = coords.shape
-        elif coords.ndim == 3:
-            batch, num_samples, _ = coords.shape
-        else:
-            raise Exception("Wrong coordinate dimension.")
+        batch, num_samples, _ = coords.shape
 
-        timer.check("rf_hyperspectral_preprocess")
+        feats = self.coords_encoder(coords)
+        timer.check("rf_hyperspectral_encode")
 
-        # embed 2D coords into high-dimensional vectors with PE or the grid
-        if self.kwargs["coords_embed_method"] == "positional":
-            feats = self.embedder(coords) # [bsz,num_samples,coords_embed_dim]
-            timer.check("rf_hyperspectral_pe")
-        elif self.kwargs["coords_embed_method"] == "grid":
-            if lod_idx is None:
-                lod_idx = len(self.grid.active_lods) - 1
-            feats = self.grid.interpolate(coords, lod_idx)
-            feats = feats.reshape(-1, self.effective_feature_dim)
-            timer.check("rf_hyperspectra_interpolate")
-        else:
-            feats = coords
-        feats = feats.view(batch,-1)
-
-        timer.check("rf_hyperspectral_embedding")
-
-        intensity = self.decoder_intensity(feats)
+        intensity = self.decoder(feats)
         intensity = self.norm(intensity)
-        ret = dict(intensity=intensity)
-
         timer.check("rf_hyperspectral_decode")
+
+        ret = dict(intensity=intensity)
         return ret

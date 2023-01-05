@@ -9,8 +9,6 @@
 import torch.nn as nn
 
 from wisp.models.nefs import BaseNeuralField
-from wisp.models.hypers import HyperSpectralDecoder
-from wisp.models.quantization import LatentQuantizer
 
 
 class AstroPipeline(nn.Module):

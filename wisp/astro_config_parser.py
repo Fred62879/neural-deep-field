@@ -8,11 +8,8 @@ import argparse
 
 from wisp.datasets import *
 from wisp.models.nefs import *
-from wisp.models.grids import *
-from wisp.models.hypers import *
 from wisp.models import AstroPipeline
 from wisp.datasets.transforms import *
-from wisp.models.quantization import LatentQuantizer
 from wisp.models.test import MLP_All
 
 
@@ -37,7 +34,8 @@ def get_optimizer_from_config(args):
     return optim_cls, optim_params
 
 def get_dataset_from_config(args):
-    """ Utility function to get the dataset from the parsed config. """
+    """ Utility function to get the dataset from the parsed config.
+    """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     transform = None #AddToDevice(device)
     if args.dataset_type == 'astro':
@@ -59,31 +57,20 @@ def get_pipelines_from_config(args, tasks=[]):
         pipelines["full"] = pipeline
 
     elif args.dataset_type == 'astro':
-        nef = globals()[args.nef_type](**vars(args))
-
-        quantz, hyper_decod = None, None
-        if args.space_dim == 3:
-            if args.quantize_latent:
-                quantz = LatentQuantizer(**vars(args))
-            hyper_decod = HyperSpectralDecoder(**vars(args))
-
-        # pipeline for training and inferrence
-        pipeline = AstroPipeline(nef, quantz, hyper_decod)
-        pipelines["full"] = pipeline
-        log.info(pipeline)
+        nef_train = globals()[args.nef_type](**vars(args))
+        pipelines["full"] = AstroPipeline(nef_train)
+        log.info(pipelines["full"])
 
         # pipeline for spectra inferrence
-        if len( tasks.intersection({"recon_gt_spectra","recon_dummy_spectra"}) ) != 0:
-            identity_decod = HyperSpectralDecoder(integrate=False, **vars(args))
-            partial_pipeline = AstroPipeline(nef, quantz, identity_decod)
-            pipelines["partial"] = partial_pipeline
+        if "recon_gt_spectra" in tasks or "recon_dummy_spectra" in tasks:
+            nef_infer_spectra = globals()[args.nef_type](
+                integrate=False, qtz_calculate_loss=False, **vars(args))
+            pipelines["spectra_infer"] = AstroPipeline(nef_infer_spectra)
 
         # pipeline for codebook spectra inferrence
         if "recon_codebook_spectra" in tasks:
-            hardcode_nef = HardcodeNef(**vars(args))
-            hps_decod = HyperSpectralDecoder(integrate=False, scale=False, **vars(args))
-            modified_pipeline = AstroPipeline(hardcode_nef, None, hps_decod)
-            pipelines["modified"] = modified_pipeline
+            codebook_nef = CodebookNef(integrate=False, **vars(args))
+            pipelines["codebook"] = AstroPipeline(codebook_nef)
     else:
         raise ValueError(f"{args.dataset_type} unrecognized dataset_type")
 

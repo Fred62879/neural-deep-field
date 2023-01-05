@@ -11,6 +11,19 @@ from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 
 
+def get_input_latents_dim(**kwargs):
+    """ Infer the dimension of the input RA/DEC coordinate.
+    """
+    if kwargs["coords_encode_method"] == "positional":
+        latents_dim = kwargs["coords_embed_dim"]
+    elif kwargs["coords_encode_method"] == "grid":
+        latents_dim = kwargs["feature_dim"]
+        if self.kwargs["multiscale_type"] == 'cat':
+            latents_dim *= kwargs["num_lods"]
+    else:
+        latents_dim = 2
+    return latents_dim
+
 def add_to_device(data, valid_fields, device):
     for field in valid_fields:
         if field in data:
@@ -119,24 +132,20 @@ def forward(class_obj, pipeline, data,
             save_embed_ids=False):
 
     net_args = {}
-    nef_channels = []
-    other_channels = []
+    requested_channels = []
 
     if class_obj.space_dim == 2:
-        nef_channels = ["intensity"]
+        requested_channels = ["intensity"]
         net_args = {"coords": data["coords"] }
 
     elif class_obj.space_dim == 3:
-        nef_channels = ["latents"]
-        if quantize_latent:
-            nef_channels.extend(["scaler","redshift"])
-
-            if calculate_codebook_loss:
-                other_channels.append("codebook_loss")
-
-        if save_spectra: other_channels.append("spectra")
-        if save_latents: other_channels.append("latents")
-        if save_embed_ids: other_channels.append("embed_ids")
+        requested_channels = ["intensity"]
+        if quantize_latent and calculate_codebook_loss:
+            requested_channels.append("codebook_loss")
+        if save_spectra: requested_channels.append("spectra")
+        if save_latents: requested_channels.append("latents")
+        if save_embed_ids: requested_channels.append("min_embed_ids")
+        if spectra_supervision_train: requested_channels.append("spectra")
 
         sample_method = class_obj.extra_args["trans_sample_method"]
         if sample_method == "hardcode":
@@ -145,25 +154,22 @@ def forward(class_obj, pipeline, data,
             pass
         elif sample_method == "mixture":
             net_args = {
-                "coords": data["coords"], #.to(class_obj.device),
-                "wave":   data["wave"], #.to(class_obj.device),
-                "trans":  data["trans"], #.to(class_obj.device),
-                "nsmpl":  data["nsmpl"] #.to(class_obj.device)
+                "coords": data["coords"],
+                "wave":   data["wave"],
+                "trans":  data["trans"],
+                "nsmpl":  data["nsmpl"]
             }
         else: raise ValueError("Unrecognized transmission sampling method.")
 
-        net_args["spectra_supervision_train"] = spectra_supervision_train
         if spectra_supervision_train:
             net_args["full_wave"] = data["full_wave"]
-
             # num of coords for gt, dummy (incl. neighbours) spectra
             net_args["num_spectra_coords"] = data["num_spectra_coords"]
 
     else: raise ValueError("Unsupported space dimension.")
 
-    nef_channels = set(nef_channels)
-    other_channels = set(other_channels)
-    return pipeline(channels=nef_channels, other_channels=other_channels, **net_args)
+    requested_channels = set(requested_channels)
+    return pipeline(channels=requested_channels, **net_args)
 
 def load_partial_latent(model, pretrained_state, lo, hi):
     cur_state = model.state_dict()

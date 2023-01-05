@@ -235,7 +235,7 @@ class RandGaus(nn.Module):
     '''
     def __init__(self, pe_args):
         super(RandGaus, self).__init__()
-        (dim, pe_dim, omega, sigma, pe_bias, seed, verbose) = pe_args
+        (dim, pe_dim, omega, sigma, pe_bias, seed) = pe_args
 
         self.dim = dim
         self.omega = omega
@@ -245,14 +245,10 @@ class RandGaus(nn.Module):
 
         self.mappings = nn.ModuleList([self.init_mapping(i + seed)
                                        for i in range(dim)])
-        if verbose:
-            print(f'= randmized Gaussian with {pe_dim} dim and sigma {sigma}')
 
     def init_mapping(self, seed):
         mapping = nn.Linear(1, self.pe_dim, bias=self.bias)
         mapping.weight = nn.Parameter(self.randmz_weights(seed),requires_grad=False)
-        #print('weight', mapping.weight.isnan().any())
-        #print(mapping.weight)
         return mapping
 
     def randmz_weights(self, seed):

@@ -103,7 +103,6 @@ def define_cmd_line_args():
     global_group.add_argument("--print-shape", action="store_true")
     global_group.add_argument("--dataloader-drop-last", action="store_true")
     global_group.add_argument("--exp-name", type=str, help="Experiment name.")
-    global_group.add_argument("--detect-anomaly", action="store_true", help="Turn on anomaly detection.")
     global_group.add_argument("--perf", action="store_true", help="Use high-level profiling for the trainer.")
 
     global_group.add_argument("--tasks", nargs="+", type=str,
@@ -119,8 +118,67 @@ def define_cmd_line_args():
     ###################
     net_group = parser.add_argument_group("net")
 
+    net_group.add_argument("--nef-type", type=str,
+                           help="The neural field class to be used.")
+    net_group.add_argument("--coords-encode-method", type=str,
+                           choices=["positional","grid"],
+                           help="ra/dec coordinate encoding method.")
+    net_group.add_argument("--wave-encode-method", type=str,
+                           choices=["positional"],
+                           help="lambda encoding method.")
+    net_group.add_argument("--quantize-latent", action="store_true")
     net_group.add_argument("--mlp-output-norm-method", type=str,
                            choices=["identity","arcsinh","sinh"])
+
+    ###################
+    # Nef decoder arguments
+    ###################
+    nef_group = parser.add_argument_group("nef")
+
+    nef_group.add_argument("--layer-type", type=str, default="none",
+                            choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
+    nef_group.add_argument("--activation-type", type=str,
+                           default="relu", choices=["relu", "sin"])
+    nef_group.add_argument("--decoder-type", type=str,
+                           default="basic", choices=["none", "basic"])
+
+    nef_group.add_argument("--num-layers", type=int, default=1,
+                           help="Number of layers for the decoder")
+    nef_group.add_argument("--hidden-dim", type=int, default=128,
+                           help="Network width")
+    nef_group.add_argument("--out-dim", type=int, default=1,
+                           help="output dimension")
+    nef_group.add_argument("--skip", type=int, default=None,
+                           help="Layer to have skip connection.")
+
+    net_group.add_argument("--siren-seed", type=int, default=1)
+    net_group.add_argument("--siren-first-w0", type=int, default=30)
+    net_group.add_argument("--siren-hidden-w0", type=int, default=30)
+    net_group.add_argument("--siren-coords-scaler", type=int, default=1)
+    net_group.add_argument("--siren-last-linear", action="store_true")
+
+    ###################
+    # Embedder arguments
+    ###################
+    embedder_group = parser.add_argument_group("embedder")
+
+    embedder_group.add_argument("--coords-embed-dim", type=int,
+                                help="ra/dec coordinate embedding dimension, if use pe.")
+    embedder_group.add_argument("--coords-embed-bias", action="store_true")
+    embedder_group.add_argument("--coords-embed-seed", type=int, default=0)
+    embedder_group.add_argument("--coords-embed-omega", type=int, default=1,
+                                help="frequency of sinusoidal functaions.")
+    embedder_group.add_argument("--coords-embed-sigma", type=int, default=1,
+                                help="variance to intialize pe weights.")
+
+    embedder_group.add_argument("--wave-embed-dim", type=int,
+                                help="wave embedding dimension, if use pe.")
+    embedder_group.add_argument("--wave-embed-bias", action="store_true")
+    embedder_group.add_argument("--wave-embed-seed", type=int, default=0)
+    embedder_group.add_argument("--wave-embed-omega", type=int, default=1,
+                                help="frequency of sinusoidal functaions.")
+    embedder_group.add_argument("--wave-embed-sigma", type=int, default=1,
+                                help="variance to intialize pe weights.")
 
     ###################
     # Grid arguments
@@ -131,22 +189,23 @@ def define_cmd_line_args():
     grid_group.add_argument("--grid-type", type=str, default="OctreeGrid",
                             choices=["None", "OctreeGrid", "CodebookOctreeGrid", "TriplanarGrid", "HashGrid"],
                             help="Type of grid to use.")
-    grid_group.add_argument("--interpolation-type", type=str, default="linear", choices=["linear", "closest"],
-                            help="SPC interpolation mode.")
-    grid_group.add_argument("--as-type", type=str, default="none", choices=["none", "octree"],
-                            help="Type of accelstruct to use.")
-    grid_group.add_argument("--raymarch-type", type=str, default="voxel", choices=["voxel", "ray"],
-                            help="Method of raymarching. `voxel` samples within each primitive, \
-                                  `ray` samples within rays and then filters them with the primitives. \
-                                  See the accelstruct for details.")
-    grid_group.add_argument("--multiscale-type", type=str, default="sum", choices=["cat", "sum"],
+    grid_group.add_argument("--grid-interpolation-type", type=str, default="linear",
+                            choices=["linear", "closest"], help="SPC interpolation mode.")
+    grid_group.add_argument("--grid-multiscale-type", type=str,
+                            default="sum", choices=["cat", "sum"],
                             help="Type of multiscale aggregation function to use.")
-    grid_group.add_argument("--feature-dim", type=int, default=32, help="Feature map dimension")
-    grid_group.add_argument("--feature-std", type=float, default=0.0, help="Feature map std")
-    grid_group.add_argument("--feature-bias", type=float, default=0.0, help="Feature map bias")
-    grid_group.add_argument("--noise-std", type=float, default=0.0, help="Added noise to features in training.")
-    grid_group.add_argument("--num-lods", type=int, default=1, help="Number of LODs")
-    grid_group.add_argument("--base-lod", type=int, default=2, help="Base level LOD")
+    grid_group.add_argument("--grid-feature-dim", type=int,
+                            default=32, help="Feature map dimension")
+    grid_group.add_argument("--grid-feature-std", type=float,
+                            default=0.0, help="Feature map std")
+    grid_group.add_argument("--grid-feature-bias", type=float,
+                            default=0.0, help="Feature map bias")
+    grid_group.add_argument("--grid-noise-std", type=float,
+                            default=0.0, help="Added noise to features in training.")
+    grid_group.add_argument("--grid-num-lods", type=int,
+                            default=1, help="Number of LODs")
+    grid_group.add_argument("--grid-base-lod", type=int,
+                            default=2, help="Base level LOD")
     grid_group.add_argument("--min-grid-res", type=int, default=16,
                             help="The minimum grid resolution. Used only in geometric initialization.")
     grid_group.add_argument("--max-grid-res", type=int, default=2048,
@@ -158,58 +217,30 @@ def define_cmd_line_args():
                             help="Bitwidth to use for the codebook. The number of vectors will be 2^bitwidth.")
 
     ###################
-    # Embedder arguments
+    # Quantization arguments
     ###################
-    embedder_group = parser.add_argument_group("embedder")
+    qtz_group = parser.add_argument_group("quantization")
 
-    embedder_group.add_argument("--pos-multires", type=int, default=10, help="log2 of max freq")
-    embedder_group.add_argument("--view-multires", type=int, default=4, help="log2 of max freq")
-    embedder_group.add_argument("--embedder-type", type=str, default="none", choices=["none", "positional", "fourier"])
+    qtz_group.add_argument("--generate-scaler", action="store_true")
+    qtz_group.add_argument("--generate-redshift", action="store_true")
 
-    ###################
-    # Nef arguments
-    ###################
-    nef_group = parser.add_argument_group("net")
+    qtz_group.add_argument("--qtz-latent-dim", type=int)
+    qtz_group.add_argument("--qtz-num-embed", type=int)
+    qtz_group.add_argument("--qtz-beta", type=float, help="codebook loss weight")
+    qtz_group.add_argument("--qtz-seed", type=int)
 
-    nef_group.add_argument("--nef-type", type=str,
-                           help="The neural field class to be used.")
-    nef_group.add_argument("--layer-type", type=str, default="none",
-                            choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
-    nef_group.add_argument("--coords-embed-dim", type=int,
-                           help="ra/dec coordinate embedding dimension.")
-    nef_group.add_argument("--coords-embed-method", type=str,
-                           choices=["positional","grid"],
-                           help="ra/dec coordinate embedding method.")
-    nef_group.add_argument("--activation-type", type=str,
+    qtz_group.add_argument("--qtz-decod-hidden-dim", type=int)
+    qtz_group.add_argument("--qtz-decod-num-hidden-layers", type=int)
+    qtz_group.add_argument("--qtz-decod-layer-type", type=str, default='none',
+                           choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
+    qtz_group.add_argument("--qtz-decod-activation-type", type=str,
                            default="relu", choices=["relu", "sin"])
-    nef_group.add_argument("--decoder-type", type=str,
-                           default="basic", choices=["none", "basic"])
-
-    nef_group.add_argument("--num-layers", type=int, default=1,
-                          help="Number of layers for the decoder")
-    nef_group.add_argument("--hidden-dim", type=int, default=128,
-                          help="Network width")
-    nef_group.add_argument("--out-dim", type=int, default=1,
-                          help="output dimension")
-    nef_group.add_argument("--skip", type=int, default=None,
-                          help="Layer to have skip connection.")
-    # net_group.add_argument("--pretrained", type=str, help="Path to pretrained model weights.")
-    # net_group.add_argument("--position-input", action="store_true", help="Use position as input.")
-
-    net_group.add_argument("--siren-seed", type=int, default=1)
-    net_group.add_argument("--siren-first-w0", type=int, default=30)
-    net_group.add_argument("--siren-hidden-w0", type=int, default=30)
-    net_group.add_argument("--siren-coords-scaler", type=int, default=1)
-    net_group.add_argument("--siren-last-linear", action="store_true")
 
     ###################
-    # Hyperspectral arguments
+    # Hyperspectral decoder arguments
     ###################
     hps_group = parser.add_argument_group("hyperspectral")
 
-    hps_group.add_argument("--wave-embed-dim", type=int, help="wave embedding dimension.")
-    hps_group.add_argument("--wave-embed-method", type=str, choices=["positional"],
-                           help="wave embedding method.")
     hps_group.add_argument("--hps-combine-method", type=str, choices=["add","concat"],
                            help="method to combine ra/dec coordinate with lambda.")
 
@@ -225,21 +256,6 @@ def define_cmd_line_args():
     hps_group.add_argument("--hps-siren-hidden-w0", type=int, default=30)
     hps_group.add_argument("--hps-siren-coords-scaler", type=int, default=1)
     hps_group.add_argument("--hps-siren-last-linear", action="store_true")
-
-    ###################
-    # Quantization arguments
-    ###################
-    qtz_group = parser.add_argument_group("quantization")
-
-    qtz_group.add_argument("--quantize-latent", action="store_true")
-    qtz_group.add_argument("--generate-scaler", action="store_true")
-    qtz_group.add_argument("--generate-redshift", action="store_true")
-
-    qtz_group.add_argument("--qtz-latent-dim", type=int)
-    qtz_group.add_argument("--qtz-num-embed", type=int)
-    qtz_group.add_argument("--qtz-beta", type=float, help="codebook loss weight")
-    qtz_group.add_argument("--qtz-calculate-loss", action="store_true")
-    qtz_group.add_argument("--qtz-seed", type=int)
 
     ###################
     # Arguments for dataset
@@ -305,36 +321,6 @@ def define_cmd_line_args():
     # spectra data
     data_group.add_argument("--gt-spectra-choices", type=int, nargs='+',
                              help="id of chosen gt spectra for supervision/recon etc.")
-
-    # SDF Dataset
-    data_group.add_argument("--sample-mode", type=str, nargs="*",
-                            default=["rand", "near", "near", "trace", "trace"],
-                            help="The sampling scheme to be used.")
-    data_group.add_argument("--get-normals", action="store_true",
-                            help="Sample the normals.")
-    data_group.add_argument("--num-samples", type=int, default=100000,
-                            help="Number of samples per mode (or per epoch for SPC)")
-    data_group.add_argument("--num-samples-on-mesh", type=int, default=100000000,
-                            help="Number of samples generated on mesh surface to initialize occupancy structures")
-    data_group.add_argument("--sample-tex", action="store_true",
-                            help="Sample textures")
-    data_group.add_argument("--mode-mesh-norm", type=str, default="sphere",
-                            choices=["sphere", "aabb", "planar", "none"],
-                            help="Normalize the mesh")
-    data_group.add_argument("--samples-per-voxel", type=int, default=256,
-                            help="Number of samples per voxel (for SDF initialization from grid)")
-
-    # Multiview Dataset
-    data_group.add_argument("--multiview-dataset-format", default="standard",
-                            choices=["standard", "rtmv"],
-                            help="Data format for the transforms")
-    data_group.add_argument("--num-rays-sampled-per-img", type=int, default="4096",
-                            help="Number of rays to sample per image")
-    data_group.add_argument("--bg-color", default="white",
-                            choices=["white", "black"],
-                            help="Background color")
-    data_group.add_argument("--mip", type=int, default=None,
-                            help="MIP level of ground truth image")
 
     ###################
     # Arguments for optimizer
@@ -418,9 +404,6 @@ def define_cmd_line_args():
     train_group.add_argument("--spectra-neighbour-size", type=int,
                              help="size of neighbourhood to average when calculating spectra.")
 
-    # TODO (ttakikawa): Only used for SDFs, but also should support RGB etc
-    train_group.add_argument("--log-2d", action="store_true",
-                             help="Log cutting plane renders to TensorBoard.")
     train_group.add_argument("--log-dir", type=str, default="_results/logs/runs/",
                              help="Log file directory for checkpoints.")
     # TODO (ttakikawa): This is only really used in the SDF training but it should be useful for multiview too
@@ -439,22 +422,6 @@ def define_cmd_line_args():
     train_group.add_argument("--growth-strategy", type=str, default="increase",
                              choices=["onebyone","increase","shrink", "finetocoarse", "onlylast"],
                              help="Strategy for coarse-to-fine training")
-
-    train_group.add_argument("--wandb-project", type=str, default=None, help="Weights & Biases Project")
-    train_group.add_argument("--wandb-run_name", type=str, default=None, help="Weights & Biases Run Name")
-    train_group.add_argument("--wandb-entity", type=str, default=None, help="Weights & Biases Entity")
-    train_group.add_argument(
-        "--wandb-viz-nerf-angles",
-        type=int,
-        default=20,
-        help="Number of Angles to visualize a scene on Weights & Biases. Set this to 0 to disable 360 degree visualizations."
-    )
-    train_group.add_argument(
-        "--wandb-viz-nerf-distance",
-        type=int,
-        default=3,
-        help="Distance to visualize Scene from on Weights & Biases"
-    )
 
     ###################
     # Arguments for validation
@@ -505,50 +472,6 @@ def define_cmd_line_args():
     infer_group.add_argument("--plot-labels", nargs="+", type=str)
     infer_group.add_argument("--plot-colors", nargs="+", type=str)
     infer_group.add_argument("--plot-styles", nargs="+", type=str)
-
-    ###################
-    # Arguments for renderer
-    ###################
-    renderer_group = parser.add_argument_group("renderer")
-    renderer_group.add_argument("--render-res", type=int, nargs=2, default=[512, 512],
-                                help="Width/height to render at.")
-    renderer_group.add_argument("--render-batch", type=int, default=0,
-                                help="Batch size (in number of rays) for batched rendering.")
-    renderer_group.add_argument("--camera-origin", type=float, nargs=3, default=[-2.8, 2.8, -2.8],
-                                help="Camera origin.")
-    renderer_group.add_argument("--camera-lookat", type=float, nargs=3, default=[0, 0, 0],
-                                help="Camera look-at/target point.")
-    renderer_group.add_argument("--camera-fov", type=float, default=30,
-                                help="Camera field of view (FOV).")
-    renderer_group.add_argument("--camera-proj", type=str, choices=["ortho", "persp"], default="persp",
-                                help="Camera projection.")
-    renderer_group.add_argument("--camera-clamp", nargs=2, type=float, default=[0, 10],
-                                help="Camera clipping bounds.")
-    renderer_group.add_argument("--tracer-type", type=str, default="PackedRFTracer",
-                                help="The tracer to be used.")
-
-    # TODO(ttakikawa): In the future the interface will be such that you either select an absolute step size or
-    #                  you select the number of steps to take. Sphere tracing will take step-scales.
-    renderer_group.add_argument("--num-steps", type=int, default=128,
-                                help="Number of steps for raymarching / spheretracing / etc")
-    renderer_group.add_argument("--step-size", type=float, default=1.0,
-                                help="Scale of step size")
-
-    # Sphere tracing stuff
-    renderer_group.add_argument("--min-dis", type=float, default=0.0003,
-                                help="Minimum distance away from surface for spheretracing")
-
-    # TODO(ttakikawa): Shader stuff... will be more modular in future
-    renderer_group.add_argument("--matcap-path", type=str,
-                                default="data/matcaps/matcap_plastic_yellow.jpg",
-                                help="Path to the matcap texture to render with.")
-    renderer_group.add_argument("--ao", action="store_true",
-                                help="Use ambient occlusion.")
-    renderer_group.add_argument("--shadow", action="store_true",
-                                help="Use shadowing.")
-    renderer_group.add_argument("--shading-mode", type=str, default="normal",
-                                choices=["matcap", "rb", "normal"],
-                                help="Shading mode.")
 
     ###################
     # Argument for unit test

@@ -266,7 +266,7 @@ class AstroTrainer(BaseTrainer):
     #############
 
     def pre_epoch(self):
-        self.loss_lods = list(range(0, self.extra_args["num_lods"]))
+        self.loss_lods = list(range(0, self.extra_args["grid_num_lods"]))
 
         if self.extra_args["grow_every"] > 0:
             self.grow()
@@ -463,7 +463,7 @@ class AstroTrainer(BaseTrainer):
 
             # todo: efficiently slice spectra with different bound
             (lo, hi) = data["recon_wave_bound_ids"][0]
-            recon_spectra = ret["spectra"][:self.num_supervision_spectra,lo:hi,0]
+            recon_spectra = ret["spectra"][:self.num_supervision_spectra,lo:hi]
 
             spectra_loss = self.spectra_loss(gt_spectra, recon_spectra)
             self.log_dict["spectra_loss"] += spectra_loss.item()
@@ -512,9 +512,9 @@ class AstroTrainer(BaseTrainer):
         return checkpoint
 
     def get_data_to_save(self, ret):
-        latents = None if not self.save_latents else ret["latents_to_save"]
+        latents = None if not self.save_latents else ret["latents"]
         embed_ids = None if not self.plot_embed_map else ret["min_embed_ids"]
-        recon_spectra = None if not self.plot_spectra else ret["spectra"][...,0]
+        recon_spectra = None if not self.plot_spectra else ret["spectra"]
         return recon_spectra, embed_ids, latents
 
     def save_local(self):

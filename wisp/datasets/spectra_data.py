@@ -31,8 +31,9 @@ class SpectraData:
         self.recon_gt_spectra = "recon_gt_spectra" in tasks
         self.recon_dummy_spectra = "recon_dummy_spectra" in tasks
         self.recon_codebook_spectra = "recon_codebook_spectra" in tasks
-        return self.recon_gt_spectra or self.recon_dummy_spectra or \
-            self.spectra_supervision_train or self.recon_codebook_spectra
+        return self.kwargs["space_dim"] == 3 and (self.recon_gt_spectra or \
+            self.recon_dummy_spectra or self.spectra_supervision_train or \
+            self.recon_codebook_spectra)
 
     def set_path(self, dataset_path):
         input_path = join(dataset_path, "input")
