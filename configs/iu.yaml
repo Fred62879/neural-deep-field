@@ -7,9 +7,9 @@ global:
     exp_name: 'test-ngp-nerf'
 
     #tasks: ['train','save_recon_during_train','infer','recon_img']
-    #tasks: ['infer','recon_img']
+    tasks: ['infer','recon_img']
 
-    tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
+    #tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
 
     #tasks: ['train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
@@ -52,11 +52,13 @@ embedder:
     coords_embed_dim: 100
     coords_embed_omega: 1
     coords_embed_sigma: 1
+    coords_embed_seed: 0
 
     wave_embed_bias: True
     wave_embed_dim: 8
     wave_embed_omega: 1
     wave_embed_sigma: 1
+    wave_embed_seed: 4
 
 grid:
     grid_dim: 2
@@ -105,7 +107,7 @@ trainer:
 
     loss_cho: l1
     num_epochs: 4000
-    batch_size: 4096 #16384
+    batch_size: 2048 #16384
     save_every: 400
     render_tb_every: -1
     log_tb_every: 400
@@ -116,8 +118,8 @@ trainer:
     #masked_pixl_ratio_per_epoch: 1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks']
 
-    pixel_supervision: False
-    spectra_supervision: True
+    pixel_supervision: True
+    spectra_supervision: False
 
     quantize_latent: False
     weight_train: False
@@ -125,6 +127,7 @@ trainer:
     resume_train: False
     #resume_log_dir: '20221220-194546'
     #pretrained_model_name: 'model-ep800-it2.pth'
+    #spectra_loss_beta: 0.1
 
     num_trans_samples: 40
     uniform_sample_trans: True

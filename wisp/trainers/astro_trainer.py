@@ -87,7 +87,7 @@ class AstroTrainer(BaseTrainer):
 
         length = self.get_dataset_length()
 
-        self.dataset.set_dataset_mode("train")
+        #self.dataset.set_dataset_mode("train")
         self.dataset.set_dataset_length(length)
         self.dataset.set_dataset_fields(fields)
         self.dataset.set_dataset_coords_source("fits")
@@ -109,9 +109,8 @@ class AstroTrainer(BaseTrainer):
         self.save_latents =  self.pixel_supervision and self.quantize_latent and \
             ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
 
+        self.plot_spectra = self.space_dim == 3 and "plot_spectra_during_train" in tasks
         self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
-        self.plot_spectra = self.spectra_supervision and self.space_dim == 3 and \
-            "plot_spectra_during_train" in tasks
 
         if self.save_cropped_recon:
             # save selected-cropped train image reconstruction
@@ -178,9 +177,9 @@ class AstroTrainer(BaseTrainer):
     def init_dataloader(self):
         """ (Re-)Initialize dataloader.
         """
-        if self.shuffle_dataloader: sampler_cls = RandomSampler
-        else: sampler_cls = SequentialSampler
-        #sampler_cls = SequentialSampler
+        #if self.shuffle_dataloader: sampler_cls = RandomSampler
+        #else: sampler_cls = SequentialSampler
+        sampler_cls = SequentialSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
@@ -298,6 +297,7 @@ class AstroTrainer(BaseTrainer):
 
             # re-init dataloader to make sure pixels are in order
             self.shuffle_dataloader = False
+            self.dataset.set_wave_sample_mode(use_full_wave=True)
             self.use_all_pixels = True
             self.set_num_batches()
             self.init_dataloader()
@@ -330,6 +330,7 @@ class AstroTrainer(BaseTrainer):
             self.shuffle_dataloader = True
             self.save_data_to_local = False
             self.set_num_batches()
+            self.dataset.set_wave_sample_mode(use_full_wave=False)
             self.init_dataloader()
             self.reset_data_iterator()
 
@@ -472,6 +473,10 @@ class AstroTrainer(BaseTrainer):
                       save_latents=self.save_data_to_local and self.save_latents,
                       save_embed_ids=self.save_data_to_local and self.plot_embed_map)
 
+        #
+        #ids = torch.cat((torch.arange(0,2080),torch.arange(2081,4096)))
+        #
+
         # i) reconstruction loss (taking inpaint into account)
         recon_loss, recon_pixels = 0, None
         if self.pixel_supervision:
@@ -487,6 +492,7 @@ class AstroTrainer(BaseTrainer):
                 mask = data["masks"]
                 recon_loss = self.pixel_loss(gt_pixels, recon_pixels, mask)
             else:
+                #recon_loss = self.pixel_loss(gt_pixels[ids], recon_pixels[ids]) # **
                 recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
 
             self.log_dict["recon_loss"] += recon_loss.item()
@@ -618,17 +624,21 @@ class AstroTrainer(BaseTrainer):
             # smpl_spectra [bsz,num_samples]
             # all spectra are collected (no duplications) and we need
             #   only selected ones (incl. neighbours)
+            self.smpl_spectra = self.smpl_spectra.view(
+                -1, self.smpl_spectra.shape[-1])
             self.smpl_spectra = self.smpl_spectra[self.selected_spectra_ids]
+            bound_spectra = False
         else:
             # smpl_spectra [bsz,num_spectra_coords,num_sampeles]
             # we get all spectra at each batch (duplications), thus average over batches
             self.smpl_spectra = torch.mean(self.smpl_spectra, dim=0)
+            bound_spectra = True
 
         self.smpl_spectra = self.smpl_spectra.detach().cpu().numpy().reshape((
             self.dataset.get_num_gt_spectra(),
             self.extra_args["spectra_neighbour_size"]**2, -1))
 
-        self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra)
+        self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra, bound=bound_spectra)
 
     def save_cropped_recon_locally(self, **re_args):
         for i, fits_id in enumerate(self.extra_args["recon_cutout_fits_ids"]):

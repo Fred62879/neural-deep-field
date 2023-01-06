@@ -101,7 +101,7 @@ class TransData:
     def get_full_wave_bound(self):
         return ( min(self.data["full_wave"]), max(self.data["full_wave"]) )
 
-    def sample_wave_trans(self, batch_size, num_samples, infer=False):
+    def sample_wave_trans(self, batch_size, num_samples, use_full_wave=False):
         """ Sample lambda and transmission data for given sampling methods.
             @Return
               wave:  [bsz,nsmpl,1]/[bsz,nbands,nsmpl,1]
@@ -110,7 +110,7 @@ class TransData:
         """
         nsmpl_within_each_band = None
 
-        if infer:
+        if use_full_wave:
             smpl_trans = self.data["full_trans"] #[None,...].tile(batch_size,1,1)
             smpl_wave = self.data["full_norm_wave"][None,:,None].tile(batch_size,1,1)
             nsmpl_within_each_band = self.data["nsmpl_within_bands"] #[None,...].tile(batch_size,1)

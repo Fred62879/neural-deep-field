@@ -292,7 +292,7 @@ class SpectraData:
     # Utilities
     #############
 
-    def plot_spectrum(self, spectra_dir, name, recon_spectra, save_spectra=False):
+    def plot_spectrum(self, spectra_dir, name, recon_spectra, save_spectra=False, bound=True):
         """ Plot given spectra.
             @Param
               recon_spectra: [num_spectra(,num_neighbours),full_num_smpl]
@@ -303,7 +303,7 @@ class SpectraData:
         for i, cur_spectra in enumerate(recon_spectra):
 
             # clip spectra to range, if specified
-            if bound_ids is not None and i < len(bound_ids):
+            if bound and bound_ids is not None and i < len(bound_ids):
                 (lo, hi) = bound_ids[i]
                 cur_spectra = cur_spectra[...,lo:hi]
 
