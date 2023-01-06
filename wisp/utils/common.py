@@ -124,19 +124,23 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
     return coords
 
 def forward(class_obj, pipeline, data,
+            pixel_supervision_train=True,
+            spectra_supervision_train=False,
             quantize_latent=False,
             calculate_codebook_loss=False,
-            spectra_supervision_train=False,
+            infer=False,
             save_spectra=False,
             save_latents=False,
             save_embed_ids=False):
 
-    net_args = {}
+    # cannot in both train and infer mode
+    assert( (pixel_supervision_train or spectra_supervision_train) != infer )
+
     requested_channels = []
+    net_args = {"coords": data["coords"] }
 
     if class_obj.space_dim == 2:
         requested_channels = ["intensity"]
-        net_args = {"coords": data["coords"] }
 
     elif class_obj.space_dim == 3:
         requested_channels = ["intensity"]
@@ -147,19 +151,17 @@ def forward(class_obj, pipeline, data,
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if spectra_supervision_train: requested_channels.append("spectra")
 
-        sample_method = class_obj.extra_args["trans_sample_method"]
-        if sample_method == "hardcode":
-            pass
-        elif sample_method == "bandwise":
-            pass
-        elif sample_method == "mixture":
-            net_args = {
-                "coords": data["coords"],
-                "wave":   data["wave"],
-                "trans":  data["trans"],
-                "nsmpl":  data["nsmpl"]
-            }
-        else: raise ValueError("Unrecognized transmission sampling method.")
+        if pixel_supervision_train or infer:
+            sample_method = class_obj.extra_args["trans_sample_method"]
+            if sample_method == "hardcode":
+                pass
+            elif sample_method == "bandwise":
+                pass
+            elif sample_method == "mixture":
+                net_args["wave"] = data["wave"]
+                net_args["trans"] = data["trans"]
+                net_args["nsmpl"] = data["nsmpl"]
+            else: raise ValueError("Unrecognized transmission sampling method.")
 
         if spectra_supervision_train:
             net_args["full_wave"] = data["full_wave"]

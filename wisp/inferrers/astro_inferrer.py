@@ -337,12 +337,14 @@ class AstroInferrer(BaseInferrer):
                 with torch.no_grad():
                     ret = forward(
                         self, self.full_pipeline, data,
-                        save_spectra=False,
-                        save_latents=False,
-                        save_embed_ids=self.plot_embed_map,
+                        pixel_supervision_train=False,
+                        spectra_supervision_train=False,
                         quantize_latent=self.quantize_latent,
                         calculate_codebook_loss=False,
-                        spectra_supervision_train=False)
+                        infer=True,
+                        save_spectra=False,
+                        save_latents=False,
+                        save_embed_ids=self.plot_embed_map)
 
                 if self.recon_img: self.recon_pixels.extend(ret["intensity"])
                 if self.plot_embed_map: self.embed_ids.extend(ret["min_embed_ids"])
@@ -363,12 +365,14 @@ class AstroInferrer(BaseInferrer):
                 with torch.no_grad():
                     spectra = forward(
                         self, self.spectra_infer_pipeline, data,
-                        save_spectra=False,
-                        save_latents=False,
-                        save_embed_ids=False,
+                        pixel_supervision_train=False,
+                        spectra_supervision_train=False,
                         quantize_latent=self.quantize_latent,
                         calculate_codebook_loss=False,
-                        spectra_supervision_train=False)["intensity"]
+                        infer=True,
+                        save_spectra=False,
+                        save_latents=False,
+                        save_embed_ids=False)["intensity"]
 
                 if spectra.ndim == 3: # bandwise
                     spectra = spectra.flatten(1,2) # [bsz,nsmpl]
@@ -401,12 +405,14 @@ class AstroInferrer(BaseInferrer):
                 with torch.no_grad():
                     spectra = forward(
                         self, self.codebook_pipeline, data,
-                        save_spectra=False,
-                        save_latents=False,
-                        save_embed_ids=False,
+                        pixel_supervision_train=False,
+                        spectra_supervision_train=False,
                         quantize_latent=False,
                         calculate_codebook_loss=False,
-                        spectra_supervision_train=False)["intensity"]
+                        infer=True,
+                        save_spectra=False,
+                        save_latents=False,
+                        save_embed_ids=False)["intensity"]
 
                 self.codebook_spectra.extend(spectra)
 

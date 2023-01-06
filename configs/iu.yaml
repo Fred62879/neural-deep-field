@@ -6,11 +6,16 @@ global:
     dataloader_drop_last: True
     exp_name: 'test-ngp-nerf'
 
-    tasks: ['train','save_recon_during_train','infer','recon_img']
+    #tasks: ['train','save_recon_during_train','infer','recon_img']
     #tasks: ['infer','recon_img']
+
+    tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
+    #tasks: ['infer','recon_gt_spectra']
 
     #tasks: ['train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
+
+    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
 
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed']
@@ -28,8 +33,6 @@ net:
     #nef_type: 'AstroNerf'
     coords_encode_method: 'none'
     wave_encode_method: 'none'
-    quantize_latent: False
-    spectra_supervision: False
     mlp_output_norm_method: 'sinh'
 
 nef:
@@ -46,12 +49,12 @@ nef:
 
 embedder:
     coords_embed_bias: True
-    coords_embed_dim: 8000
+    coords_embed_dim: 100
     coords_embed_omega: 1
     coords_embed_sigma: 1
 
     wave_embed_bias: True
-    wave_embed_dim: 4
+    wave_embed_dim: 8
     wave_embed_omega: 1
     wave_embed_sigma: 1
 
@@ -72,13 +75,13 @@ qtz:
     generate_scaler: True
     generate_redshift: True
 
-    qtz_latent_dim: 3
+    qtz_latent_dim: 8
     qtz_num_embed: 4
     qtz_beta: 0.1
     qtz_seed: 1
 
-    qtz_decod_hidden_dim: 64
-    qtz_decod_num_hidden_layers: 1
+    qtz_decod_hidden_dim: 256
+    qtz_decod_num_hidden_layers: 3
     qtz_decod_layer_type: 'none'
     qtz_decod_activation_type: 'relu'
 
@@ -100,6 +103,7 @@ trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
+    loss_cho: l1
     num_epochs: 4000
     batch_size: 4096 #16384
     save_every: 400
@@ -112,13 +116,15 @@ trainer:
     #masked_pixl_ratio_per_epoch: 1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks']
 
-    loss_cho: l1
+    pixel_supervision: False
+    spectra_supervision: True
+
+    quantize_latent: False
     weight_train: False
+    train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20221220-194546'
     #pretrained_model_name: 'model-ep800-it2.pth'
-    train_use_all_wave: False
-    #permute_pixls_train: True
 
     num_trans_samples: 40
     uniform_sample_trans: True
@@ -126,7 +132,7 @@ trainer:
 
     # spectra supervision
     num_supervision_spectra: 1
-    spectra_neighbour_size: 3
+    spectra_neighbour_size: 1
 
 infer:
     inferrer_type: 'AstroInferrer'

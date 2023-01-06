@@ -594,7 +594,7 @@ class FITSData:
         """
         index, base_count = self.calculate_global_offset(fits_id)
         if neighbour_size <= 1:
-            local_id = self.calculate_local_id(index, r, c, fits_id)
+            local_id = self.calculate_local_id(r, c, index, fits_id)
             ids = [local_id + base_count]
         else:
             ids = self.calculate_neighbour_ids(base_count, r, c, neighbour_size, index, fits_id)

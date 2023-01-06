@@ -133,7 +133,7 @@ class AstroDataset(Dataset):
     def get_spectra_data(self, out):
         """ Get unbatched spectra data (only for spectra supervision training).
         """
-        # get only supervision spectra (not all gt spectra)
+        # get only supervision spectra (not all gt spectra) for loss calculation
         out["gt_spectra"] = self.spectra_dataset.get_supervision_spectra()
 
         # get all coords to plot all spectra (gt, dummy, incl. neighbours)
@@ -158,14 +158,6 @@ class AstroDataset(Dataset):
         """ Sample data from requried fields using given index.
             Also get unbatched data (trans, spectra etc.).
         """
-        # if self.kwargs["debug"]:
-        #     out = {"coords": self.coords[idx],
-        #            "pixels": self.pixels[idx]}
-        #     if self.space_dim == 3:
-        #         out["coords"] = out["coords"][:,None] #.tile(1, self.num_samples,1)
-        #         out["coords"] = torch.cat((out["coords"], out["wave"]), dim=-1)
-        #     return out
-
         out = {}
         batch_size = len(idx)
         batched_fields = self.requested_fields - self.unbatched_fields

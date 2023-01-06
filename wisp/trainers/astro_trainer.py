@@ -55,12 +55,11 @@ class AstroTrainer(BaseTrainer):
         self.gpu_fields = self.extra_args["gpu_data"]
         self.weight_train = self.extra_args["weight_train"]
 
-        self.use_all_pixels = True
-        self.set_num_batches()
-
         self.set_log_path()
         self.summarize_training_tasks()
 
+        self.use_all_pixels = True
+        self.set_num_batches()
         self.configure_dataset()
         self.init_loss()
         self.init_dataloader()
@@ -72,17 +71,21 @@ class AstroTrainer(BaseTrainer):
     def configure_dataset(self):
         """ Configure dataset with selected fields and set length accordingly.
         """
-        fields = ["coords","pixels"]
-        if self.weight_train:
-            fields.append("weights")
-        if self.space_dim == 3:
-            fields.append("trans_data")
-        if self.spectral_inpaint:
-            pass
+        fields = []
+
+        if self.pixel_supervision:
+            fields.extend(["coords","pixels"])
+            if self.weight_train:
+                fields.append("weights")
+            if self.space_dim == 3:
+                fields.append("trans_data")
+            if self.spectral_inpaint:
+                pass
+
         if self.spectra_supervision:
             fields.append("spectra_supervision_data")
 
-        length = self.dataset.get_num_coords()
+        length = self.get_dataset_length()
 
         self.dataset.set_dataset_mode("train")
         self.dataset.set_dataset_length(length)
@@ -92,22 +95,29 @@ class AstroTrainer(BaseTrainer):
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
 
-        self.save_recon = "save_recon_during_train" in tasks
-        self.spectral_inpaint = self.space_dim == 3 and "spectral_inpaint" in tasks
-        self.plot_spectra = self.space_dim == 3 and "plot_spectra_during_train" in tasks
         self.quantize_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
-        self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
-        self.plot_embed_map = self.quantize_latent and "plot_embed_map_during_train" in tasks
-        self.save_latents =  self.quantize_latent and ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
 
-        if self.save_recon:
+        self.pixel_supervision = self.extra_args["pixel_supervision"]
+        self.save_recon = self.pixel_supervision and \
+            "save_recon_during_train" in tasks
+        self.save_cropped_recon = self.pixel_supervision and \
+            "save_cropped_recon_during_train" in tasks
+        self.spectral_inpaint = self.pixel_supervision and self.space_dim == 3 and \
+            "spectral_inpaint" in tasks
+        self.plot_embed_map = self.pixel_supervision and self.quantize_latent and \
+            "plot_embed_map_during_train" in tasks
+        self.save_latents =  self.pixel_supervision and self.quantize_latent and \
+            ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
+
+        self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
+        self.plot_spectra = self.spectra_supervision and self.space_dim == 3 and \
+            "plot_spectra_during_train" in tasks
+
+        if self.save_cropped_recon:
             # save selected-cropped train image reconstruction
             self.recon_cutout_fits_ids = self.extra_args["recon_cutout_fits_ids"]
             self.recon_cutout_sizes = self.extra_args["recon_cutout_sizes"]
             self.recon_cutout_start_pos = self.extra_args["recon_cutout_start_pos"]
-            self.save_cropped_recon = self.recon_cutout_fits_ids is not None and \
-                self.recon_cutout_sizes is not None and self.recon_cutout_start_pos is not None
-        else: self.save_cropped_recon = False
 
         if self.plot_spectra:
             self.selected_spectra_ids = self.dataset.get_spectra_coord_ids()
@@ -158,11 +168,12 @@ class AstroTrainer(BaseTrainer):
         if self.spectra_supervision:
             self.spectra_loss = partial(spectra_supervision_loss, loss)
 
-        if self.spectral_inpaint:
-            loss = partial(spectral_masking_loss, loss,
-                           self.extra_args["relative_train_bands"],
-                           self.extra_args["relative_inpaint_bands"])
-        self.loss = loss
+        if self.pixel_supervision:
+            if self.spectral_inpaint:
+                loss = partial(spectral_masking_loss, loss,
+                               self.extra_args["relative_train_bands"],
+                               self.extra_args["relative_inpaint_bands"])
+            self.pixel_loss = loss
 
     def init_dataloader(self):
         """ (Re-)Initialize dataloader.
@@ -359,6 +370,7 @@ class AstroTrainer(BaseTrainer):
 
         with torch.cuda.amp.autocast():
             total_loss, recon_pixels, ret = self.calculate_loss(data)
+            #total_loss, recon_pixels, recon_spectra, ret = self.calculate_loss(data)
 
         self.scaler.scale(total_loss).backward()
         self.scaler.step(self.optimizer)
@@ -387,7 +399,7 @@ class AstroTrainer(BaseTrainer):
             At certain epochs, we may not need all data and can break before
               iterating thru all data.
         """
-        length = self.dataset.get_num_coords()
+        length = self.get_dataset_length()
         if not self.use_all_pixels:
             length = int(length * self.extra_args["train_pixel_ratio"])
 
@@ -397,6 +409,23 @@ class AstroTrainer(BaseTrainer):
             self.num_iterations_cur_epoch = int(length // self.batch_size)
         else:
             self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))
+
+    def get_dataset_length(self):
+        """ Get length of dataset based on training tasks.
+            If we do pixel supervision, we use #coords as length and don't
+              count #spectra coords as they are included every batch.
+            Otherwise, when we do spectra supervision only, we need to
+              set #spectra coords as dataset length.
+            (TODO: we assume that #spectra coords is far less
+                   than batch size, which may not be the case soon)
+        """
+        if self.pixel_supervision:
+            length = self.dataset.get_num_coords()
+        elif self.spectra_supervision:
+            length = self.dataset.get_num_spectra_coords()
+        else:
+            raise ValueError("No training tasks to perform.")
+        return length
 
     def resume_train(self):
         try:
@@ -434,28 +463,33 @@ class AstroTrainer(BaseTrainer):
         add_to_device(data, self.extra_args["gpu_data"], self.device)
 
         ret = forward(self, self.pipeline, data,
+                      pixel_supervision_train=self.pixel_supervision,
+                      spectra_supervision_train=self.spectra_supervision,
                       quantize_latent=self.quantize_latent,
                       calculate_codebook_loss=self.quantize_latent,
-                      spectra_supervision_train=self.spectra_supervision,
+                      infer=False,
                       save_spectra=self.save_data_to_local and self.plot_spectra,
                       save_latents=self.save_data_to_local and self.save_latents,
                       save_embed_ids=self.save_data_to_local and self.plot_embed_map)
 
-        recon_pixels = ret["intensity"]
-        gt_pixels = data["pixels"]
-
-        if self.extra_args["weight_train"]:
-            weights = data["weights"]
-            gt_pixels *= weights
-            recon_pixels *= weights
-
         # i) reconstruction loss (taking inpaint into account)
-        if self.spectral_inpaint:
-            mask = data["masks"]
-            recon_loss = self.loss(gt_pixels, recon_pixels, mask)
-        else:
-            recon_loss = self.loss(gt_pixels, recon_pixels)
-        self.log_dict["recon_loss"] += recon_loss.item()
+        recon_loss, recon_pixels = 0, None
+        if self.pixel_supervision:
+            recon_pixels = ret["intensity"]
+            gt_pixels = data["pixels"]
+
+            if self.extra_args["weight_train"]:
+                weights = data["weights"]
+                gt_pixels *= weights
+                recon_pixels *= weights
+
+            if self.spectral_inpaint:
+                mask = data["masks"]
+                recon_loss = self.pixel_loss(gt_pixels, recon_pixels, mask)
+            else:
+                recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
+
+            self.log_dict["recon_loss"] += recon_loss.item()
 
         # ii) spectra loss
         spectra_loss, recon_spectra = 0, None
@@ -470,16 +504,16 @@ class AstroTrainer(BaseTrainer):
             self.log_dict["spectra_loss"] += spectra_loss.item()
 
         # iii) latent quantization codebook loss
+        codebook_loss = 0
         if self.quantize_latent:
-            cdbk_loss = ret["codebook_loss"]
-            self.log_dict["codebook_loss"] += cdbk_loss.item()
-        else: cdbk_loss = 0
+            codebook_loss = ret["codebook_loss"]
+            self.log_dict["codebook_loss"] += codebook_loss.item()
 
-        total_loss = recon_loss + spectra_loss + cdbk_loss
+        total_loss = recon_loss + spectra_loss + codebook_loss
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss")
         return total_loss, recon_pixels, ret
-        #return total_loss, gt_pixels, ret
+        #return total_loss, recon_pixels, gt_spectra, ret
 
     def log_cli(self):
         """ Controls CLI logging.

@@ -61,7 +61,7 @@ class AstroHyperSpectral(BaseNeuralField):
             channels.extend(["codebook_loss","min_embed_ids"])
         self._register_forward_function( self.hyperspectral, channels )
 
-    def hyperspectral(self, coords, wave, trans, nsmpl, full_wave=None, num_spectra_coords=-1, rpidx=None, lod_idx=None):
+    def hyperspectral(self, coords, wave=None, trans=None, nsmpl=None, full_wave=None, num_spectra_coords=-1, rpidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
               coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2/3]
@@ -82,6 +82,5 @@ class AstroHyperSpectral(BaseNeuralField):
         if self.kwargs["quantize_latent"]:
             latents = self.quantized_decoder(latents, ret)
         self.hps_decoder(latents, wave, trans, nsmpl, ret, full_wave, num_spectra_coords)
-        #self.hps_decoder(coords, wave, trans, nsmpl, ret, full_wave, num_spectra_coords)
 
         return ret

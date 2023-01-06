@@ -126,7 +126,6 @@ def define_cmd_line_args():
     net_group.add_argument("--wave-encode-method", type=str,
                            choices=["positional"],
                            help="lambda encoding method.")
-    net_group.add_argument("--quantize-latent", action="store_true")
     net_group.add_argument("--mlp-output-norm-method", type=str,
                            choices=["identity","arcsinh","sinh"])
 
@@ -384,7 +383,11 @@ def define_cmd_line_args():
 
     train_group.add_argument("--weight-train", action="store_true")
     train_group.add_argument("--train-use-all-wave", action="store_true")
-    train_group.add_argument("--spectra-supervision", action="store_true")
+    train_group.add_argument("--pixel-supervision", action="store_true",
+                             help="whether training supervised by pixel values or not.")
+    train_group.add_argument("--spectra-supervision", action="store_true",
+                             help="whether training supervised by spectra or not.")
+    train_group.add_argument("--quantize-latent", action="store_true")
     # train_group.add_argument("--cutout_based_train", action="store_true")
     train_group.add_argument("--resume-train", action="store_true")
     train_group.add_argument("--resume-log-dir", type=str)
