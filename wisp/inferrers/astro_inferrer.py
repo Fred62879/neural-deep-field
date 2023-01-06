@@ -425,7 +425,8 @@ class AstroInferrer(BaseInferrer):
         """
         if self.space_dim == 3: self.batched_fields.extend(["trans_data"])
 
-        self.dataset.set_dataset_mode("infer")
+        # self.dataset.set_dataset_mode("infer")
+        self.dataset.set_wave_sample_mode(use_full_wave=True)
         self.dataset.set_dataset_length(self.dataset_length)
         self.dataset.set_dataset_fields(self.batched_fields)
         self.dataset.set_dataset_coords_source(self.coords_source)

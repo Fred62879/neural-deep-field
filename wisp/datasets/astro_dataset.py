@@ -1,5 +1,6 @@
 
 import torch
+import numpy as np
 
 from typing import Callable
 from torch.utils.data import Dataset
@@ -49,19 +50,23 @@ class AstroDataset(Dataset):
         self.spectra_dataset = SpectraData(self.fits_dataset, self.trans_dataset,
                                            self.root, self.device, **self.kwargs)
         # randomly initialize
+        #self.mode = "train"
         self.coords_source = "fits"
-        self.mode = "train"
+        self.use_full_wave = False
         self.set_dataset_length(1000)
 
     ############
     # Setters
     ############
 
-    def set_dataset_mode(self, mode):
-        """ Set dataset to be in train or infer mode, which determines
-              i) number of transmission samples (use all samples for inferrence)
-        """
-        self.mode = mode
+    def set_wave_sample_mode(self, use_full_wave: bool):
+        self.use_full_wave = use_full_wave
+
+    # def set_dataset_mode(self, mode):
+    #     """ Set dataset to be in train or infer mode, which determines
+    #           i) number of transmission samples (use all samples for inferrence)
+    #     """
+    #     self.mode = mode
 
     def set_dataset_coords_source(self, coords_source):
         """ Set dataset source of coords that controls:
@@ -126,9 +131,10 @@ class AstroDataset(Dataset):
         """ Get transmission data (wave, trans, nsmpl etc.).
             These are not batched, we do monte carlo sampling at every step.
         """
-        infer = self.mode == "infer"
+        # infer = self.mode == "infer"
         out["wave"], out["trans"], out["nsmpl"] = \
-                self.trans_dataset.sample_wave_trans(batch_size, self.nsmpls, infer=infer)
+                self.trans_dataset.sample_wave_trans(
+                    batch_size, self.nsmpls, use_full_wave=self.use_full_wave)
 
     def get_spectra_data(self, out):
         """ Get unbatched spectra data (only for spectra supervision training).
@@ -160,6 +166,7 @@ class AstroDataset(Dataset):
         """
         out = {}
         batch_size = len(idx)
+        #idx = np.array(list(set(idx) - set([2080])))
         batched_fields = self.requested_fields - self.unbatched_fields
 
         for field in batched_fields:
@@ -187,6 +194,6 @@ class AstroDataset(Dataset):
         """
         return self.fits_dataset.restore_evaluate_tiles(recon_pixels, **re_args)
 
-    def plot_spectrum(self, spectra_dir, name, recon_spectra, save_spectra=False):
+    def plot_spectrum(self, spectra_dir, name, recon_spectra, save_spectra=False, bound=True):
         self.spectra_dataset.plot_spectrum(
-            spectra_dir, name, recon_spectra, save_spectra=save_spectra)
+            spectra_dir, name, recon_spectra, save_spectra=save_spectra, bound=bound)

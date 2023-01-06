@@ -73,6 +73,8 @@ class HyperSpectralDecoder(nn.Module):
 
     def reconstruct_spectra(self, wave, latents, scaler, redshift, scale=True):
         latents = self.convert(wave, latents, redshift) # **
+        #if latents.shape[0] == 1: print(latents)
+        #else: print(latents[2080])
 
         if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
@@ -121,6 +123,7 @@ class HyperSpectralDecoder(nn.Module):
         if self.kwargs["print_shape"]: print('hps_decoder',latents.shape)
 
         if num_spectra_coords > 0:
+            #assert(latents[2080] == latents[4096])
             self.train_with_full_wave(latents, full_wave, num_spectra_coords, ret)
             latents = latents[:-num_spectra_coords]
             if ret["scaler"] is not None: ret["scaler"] = ret["scaler"][:-num_spectra_coords]
