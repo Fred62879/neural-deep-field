@@ -23,63 +23,13 @@ optimizer:
     weight_decay: 1e-5
     hps_lr: 1e-5
 
-dataset:
-    space_dim: 2
-    dataset_type: 'astro'
-    load_fits_data_cache: True
-    dataset_path: '../../data/pdr3'
-    gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
-    train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
-
-    use_full_fits: False
-
-    # if don't use full fits, we can select cutout from tiles
-    # the order of the following 5 fields corresponds to each other
-    fits_footprints: ['9812']
-    fits_tile_ids: ['1']
-    fits_subtile_ids: ['5']
-    fits_cutout_sizes: [ 64 ] #256 ]
-    fits_cutout_start_pos: [[86,188]] #[[1750,550]]
-
-    # num_bands: 1
-    # sensor_collection_name: '1_y'
-    # filter_ids: [4]
-    # filters: [y]
-    # sensors_full_name: [HSC-Y]
-
-    num_bands: 5
-    sensor_collection_name: '5_grizy'
-    filter_ids: [0,1,2,3,4]
-    filters: [g,r,i,z,y]
-    sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y]
-    plot_labels: ['g', 'r', 'i', 'z', 'y']
-    plot_colors: ['green','red','blue','gray','yellow']
-    plot_styles: ['solid','solid','solid','solid','solid']
-
-    # num_bands: 10
-    # sensor_collection_name: '10'
-    # filter_ids: [0,1,2,3,4,5,6,7,8,9]
-    # filters: [g,r,i,z,y,nb387,nb816,nb921,u,us]
-    # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y,NB0387,NB0816,NB0921,u,uS]
-    # plot_labels: ['g', 'r', 'i', 'z', 'y', 'nb387', 'nb816', 'nb921','u','u*']
-    # plot_colors: ['green','red','blue','gray','yellow','gray','red','blue','yellow','blue']    
-    # plot_styles: ['solid','solid','solid','solid','solid','dashed','dashed','dashed','dashdot','dashdot']
-
-    plot_trans: True
-    trans_sample_method: 'mixture'
-    trans_threshold: 1e-3
-    hardcode_num_trans_samples: 40
-    trans_sample_interval: 10
-
-    gt_spectra_choices: [0] #[1,2,3,4]
-
 net:
-    #nef_type: 'AstroHyperSpectral'
-    nef_type: 'AstroNerf'
+    nef_type: 'AstroHyperSpectral'
+    #nef_type: 'AstroNerf'
     coords_encode_method: 'none'
     wave_encode_method: 'none'
-    quantize_latent: True
-    spectra_supervision: True
+    quantize_latent: False
+    spectra_supervision: False
     mlp_output_norm_method: 'sinh'
 
 nef:
@@ -134,7 +84,7 @@ qtz:
 
 hyperspectral:
     hps_combine_method: 'concat'
-    hps_decod_activation_type: 'relu'
+    hps_decod_activation_type: 'sin'
     hps_decod_num_layers: 3
     hps_decod_hidden_dim: 256
     hps_decod_layer_type: 'none'
@@ -144,13 +94,13 @@ hyperspectral:
     hps_siren_first_w0: 24
     hps_siren_hidden_w0: 6
     hps_siren_coords_scaler: 8
-    hps_siren_last_linear: False
+    hps_siren_last_linear: True
 
 trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
 
-    num_epochs: 8000
+    num_epochs: 4000
     batch_size: 4096 #16384
     save_every: 400
     render_tb_every: -1
@@ -198,6 +148,56 @@ infer:
     average_spectra: True
     plot_spectrum_with_trans: True
     infer_spectra_individually: True
+
+dataset:
+    space_dim: 3
+    dataset_type: 'astro'
+    load_fits_data_cache: True
+    dataset_path: '../../data/pdr3'
+    gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
+    train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
+
+    use_full_fits: False
+
+    # if don't use full fits, we can select cutout from tiles
+    # the order of the following 5 fields corresponds to each other
+    fits_footprints: ['9812']
+    fits_tile_ids: ['1']
+    fits_subtile_ids: ['5']
+    fits_cutout_sizes: [ 64 ] #256 ]
+    fits_cutout_start_pos: [[86,188]] #[[1750,550]]
+
+    # num_bands: 1
+    # sensor_collection_name: '1_y'
+    # filter_ids: [4]
+    # filters: [y]
+    # sensors_full_name: [HSC-Y]
+
+    num_bands: 5
+    sensor_collection_name: '5_grizy'
+    filter_ids: [0,1,2,3,4]
+    filters: [g,r,i,z,y]
+    sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y]
+    plot_labels: ['g', 'r', 'i', 'z', 'y']
+    plot_colors: ['green','red','blue','gray','yellow']
+    plot_styles: ['solid','solid','solid','solid','solid']
+
+    # num_bands: 10
+    # sensor_collection_name: '10'
+    # filter_ids: [0,1,2,3,4,5,6,7,8,9]
+    # filters: [g,r,i,z,y,nb387,nb816,nb921,u,us]
+    # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y,NB0387,NB0816,NB0921,u,uS]
+    # plot_labels: ['g', 'r', 'i', 'z', 'y', 'nb387', 'nb816', 'nb921','u','u*']
+    # plot_colors: ['green','red','blue','gray','yellow','gray','red','blue','yellow','blue']    
+    # plot_styles: ['solid','solid','solid','solid','solid','dashed','dashed','dashed','dashdot','dashdot']
+
+    plot_trans: True
+    trans_sample_method: 'mixture'
+    trans_threshold: 1e-3
+    hardcode_num_trans_samples: 40
+    trans_sample_interval: 10
+
+    gt_spectra_choices: [0] #[1,2,3,4]
 
 inpaint:
     inpaint_cho: 'no_inpaint' # 'spectral_inpaint'

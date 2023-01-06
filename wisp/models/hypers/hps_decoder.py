@@ -52,7 +52,7 @@ class HyperSpectralDecoder(nn.Module):
                 input_dim = self.kwargs["wave_embed_dim"] + latents_dim
 
         else: # coords and wave are not encoded
-            input_dim = 3
+            input_dim = 3 # **
 
         if self.kwargs["hps_decod_activation_type"] == "relu":
             decoder = BasicDecoder(
@@ -72,11 +72,13 @@ class HyperSpectralDecoder(nn.Module):
         return decoder
 
     def reconstruct_spectra(self, wave, latents, scaler, redshift, scale=True):
-        hps_latents = self.convert(wave, latents, redshift)
-        if self.kwargs["print_shape"]: print('hps_decoder', hps_latents.shape)
+        latents = self.convert(wave, latents, redshift) # **
 
-        spectra = self.decode(hps_latents)[...,0]
-        if self.scale and scaler is not None: spectra *= scaler
+        if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
+
+        spectra = self.decode(latents)[...,0] # **
+        if self.scale and scaler is not None:
+            spectra *= scaler
         spectra = self.norm(spectra)
         return spectra
 
@@ -130,6 +132,7 @@ class HyperSpectralDecoder(nn.Module):
             if "spectra" not in ret: ret["spectra"] = spectra
             if self.kwargs["print_shape"]: print('hps_decoder', spectra.shape)
 
-            intensity = self.inte(spectra, trans, nsmpl)
+            intensity = self.inte(spectra, trans, nsmpl) # **
             if self.kwargs["print_shape"]: print('hps_decoder', intensity.shape)
-            ret["intensity"] = intensity
+            ret["intensity"] = intensity # **
+            #ret["intensity"] = spectra

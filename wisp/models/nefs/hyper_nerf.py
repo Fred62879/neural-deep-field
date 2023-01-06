@@ -82,5 +82,6 @@ class AstroHyperSpectral(BaseNeuralField):
         if self.kwargs["quantize_latent"]:
             latents = self.quantized_decoder(latents, ret)
         self.hps_decoder(latents, wave, trans, nsmpl, ret, full_wave, num_spectra_coords)
+        #self.hps_decoder(coords, wave, trans, nsmpl, ret, full_wave, num_spectra_coords)
 
         return ret
