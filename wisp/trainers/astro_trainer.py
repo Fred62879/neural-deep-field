@@ -54,6 +54,7 @@ class AstroTrainer(BaseTrainer):
         self.space_dim = self.extra_args["space_dim"]
         self.gpu_fields = self.extra_args["gpu_data"]
         self.weight_train = self.extra_args["weight_train"]
+        self.spectra_beta = self.extra_args["spectra_beta"]
 
         self.set_log_path()
         self.summarize_training_tasks()
@@ -177,9 +178,9 @@ class AstroTrainer(BaseTrainer):
     def init_dataloader(self):
         """ (Re-)Initialize dataloader.
         """
-        #if self.shuffle_dataloader: sampler_cls = RandomSampler
-        #else: sampler_cls = SequentialSampler
-        sampler_cls = SequentialSampler
+        if self.shuffle_dataloader: sampler_cls = RandomSampler
+        else: sampler_cls = SequentialSampler
+        #sampler_cls = SequentialSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
@@ -506,7 +507,7 @@ class AstroTrainer(BaseTrainer):
             (lo, hi) = data["recon_wave_bound_ids"][0]
             recon_spectra = ret["spectra"][:self.num_supervision_spectra,lo:hi]
 
-            spectra_loss = self.spectra_loss(gt_spectra, recon_spectra)
+            spectra_loss = self.spectra_loss(gt_spectra, recon_spectra) * self.spectra_beta
             self.log_dict["spectra_loss"] += spectra_loss.item()
 
         # iii) latent quantization codebook loss

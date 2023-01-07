@@ -387,6 +387,7 @@ def define_cmd_line_args():
                              help="whether training supervised by pixel values or not.")
     train_group.add_argument("--spectra-supervision", action="store_true",
                              help="whether training supervised by spectra or not.")
+    train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")
     train_group.add_argument("--quantize-latent", action="store_true")
     # train_group.add_argument("--cutout_based_train", action="store_true")
     train_group.add_argument("--resume-train", action="store_true")

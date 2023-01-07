@@ -106,20 +106,21 @@ trainer:
     log_dir: '../../data/pdr3/output'
 
     loss_cho: l1
-    num_epochs: 4000
+    num_epochs: 8000
     batch_size: 2048 #16384
-    save_every: 400
+    save_every: 800
     render_tb_every: -1
-    log_tb_every: 400
+    log_tb_every: 800
     log_gpu_every: -1
-    save_local_every: 400
+    save_local_every: 800
     save_as_new: True
     train_pixel_ratio: 0.1
     #masked_pixl_ratio_per_epoch: 1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks']
 
     pixel_supervision: True
-    spectra_supervision: False
+    spectra_supervision: True
+    spectra_beta: 0.01
 
     quantize_latent: False
     weight_train: False
