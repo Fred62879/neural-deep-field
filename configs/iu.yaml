@@ -12,7 +12,7 @@ global:
     #tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
 
-    #tasks: ['train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
+    tasks: ['train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
 
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
@@ -114,7 +114,7 @@ trainer:
     log_gpu_every: -1
     save_local_every: 400
     save_as_new: True
-    train_pixel_ratio: 1
+    train_pixel_ratio: 0.1
     #masked_pixl_ratio_per_epoch: 1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks']
 

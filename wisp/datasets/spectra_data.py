@@ -120,6 +120,9 @@ class SpectraData:
         """
         return self.data["gt_spectra_wave"]
 
+    def get_full_wave(self):
+        return self.full_wave
+
     #############
     # Helpers
     #############
@@ -297,7 +300,8 @@ class SpectraData:
             @Param
               recon_spectra: [num_spectra(,num_neighbours),full_num_smpl]
         """
-        wave = self.get_recon_spectra_wave()
+        full_wave = self.get_full_wave()
+        bounded_wave = self.get_recon_spectra_wave()
         bound_ids = self.get_recon_wave_bound_ids()
 
         for i, cur_spectra in enumerate(recon_spectra):
@@ -316,11 +320,14 @@ class SpectraData:
             cur_spectra /= np.max(cur_spectra)
 
             # get wave values (x-axis)
-            if wave is not None and i < len(wave):
-                recon_wave = wave[i]
+            if bound:
+                if bounded_wave is not None and i < len(bounded_wave):
+                    recon_wave = bounded_wave[i]
+                else:
+                    (lo, hi) = self.full_wave_bound
+                    recon_wave = np.arange(lo, hi + 1, self.kwargs["trans_sample_interval"])
             else:
-                (lo, hi) = self.full_wave_bound
-                recon_wave = np.arange(lo, hi + 1, self.kwargs["trans_sample_interval"])
+                recon_wave = full_wave
 
             if self.kwargs["plot_spectrum_with_trans"]:
                 self.trans_obj.plot_trans()
