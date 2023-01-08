@@ -52,13 +52,14 @@ class QuantizedDecoder(nn.Module):
         self.codebook = nn.Embedding(self.latent_dim, self.num_embed)
         self.codebook.weight.data.uniform_(
             -1.0 / self.latent_dim, 1.0 / self.latent_dim)
-        #self.codebook.weight.data *= 50
+        self.codebook.weight.data /= 10
         #self.codebook = torch.zeros(self.latent_dim, self.num_embed).to('cuda:0')
         #self.codebook.uniform_(-1/2,1/2)
+        #print(torch.min(self.codebook.weight.data), torch.max(self.codebook.weight.data))
 
     def quantize(self, z):
         # flatten input [...,]
-        assert(z.shape[-1] == self.latent_dim)
+        # assert(z.shape[-1] == self.latent_dim)
         z_shape = z.shape
         z_f = z.view(-1,self.latent_dim)
 
@@ -83,21 +84,22 @@ class QuantizedDecoder(nn.Module):
 
         # decode high-dim features into low dim latents
         z = self.decoder(z)
+        #print(torch.min(z), torch.max(z))
         scaler, redshift = None, None
 
         if self.output_scaler:
             if self.output_redshift:
-                scaler = z[...,-2:-1]
-                redshift = z[...,-1:]
+                scaler = z[:,0,-2]
+                redshift = z[:,0,-1]
                 z = z[...,:-2]
             else:
-                scaler = z[...,-1:]
+                scaler = z[:,0,-1]
                 z = z[...,:-1]
 
-        ret["scale"] = scaler
+        ret["scaler"] = scaler
         ret["redshift"] = redshift
 
-        # quantiza latents
+        # quantize latents
         z_q, min_embed_ids = self.quantize(z)
 
         if self.calculate_loss:

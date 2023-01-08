@@ -72,15 +72,12 @@ class HyperSpectralDecoder(nn.Module):
         return decoder
 
     def reconstruct_spectra(self, wave, latents, scaler, redshift, scale=True):
-        latents = self.convert(wave, latents, redshift) # **
-        #if latents.shape[0] == 1: print(latents)
-        #else: print(latents[2080])
-
+        latents = self.convert(wave, latents, redshift)
         if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
-        spectra = self.decode(latents)[...,0] # **
+        spectra = self.decode(latents)[...,0]
         if self.scale and scaler is not None:
-            spectra *= scaler
+            spectra = torch.exp((scaler * spectra.T).T)
         spectra = self.norm(spectra)
         return spectra
 
@@ -135,7 +132,6 @@ class HyperSpectralDecoder(nn.Module):
             if "spectra" not in ret: ret["spectra"] = spectra
             if self.kwargs["print_shape"]: print('hps_decoder', spectra.shape)
 
-            intensity = self.inte(spectra, trans, nsmpl) # **
+            intensity = self.inte(spectra, trans, nsmpl)
             if self.kwargs["print_shape"]: print('hps_decoder', intensity.shape)
-            ret["intensity"] = intensity # **
-            #ret["intensity"] = spectra
+            ret["intensity"] = intensity
