@@ -22,19 +22,23 @@ class HyperSpectralConverter(nn.Module):
     def shift_wave(self, wave, redshift):
         if self.kwargs["print_shape"]: print('hps_converter, shift wave', wave.shape)
         if self.kwargs["print_shape"]: print('hps_converter, shift wave', redshift.shape)
+        wave = wave.permute(1,2,0)
+
         if wave.ndim == 3:
             nsmpl = wave.shape[1] # [bsz,nsmpl,1]
-            redshift = torch.exp(redshift) - 0.1
-            wave += redshift.tile(1,nsmpl,1)
-            #wave /= (1 + redshift[:,:,None].tile(1,nsmpl,1))
+            # wave += torch.exp(redshift) - 0.1
+            # wave /= (1 + torch.exp(redshift))
+            wave /= (1 + redshift)
         elif wave.ndim == 4:
             nsmpl = wave.shape[2] # [bsz,nbands,nsmpl,1]
-            redshift = torch.exp(redshift) - 0.1
-            wave += redshift[:,:,:,None].tile(1,self.nbands,nsmpl,1)
-            #wave /= (1 + redshift[:,:,:,None].tile(1,self.nbands,nsmpl,1))
+            # wave += torch.exp(redshift) - 0.1
+            # wave /= (1 + torch.exp(redshift))
+            wave /= (1 + redshift)
         else:
             raise Exception("Wrong wave dimension when doing wave shifting.")
+
         del redshift
+        wave = wave.permute(2,0,1)
         return wave
 
     def combine_spatial_spectral(self, spatial, spectral):
@@ -85,4 +89,6 @@ class HyperSpectralConverter(nn.Module):
         latents = latents.tile(1,num_samples,1) # [bsz,nsamples,encode_dim or 2]
         if self.kwargs["print_shape"]: print('hps_converter, latents',latents.shape)
         latents = self.combine_spatial_spectral(latents, wave)
+
+        del wave, redshift
         return latents

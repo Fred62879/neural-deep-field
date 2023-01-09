@@ -55,7 +55,7 @@ class QuantizedDecoder(nn.Module):
         self.codebook.weight.data /= 10
         #self.codebook = torch.zeros(self.latent_dim, self.num_embed).to('cuda:0')
         #self.codebook.uniform_(-1/2,1/2)
-        #print(torch.min(self.codebook.weight.data), torch.max(self.codebook.weight.data))
+        print(torch.min(self.codebook.weight.data), torch.max(self.codebook.weight.data))
 
     def quantize(self, z):
         # flatten input [...,]
@@ -83,6 +83,7 @@ class QuantizedDecoder(nn.Module):
         if self.kwargs["print_shape"]: print('qtz ', z.shape)
 
         # decode high-dim features into low dim latents
+        #print(torch.min(z), torch.max(z))
         z = self.decoder(z)
         #print(torch.min(z), torch.max(z))
         scaler, redshift = None, None

@@ -46,9 +46,18 @@ class AstroHyperSpectral(BaseNeuralField):
             self.kwargs["coords_embed_sigma"], self.kwargs["coords_embed_bias"],
             self.kwargs["coords_embed_seed"])
 
+        coords_grid_args = (
+            self.grid_type, self.kwargs["grid_feature_dim"], self.kwargs["grid_dim"],
+            self.base_lod, self.kwargs["grid_num_lods"],
+            self.kwargs["grid_interpolation_type"], self.kwargs["grid_multiscale_type"],
+            self.kwargs["min_grid_res"], self.kwargs["max_grid_res"]
+        )
+
         self.coords_encoder = Encoder(
-            encode_method=self.kwargs["coords_encode_method"],
-            embedder_args=coords_embedder_args, **self.kwargs)
+            self.kwargs["coords_encode_method"],
+            coords_embedder_args,
+            *coords_grid_args,
+            **self.kwargs)
 
     def get_nef_type(self):
         return 'hyperspectral'
@@ -61,7 +70,7 @@ class AstroHyperSpectral(BaseNeuralField):
             channels.extend(["codebook_loss","min_embed_ids"])
         self._register_forward_function( self.hyperspectral, channels )
 
-    def hyperspectral(self, coords, wave=None, trans=None, nsmpl=None, full_wave=None, num_spectra_coords=-1, rpidx=None, lod_idx=None):
+    def hyperspectral(self, coords, wave=None, trans=None, nsmpl=None, full_wave=None, num_spectra_coords=-1, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
               coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2/3]
@@ -78,7 +87,7 @@ class AstroHyperSpectral(BaseNeuralField):
 
         ret = defaultdict(lambda: None)
 
-        latents = self.coords_encoder(coords)
+        latents = self.coords_encoder(coords, lod_idx=lod_idx)
         if self.kwargs["quantize_latent"]:
             latents = self.quantized_decoder(latents, ret)
         self.hps_decoder(latents, wave, trans, nsmpl, ret, full_wave, num_spectra_coords)

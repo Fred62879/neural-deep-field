@@ -9,18 +9,20 @@ from wisp.models.embedders import RandGaus
 class Encoder(nn.Module):
     """ Encoder class for coordinates.
     """
-    def __init__(self, encode_method, embedder_args, **kwargs):
+    def __init__(self, encode_method, embedder_args, *grid_args, **kwargs):
         super(Encoder, self).__init__()
 
+        self.kwargs = kwargs
         self.encode_method = encode_method
 
         if encode_method == "positional":
             self.embedder = RandGaus(embedder_args)
         elif encode_method == "grid":
-            self.init_grid()
+            self.init_grid(*grid_args)
 
-    def init_grid(self):
-        grid_type = self.kwargs["grid_type"]
+    def init_grid(self, *grid_args):
+        (grid_type, grid_feature_dim, grid_dim, grid_base_lod, grid_num_lods,
+         grid_interpolation_type, grid_multiscale_type, min_grid_res, max_grid_res) = grid_args
 
         if grid_type == "OctreeGrid":
             grid_class = OctreeGrid
@@ -34,22 +36,19 @@ class Encoder(nn.Module):
             raise NotImplementedError
 
         self.grid = grid_class(
-            self.kwargs["grid_feature_dim"],
-            grid_dim=self.kwargs["grid_dim"],
-            base_lod=self.kwargs["grid_base_lod"],
-            num_lods=self.kwargs["grid_num_lods"],
-            interpolation_type=self.kwargs["grid_interpolation_type"],
-            multiscale_type=self.kwargs["grid_multiscale_type"],
-            **self.kwargs)
+            grid_feature_dim,
+            base_lod=grid_base_lod,
+            num_lods=grid_num_lods,
+            interpolation_type=grid_interpolation_type,
+            multiscale_type=grid_multiscale_type, **self.kwargs)
 
-        self.grid.init_from_geometric(
-            self.kwargs["min_grid_res"], self.kwargs["max_grid_res"], self.kwargs["grid_num_lods"])
+        self.grid.init_from_geometric(min_grid_res, max_grid_res, grid_num_lods)
 
-        if self.multiscale_type == 'cat':
-            self.effective_feature_dim = self.grid.feature_dim * self.kwargs["grid_num_lods"]
-        else: self.effective_feature_dim = self.grid.feature_dim
+        if grid_multiscale_type == 'cat':
+            self.effective_feature_dim = self.grid.feature_dim * grid_num_lods
+        else: grid_effective_feature_dim = self.grid.feature_dim
 
-    def forward(self, coords):
+    def forward(self, coords, lod_idx=None):
         """ Encode given coords
             @Param
               coords: [batch_size,num_samples,coord_dim]

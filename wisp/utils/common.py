@@ -17,9 +17,9 @@ def get_input_latents_dim(**kwargs):
     if kwargs["coords_encode_method"] == "positional":
         latents_dim = kwargs["coords_embed_dim"]
     elif kwargs["coords_encode_method"] == "grid":
-        latents_dim = kwargs["feature_dim"]
-        if self.kwargs["multiscale_type"] == 'cat':
-            latents_dim *= kwargs["num_lods"]
+        latents_dim = kwargs["grid_feature_dim"]
+        if kwargs["grid_multiscale_type"] == 'cat':
+            latents_dim *= kwargs["grid_num_lods"]
     else:
         latents_dim = 2
     return latents_dim
