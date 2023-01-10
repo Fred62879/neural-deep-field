@@ -15,8 +15,8 @@ global:
     #tasks: ['train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
 
-    tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
-    #tasks: [''infer','recon_img','plot_embed_map','plot_latent_embed']
+    tasks: ['train','plot_save_scaler','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
+    #tasks: ['infer','recon_img','plot_embed_map','plot_latent_embed','plot_save_scaler']
 
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed']
@@ -109,11 +109,11 @@ trainer:
     loss_cho: l1
     num_epochs: 6000
     batch_size: 4096 #16384
-    save_every: 800
+    save_every: 600
     render_tb_every: -1
-    log_tb_every: 800
+    log_tb_every: 600
     log_gpu_every: -1
-    save_local_every: 800
+    save_local_every: 600
     save_as_new: True
     train_pixel_ratio: 0.1
     #masked_pixl_ratio_per_epoch: 1

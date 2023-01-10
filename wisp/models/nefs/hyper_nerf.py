@@ -67,7 +67,7 @@ class AstroHyperSpectral(BaseNeuralField):
         """
         channels = ["intensity","latents","spectra"]
         if self.kwargs["quantize_latent"]:
-            channels.extend(["codebook_loss","min_embed_ids"])
+            channels.extend(["scaler","redshift","codebook_loss","min_embed_ids"])
         self._register_forward_function( self.hyperspectral, channels )
 
     def hyperspectral(self, coords, wave=None, trans=None, nsmpl=None, full_wave=None, num_spectra_coords=-1, pidx=None, lod_idx=None):
@@ -91,5 +91,4 @@ class AstroHyperSpectral(BaseNeuralField):
         if self.kwargs["quantize_latent"]:
             latents = self.quantized_decoder(latents, ret)
         self.hps_decoder(latents, wave, trans, nsmpl, ret, full_wave, num_spectra_coords)
-
         return ret

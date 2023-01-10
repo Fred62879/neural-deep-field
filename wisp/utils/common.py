@@ -129,6 +129,7 @@ def forward(class_obj, pipeline, data,
             quantize_latent=False,
             calculate_codebook_loss=False,
             infer=False,
+            save_scaler=False,
             save_spectra=False,
             save_latents=False,
             save_embed_ids=False):
@@ -146,6 +147,7 @@ def forward(class_obj, pipeline, data,
         requested_channels = ["intensity"]
         if quantize_latent and calculate_codebook_loss:
             requested_channels.append("codebook_loss")
+        if save_scaler: requested_channels.append("scaler")
         if save_spectra: requested_channels.append("spectra")
         if save_latents: requested_channels.append("latents")
         if save_embed_ids: requested_channels.append("min_embed_ids")

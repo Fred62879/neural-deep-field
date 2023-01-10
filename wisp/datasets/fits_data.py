@@ -665,6 +665,7 @@ class FITSData:
 
         cur_tile = np.array(pixels[num_pixels_acc : num_pixels_acc + cur_num_pixels]).T. \
             reshape((re_args["num_bands"], num_rows, num_cols))
+
         cur_metrics, cur_metrics_zscale = self.evaluate(fits_id, cur_tile, **re_args)
         num_pixels_acc += cur_num_pixels
         return num_pixels_acc, cur_metrics, cur_metrics_zscale
