@@ -22,6 +22,9 @@ def get_input_latents_dim(**kwargs):
             latents_dim *= kwargs["grid_num_lods"]
     else:
         latents_dim = 2
+    # if self.kwargs["grid_multiscale_type"] == 'cat':
+    #     self.effective_feature_dim = self.grid.feature_dim * self.kwargs["grid_num_lods"]
+    # else: grid_effective_feature_dim = self.grid.feature_dim
     return latents_dim
 
 def add_to_device(data, valid_fields, device):

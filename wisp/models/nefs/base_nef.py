@@ -22,103 +22,12 @@ class BaseNeuralField(nn.Module):
 
     TODO(ttakikawa): More complete documentation here.
     """
-    def __init__(self,
-        space_dim          : int   = 3,
-        grid_type          : str = 'OctreeGrid',
-        interpolation_type : str = 'linear',
-        multiscale_type    : str = 'none',
-
-        as_type            : str = 'octree',
-        raymarch_type      : str = 'voxel',
-
-        decoder_type       : str = 'none',
-        embedder_type      : str = 'none',
-        activation_type    : str = 'relu',
-        layer_type         : str = 'none',
-
-        base_lod         : int   = 2,
-        num_lods         : int   = 1,
-
-        # grid args
-        sample_tex       : bool  = False,
-        dilate           : int   = None,
-        feature_dim      : int   = 16,
-        grid_dim         : int   = 3,
-
-        # decoder args
-        hidden_dim       : int   = 128,
-        output_dim       : int   = 5,
-        pos_multires     : int   = 10,
-        view_multires    : int   = 4,
-        num_layers       : int   = 1,
-        position_input   : bool  = False,
-        **kwargs
-    ):
+    def __init__(self):
         super().__init__()
 
-        self.space_dim = space_dim
-        self.grid_type = grid_type
-        self.interpolation_type = interpolation_type
-        self.raymarch_type = raymarch_type
-        self.embedder_type = embedder_type
-        self.activation_type = activation_type
-        self.layer_type = layer_type
-        self.decoder_type = decoder_type
-        self.multiscale_type = multiscale_type
-
-        self.base_lod = base_lod
-        self.num_lods = num_lods
-
-        self.sample_tex = sample_tex
-        self.dilate = dilate
-        self.feature_dim = feature_dim
-        self.grid_dim = grid_dim
-
-        self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
-        self.pos_multires = pos_multires
-        self.view_multires = view_multires
-        self.num_layers = num_layers
-        self.position_input = position_input
-
-        self.kwargs = kwargs
-
-        self.grid = None
-        self.decoder = None
-
-        self.init_grid()
-        self.init_embedder()
-        self.init_decoder()
-        torch.cuda.empty_cache()
         self._forward_functions = {}
         self.register_forward_functions()
         self.supported_channels = set([channel for channels in self._forward_functions.values() for channel in channels])
-
-    def init_embedder(self):
-        """Initialize positional embedding objects.
-        """
-        return
-
-    def init_decoder(self):
-        """Initialize the decoder object.
-        """
-        return
-
-    def init_grid(self):
-        """Initialize the grid object.
-        """
-        return
-
-    def get_nef_type(self):
-        """Returns a text keyword of the neural field type.
-
-        'default' works in most scenarios, but you can use other keywords to specify
-        custom behaviour from the renderer widgets.
-
-        Returns:
-            (str): The key type
-        """
-        return 'default'
 
     @property
     def device(self):

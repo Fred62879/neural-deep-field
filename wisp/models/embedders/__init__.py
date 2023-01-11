@@ -6,5 +6,6 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
+from .encoder import *
 from .pe import RandGaus
 from .positional_embedder import *

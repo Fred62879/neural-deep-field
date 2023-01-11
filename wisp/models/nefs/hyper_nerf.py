@@ -4,13 +4,13 @@ import torch
 from collections import defaultdict
 
 from wisp.utils import PerfTimer
-from wisp.models.encoders import Encoder
+from wisp.models.embedders import Encoder
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.decoders import QuantizedDecoder
 from wisp.models.hypers import HyperSpectralDecoder
 
 
-class AstroHyperSpectral(BaseNeuralField):
+class AstroHyperSpectralNerf(BaseNeuralField):
     """ Model for encoding RA/DEC coordinates with lambda
           values from Monte Carlo sampling.
 
@@ -18,46 +18,18 @@ class AstroHyperSpectral(BaseNeuralField):
           here we use either the positional encoding or the grid for encoding.
     """
     def __init__(self, integrate=True, scale=True, qtz_calculate_loss=True, **kwargs):
-        super(AstroHyperSpectral, self).__init__(**kwargs)
+        super(AstroHyperSpectralNerf, self).__init__()
 
         self.kwargs = kwargs
         self.space_dim = kwargs["space_dim"]
 
-        self.init_encoder()
+        self.encoder = Encoder(kwargs["coords_encode_method"], **kwargs)
         if kwargs["quantize_latent"]:
-            self.quantized_decoder = QuantizedDecoder(
-                qtz_calculate_loss, **kwargs)
+            self.quantized_decoder = QuantizedDecoder(qtz_calculate_loss, **kwargs)
         self.hps_decoder = HyperSpectralDecoder(
             integrate=integrate, scale=scale, **kwargs)
 
         torch.cuda.empty_cache()
-        self._forward_functions = {}
-        self.register_forward_functions()
-        self.supported_channels = set([
-            channel for channels in self._forward_functions.values()
-            for channel in channels])
-
-    def init_encoder(self):
-        """ Initialize the encoder (positional encoding or grid interpolaton)
-              for both ra/dec coordinates and wave (lambda values).
-        """
-        coords_embedder_args = (
-            2, self.kwargs["coords_embed_dim"], self.kwargs["coords_embed_omega"],
-            self.kwargs["coords_embed_sigma"], self.kwargs["coords_embed_bias"],
-            self.kwargs["coords_embed_seed"])
-
-        coords_grid_args = (
-            self.grid_type, self.kwargs["grid_feature_dim"], self.kwargs["grid_dim"],
-            self.base_lod, self.kwargs["grid_num_lods"],
-            self.kwargs["grid_interpolation_type"], self.kwargs["grid_multiscale_type"],
-            self.kwargs["min_grid_res"], self.kwargs["max_grid_res"]
-        )
-
-        self.coords_encoder = Encoder(
-            self.kwargs["coords_encode_method"],
-            coords_embedder_args,
-            *coords_grid_args,
-            **self.kwargs)
 
     def get_nef_type(self):
         return 'hyperspectral'

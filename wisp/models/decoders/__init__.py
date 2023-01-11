@@ -6,6 +6,7 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
-from .siren import *
-from .basic_decoders import *
+from .decoder import *
+#from .siren import *
+#from .basic_decoders import *
 from .quantized_decoder import *

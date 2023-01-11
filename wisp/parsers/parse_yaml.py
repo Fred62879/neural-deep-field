@@ -130,33 +130,6 @@ def define_cmd_line_args():
                            choices=["identity","arcsinh","sinh"])
 
     ###################
-    # Nef decoder arguments
-    ###################
-    nef_group = parser.add_argument_group("nef")
-
-    nef_group.add_argument("--layer-type", type=str, default="none",
-                            choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
-    nef_group.add_argument("--activation-type", type=str,
-                           default="relu", choices=["relu", "sin"])
-    nef_group.add_argument("--decoder-type", type=str,
-                           default="basic", choices=["none", "basic"])
-
-    nef_group.add_argument("--num-layers", type=int, default=1,
-                           help="Number of layers for the decoder")
-    nef_group.add_argument("--hidden-dim", type=int, default=128,
-                           help="Network width")
-    nef_group.add_argument("--out-dim", type=int, default=1,
-                           help="output dimension")
-    nef_group.add_argument("--skip", type=int, default=None,
-                           help="Layer to have skip connection.")
-
-    net_group.add_argument("--siren-seed", type=int, default=1)
-    net_group.add_argument("--siren-first-w0", type=int, default=30)
-    net_group.add_argument("--siren-hidden-w0", type=int, default=30)
-    net_group.add_argument("--siren-coords-scaler", type=int, default=1)
-    net_group.add_argument("--siren-last-linear", action="store_true")
-
-    ###################
     # Embedder arguments
     ###################
     embedder_group = parser.add_argument_group("embedder")
@@ -216,6 +189,33 @@ def define_cmd_line_args():
                             help="Bitwidth to use for the codebook. The number of vectors will be 2^bitwidth.")
 
     ###################
+    # Decoder arguments
+    ###################
+    decoder_group = parser.add_argument_group("decoder")
+
+    decoder_group.add_argument("--decoder-layer-type", type=str, default="none",
+                            choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
+    decoder_group.add_argument("--decoder-activation-type", type=str,
+                           default="relu", choices=["relu", "sin"])
+    decoder_group.add_argument("--decoder-decoder-type", type=str,
+                           default="basic", choices=["none", "basic"])
+
+    decoder_group.add_argument("--decoder-num-layers", type=int, default=1,
+                           help="Number of layers for the decoder")
+    decoder_group.add_argument("--decoder-hidden-dim", type=int, default=128,
+                           help="Network width")
+    decoder_group.add_argument("--decoder-out-dim", type=int, default=1,
+                           help="output dimension")
+    decoder_group.add_argument("--decoder-skip", type=int, default=None,
+                           help="Layer to have skip connection.")
+
+    decoder_group.add_argument("--siren-seed", type=int, default=1)
+    decoder_group.add_argument("--siren-first-w0", type=int, default=30)
+    decoder_group.add_argument("--siren-hidden-w0", type=int, default=30)
+    decoder_group.add_argument("--siren-coords-scaler", type=int, default=1)
+    decoder_group.add_argument("--siren-last-linear", action="store_true")
+
+    ###################
     # Quantization arguments
     ###################
     qtz_group = parser.add_argument_group("quantization")
@@ -236,25 +236,14 @@ def define_cmd_line_args():
                            default="relu", choices=["relu", "sin"])
 
     ###################
-    # Hyperspectral decoder arguments
+    # Hyperspectral arguments
     ###################
     hps_group = parser.add_argument_group("hyperspectral")
 
     hps_group.add_argument("--hps-combine-method", type=str, choices=["add","concat"],
                            help="method to combine ra/dec coordinate with lambda.")
-
-    hps_group.add_argument("--hps-decod-activation-type", type=str)
-    hps_group.add_argument("--hps-decod-num-layers", type=int)
-    hps_group.add_argument("--hps-decod-hidden-dim", type=int)
-    hps_group.add_argument("--hps-decod-layer-type", type=str, default="none")
     hps_group.add_argument("--integration-method", type=str,
                             choices=["identity","dot_prod","trapezoid","simpson"])
-
-    hps_group.add_argument("--hps-siren-seed", type=int, default=1)
-    hps_group.add_argument("--hps-siren-first-w0", type=int, default=30)
-    hps_group.add_argument("--hps-siren-hidden-w0", type=int, default=30)
-    hps_group.add_argument("--hps-siren-coords-scaler", type=int, default=1)
-    hps_group.add_argument("--hps-siren-last-linear", action="store_true")
 
     ###################
     # Arguments for dataset

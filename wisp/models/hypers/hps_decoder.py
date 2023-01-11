@@ -3,12 +3,8 @@ import torch
 import torch.nn as nn
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import get_input_latents_dim
-
-from wisp.models.encoders import Encoder
-from wisp.models.decoders import BasicDecoder, Siren
-from wisp.models.activations import get_activation_class
-from wisp.models.layers import get_layer_class, Normalization
+from wisp.models.embedders import Encoder
+from wisp.models.layers import Normalization
 from wisp.models.hypers.hps_converter import HyperSpectralConverter
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
 
@@ -22,54 +18,12 @@ class HyperSpectralDecoder(nn.Module):
         self.kwargs = kwargs
         self.scale = scale
 
-        self.init_wave_encoder()
+        self.wave_encoder = Encoder(
+            encode_method=self.kwargs["wave_encode_method"], **kwargs)
         self.convert = HyperSpectralConverter(self.wave_encoder, **kwargs)
-        self.decode = self.init_decoder()
+        self.decoder = Decoder(**kwargs)
         self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
-
-    def init_wave_encoder(self):
-        wave_embedder_args = (
-            1, self.kwargs["wave_embed_dim"], self.kwargs["wave_embed_omega"],
-            self.kwargs["wave_embed_sigma"], self.kwargs["wave_embed_bias"],
-            self.kwargs["wave_embed_seed"])
-
-        self.wave_encoder = Encoder(
-            encode_method=self.kwargs["wave_encode_method"],
-            embedder_args=wave_embedder_args, **self.kwargs)
-
-    def init_decoder(self):
-        # encode ra/dec coords first and then combine with wave
-        if self.kwargs["quantize_latent"]:
-            latents_dim = self.kwargs["qtz_latent_dim"]
-        else: latents_dim = get_input_latents_dim(**self.kwargs)
-
-        if self.kwargs["wave_encode_method"] == "positional":
-            if self.kwargs["hps_combine_method"] == "add":
-                assert(self.kwargs["wave_encode_dim"] == latents_dim)
-                input_dim = self.kwargs["wave_embed_dim"]
-            elif self.kwargs["hps_combine_method"] == "concat":
-                input_dim = self.kwargs["wave_embed_dim"] + latents_dim
-
-        else: # coords and wave are not encoded
-            input_dim = 3 # **
-
-        if self.kwargs["hps_decod_activation_type"] == "relu":
-            decoder = BasicDecoder(
-                input_dim, 1, get_activation_class(self.kwargs["hps_decod_activation_type"]),
-                True, layer=get_layer_class(self.kwargs["hps_decod_layer_type"]),
-                num_layers=self.kwargs["hps_decod_num_layers"]+1,
-                hidden_dim=self.kwargs["hps_decod_hidden_dim"], skip=[])
-
-        elif self.kwargs["hps_decod_activation_type"] == "sin":
-            decoder = Siren(
-                input_dim, 1, self.kwargs["hps_decod_num_layers"], self.kwargs["hps_decod_hidden_dim"],
-                self.kwargs["hps_siren_first_w0"], self.kwargs["hps_siren_hidden_w0"],
-                self.kwargs["hps_siren_seed"], self.kwargs["hps_siren_coords_scaler"],
-                self.kwargs["hps_siren_last_linear"])
-
-        else: raise ValueError("Unrecognized hyperspectral decoder activation type.")
-        return decoder
 
     def reconstruct_spectra(self, wave, latents, scaler, redshift, scale=True):
         latents = self.convert(wave, latents, redshift)
@@ -78,6 +32,7 @@ class HyperSpectralDecoder(nn.Module):
         spectra = self.decode(latents)[...,0]
         if self.scale and scaler is not None:
             spectra = torch.exp((scaler * spectra.T).T)
+            #spectra = (scaler * spectra.T).T
         spectra = self.norm(spectra)
         return spectra
 
