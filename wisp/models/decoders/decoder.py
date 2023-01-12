@@ -31,8 +31,8 @@ class Decoder(nn.Module):
                 assert(self.kwargs["decoder_activation_type"] == "relu")
                 input_dim = get_input_latents_dim(**self.kwargs)
             else:
-                assert(activation_type == "sin")
-                input_dim = self.space_dim
+                assert(self.kwargs["decoder_activation_type"] == "sin")
+                input_dim = self.kwargs["space_dim"]
 
         else: #if kwargs["space_dim"] == 3:
             if self.kwargs["quantize_latent"]:
@@ -73,7 +73,7 @@ class Decoder(nn.Module):
                 hidden_dim=self.kwargs["decoder_hidden_dim"],
                 skip=[])
 
-        elif kwargs["activation_type"] == "sin":
+        elif self.kwargs["decoder_activation_type"] == "sin":
             self.decoder = Siren(
                 input_dim, output_dim,
                 self.kwargs["decoder_num_layers"],

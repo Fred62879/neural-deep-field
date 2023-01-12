@@ -6,7 +6,7 @@ global:
     dataloader_drop_last: True
     exp_name: 'test-ngp-nerf'
 
-    tasks: ['train','save_recon_during_train','infer','recon_img']
+    #tasks: ['train','save_recon_during_train','infer','recon_img']
     #tasks: ['infer','recon_img']
 
     #tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
@@ -20,6 +20,7 @@ global:
 
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed']
+    tasks: ['infer','recon_gt_spectra']
 
 optimizer:
     optimizer_type: 'adam'
@@ -30,15 +31,15 @@ optimizer:
     hps_lr: 1e-5
 
 net:
-    #nef_type: 'AstroHyperSpectral'
-    nef_type: 'AstroNerf'
-    coords_encode_method: 'none'
-    wave_encode_method: 'none'
+    nef_type: 'AstroHyperSpectralNerf'
+    #nef_type: 'AstroNerf'
+    coords_encode_method: 'positional'
+    wave_encode_method: 'positional'
     mlp_output_norm_method: 'sinh'
 
 embedder:
     coords_embed_bias: True
-    coords_embed_dim: 4000
+    coords_embed_dim: 1000
     coords_embed_omega: 8
     coords_embed_sigma: 1.0
     coords_embed_seed: 2
@@ -65,7 +66,6 @@ grid:
 decoder:
     decoder_num_layers: 3
     decoder_hidden_dim: 256
-    decoder_out_dim: 5
     decoder_layer_type: 'none'
     decoder_activation_type: "sin"
 
@@ -98,20 +98,20 @@ trainer:
     log_dir: '../../data/pdr3/output'
 
     loss_cho: l1
-    num_epochs: 10000
-    batch_size: 4096 #16384
-    save_every: 1000
+    num_epochs: 6000
+    batch_size: 2048 #16384
+    save_every: 600
     render_tb_every: -1
-    log_tb_every: 1000
+    log_tb_every: 600
     log_gpu_every: -1
-    save_local_every: 1000
+    save_local_every: 600
     save_as_new: True
     train_pixel_ratio: 0.1
     #masked_pixl_ratio_per_epoch: 1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks']
 
     pixel_supervision: True
-    spectra_supervision: False
+    spectra_supervision: True
     spectra_beta: 0.01
 
     quantize_latent: True
@@ -151,7 +151,7 @@ infer:
     infer_spectra_individually: True
 
 dataset:
-    space_dim: 2
+    space_dim: 3
     dataset_type: 'astro'
     load_fits_data_cache: True
     dataset_path: '../../data/pdr3'

@@ -295,7 +295,7 @@ class SpectraData:
     # Utilities
     #############
 
-    def plot_spectrum(self, spectra_dir, name, recon_spectra, save_spectra=False, bound=True):
+    def plot_spectrum(self, spectra_dir, name, recon_spectra, save_spectra=False, bound=True, codebook=False):
         """ Plot given spectra.
             @Param
               recon_spectra: [num_spectra(,num_neighbours),full_num_smpl]
@@ -310,6 +310,9 @@ class SpectraData:
             if bound and bound_ids is not None and i < len(bound_ids):
                 (lo, hi) = bound_ids[i]
                 cur_spectra = cur_spectra[...,lo:hi]
+            elif codebook:
+                (lo, hi) = bound_ids[0]
+                cur_spectra = cur_spectra[...,lo:hi]
 
             # average spectra over neighbours, if required
             if cur_spectra.ndim == 2:
@@ -323,6 +326,8 @@ class SpectraData:
             if bound:
                 if bounded_wave is not None and i < len(bounded_wave):
                     recon_wave = bounded_wave[i]
+                elif codebook:
+                    recon_wave = bounded_wave[0]
                 else:
                     (lo, hi) = self.full_wave_bound
                     recon_wave = np.arange(lo, hi + 1, self.kwargs["trans_sample_interval"])
@@ -337,6 +342,11 @@ class SpectraData:
             if i < self.get_num_gt_spectra():
                 cur_gt_spectra = self.get_gt_spectra()[i]
                 cur_gt_spectra_wave = self.get_gt_spectra_wave()[i]
+                cur_gt_spectra /= np.max(cur_gt_spectra)
+                plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
+            elif codebook:
+                cur_gt_spectra = self.get_gt_spectra()[0]
+                cur_gt_spectra_wave = self.get_gt_spectra_wave()[0]
                 cur_gt_spectra /= np.max(cur_gt_spectra)
                 plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
 

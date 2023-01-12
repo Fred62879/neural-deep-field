@@ -314,7 +314,7 @@ class AstroInferrer(BaseInferrer):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
         self.dataset.plot_spectrum(
             self.codebook_spectra_dir, model_id, self.codebook_spectra,
-            save_spectra=True)
+            save_spectra=True, codebook=True)
 
     #############
     # Helpers
@@ -391,6 +391,7 @@ class AstroInferrer(BaseInferrer):
     def infer_codebook_spectra(self, model_id, checkpoint):
         load_model_weights(self.codebook_pipeline, checkpoint)
         self.codebook_pipeline.eval()
+        #print(self.codebook_pipeline)
 
         codebook_latents = load_layer_weights(
             checkpoint, lambda n: "grid" not in n and "codebook" in n)

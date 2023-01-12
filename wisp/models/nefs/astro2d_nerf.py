@@ -26,11 +26,27 @@ class AstroNerf(BaseNeuralField):
         self.kwargs = kwargs
         self.num_bands = kwargs["num_bands"]
 
-        self.encoder = Encoder(kwargs["coords_encode_method"], **kwargs)
+        self.init_encoder()
         self.decoder = Decoder(**kwargs)
         self.norm = Normalization(kwargs["mlp_output_norm_method"])
 
         torch.cuda.empty_cache()
+
+    def init_encoder(self):
+        embedder_args = (
+            2,
+            self.kwargs["coords_embed_dim"],
+            self.kwargs["coords_embed_omega"],
+            self.kwargs["coords_embed_sigma"],
+            self.kwargs["coords_embed_bias"],
+            self.kwargs["coords_embed_seed"]
+        )
+        self.encoder = Encoder(
+            input_dim=2,
+            encode_method=self.kwargs["coords_encode_method"],
+            embedder_args=embedder_args,
+            **self.kwargs
+        )
 
     def get_nef_type(self):
         return 'astro2d'

@@ -10,7 +10,6 @@ from wisp.datasets import *
 from wisp.models.nefs import *
 from wisp.models import AstroPipeline
 from wisp.datasets.transforms import *
-from wisp.models.test import MLP_All
 
 
 str2optim = {m.lower(): getattr(torch.optim, m) for m in dir(torch.optim) if m[0].isupper()}
@@ -52,11 +51,7 @@ def get_pipelines_from_config(args, tasks=[]):
     tasks = set(tasks)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    if args.debug:
-        pipeline = MLP_All('siren',(2,256,5,3,False,24,6,8,0,torch.FloatTensor))
-        pipelines["full"] = pipeline
-
-    elif args.dataset_type == 'astro':
+    if args.dataset_type == 'astro':
         nef_train = globals()[args.nef_type](**vars(args))
         pipelines["full"] = AstroPipeline(nef_train)
         log.info(pipelines["full"])
@@ -69,7 +64,9 @@ def get_pipelines_from_config(args, tasks=[]):
 
         # pipeline for codebook spectra inferrence
         if "recon_codebook_spectra" in tasks:
-            codebook_nef = CodebookNef(integrate=False, **vars(args))
+            #codebook_nef = CodebookNef(integrate=False, **vars(args))
+            codebook_nef = globals()[args.nef_type](
+                integrate=False, qtz_calculate_loss=False, **vars(args))
             pipelines["codebook"] = AstroPipeline(codebook_nef)
     else:
         raise ValueError(f"{args.dataset_type} unrecognized dataset_type")

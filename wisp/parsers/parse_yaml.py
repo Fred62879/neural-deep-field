@@ -204,8 +204,6 @@ def define_cmd_line_args():
                            help="Number of layers for the decoder")
     decoder_group.add_argument("--decoder-hidden-dim", type=int, default=128,
                            help="Network width")
-    decoder_group.add_argument("--decoder-out-dim", type=int, default=1,
-                           help="output dimension")
     decoder_group.add_argument("--decoder-skip", type=int, default=None,
                            help="Layer to have skip connection.")
 

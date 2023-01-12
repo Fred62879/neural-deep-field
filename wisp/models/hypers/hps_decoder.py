@@ -4,6 +4,7 @@ import torch.nn as nn
 
 from wisp.utils import PerfTimer
 from wisp.models.embedders import Encoder
+from wisp.models.decoders import Decoder
 from wisp.models.layers import Normalization
 from wisp.models.hypers.hps_converter import HyperSpectralConverter
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
@@ -18,18 +19,33 @@ class HyperSpectralDecoder(nn.Module):
         self.kwargs = kwargs
         self.scale = scale
 
-        self.wave_encoder = Encoder(
-            encode_method=self.kwargs["wave_encode_method"], **kwargs)
+        self.init_encoder()
         self.convert = HyperSpectralConverter(self.wave_encoder, **kwargs)
-        self.decoder = Decoder(**kwargs)
+        self.spectra_decoder = Decoder(**kwargs)
         self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
+
+    def init_encoder(self):
+        embedder_args = (
+            1,
+            self.kwargs["wave_embed_dim"],
+            self.kwargs["wave_embed_omega"],
+            self.kwargs["wave_embed_sigma"],
+            self.kwargs["wave_embed_bias"],
+            self.kwargs["wave_embed_seed"]
+        )
+        self.wave_encoder = Encoder(
+            input_dim=1,
+            encode_method=self.kwargs["wave_encode_method"],
+            embedder_args=embedder_args,
+            **self.kwargs
+        )
 
     def reconstruct_spectra(self, wave, latents, scaler, redshift, scale=True):
         latents = self.convert(wave, latents, redshift)
         if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
-        spectra = self.decode(latents)[...,0]
+        spectra = self.spectra_decoder(latents)[...,0]
         if self.scale and scaler is not None:
             spectra = torch.exp((scaler * spectra.T).T)
             #spectra = (scaler * spectra.T).T

@@ -375,11 +375,13 @@ class AstroTrainer(BaseTrainer):
 
         with torch.cuda.amp.autocast():
             total_loss, recon_pixels, ret = self.calculate_loss(data)
-            #total_loss, recon_pixels, recon_spectra, ret = self.calculate_loss(data)
+        # total_loss, recon_pixels, recon_spectra, ret = self.calculate_loss(data)
 
         self.scaler.scale(total_loss).backward()
         self.scaler.step(self.optimizer)
         self.scaler.update()
+        #total_loss.backward()
+        #self.optimizer.step()
 
         self.timer.check("backward and step")
 

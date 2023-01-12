@@ -197,7 +197,9 @@ def load_model_weights_exact(model, pretrained_state, train_chnls):
 
 def load_model_weights(model, pretrained_state):
     cur_state = model.state_dict()
+    #print(pretrained_state.keys())
     pretrained_dict = {k: v for k, v in pretrained_state.items() if k in cur_state}
+    #print(pretrained_dict.keys())
     model.load_state_dict(pretrained_dict)
 
 def load_model(model, optimizer, modelDir, model_smpl_intvl, cuda, verbose):

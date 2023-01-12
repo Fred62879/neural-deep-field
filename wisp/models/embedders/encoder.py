@@ -15,25 +15,17 @@ class Encoder(nn.Module):
          - Positional encoding
          - Grid
     """
-    def __init__(self, encode_method, **kwargs):
+    def __init__(self, input_dim, encode_method, embedder_args, **kwargs):
         super(Encoder, self).__init__()
 
         self.kwargs = kwargs
+        self.input_dim = input_dim
         self.encode_method = encode_method
 
         if encode_method == "positional":
-            self.init_embedder()
+            self.embedder = RandGaus(embedder_args)
         elif encode_method == "grid":
             self.init_grid()
-        else:
-            raise ValueError("Unsupported coordinate encoding method.")
-
-    def init_embedder(self):
-        embedder_args = (
-            2, self.kwargs["coords_embed_dim"], self.kwargs["coords_embed_omega"],
-            self.kwargs["coords_embed_sigma"], self.kwargs["coords_embed_bias"],
-            self.kwargs["coords_embed_seed"])
-        self.embedder = RandGaus(embedder_args)
 
     def init_grid(self):
         grid_type = self.kwargs["grid_type"]

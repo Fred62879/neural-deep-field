@@ -10,17 +10,12 @@ class CodebookNef(BaseNeuralField):
     """ Model for returning hardcoded value.
     """
     def __init__(self, integrate, **kwargs):
-        super(CodebookNef, self).__init__(**kwargs)
+        super(CodebookNef, self).__init__()
 
         self.hps_decoder = HyperSpectralDecoder(
             integrate=integrate, scale=False, **kwargs)
 
         torch.cuda.empty_cache()
-        self._forward_functions = {}
-        self.register_forward_functions()
-        self.supported_channels = set([
-            channel for channels in self._forward_functions.values()
-            for channel in channels])
 
     def get_nef_type(self):
         return 'codebook'
