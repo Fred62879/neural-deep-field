@@ -46,14 +46,12 @@ class HyperSpectralDecoder(nn.Module):
         if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
         spectra = self.spectra_decoder(latents)[...,0]
-        print(scaler)
-        '''
+
         if self.scale and scaler is not None:
-            spectra = torch.exp((scaler * spectra.T).T)
+            spectra = (torch.exp(scaler) * spectra.T).T
             #spectra = (scaler * spectra.T).T
         spectra = self.norm(spectra)
-        '''
-        print(spectra)
+
         return spectra
 
     def train_with_full_wave(self, latents, full_wave, num_spectra_coords, ret):

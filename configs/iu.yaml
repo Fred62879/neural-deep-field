@@ -19,8 +19,8 @@ global:
     #tasks: ['infer','recon_img','plot_embed_map','plot_latent_embed','plot_save_scaler']
 
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra']
-    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed']
-    tasks: ['infer','recon_gt_spectra']
+    tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed']
+    #tasks: ['infer','recon_gt_spectra']
 
 optimizer:
     optimizer_type: 'adam'
@@ -133,7 +133,7 @@ infer:
     inferrer_type: 'AstroInferrer'
     infer_batch_size: 128
     infer_use_all_wave: True # enforced
-    infer_last_model_only: True
+    infer_last_model_only: False
 
     # recon img
     to_HDU: True
