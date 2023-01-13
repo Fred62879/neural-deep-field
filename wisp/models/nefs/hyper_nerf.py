@@ -9,6 +9,8 @@ from wisp.models.nefs import BaseNeuralField
 from wisp.models.decoders import QuantizedDecoder
 from wisp.models.hypers import HyperSpectralDecoder
 
+from wisp.utils.common import load_layer_weights
+
 
 class AstroHyperSpectralNerf(BaseNeuralField):
     """ Model for encoding RA/DEC coordinates with lambda
@@ -80,9 +82,18 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         if self.kwargs["quantize_latent"]:
             latents = self.qtz_decoder(latents, ret)
 
-        np.save('../../data/tmp.npy', latents.detach().cpu().numpy())
-        latents = torch.FloatTensor(np.load('../../data/tmp.npy')).to('cuda:0')
+        '''
+        #ids = ret["min_embed_ids"]
+        checkpoint = torch.load('../../data/pdr3/output/test-ngp-nerf/20230111-191730/models/model-ep6000-it2.pth')['model_state_dict']
+        codebook_latents = load_layer_weights(
+            checkpoint, lambda n: "grid" not in n and "codebook" in n)
+        codebook_latents = codebook_latents.T[:,None] # [num_embd, 1, latent_dim]
+
         #latents = coords
-        #print(latents)
+        latents = codebook_latents[2]
+        '''
+
         self.hps_decoder(latents, wave, trans, nsmpl, ret, full_wave, num_spectra_coords)
+        #print(ret["spectra"][1,206:407])
+        #print(ret["spectra"])
         return ret

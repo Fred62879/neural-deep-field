@@ -300,7 +300,8 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()
 
-        self.dataset.plot_spectrum(self.spectra_dir, model_id, self.recon_spectra)
+        self.dataset.plot_spectrum(self.spectra_dir, model_id, self.recon_spectra,
+                                   save_spectra=True)
         #self.calculate_recon_spectra_pixel_values()
 
     def pre_checkpoint_hardcode_coords_modified_model(self, model_id):

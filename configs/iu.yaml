@@ -133,7 +133,7 @@ infer:
     inferrer_type: 'AstroInferrer'
     infer_batch_size: 128
     infer_use_all_wave: True # enforced
-    infer_last_model_only: False
+    infer_last_model_only: True
 
     # recon img
     to_HDU: True
