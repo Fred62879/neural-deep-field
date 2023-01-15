@@ -363,7 +363,11 @@ class FITSData:
             np.save(self.coords_fname, coords)
             np.save(self.coords_range_fname, np.array(coords_range))
 
-        self.data["coords"] = torch.FloatTensor(coords)[:,None] #.to(self.device)
+        num_coords = coords.shape[0]
+        coords_3d = np.zeros((num_coords, 3))
+        coords_3d[...,:2] = coords
+        #self.data["coords"] = torch.FloatTensor(coords)[:,None]
+        self.data["coords"] = torch.FloatTensor(coords_3d)[:,None]
 
     def get_mgrid_np(self, sidelen, lo=0, hi=1, dim=2, indexing='ij', flat=True):
         """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version).

@@ -1,5 +1,6 @@
 
 import torch
+import torch.nn as nn
 
 from wisp.utils import PerfTimer
 from wisp.models.embedders import Encoder
@@ -74,6 +75,7 @@ class AstroNerf(BaseNeuralField):
         batch, num_samples, _ = coords.shape
 
         coords = self.encoder(coords)
+
         intensity = self.decoder(coords).view(-1, self.num_bands)
         intensity = self.norm(intensity)
         timer.check("rf_hyperspectral_decode")

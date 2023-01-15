@@ -60,9 +60,9 @@ def query_GPU_mem():
     handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
     # card id 0 hardcoded here, there is also a call to get all available card ids, so we could iterate
     info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
-    print("Total memory:", info.total)
-    print("Free memory:", info.free)
-    print("Used memory:", info.used)
+    print(f"Total memory: {info.total/1e9}GB")
+    print(f"Free memory: {info.free/1e9}GB")
+    print(f"Used memory: {info.used/1e9}GB")
     nvidia_smi.nvmlShutdown()
 
 def generate_hdu(header, data, fname):

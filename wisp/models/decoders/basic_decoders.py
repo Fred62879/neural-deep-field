@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from scipy.stats import ortho_group
-from wisp.utils.common import get_gpu_info
+from wisp.utils.common import get_gpu_info, query_GPU_mem
 
 class MLP_Relu(nn.Module):
     def __init__(self, dim_in, dim_hidden, dim_out, num_hidden_layers, seed):
@@ -107,19 +107,7 @@ class BasicDecoder(nn.Module):
         N = x.shape[0]
         for i, l in enumerate(self.layers):
             if i == 0:
-                # gpu_info = get_gpu_info()
-                # free = gpu_info.free / 1e9
-                # used = gpu_info.used / 1e9
-                # print(f"Free/Used GPU memory: ~{free}GB / ~{used}GB")
-                # t = torch.cuda.get_device_properties(0).total_memory
-                # r = torch.cuda.memory_reserved(0)
-                # a = torch.cuda.memory_allocated(0)
-                # print(f"free:{r - a}, reserved:{r}, allocated:{a}")
                 h = self.activation(l(x))
-                # t = torch.cuda.get_device_properties(0).total_memory
-                # r = torch.cuda.memory_reserved(0)
-                # a = torch.cuda.memory_allocated(0)
-                # print(f"free:{r - a}, reserved:{r}, allocated:{a}")
             elif i in self.skip:
                 h = self.activation(l(h))
                 h = torch.cat([x, h], dim=-1)

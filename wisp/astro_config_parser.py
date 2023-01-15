@@ -35,7 +35,10 @@ def get_optimizer_from_config(args):
 def get_dataset_from_config(args):
     """ Utility function to get the dataset from the parsed config.
     """
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if args.use_gpu:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    else: device = "cpu"
+
     transform = None #AddToDevice(device)
     if args.dataset_type == 'astro':
         dataset = AstroDataset(device=device, transform=transform, **vars(args))
@@ -49,7 +52,9 @@ def get_pipelines_from_config(args, tasks=[]):
     """
     pipelines = {}
     tasks = set(tasks)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if args.use_gpu:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    else: device = "cpu"
 
     if args.dataset_type == 'astro':
         nef_train = globals()[args.nef_type](**vars(args))

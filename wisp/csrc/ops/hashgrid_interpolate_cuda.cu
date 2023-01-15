@@ -25,8 +25,7 @@ hash_index_2d(
     constexpr uint32_t primes[2] = { 1u, 2654435761u };
 
     if (resolution < codebook_size &&
-        resolution * resolution < codebook_size &&
-        resolution * resolution * resolution < codebook_size) {
+        resolution * resolution < codebook_size) {
         index = pos.x + pos.y * resolution;
     } else {
         index = (pos.x * primes[0] ^
@@ -126,6 +125,7 @@ hashgrid_interpolate_cuda_kernel_3d(
     const float* codebook,
     float* feats
 ){
+
     uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
     int64_t stride = blockDim.x*gridDim.x;
     for (int64_t i=tidx; i<num_coords; i+=stride) {

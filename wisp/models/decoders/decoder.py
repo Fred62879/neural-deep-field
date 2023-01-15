@@ -3,13 +3,14 @@ import torch.nn as nn
 
 from wisp.models.grids import *
 from wisp.models.layers import get_layer_class
-from wisp.utils.common import get_input_latents_dim
+from wisp.utils.common import get_input_latents_dim, query_GPU_mem
 from wisp.models.activations import get_activation_class
 
 import sys
 sys.path.insert(0, "./wisp/models/decoders")
 from siren import Siren
 from basic_decoders import BasicDecoder
+
 
 class Decoder(nn.Module):
     """ Wrapper class for different implementations of the MLP decoder.

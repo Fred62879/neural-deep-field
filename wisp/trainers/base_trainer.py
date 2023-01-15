@@ -103,8 +103,9 @@ class BaseTrainer(ABC):
         )
         # Set device to use
         self.device = device
-        device_name = torch.cuda.get_device_name(device=self.device)
-        log.info(f'Using {device_name} with CUDA v{torch.version.cuda}')
+        if device == "gpu":
+            device_name = torch.cuda.get_device_name(device=self.device)
+            log.info(f'Using {device_name} with CUDA v{torch.version.cuda}')
 
         self.init_renderer()
 
