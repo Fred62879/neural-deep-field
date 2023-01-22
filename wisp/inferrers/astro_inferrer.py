@@ -62,9 +62,9 @@ class AstroInferrer(BaseInferrer):
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","metric_dir", "spectra_dir",
                  "codebook_spectra_dir", "embed_map_dir","latent_dir",
-                 "latent_embed_dir"],
+                 "latent_embed_dir","zoomed_recon_dir"],
                 ["models","recons","metrics","spectra","codebook_spectra",
-                 "embed_map","latents","latent_embed"]
+                 "embed_map","latents","latent_embed","zoomed_recon"]
         ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
@@ -261,7 +261,13 @@ class AstroInferrer(BaseInferrer):
                 "zscale": True,
                 "to_HDU": self.to_HDU_now,
                 "calculate_metrics": self.calculate_metrics,
-                "recon_flat_trans": self.recon_flat_trans_now
+                "recon_flat_trans": self.recon_flat_trans_now,
+                "zoom": self.extra_args["recon_zoomed"],
+                "cutout_fits_ids": self.extra_args["recon_cutout_fits_ids"],
+                "cutout_sizes": self.extra_args["recon_cutout_sizes"],
+                "cutout_start_pos": self.extra_args["recon_cutout_start_pos"],
+                "zoomed_recon_dir": self.zoomed_recon_dir,
+                "zoomed_recon_fname": model_id,
             }
             cur_metrics, cur_metrics_zscale = self.dataset.restore_evaluate_tiles(
                 self.recon_pixels, **re_args)

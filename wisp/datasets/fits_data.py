@@ -70,9 +70,8 @@ class FITSData:
         self.load_headers()
 
         if self.require_coords:
-            self.get_world_coords_all_fits()
-            #self.get_mgrid_np(64)
-            #self.get_mgrid_tensor(64)
+            #self.get_world_coords_all_fits()
+            self.get_pixel_coords_all_fits()
 
         if self.require_pixels:
             self.load_all_fits()
@@ -311,10 +310,11 @@ class FITSData:
                 pixels = normalize(pixels, "linear")
 
             np.save(self.pixels_fname, pixels)
-            pixel_max = np.round(np.max(pixels, axis=0), 3)
-            pixel_min = np.round(np.min(pixels, axis=0), 3)
-            log.info(f"train pixels max {pixel_max}")
-            log.info(f"train pixels min {pixel_min}")
+
+        pixel_max = np.round(np.max(pixels, axis=0), 3)
+        pixel_min = np.round(np.min(pixels, axis=0), 3)
+        log.info(f"train pixels max {pixel_max}")
+        log.info(f"train pixels min {pixel_min}")
 
         self.data["pixels"] = torch.FloatTensor(pixels) #.to(self.device)
         if self.load_weights:
@@ -363,27 +363,43 @@ class FITSData:
             np.save(self.coords_fname, coords)
             np.save(self.coords_range_fname, np.array(coords_range))
 
-        num_coords = coords.shape[0]
-        coords_3d = np.zeros((num_coords, 3))
-        coords_3d[...,:2] = coords
-        #self.data["coords"] = torch.FloatTensor(coords)[:,None]
-        self.data["coords"] = torch.FloatTensor(coords_3d)[:,None]
+        self.data["coords"] = self.add_dummy_dim(coords)
 
-    def get_mgrid_np(self, sidelen, lo=0, hi=1, dim=2, indexing='ij', flat=True):
+    def get_pixel_coords_all_fits(self):
+        assert(not self.use_full_fits)
+        assert(len(self.fits_ids) == 1)
+        for id, fits_id in enumerate(self.fits_ids):
+            # num_rows, num_cols = self.num_rows[fits_id], self.num_cols[fits_id]
+            # assert(num_rows == num_cols
+            size = self.fits_cutout_sizes[id]
+            self.get_mgrid_np(size)
+
+    def get_mgrid_np(self, sidelen, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
         """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version).
         """
         arrays = tuple(dim * [np.linspace(lo, hi, num=sidelen)])
         mgrid = np.stack(np.meshgrid(*arrays, indexing=indexing), axis=-1)
         if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
-        self.data["coords"] = torch.FloatTensor(mgrid)[:,None] #.to(self.device)
+        self.data["coords"] = self.add_dummy_dim(mgrid)
 
-    def get_mgrid_tensor(self, sidelen, lo=0, hi=1, dim=2, flat=True):
+    def get_mgrid_tensor(self, sidelen, lo=-1, hi=1, dim=2, flat=True):
         """ Generates a flattened grid of (x,y,...) coords in [-1,1] (Tensor version).
         """
         tensors = tuple(dim * [torch.linspace(lo, hi, steps=sidelen)])
         mgrid = torch.stack(torch.meshgrid(*tensors), dim=-1)
         if flat: mgrid = mgrid.reshape(-1, dim)
-        self.data["coords"] = mgrid[:,None] #.to(self.device)
+        self.data["coords"] = self.add_dummy_dim(mgrid)
+
+    def add_dummy_dim(self, coords):
+        if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
+            num_coords = coords.shape[0]
+            if type(coords).__module__ == "torch":
+                coords_3d = torch.zeros((num_coords, 3))
+            else:
+                coords_3d = np.zeros((num_coords, 3))
+                coords_3d[...,:2] = coords
+            coords = coords_3d
+        return torch.FloatTensor(coords)[:,None]
 
     #############
     # Mask creation
@@ -661,6 +677,26 @@ class FITSData:
             return metrics, metrics_zscale
         return None, None
 
+    def restore_evaluate_zoomed_tile(self, recon_tile, fits_id, **re_args):
+        """ Crop smaller cutouts from reconstructed image.
+            Helpful to evaluate local reconstruction quality when recon is large.
+        """
+        id = re_args["cutout_fits_ids"].index(fits_id)
+        zscale_ranges = self.get_zscale_ranges(fits_id)
+
+        for i, (size, (r,c)) in enumerate(
+                zip(re_args["cutout_sizes"][id], re_args["cutout_start_pos"][id])
+        ):
+            print(type(fits_id))
+            zoomed_gt = np.load(self.gt_img_fnames[fits_id] + ".npy")[:,r-size:r+size,c-size:c+size]
+            zoomed_gt_fname = str(self.gt_img_fnames[fits_id]) + f"_zoomed_{size}_{r}_{c}"
+            plot_horizontally(zoomed_gt, zoomed_gt_fname)
+
+            zoomed_recon = recon_tile[:,r-size:r+size,c-size:c+size]
+            zoomed_recon_fname = join(re_args["zoomed_recon_dir"],
+                                      str(re_args["zoomed_recon_fname"]) + f"_{fits_id}_{i}")
+            plot_horizontally(zoomed_recon, zoomed_recon_fname, zscale_ranges=zscale_ranges)
+
     def restore_evaluate_one_tile(self, index, fits_id, num_pixels_acc, pixels, **re_args):
         if self.use_full_fits:
             num_rows, num_cols = self.num_rows[fits_id], self.num_cols[fits_id]
@@ -669,6 +705,9 @@ class FITSData:
 
         cur_tile = np.array(pixels[num_pixels_acc : num_pixels_acc + cur_num_pixels]).T. \
             reshape((re_args["num_bands"], num_rows, num_cols))
+
+        if re_args["zoom"] and fits_id in re_args["cutout_fits_ids"]:
+            self.restore_evaluate_zoomed_tile(cur_tile, fits_id, **re_args)
 
         cur_metrics, cur_metrics_zscale = self.evaluate(fits_id, cur_tile, **re_args)
         num_pixels_acc += cur_num_pixels

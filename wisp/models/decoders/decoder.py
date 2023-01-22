@@ -43,7 +43,7 @@ class Decoder(nn.Module):
 
             if self.kwargs["wave_encode_method"] == "positional":
                 if self.kwargs["hps_combine_method"] == "add":
-                    assert(self.kwargs["wave_encode_dim"] == latents_dim)
+                    assert(self.kwargs["wave_embed_dim"] == latents_dim)
                     input_dim = self.kwargs["wave_embed_dim"]
                 elif self.kwargs["hps_combine_method"] == "concat":
                     input_dim = self.kwargs["wave_embed_dim"] + latents_dim

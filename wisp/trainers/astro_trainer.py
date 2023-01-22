@@ -59,11 +59,12 @@ class AstroTrainer(BaseTrainer):
         self.set_log_path()
         self.summarize_training_tasks()
 
-        self.use_all_pixels = True
-        self.set_num_batches()
-        self.configure_dataset()
         self.init_loss()
+        self.use_all_pixels = False
+        self.save_data_to_local = False
+        self.set_num_batches()
         self.init_dataloader()
+        self.configure_dataset()
 
     #############
     # Initializations
@@ -190,7 +191,7 @@ class AstroTrainer(BaseTrainer):
             #collate_fn=default_collate,
             sampler=BatchSampler(
                 sampler_cls(self.dataset), batch_size=self.batch_size, drop_last=self.dataloader_drop_last),
-            #pin_memory=True,
+            pin_memory=True,
             num_workers=0
         )
 
@@ -267,6 +268,7 @@ class AstroTrainer(BaseTrainer):
             except StopIteration:
                 self.end_epoch()
                 self.begin_epoch()
+                #print(self.num_iterations_cur_epoch)
                 data = self.next_batch()
 
             self.pre_step()
@@ -309,6 +311,7 @@ class AstroTrainer(BaseTrainer):
 
         self.pipeline.train()
         self.timer.check("pre_epoch done")
+        #print(self.num_iterations_cur_epoch, self.batch_size)
 
     def post_epoch(self):
         """ By default, this function logs to Tensorboard, renders images to Tensorboard,
@@ -373,15 +376,15 @@ class AstroTrainer(BaseTrainer):
         self.optimizer.zero_grad(set_to_none=True)
         self.timer.check("zero grad")
 
-        with torch.cuda.amp.autocast():
-            total_loss, recon_pixels, ret = self.calculate_loss(data)
-        # total_loss, recon_pixels, recon_spectra, ret = self.calculate_loss(data)
+        #with torch.cuda.amp.autocast():
+        #total_loss, recon_pixels, ret = self.calculate_loss(data)
+        total_loss, recon_pixels, ret = self.calculate_loss(data)
 
-        self.scaler.scale(total_loss).backward()
-        self.scaler.step(self.optimizer)
-        self.scaler.update()
-        #total_loss.backward()
-        #self.optimizer.step()
+        #self.scaler.scale(total_loss).backward()
+        #self.scaler.step(self.optimizer)
+        #self.scaler.update()
+        total_loss.backward()
+        self.optimizer.step()
 
         self.timer.check("backward and step")
 

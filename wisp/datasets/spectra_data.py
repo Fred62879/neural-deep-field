@@ -279,7 +279,7 @@ class SpectraData:
         # coord_loose = ((ra - ra_lo) / (ra_hi - ra_lo),
         #                (dec - dec_lo) / (dec_hi - dec_lo))
 
-        # get random header
+        # get a random header
         random_name = f"calexp-HSC-G-{footprint}-{tile_id}%2C{subtile_id}.fits"
         fits_fname = join(self.input_fits_path, random_name)
         header = fits.open(fits_fname)[1].header

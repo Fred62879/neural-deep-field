@@ -121,7 +121,7 @@ hashgrid_interpolate_cuda_kernel_3d(
     const int32_t lod_idx,
     const int32_t num_lods,
     const int8_t  space_dim,
-    const float* coords,
+    const float* coords, // ideally in [-1,1]
     const float* codebook,
     float* feats
 ){
@@ -134,10 +134,10 @@ hashgrid_interpolate_cuda_kernel_3d(
                                clamp(resolution * (coords[i*3+1] * 0.5 + 0.5), 0, resolution-1-1e-5),
                                clamp(resolution * (coords[i*3+2] * 0.5 + 0.5), 0, resolution-1-1e-5));
         int3 pos = make_int3(floor(x.x), floor(x.y), floor(x.z)); // global lower bound
-        float3 x_ = make_float3(x.x - (float) pos.x, x.y - (float) pos.y, x.z - (float) pos.z); // local lower left corner
+        float3 x_ = make_float3(x.x - (float) pos.x, x.y - (float) pos.y, x.z - (float) pos.z); // dist to local lower left corner
         float3 _x = make_float3(1.0 - x_.x, 1.0 - x_.y, 1.0 - x_.z); // upper right
 
-        float c000 = _x.x * _x.y * _x.z;
+        float c000 = _x.x * _x.y * _x.z; // interpolation weights
         float c001 = _x.x * _x.y * x_.z;
         float c010 = _x.x * x_.y * _x.z;
         float c011 = _x.x * x_.y * x_.z;

@@ -447,9 +447,12 @@ def define_cmd_line_args():
     infer_group.add_argument("--recon-restore", action="store_true", default=False)
     infer_group.add_argument("--metric-options", nargs="+", choices=["mse","psnr","ssim"])
 
-    # these three args, if specified, directs reconstructing smaller cutouts than train image
+    # these several args, if specified, directs reconstructing smaller cutouts than train image
     # Note, if recon_img is included as inferrence tasks, we always reconstruct the full train image
     # regardless of whether these three are given or not
+    infer_group.add_argument("--recon-zoomed", action="store_true",
+                             help="whether reconstruct zoomed in cutouts or not. \
+                             If true, the three below args needs to be specified")
     infer_group.add_argument("--recon-cutout-fits-ids", nargs="+", type=str,
                              help="id of tiles to generate reconstructed cutout")
     infer_group.add_argument("--recon-cutout-sizes", nargs="+", type=list,

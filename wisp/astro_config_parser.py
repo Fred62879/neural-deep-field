@@ -70,8 +70,6 @@ def get_pipelines_from_config(args, tasks=[]):
         # pipeline for codebook spectra inferrence
         if "recon_codebook_spectra" in tasks:
             codebook_nef = CodebookNef(integrate=False, **vars(args))
-            #codebook_nef = globals()[args.nef_type](
-            #    integrate=False, qtz_calculate_loss=False, **vars(args))
             pipelines["codebook"] = AstroPipeline(codebook_nef)
     else:
         raise ValueError(f"{args.dataset_type} unrecognized dataset_type")
