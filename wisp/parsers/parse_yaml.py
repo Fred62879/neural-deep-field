@@ -98,10 +98,10 @@ def define_cmd_line_args():
 
     global_group.add_argument("--config", type=str, help="Path to config file to replace defaults.")
 
-    global_group.add_argument("--debug", action="store_true")
     global_group.add_argument("--use_gpu", action="store_true")
     global_group.add_argument("--verbose", action="store_true")
     global_group.add_argument("--print-shape", action="store_true")
+    global_group.add_argument("--activate_timer", action="store_true")
     global_group.add_argument("--dataloader-drop-last", action="store_true")
     global_group.add_argument("--exp-name", type=str, help="Experiment name.")
     global_group.add_argument("--perf", action="store_true", help="Use high-level profiling for the trainer.")
@@ -308,6 +308,7 @@ def define_cmd_line_args():
     # spectra data
     data_group.add_argument("--gt-spectra-choices", type=int, nargs='+',
                              help="id of chosen gt spectra for supervision/recon etc.")
+    data_group.add_argument("--spectra_smooth_sigma",type=int, default=5)
 
     ###################
     # Arguments for optimizer

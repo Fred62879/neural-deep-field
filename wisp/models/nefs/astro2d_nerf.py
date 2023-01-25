@@ -70,15 +70,16 @@ class AstroNerf(BaseNeuralField):
               {"indensity": torch.FloatTensor }:
                 - Output intensity tensor of shape [batch, num_samples, num_bands]
         """
-        timer = PerfTimer(activate=False, show_memory=True)
+        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
 
         batch, num_samples, _ = coords.shape
 
+        timer.check("astro2d encode coords")
         coords = self.encoder(coords)
 
+        timer.check("astro2d, decoder embedding")
         intensity = self.decoder(coords).view(-1, self.num_bands)
         intensity = self.norm(intensity)
-        timer.check("rf_hyperspectral_decode")
 
         ret = dict(intensity=intensity)
         return ret

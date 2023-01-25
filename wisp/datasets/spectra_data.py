@@ -9,6 +9,7 @@ from os.path import join, exists
 from collections import defaultdict
 from scipy.interpolate import interp1d
 from wisp.utils.common import worldToPix
+from scipy.ndimage import gaussian_filter1d
 from astropy.convolution import convolve, Gaussian1DKernel
 
 
@@ -188,7 +189,7 @@ class SpectraData:
             coords, ids = self.get_gt_spectra_pixel_coords(
                 source_spectra_data, choice, self.kwargs["spectra_neighbour_size"])
             all_ids.append(ids)       # [num_neighbours,1]
-            all_coords.append(coords) # [num_neighbours,2]
+            all_coords.append(coords) # [num_neighbours,2/3]
 
             # get range of wave that we reconstruct spectra
             recon_wave_bound = [source_spectra_data["trusted_wave_lo"][choice],
@@ -204,7 +205,8 @@ class SpectraData:
                          source_spectra_data["spectra_fname"][choice] + ".npy")
             gt_wave, gt_spectra, gt_spectra_for_supervision = load_gt_spectra(
                 fname, self.full_wave_bound, recon_wave_bound, smpl_interval,
-                interpolate=self.spectra_supervision_train)
+                interpolate=self.spectra_supervision_train,
+                sigma=self.kwargs["spectra_smooth_sigma"])
 
             gt_waves.append(gt_wave)
             spectra.append(gt_spectra)
@@ -217,10 +219,12 @@ class SpectraData:
         self.data["gt_spectra_coord_ids"] = all_ids  # [num_coords,num_neighbours,1]
         self.data["recon_wave_bound_ids"] = recon_bound_ids
 
-        # [num_coords,num_neighbours,1,2]
+        # [num_coords,num_neighbours,1,2/3]
         self.data["gt_spectra_coords"] = torch.stack(all_coords).type(
             torch.FloatTensor)[:,:,None] #.to(self.device)
-        self.data["gt_spectra_coords"] = self.data["gt_spectra_coords"].view(-1,1,2)
+
+        coord_dim = 3 if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3 else 2
+        self.data["gt_spectra_coords"] = self.data["gt_spectra_coords"].view(-1,1,coord_dim)
 
         if self.spectra_supervision_train:
             n = self.kwargs["num_supervision_spectra"]
@@ -274,7 +278,7 @@ class SpectraData:
         fits_id = footprint + tile_id + subtile_id
 
         # ra/dec values from spectra data may not be exactly the same as real coords
-        # this normalized ra/dec may thsu be slightly different from real coords
+        # this normalized ra/dec may thus be slightly different from real coords
         # (ra_lo, ra_hi, dec_lo, dec_hi) = np.load(self.fits_obj.coords_range_fname)
         # coord_loose = ((ra - ra_lo) / (ra_hi - ra_lo),
         #                (dec - dec_lo) / (dec_hi - dec_lo))
@@ -363,7 +367,6 @@ class SpectraData:
 
 def read_spectra_data(fname):
     data, colnames, datatypes = {}, None, None
-
     with open(fname) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
         line_count = 0
@@ -407,7 +410,7 @@ def get_bound_id(wave_bound, full_wave):
     wave_id_lo = np.argmax((full_wave >= wave_lo))
     return [wave_id_lo, wave_id_hi + 1]
 
-def load_gt_spectra(fname, trans_wave_bound, recon_wave_bound, smpl_interval, interpolate=False):
+def load_gt_spectra(fname, trans_wave_bound, recon_wave_bound, smpl_interval, interpolate=False, sigma=-1):
     """ Load gt spectra (intensity values) for spectra supervision and
           spectrum plotting. Also smooth the gt spectra which has significantly
           larger discretization values than the transmission data.
@@ -428,16 +431,20 @@ def load_gt_spectra(fname, trans_wave_bound, recon_wave_bound, smpl_interval, in
     """
     gt = np.load(fname)
     gt_wave, gt_spectra = gt[:,0], gt[:,1]
-    gt_spectra = convolve_spectra(gt_spectra)
+    if sigma != -1:
+        gt_spectra = convolve_spectra(gt_spectra, std=sigma)
     gt_spectra_for_supervision = None
+
+    #if sigma != -1:
+    #    gt_spectra = gaussian_filter1d(gt_spectra, sigma)
 
     if interpolate:
         f_gt = interp1d(gt_wave, gt_spectra)
 
         # make sure wave range to interpolate stay within gt wave range
         (lo, hi) = trans_wave_bound
-        lo = max(lo, min(gt_wave))
-        hi = min(hi, max(gt_wave))
+        lo = np.ceil(max(lo, min(gt_wave)))
+        hi = np.floor(min(hi, max(gt_wave)))
 
         # new gt wave range with same discretization value as trans
         gt_wave = np.arange(lo, hi + 1, smpl_interval)

@@ -46,6 +46,7 @@ class HyperSpectralDecoder(nn.Module):
         if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
         spectra = self.spectra_decoder(latents)[...,0]
+        #spectra = self.spectra_decoder(latents)[:,:5,0]
 
         if self.scale and scaler is not None:
             spectra = (torch.exp(scaler) * spectra.T).T
@@ -90,6 +91,8 @@ class HyperSpectralDecoder(nn.Module):
               intensity: reconstructed pixel values
               spectra:   reconstructed spectra
         """
+        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
+
         if self.kwargs["print_shape"]: print('hps_decoder',latents.shape)
 
         if num_spectra_coords > 0:
@@ -101,10 +104,13 @@ class HyperSpectralDecoder(nn.Module):
             if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
         if latents.shape[0] > 0:
+            #timer.check("hps decoder, reconstruct spectra")
             spectra = self.reconstruct_spectra(wave, latents, ret["scaler"], ret["redshift"])
             if "spectra" not in ret: ret["spectra"] = spectra
             if self.kwargs["print_shape"]: print('hps_decoder', spectra.shape)
 
+            #timer.check("hps decoder, integration")
             intensity = self.inte(spectra, trans, nsmpl)
             if self.kwargs["print_shape"]: print('hps_decoder', intensity.shape)
             ret["intensity"] = intensity
+            #ret["intensity"] = spectra

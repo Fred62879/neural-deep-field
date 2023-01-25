@@ -17,7 +17,7 @@ class AstroDataset(Dataset):
     def __init__(self,
                  device                   : str,
                  dataset_path             : str,
-                 dataset_num_workers      : int      = -1,
+                 dataset_num_workers      : int      = -1, # not used
                  transform                : Callable = None,
                  **kwargs):
         """ Initializes the dataset class.
@@ -135,6 +135,9 @@ class AstroDataset(Dataset):
         out["wave"], out["trans"], out["nsmpl"] = \
                 self.trans_dataset.sample_wave_trans(
                     batch_size, self.nsmpls, use_full_wave=self.use_full_wave)
+        #out["wave"] = torch.ones(4096,1,1)
+        #out["trans"] = torch.ones(4096,5,1)
+        #out["nsmpl"] = torch.ones(5)
 
     def get_spectra_data(self, out):
         """ Get unbatched spectra data (only for spectra supervision training).

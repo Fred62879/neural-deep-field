@@ -1,14 +1,16 @@
 
 global:
-    debug: False
     verbose: True
     print_shape: False
+    activate_timer: False
     dataloader_drop_last: True
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
+    tasks: ['train']
+
     #tasks: ['train','save_recon_during_train','infer','recon_img']
-    tasks: ['infer','recon_img']
+    #tasks: ['infer','recon_img']
 
     #tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
@@ -32,8 +34,8 @@ optimizer:
     hps_lr: 1e-5
 
 net:
-    #nef_type: 'AstroHyperSpectralNerf'
-    nef_type: 'AstroNerf'
+    nef_type: 'AstroHyperSpectralNerf'
+    #nef_type: 'AstroNerf'
     coords_encode_method: 'grid'
     wave_encode_method: 'positional'
     mlp_output_norm_method: 'sinh'
@@ -46,7 +48,7 @@ embedder:
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 1000
+    wave_embed_dim: 20
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -58,11 +60,11 @@ grid:
     grid_multiscale_type: 'cat'
     grid_feature_dim: 2
     grid_feature_std: 0.01
-    grid_num_lods: 16  # max / min = b**l
+    grid_num_lods: 10 #16  # max / min = b**l
     tree_type: 'geometric'
-    min_grid_res: 8
-    max_grid_res: 1416 #80
-    codebook_bitwidth: 24
+    min_grid_res: 4 #8
+    max_grid_res: 90 #1416
+    codebook_bitwidth: 18
 
 decoder:
     decoder_num_layers: 1
@@ -97,22 +99,23 @@ hyperspectral:
 trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '../../data/pdr3/output'
+    perf: False
 
     loss_cho: l1
-    num_epochs: 6000
-    batch_size: 131072 #1024 #4096 #73728 #36864 #16384 #36864 #65536
-    save_every: 1000
+    num_epochs: 1000
+    batch_size: 4096 #131072
+    save_every: 100
     render_tb_every: -1
-    log_tb_every: 1000
+    log_tb_every: 100
     log_gpu_every: -1
     save_local_every: -1
     save_as_new: True
-    train_pixel_ratio: 0.1
+    train_pixel_ratio: 1
     #masked_pixl_ratio_per_epoch: 1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks']
 
     pixel_supervision: True
-    spectra_supervision: True
+    spectra_supervision: False
     spectra_beta: 0.01
 
     quantize_latent: False
@@ -141,7 +144,7 @@ infer:
     #infer_log_fname: '20221219-175517'
     metric_options: ['mse','ssim','psnr']
 
-    recon_zoomed: True
+    recon_zoomed: False
     recon_cutout_fits_ids: ['981215'] #,'981217']
     # each fits may have multiple cutouts
     recon_cutout_sizes: [ [64,32] ] #, [32] ]
@@ -153,7 +156,8 @@ infer:
     infer_spectra_individually: True
 
 dataset:
-    space_dim: 2
+    dataset_num_workers: 0
+    space_dim: 3
     dataset_type: 'astro'
     load_fits_data_cache: True
     dataset_path: '../../data/pdr3'
@@ -167,8 +171,8 @@ dataset:
     fits_footprints: ['9812']
     fits_tile_ids: ['1']
     fits_subtile_ids: ['5']
-    fits_cutout_sizes: [1024] #[64] #[384] #[256]
-    fits_cutout_start_pos: [[1970,758]] #[[1750,550]]
+    fits_cutout_sizes: [64] #[384] #[256]
+    fits_cutout_start_pos: [[86,188]] #[[1970,758]] #[[1750,550]]
 
     # num_bands: 1
     # sensor_collection_name: '1_y'
@@ -201,6 +205,7 @@ dataset:
     trans_sample_interval: 10
 
     gt_spectra_choices: [0] #[2,3,4,5,6] #[1,2,3,4]
+    spectra_smooth_sigma: 50
 
 inpaint:
     inpaint_cho: 'no_inpaint' # 'spectral_inpaint'

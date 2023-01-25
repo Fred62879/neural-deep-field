@@ -386,7 +386,7 @@ def batch_sample_trans(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, 
                 trans       [nbands,nsmpl_full]
                 distrib     [nsmpl_full]
                 encd_ids    [nbands,nsmpl_full] if mixture o.w. None
-        @Return smpl_wave   [bsz,nsmpl]
+        @Return smpl_wave   [bsz,nsmpl,1]
                 smpl_trans  [bsz,nbands,nsmpl]
                 avg_nsmpl   [nbands]
                 ids         [nsmpls]
@@ -402,6 +402,8 @@ def batch_sample_trans(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, 
         # sample #nsmpl lambda [bsz,nsmpl]
         distrib = distrib[None,:].tile(bsz,1)
         ids = torch.multinomial(distrib, nsmpls, replacement=True)
+
+    #ids = torch.arange(nsmpls)[None,:].tile(bsz,1)
 
     if encd_ids is None:
         avg_nsmpl = torch.zeros(bsz, nbands).type(trans.dtype)

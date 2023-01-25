@@ -80,12 +80,13 @@ class QuantizedDecoder(nn.Module):
         """ Quantize latent variables
             @Param
         """
+        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
+
         if self.kwargs["print_shape"]: print('qtz ', z.shape)
 
         # decode high-dim features into low dim latents
-        #print(torch.min(z), torch.max(z))
+        #timer.check("quantization decode")
         z = self.decoder(z)
-        #print(torch.min(z), torch.max(z))
         scaler, redshift = None, None
 
         if self.output_scaler:
@@ -101,9 +102,11 @@ class QuantizedDecoder(nn.Module):
         ret["redshift"] = redshift
 
         # quantize latents
+        #timer.check("quantization quantize")
         z_q, min_embed_ids = self.quantize(z)
 
         if self.calculate_loss:
+            #timer.check("quantization calculate loss")
             ret["codebook_loss"] = self.partial_loss(z, z_q)
 
         # straight-through estimator

@@ -58,20 +58,20 @@ class Encoder(nn.Module):
             @Return
               latents: [batch_size,num_samples,latent_dim]
         """
-        timer = PerfTimer(activate=False, show_memory=True)
+        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
 
         batch, num_samples, _ = coords.shape
 
         if self.encode_method == "positional":
             latents = self.embedder(coords) # [bsz,num_samples,coords_embed_dim]
-            timer.check("rf_hyperspectral_pe")
+            #timer.check("rf_hyperspectral_pe")
 
         elif self.encode_method == "grid":
             if lod_idx is None:
                 lod_idx = len(self.grid.active_lods) - 1
             latents = self.grid.interpolate(coords, lod_idx)
             latents = latents.reshape(batch, num_samples, self.effective_feature_dim)
-            timer.check("rf_hyperspectra_interpolate")
+            #timer.check("rf_hyperspectra_interpolate")
         else:
             latents = coords
 

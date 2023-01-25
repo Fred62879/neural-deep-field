@@ -192,7 +192,7 @@ class AstroTrainer(BaseTrainer):
             sampler=BatchSampler(
                 sampler_cls(self.dataset), batch_size=self.batch_size, drop_last=self.dataloader_drop_last),
             pin_memory=True,
-            num_workers=0
+            num_workers=self.extra_args["dataset_num_workers"]
         )
 
     def init_optimizer(self):
@@ -541,6 +541,9 @@ class AstroTrainer(BaseTrainer):
         if self.spectra_supervision:
             log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
         log.info(log_text)
+
+    def log_tb(self):
+        pass
 
     def save_model(self):
         if self.extra_args["save_as_new"]:
