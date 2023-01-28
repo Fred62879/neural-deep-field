@@ -7,12 +7,12 @@ global:
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    tasks: ['train']
+    #tasks: ['train']
 
     #tasks: ['train','save_recon_during_train','infer','recon_img']
     #tasks: ['infer','recon_img']
 
-    #tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
+    tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
 
     #tasks: ['train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
@@ -60,10 +60,10 @@ grid:
     grid_multiscale_type: 'cat'
     grid_feature_dim: 2
     grid_feature_std: 0.01
-    grid_num_lods: 10 #16  # max / min = b**l
+    grid_num_lods: 10  # max / min = b**l
     tree_type: 'geometric'
-    min_grid_res: 4 #8
-    max_grid_res: 90 #1416
+    min_grid_res: 2 #8
+    max_grid_res: 80 #500
     codebook_bitwidth: 18
 
 decoder:
@@ -93,7 +93,7 @@ qtz:
     qtz_decod_activation_type: 'relu'
 
 hyperspectral:
-    hps_combine_method: 'add'
+    hps_combine_method: 'concat'
     integration_method: 'dot_prod'
 
 trainer:
@@ -101,12 +101,13 @@ trainer:
     log_dir: '../../data/pdr3/output'
     perf: False
 
-    loss_cho: l1
-    num_epochs: 1000
-    batch_size: 4096 #131072
-    save_every: 100
+    pixel_loss_cho: l1
+    spectra_loss_cho: l1
+    num_epochs: 20000
+    batch_size: 1 #4096 #262144 #131072
+    save_every: 2000
     render_tb_every: -1
-    log_tb_every: 100
+    log_tb_every: 2000
     log_gpu_every: -1
     save_local_every: -1
     save_as_new: True
@@ -114,8 +115,8 @@ trainer:
     #masked_pixl_ratio_per_epoch: 1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks']
 
-    pixel_supervision: True
-    spectra_supervision: False
+    pixel_supervision: False
+    spectra_supervision: True
     spectra_beta: 0.01
 
     quantize_latent: False

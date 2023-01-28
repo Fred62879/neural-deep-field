@@ -80,6 +80,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
 
         timer.check("hyper nef encode coord")
         latents = self.coord_encoder(coords, lod_idx=lod_idx)
+
         if self.kwargs["quantize_latent"]:
             timer.check("hyper nef quantiza latent")
             latents = self.qtz_decoder(latents, ret)

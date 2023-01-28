@@ -403,8 +403,6 @@ def batch_sample_trans(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, 
         distrib = distrib[None,:].tile(bsz,1)
         ids = torch.multinomial(distrib, nsmpls, replacement=True)
 
-    #ids = torch.arange(nsmpls)[None,:].tile(bsz,1)
-
     if encd_ids is None:
         avg_nsmpl = torch.zeros(bsz, nbands).type(trans.dtype)
     elif kwargs["mixture_avg_per_band"]:

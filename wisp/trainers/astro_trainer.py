@@ -35,7 +35,7 @@ class AstroTrainer(BaseTrainer):
     def __init__(self, pipeline, dataset, num_epochs, batch_size,
                  optim_cls, lr, weight_decay, grid_lr_weight, optim_params, log_dir, device,
                  exp_name=None, info=None, scene_state=None, extra_args=None,
-                 render_tb_every=-1, save_every=-1, using_wandb=False):
+                 render_tb_every=-1, save_every=-1, using_wandb=False, inferrer=None):
 
         self.shuffle_dataloader = True
         self.dataloader_drop_last = extra_args["dataloader_drop_last"]
@@ -60,6 +60,7 @@ class AstroTrainer(BaseTrainer):
         self.summarize_training_tasks()
 
         self.init_loss()
+        self.inferrer = inferrer
         self.use_all_pixels = False
         self.save_data_to_local = False
         self.set_num_batches()
@@ -160,18 +161,21 @@ class AstroTrainer(BaseTrainer):
                 fnames = sorted_nicely(fnames)
                 self.pretrained_model_fname = join(pretrained_model_dir, fnames[-1])
 
-    def init_loss(self):
-        cho = self.extra_args["loss_cho"]
+    def get_loss(self, cho):
         if cho == "l1":
             loss = nn.L1Loss() if not self.cuda else nn.L1Loss().cuda()
         elif cho == "l2":
             loss = nn.MSELoss() if not self.cuda else nn.MSELoss().cuda()
         else: raise Exception("Unsupported loss choice")
+        return loss
 
+    def init_loss(self):
         if self.spectra_supervision:
+            loss = self.get_loss(self.extra_args["spectra_loss_cho"])
             self.spectra_loss = partial(spectra_supervision_loss, loss)
 
         if self.pixel_supervision:
+            loss = self.get_loss(self.extra_args["pixel_loss_cho"])
             if self.spectral_inpaint:
                 loss = partial(spectral_masking_loss, loss,
                                self.extra_args["relative_train_bands"],
@@ -184,11 +188,11 @@ class AstroTrainer(BaseTrainer):
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
         #sampler_cls = SequentialSampler
+        #sampler_cls = RandomSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
             batch_size=None,
-            #collate_fn=default_collate,
             sampler=BatchSampler(
                 sampler_cls(self.dataset), batch_size=self.batch_size, drop_last=self.dataloader_drop_last),
             pin_memory=True,
@@ -196,60 +200,67 @@ class AstroTrainer(BaseTrainer):
         )
 
     def init_optimizer(self):
+        params, grid_params, rest_params = [], [], []
         params_dict = { name : param for name, param
                         in self.pipeline.named_parameters() }
-        params = []
-        hps_params, decoder_params, grid_params, rest_params = [],[],[],[]
-
-        # for name in params_dict:
-        #     if "hyper_decod" in name:
-        #         hps_params.append(params_dict[name])
-        #     elif "decoder" in name:
-        #         decoder_params.append(params_dict[name])
-        #     elif "grid" in name:
-        #         grid_params.append(params_dict[name])
-        #     else:
-        #         rest_params.append(params_dict[name])
-
-        # params.append({"params": hps_params,
-        #                "lr": self.hps_lr})
-        # params.append({"params" : decoder_params,
-        #                "lr": self.lr,
-        #                "weight_decay": self.weight_decay})
-        # params.append({"params" : grid_params,
-        #                "lr": self.lr * self.grid_lr_weight})
-        # params.append({"params" : rest_params,
-        #                "lr": self.lr})
 
         for name in params_dict:
-            if "grid" in name:
-                grid_params.append(params_dict[name])
-            else:
-                rest_params.append(params_dict[name])
+            print(name)
+            if "grid" in name: grid_params.append(params_dict[name])
+            else: rest_params.append(params_dict[name])
 
         params.append({"params" : grid_params,
                        "lr": self.lr * self.grid_lr_weight})
         params.append({"params" : rest_params,
                        "lr": self.extra_args["hps_lr"]})
+
         self.optimizer = self.optim_cls(params, **self.optim_params)
 
-        print(self.optimizer)
-
     #############
-    # training iterations
+    # Training logic
     #############
 
     def train(self):
         if self.extra_args["resume_train"]:
             self.resume_train()
 
-        super().train()
+        self.scene_state.optimization.running = True
+
+        for epoch in range(1, self.num_epochs + 1):
+            self.begin_epoch()
+
+            for batch in range(self.num_iterations_cur_epoch):
+                #print(epoch, batch)
+                iter_start_time = time.time()
+                self.scene_state.optimization.iteration = self.iteration
+
+                data = self.next_batch()
+
+                self.pre_step()
+                self.step(data)
+                self.post_step()
+
+                self.iteration += 1
+                iter_end_time = time.time()
+                self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
+
+            self.end_epoch()
+
+        self.writer.close()
 
         if self.extra_args["log_gpu_every"] != -1:
             nvidia_smi.nvmlShutdown()
 
+    '''
+    def train(self):
+        if self.extra_args["resume_train"]:
+            self.resume_train()
+        super().train()
+        if self.extra_args["log_gpu_every"] != -1:
+            nvidia_smi.nvmlShutdown()
+
     def iterate(self):
-        """ Advances the training by one training step (batch).
+        """Advances the training by one training step (batch).
         """
         if self.scene_state.optimization.running:
             iter_start_time = time.time()
@@ -268,20 +279,54 @@ class AstroTrainer(BaseTrainer):
             except StopIteration:
                 self.end_epoch()
                 self.begin_epoch()
-                #print(self.num_iterations_cur_epoch)
                 data = self.next_batch()
 
+            #print(self.epoch, self.iteration)
             self.pre_step()
             self.step(data)
             self.post_step()
             iter_end_time = time.time()
             self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
+    '''
+
+    #############
+    # Epoch begin and end
+    #############
+
+    def begin_epoch(self):
+        self.iteration = 0
+        self.reset_data_iterator()
+        self.pre_epoch()
+        self.init_log_dict()
+
+    def end_epoch(self):
+        self.post_epoch()
+
+        if self.extra_args["valid_every"] > -1 and \
+                self.epoch % self.extra_args["valid_every"] == 0 and \
+                self.epoch != 0:
+            self.validate()
+            self.timer.check('validate')
+
+        if self.epoch < self.num_epochs:
+            self.iteration = 0
+            self.epoch += 1
+        else:
+            self.scene_state.optimization.running = False
+
+    def reset_data_iterator(self):
+        """ Rewind the iterator for the new epoch.
+        """
+        self.scene_state.optimization.iterations_per_epoch = len(self.train_data_loader)
+        self.train_data_loader_iter = iter(self.train_data_loader)
 
     #############
     # One epoch
     #############
 
     def pre_epoch(self):
+        self.set_num_batches()
+
         self.loss_lods = list(range(0, self.extra_args["grid_num_lods"]))
 
         if self.extra_args["grow_every"] > 0:
@@ -293,6 +338,10 @@ class AstroTrainer(BaseTrainer):
         if self.extra_args["resample"] and self.epoch % self.extra_args["resample_every"] == 0:
             self.resample_dataset()
 
+        # save model
+        if self.save_every > -1 and self.epoch % self.save_every == 0:
+            self.save_model()
+
         if self.extra_args["save_local_every"] > -1 and self.epoch % self.extra_args["save_local_every"] == 0:
             self.save_data_to_local = True
             if self.save_scaler: self.pixel_scaler = []
@@ -303,7 +352,7 @@ class AstroTrainer(BaseTrainer):
 
             # re-init dataloader to make sure pixels are in order
             self.shuffle_dataloader = False
-            self.dataset.set_wave_sample_mode(use_full_wave=True)
+            self.dataset.set_wave_sample_mode(use_full_wave=False)
             self.use_all_pixels = True
             self.set_num_batches()
             self.init_dataloader()
@@ -311,7 +360,6 @@ class AstroTrainer(BaseTrainer):
 
         self.pipeline.train()
         self.timer.check("pre_epoch done")
-        #print(self.num_iterations_cur_epoch, self.batch_size)
 
     def post_epoch(self):
         """ By default, this function logs to Tensorboard, renders images to Tensorboard,
@@ -341,9 +389,11 @@ class AstroTrainer(BaseTrainer):
             self.init_dataloader()
             self.reset_data_iterator()
 
+        '''
         # save model
         if self.save_every > -1 and self.epoch % self.save_every == 0:
             self.save_model()
+        '''
 
         self.timer.check("post_epoch done")
 
@@ -377,7 +427,6 @@ class AstroTrainer(BaseTrainer):
         self.timer.check("zero grad")
 
         #with torch.cuda.amp.autocast():
-        #total_loss, recon_pixels, ret = self.calculate_loss(data)
         total_loss, recon_pixels, ret = self.calculate_loss(data)
 
         #self.scaler.scale(total_loss).backward()
@@ -558,6 +607,11 @@ class AstroTrainer(BaseTrainer):
             "model_state_dict": self.pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
         }
+
+        #if self.extra_args["infer_during_train"]:
+        #self.inferrer.set_checkpoint(self.epoch, checkpoint)
+        #self.inferrer.infer()
+
         torch.save(checkpoint, model_fname)
         return checkpoint
 

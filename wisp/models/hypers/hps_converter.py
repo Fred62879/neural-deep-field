@@ -57,6 +57,7 @@ class HyperSpectralConverter(nn.Module):
             latents = torch.cat((spatial, spectral), dim=-1)
         else:
             raise ValueError("Unrecognized spatial-spectral combination method.")
+
         del spatial, spectral
         return latents
 

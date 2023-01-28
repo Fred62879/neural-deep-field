@@ -196,7 +196,7 @@ class SpectraData:
                                 source_spectra_data["trusted_wave_hi"][choice]]
             (lo, hi) = recon_wave_bound
             recon_wave = np.arange(lo, hi + 1, smpl_interval)
-            recon_wave_bound_id = get_bound_id(recon_wave_bound, self.full_wave)
+            recon_wave_bound_id = get_bound_id(recon_wave_bound, self.full_wave) # [206,407]
             recon_waves.append(recon_wave)
             recon_bound_ids.append(recon_wave_bound_id)
 

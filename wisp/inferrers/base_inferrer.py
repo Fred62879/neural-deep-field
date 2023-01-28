@@ -58,6 +58,10 @@ class BaseInferrer(ABC):
         self.summarize_inferrence_tasks()
         self.generate_inferrence_funcs()
 
+    def set_checkpoint(self, model_id, checkpoint):
+        self.model_id = model_id
+        self.checkpoint = checkpoint
+
     @abstractmethod
     def summarize_inferrence_tasks(self):
         self.group_tasks = []
@@ -76,8 +80,8 @@ class BaseInferrer(ABC):
             batch_size=None,
             sampler=BatchSampler(
                 SequentialSampler(self.dataset), batch_size=self.batch_size, drop_last=True),
-            #pin_memory=True,
-            num_workers=0
+            pin_memory=True,
+            num_workers=self.extra_args["dataset_num_workers"]
         )
 
     def reset_data_iterator(self):
@@ -120,10 +124,14 @@ class BaseInferrer(ABC):
         """ Perform current inferrence task using each selected checkpoints.
             Override if needed.
         """
-        for model_id, model_fname in enumerate(self.selected_model_fnames):
-            model_fname = join(self.model_dir, model_fname)
-            checkpoint = torch.load(model_fname)
-            self.infer_with_checkpoint(model_id, checkpoint)
+        if self.extra_args["infer_during_train"]:
+            self.infer_with_checkpoint(self.model_id, self.checkpoint)
+
+        else:
+            for model_id, model_fname in enumerate(self.selected_model_fnames):
+                model_fname = join(self.model_dir, model_fname)
+                checkpoint = torch.load(model_fname)
+                self.infer_with_checkpoint(model_id, checkpoint)
 
     def post_inferrence(self):
         pass

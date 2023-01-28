@@ -74,5 +74,4 @@ class Encoder(nn.Module):
             #timer.check("rf_hyperspectra_interpolate")
         else:
             latents = coords
-
         return latents

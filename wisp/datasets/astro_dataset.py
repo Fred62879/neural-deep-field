@@ -169,7 +169,6 @@ class AstroDataset(Dataset):
         """
         out = {}
         batch_size = len(idx)
-        #idx = np.array(list(set(idx) - set([2080])))
         batched_fields = self.requested_fields - self.unbatched_fields
 
         for field in batched_fields:

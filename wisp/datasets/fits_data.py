@@ -706,7 +706,7 @@ class FITSData:
         cur_tile = np.array(pixels[num_pixels_acc : num_pixels_acc + cur_num_pixels]).T. \
             reshape((re_args["num_bands"], num_rows, num_cols))
 
-        if re_args["zoom"] and fits_id in re_args["cutout_fits_ids"]:
+        if "zoom" in re_args and re_args["zoom"] and fits_id in re_args["cutout_fits_ids"]:
             self.restore_evaluate_zoomed_tile(cur_tile, fits_id, **re_args)
 
         cur_metrics, cur_metrics_zscale = self.evaluate(fits_id, cur_tile, **re_args)
