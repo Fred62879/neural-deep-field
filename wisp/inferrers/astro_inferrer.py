@@ -9,7 +9,7 @@ from pathlib import Path
 from os.path import exists, join
 from wisp.inferrers import BaseInferrer
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_latent_embed
-from wisp.utils.common import add_to_device, forward, load_model_weights, load_layer_weights
+from wisp.utils.common import add_to_device, forward, load_model_weights, load_layer_weights, load_embed
 
 
 class AstroInferrer(BaseInferrer):
@@ -240,12 +240,16 @@ class AstroInferrer(BaseInferrer):
         if self.plot_embed_map:
             self.embed_ids = []
 
+        if self.plot_latent_embed:
+            self.latents = []
+
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
         epoch = checkpoint["epoch_trained"]
         model_state = checkpoint["model_state_dict"]
         self.infer_all_coords(model_id, model_state)
+
         if self.plot_latent_embed:
-            plot_latent_embed(epoch, self.latent_dir, self.latent_embed_dir, model_state)
+            self.embed = load_embed(model_state)
 
     def post_checkpoint_all_coords_full_model(self, model_id):
         if self.recon_img:
@@ -292,6 +296,9 @@ class AstroInferrer(BaseInferrer):
                 "calculate_metrics": False,
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.embed_ids, **re_args)
+
+        if self.plot_latent_embed:
+            plot_latent_embed(self.latents, self.embed, model_id, self.latent_embed_dir)
 
     def pre_checkpoint_selected_coords_partial_model(self, model_id):
         self.reset_data_iterator()
@@ -350,10 +357,11 @@ class AstroInferrer(BaseInferrer):
                         calculate_codebook_loss=False,
                         infer=True,
                         save_spectra=False,
-                        save_latents=False,
+                        save_latents=True,
                         save_embed_ids=self.plot_embed_map)
 
                 if self.recon_img: self.recon_pixels.extend(ret["intensity"])
+                if self.plot_latent_embed: self.latents.extend(ret["latents"])
                 if self.plot_embed_map: self.embed_ids.extend(ret["min_embed_ids"])
 
             except StopIteration:

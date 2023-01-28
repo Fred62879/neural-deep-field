@@ -11,26 +11,27 @@ from astropy.visualization import ZScaleInterval
 from wisp.utils.numerical import calculate_sam_spectrum
 
 
-def plot_latent_embed(fname, latent_dir, out_dir, model_dict=None, plot_latent_only=False):
+#def plot_latent_embed(fname, latent_dir, out_dir, model_dict=None, plot_latent_only=False):
+def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):
     # plot latent variables only
-    latent = np.load(join(latent_dir, f"{fname}.npy"))
-    latent = latent.reshape((-1,latent.shape[-1]))
+    # latent = np.load(join(latent_dir, f"{fname}.npy"))
+
+    if type(latents) is list:
+        latents = torch.stack(latents)
+    if type(latents).__module__ == "torch":
+        if latents.device != "cpu":
+            latents = latents.detach().cpu()
+        latents = latents.numpy()
+    latents = latents.reshape((-1,latents.shape[-1]))
+
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
-    ax.scatter(latent[:,0],latent[:,1],latent[:,2],marker='v',color='orange')
+    ax.scatter(latents[:,0],latents[:,1],latents[:,2],marker='v',color='orange')
     png_fn = join(out_dir, f"latent_{fname}")
     plt.savefig(png_fn)
     plt.close()
 
     if plot_latent_only: return
-
-    assert(model_dict is not None)
-    for n,p in model_dict.items():
-        if "grid" not in n and "codebook" in n:
-            embed = p.T
-            break
-
-    embed = np.array(embed.cpu())
 
     # plot embeddings only
     fig = plt.figure()
@@ -44,7 +45,7 @@ def plot_latent_embed(fname, latent_dir, out_dir, model_dict=None, plot_latent_o
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
     ax.scatter(embed[:,0],embed[:,1],embed[:,2],marker='o',color='blue')
-    ax.scatter(latent[:,0],latent[:,1],latent[:,2],marker='v',color='orange')
+    ax.scatter(latents[:,0],latents[:,1],latents[:,2],marker='v',color='orange')
     png_fname = join(out_dir, f"{fname}")
     plt.savefig(png_fname)
     plt.close()

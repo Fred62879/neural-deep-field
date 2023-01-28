@@ -12,7 +12,7 @@ global:
     #tasks: ['train','save_recon_during_train','infer','recon_img']
     #tasks: ['infer','recon_img']
 
-    tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
+    #tasks: ['train','plot_spectra_during_train'] #,'infer','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
 
     #tasks: ['train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
@@ -22,7 +22,7 @@ global:
     #tasks: ['infer','recon_img','plot_embed_map','plot_latent_embed','plot_save_scaler']
 
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra']
-    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed']
+    tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed']
     #tasks: ['infer','recon_gt_spectra']
 
 optimizer:
@@ -42,13 +42,13 @@ net:
 
 embedder:
     coords_embed_bias: True
-    coords_embed_dim: 1000
+    coords_embed_dim: 10
     coords_embed_omega: 8
     coords_embed_sigma: 1.0
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 20
+    wave_embed_dim: 16
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -60,10 +60,10 @@ grid:
     grid_multiscale_type: 'cat'
     grid_feature_dim: 2
     grid_feature_std: 0.01
-    grid_num_lods: 10  # max / min = b**l
+    grid_num_lods: 16  # max / min = b**l
     tree_type: 'geometric'
-    min_grid_res: 2 #8
-    max_grid_res: 80 #500
+    min_grid_res: 2
+    max_grid_res: 500
     codebook_bitwidth: 18
 
 decoder:
@@ -93,7 +93,7 @@ qtz:
     qtz_decod_activation_type: 'relu'
 
 hyperspectral:
-    hps_combine_method: 'concat'
+    hps_combine_method: 'add'
     integration_method: 'dot_prod'
 
 trainer:
@@ -103,23 +103,23 @@ trainer:
 
     pixel_loss_cho: l1
     spectra_loss_cho: l1
-    num_epochs: 20000
-    batch_size: 1 #4096 #262144 #131072
-    save_every: 2000
+    num_epochs: 8000
+    batch_size: 147456 #4096 #262144 #131072
+    save_every: 800
     render_tb_every: -1
-    log_tb_every: 2000
+    log_tb_every: 800
     log_gpu_every: -1
     save_local_every: -1
     save_as_new: True
-    train_pixel_ratio: 1
+    train_pixel_ratio: .1
     #masked_pixl_ratio_per_epoch: 1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks']
 
-    pixel_supervision: False
+    pixel_supervision: True
     spectra_supervision: True
     spectra_beta: 0.01
 
-    quantize_latent: False
+    quantize_latent: True
     weight_train: False
     train_use_all_wave: False
     resume_train: False
@@ -172,7 +172,7 @@ dataset:
     fits_footprints: ['9812']
     fits_tile_ids: ['1']
     fits_subtile_ids: ['5']
-    fits_cutout_sizes: [64] #[384] #[256]
+    fits_cutout_sizes: [128] #[384] #[256]
     fits_cutout_start_pos: [[86,188]] #[[1970,758]] #[[1750,550]]
 
     # num_bands: 1

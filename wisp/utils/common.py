@@ -178,6 +178,13 @@ def forward(class_obj, pipeline, data,
     requested_channels = set(requested_channels)
     return pipeline(channels=requested_channels, **net_args)
 
+def load_embed(pretrained_state):
+    for n,p in pretrained_state.items():
+        if "grid" not in n and "codebook" in n:
+            embed = p.T
+            break
+    return np.array(embed.cpu())
+
 def load_partial_latent(model, pretrained_state, lo, hi):
     cur_state = model.state_dict()
     pretrained_dict = {}

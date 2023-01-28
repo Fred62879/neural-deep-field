@@ -80,7 +80,7 @@ class QuantizedDecoder(nn.Module):
         """ Quantize latent variables
             @Param
         """
-        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
+        #timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
 
         if self.kwargs["print_shape"]: print('qtz ', z.shape)
 
