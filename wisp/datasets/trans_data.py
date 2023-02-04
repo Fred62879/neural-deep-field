@@ -43,7 +43,10 @@ class TransData:
     def init_trans(self):
         self.data = {}
         self.preprocess_wave_trans()
-        self.load_full_wave_trans()
+        if self.kwargs["trans_sample_method"] == "mixture":
+            self.load_full_wave_trans()
+        elif self.kwargs["trans_sample_method"] == "hardcode":
+            self.load_hdcd_wave_trans()
         self.load_sampling_trans_data()
 
     def set_log_path(self, dataset_path):
@@ -71,8 +74,8 @@ class TransData:
         self.bdws_uniform_distrib_fname = join(self.trans_dir, 'bdws_uniform_distrib')
 
         hdcd_nsmpls = self.kwargs["hardcode_num_trans_samples"]
-        self.hdcd_wave_fname = join(self.trans_dir, f"hdcd_wave_{hdcd_nsmpls}.npy")
-        self.hdcd_trans_fname = join(self.trans_dir, f"hdcd_trans_{hdcd_nsmpls}.npy")
+        self.hdcd_wave_fname = join(self.trans_dir, f"hdcd_wave_{hdcd_nsmpls}")
+        self.hdcd_trans_fname = join(self.trans_dir, f"hdcd_trans_{hdcd_nsmpls}")
 
         self.flat_trans_fname = join(self.trans_dir, "flat_trans")
 
@@ -85,6 +88,15 @@ class TransData:
 
     def get_source_trans(self):
         return self.data["trans"]
+
+    def get_hdcd_wave(self):
+        return self.data["hdcd_wave"]
+
+    def get_hdcd_trans(self):
+        return self.data["hdcd_trans"]
+
+    def get_hdcd_nsmpl(self):
+        return self.data["hdcd_nsmpl"]
 
     def get_full_wave(self):
         return self.data["full_wave"]
@@ -250,6 +262,22 @@ class TransData:
         self.data["band_coverage_range"] = band_coverage_range
         self.data["nsmpl_within_bands"] = torch.FloatTensor(nsmpl_within_bands) #.to(self.device)
 
+    def load_sampling_trans_data(self):
+        """ Get trans data depending on sampling method.
+        """
+        if self.sample_method == "mixture":
+            self.trans_data = (self.data["full_norm_wave"],self.data["full_trans"],
+                               self.data["distrib"],self.data["encd_ids"])
+
+        elif self.sample_method == "bandwise":
+            self.trans_data = self.load_bandwise_wave_trans(norm_wave, trans)
+
+        elif self.sample_method == "hardcode":
+            self.trans_data = (self.data["hdcd_norm_wave"], self.data["hdcd_trans"])
+
+        else:
+            raise ValueError("Unrecognized transmission sampling method.")
+
     def load_full_wave_trans(self):
         """ Load wave, trans, and distribution for mixture sampling.
         """
@@ -287,21 +315,24 @@ class TransData:
         self.data["full_trans"] = torch.FloatTensor(full_trans) #.to(self.device)
         self.data["full_norm_wave"] = torch.FloatTensor(full_norm_wave) #.to(self.device)
 
-    def load_sampling_trans_data(self):
-        """ Get trans data depending on sampling method.
+    def load_hdcd_wave_trans(self):
+        """ Load wave, trans, and distribution for hardcode sampling.
         """
-        if self.sample_method == "mixture":
-            self.trans_data = (self.data["full_norm_wave"],self.data["full_trans"],
-                               self.data["distrib"],self.data["encd_ids"])
+        if exists(self.hdcd_wave_fname + ".npy") and exists(self.hdcd_trans_fname + ".npy"):
+            self.data["hdcd_wave"] = np.load(self.hdcd_wave_fname + ".npy")
+            self.data["hdcd_trans"] = np.load(self.hdcd_trans_fname + ".npy")
+            self.data["hdcd_norm_wave"] = 2 * (
+                ( self.data["hdcd_wave"] - np.min(self.data["hdcd_wave"]) ) /
+                ( np.max(self.data["hdcd_wave"]) - np.min(self.data["hdcd_wave"]) )
+            ) - 1
+            plot_save(self.hdcd_trans_fname + ".jpg", self.data["hdcd_wave"], self.data["hdcd_trans"].T)
 
-        elif self.sample_method == "bandwise":
-            self.trans_data = self.load_bandwise_wave_trans(norm_wave, trans)
+            #self.data["hdcd_wave"] = self.data["hdcd_wave"][:,None,:].tile(1,
+            self.data["hdcd_wave"] = torch.FloatTensor(self.data["hdcd_wave"])
+            self.data["hdcd_trans"] = torch.FloatTensor(self.data["hdcd_trans"])
+            self.data["hdcd_nsmpl"] = torch.FloatTensor([self.kwargs["hardcode_num_trans_samples"]])
 
-        elif self.sample_method == "hardcode":
-            self.trans_data = self.load_hdcd_wave_trans(
-                self.trans_dir, hdcd_wave, hdcd_trans)
-        else:
-            raise ValueError("Unrecognized transmission sampling method.")
+        else: assert(False)
 
     def load_bandwise_wave_trans(self, wave, trans):
         """ Load wave, trans, and distribution for bandwise sampling.
@@ -344,20 +375,6 @@ class TransData:
         distrib = torch.FloatTensor(distrib)
         return wave, trans, distrib
 
-    def load_hdcd_wave_trans(self, wave, trans):
-        """ Load wave, trans, and distribution for hardcode sampling.
-        """
-        if not exists(self.hdcd_wave_fname) or not exists(self.hdcd_trans_fname):
-            wave = np.load(self.hdcd_wave_fname)
-            trans = np.load(self.hdcd_trans_fname)
-            if self.plot:
-                plot_save(self.hdcd_trans_fname, wave, trans)
-        else: assert(False)
-
-        wave = torch.FloatTensor(wave)
-        trans = torch.FloatTensor(trans)
-        return wave, trans, None
-
     #############
     # Utilities
     #############
@@ -394,10 +411,27 @@ def batch_sample_trans(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, 
     (wave, trans, distrib, encd_ids) = trans_data
     (nbands, nsmpl_full) = trans.shape
 
+    '''
+    elif uniform_sample:
+        grid = kwargs["grid"]
+
+        ids = torch.arange(nsmpl_full)
+        torch.randperm(ids)
+        ids_all = torch.cat((ids,ids[:nsmpl]))
+
+        coord_ids = torch.randint(nsmpl_full,(bsz,))
+        coord_ids = torch.arange(nsmpl_full)
+        torch.randperm(coord_ids)
+    '''
+
     if use_all_wave:
         # use all lambda [bsz,nsmpl_full]
         ids = torch.arange(nsmpl_full)
         ids = ids[None,:].tile((bsz,1))
+
+    elif kwargs["uniform_sample_trans"]:
+        ids = torch.zeros(bsz,nsmpls).uniform_(0,nsmpl_full).to(torch.long)
+
     else:
         # sample #nsmpl lambda [bsz,nsmpl]
         distrib = distrib[None,:].tile(bsz,1)

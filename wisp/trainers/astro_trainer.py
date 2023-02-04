@@ -226,11 +226,10 @@ class AstroTrainer(BaseTrainer):
 
         self.scene_state.optimization.running = True
 
-        for epoch in range(1, self.num_epochs + 1):
+        for epoch in range(self.num_epochs + 1):
             self.begin_epoch()
 
             for batch in range(self.num_iterations_cur_epoch):
-                #print(epoch, batch)
                 iter_start_time = time.time()
                 self.scene_state.optimization.iteration = self.iteration
 
@@ -250,44 +249,6 @@ class AstroTrainer(BaseTrainer):
 
         if self.extra_args["log_gpu_every"] != -1:
             nvidia_smi.nvmlShutdown()
-
-    '''
-    def train(self):
-        if self.extra_args["resume_train"]:
-            self.resume_train()
-        super().train()
-        if self.extra_args["log_gpu_every"] != -1:
-            nvidia_smi.nvmlShutdown()
-
-    def iterate(self):
-        """Advances the training by one training step (batch).
-        """
-        if self.scene_state.optimization.running:
-            iter_start_time = time.time()
-            self.scene_state.optimization.iteration = self.iteration
-            try:
-                if self.train_data_loader_iter is None:
-                    self.begin_epoch()
-
-                # we may not need to iterate thru all data at certain epochs
-                if self.iteration > self.num_iterations_cur_epoch:
-                    raise StopIteration
-
-                data = self.next_batch()
-                self.iteration += 1
-
-            except StopIteration:
-                self.end_epoch()
-                self.begin_epoch()
-                data = self.next_batch()
-
-            #print(self.epoch, self.iteration)
-            self.pre_step()
-            self.step(data)
-            self.post_step()
-            iter_end_time = time.time()
-            self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
-    '''
 
     #############
     # Epoch begin and end
@@ -370,9 +331,11 @@ class AstroTrainer(BaseTrainer):
         total_loss = self.log_dict["total_loss"] / len(self.train_data_loader)
         self.scene_state.optimization.losses["total_loss"].append(total_loss)
 
-        # log to cli and tensorboard
         if self.extra_args["log_tb_every"] > -1 and self.epoch % self.extra_args["log_tb_every"] == 0:
-            self.log_cli(); self.log_tb()
+            self.log_tb()
+
+        if self.extra_args["log_cli_every"] > -1 and self.epoch % self.extra_args["log_cli_every"] == 0:
+            self.log_cli()
 
         # render visualizations to tensorboard
         if self.render_tb_every > -1 and self.epoch % self.render_tb_every == 0:
@@ -590,9 +553,6 @@ class AstroTrainer(BaseTrainer):
         if self.spectra_supervision:
             log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
         log.info(log_text)
-
-    def log_tb(self):
-        pass
 
     def save_model(self):
         if self.extra_args["save_as_new"]:

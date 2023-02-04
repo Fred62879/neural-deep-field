@@ -91,16 +91,18 @@ class FITSData:
         # suffix that uniquely identifies the currently selected group of
         # tiles with the corresponding cropping parameters, if any
         suffix, self.gt_img_fnames = "", {}
+        norm = self.kwargs["gt_img_norm_cho"]
+
         if self.use_full_fits:
             for fits_id in self.fits_ids:
                 suffix += f"_{fits_id}"
-                self.gt_img_fnames[fits_id] = join(img_data_path, f"gt_img_{fits_id}")
+                self.gt_img_fnames[fits_id] = join(img_data_path, f"gt_img_{norm}_{fits_id}")
         else:
             for (fits_id, size, (r,c)) in zip(
                     self.fits_ids, self.fits_cutout_sizes, self.fits_cutout_start_pos):
                 suffix += f"_{fits_id}_{size}_{r}_{c}"
                 self.gt_img_fnames[fits_id] = join(
-                    img_data_path, f"gt_img_{fits_id}_{size}_{r}_{c}")
+                    img_data_path, f"gt_img_{norm}_{fits_id}_{size}_{r}_{c}")
 
         norm_str = self.kwargs["train_pixels_norm"]
 
@@ -308,6 +310,8 @@ class FITSData:
             # apply normalization to pixels as specified
             if self.kwargs["train_pixels_norm"] == "linear":
                 pixels = normalize(pixels, "linear")
+            elif self.kwargs["train_pixels_norm"] == "zscale":
+                pixels = normalize(pixels, "zscale", gt=pixels)
 
             np.save(self.pixels_fname, pixels)
 
@@ -432,7 +436,6 @@ class FITSData:
             mask, masked_ids = create_mask_one_band(npixls, ratio, mask_seed)
             mask = np.tile(mask[:,None], (1,num_bands))
             # [npixls, nbands], [num_masked_pixls]
-            print(masked_ids.shape)
 
         elif mask_config == "region": # NOT TESTED
             assert(False)
@@ -687,12 +690,11 @@ class FITSData:
         for i, (size, (r,c)) in enumerate(
                 zip(re_args["cutout_sizes"][id], re_args["cutout_start_pos"][id])
         ):
-            print(type(fits_id))
-            zoomed_gt = np.load(self.gt_img_fnames[fits_id] + ".npy")[:,r-size:r+size,c-size:c+size]
+            zoomed_gt = np.load(self.gt_img_fnames[fits_id] + ".npy")[:,r:r+size,c:c+size]
             zoomed_gt_fname = str(self.gt_img_fnames[fits_id]) + f"_zoomed_{size}_{r}_{c}"
             plot_horizontally(zoomed_gt, zoomed_gt_fname)
 
-            zoomed_recon = recon_tile[:,r-size:r+size,c-size:c+size]
+            zoomed_recon = recon_tile[:,r:r+size,c:c+size]
             zoomed_recon_fname = join(re_args["zoomed_recon_dir"],
                                       str(re_args["zoomed_recon_fname"]) + f"_{fits_id}_{i}")
             plot_horizontally(zoomed_recon, zoomed_recon_fname, zscale_ranges=zscale_ranges)

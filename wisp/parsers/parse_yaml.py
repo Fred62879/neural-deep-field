@@ -356,7 +356,9 @@ def define_cmd_line_args():
     train_group.add_argument("--render-tb-every", type=int, default=100,
                                 help="Render every N iterations")
     train_group.add_argument("--log-tb-every", type=int, default=100,
-                             help="Log to cli and tb at every N epoch.")
+                             help="Log to tensorboard at every N epoch.")
+    train_group.add_argument("--log-cli-every", type=int, default=100,
+                             help="Log to command line at every N epoch.")
     train_group.add_argument("--log-gpu-every", type=int, default=100,
                              help="Log to cli gpu usage at every N epoch.")
     train_group.add_argument("--save-local-every", type=int, default=100,

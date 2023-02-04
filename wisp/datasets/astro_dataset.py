@@ -132,12 +132,18 @@ class AstroDataset(Dataset):
             These are not batched, we do monte carlo sampling at every step.
         """
         # infer = self.mode == "infer"
-        out["wave"], out["trans"], out["nsmpl"] = \
+        if self.kwargs["trans_sample_method"] == "hardcode":
+            out["wave"] = self.trans_dataset.get_hdcd_wave()[None,:,None].tile(batch_size,1,1)
+            out["trans"] = self.trans_dataset.get_hdcd_trans()
+            out["nsmpl"] = self.trans_dataset.get_hdcd_nsmpl()
+        else:
+            out["wave"], out["trans"], out["nsmpl"] = \
                 self.trans_dataset.sample_wave_trans(
                     batch_size, self.nsmpls, use_full_wave=self.use_full_wave)
-        #out["wave"] = torch.ones(4096,1,1)
-        #out["trans"] = torch.ones(4096,5,1)
-        #out["nsmpl"] = torch.ones(5)
+
+        #out["wave"] = torch.ones(14745,self.kwargs["num_trans_samples"],1)
+        #out["trans"] = torch.ones(14745,5,self.kwargs["num_trans_samples"])
+        #out["nsmpl"] = torch.ones(14745,5)
 
     def get_spectra_data(self, out):
         """ Get unbatched spectra data (only for spectra supervision training).

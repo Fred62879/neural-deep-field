@@ -411,6 +411,8 @@ class AstroInferrer(BaseInferrer):
         codebook_latents = load_layer_weights(
             checkpoint, lambda n: "grid" not in n and "codebook" in n)
         codebook_latents = codebook_latents.T[:,None] # [num_embd, 1, latent_dim]
+        codebook_latents = codebook_latents.detach().cpu().numpy()
+        # print(codebook_latents[:,0])
         self.dataset.set_hardcode_data(self.coords_source, codebook_latents)
 
         while True:

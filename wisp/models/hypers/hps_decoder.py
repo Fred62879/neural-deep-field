@@ -45,8 +45,9 @@ class HyperSpectralDecoder(nn.Module):
         latents = self.convert(wave, latents, redshift)
         if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
+        # print(latents)
         spectra = self.spectra_decoder(latents)[...,0]
-
+        # print(spectra)
         if self.scale and scaler is not None:
             spectra = (torch.exp(scaler) * spectra.T).T
             #spectra = (scaler * spectra.T).T

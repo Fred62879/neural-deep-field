@@ -112,8 +112,13 @@ def plot_horizontally(img, png_fname, zscale_ranges=None):
 
 # not used
 def plot_save(fname, x, y):
+    # assert(y.ndim <= 2)
+    # if y.ndim == 2:
+    #     for sub_y in y:
+    #         plt.plot(x, sub_y)
+    # else: plt.plot(x, y)
     plt.plot(x, y)
-    plt.savefig(fname);
+    plt.savefig(fname)
     plt.close()
 
 def sdss_rgb(imgs, bands, scales=None, m = 0.02):

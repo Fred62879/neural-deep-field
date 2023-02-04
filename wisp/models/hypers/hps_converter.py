@@ -72,6 +72,7 @@ class HyperSpectralConverter(nn.Module):
               latents:  hyperspectral latents (i.e. ra/dec/wave)
         """
         if self.kwargs["print_shape"]: print('hps_converter',latents.shape)
+
         num_samples = wave.shape[-2]
         coords_encode_dim = latents.shape[-1]
 

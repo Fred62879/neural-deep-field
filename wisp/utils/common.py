@@ -159,7 +159,9 @@ def forward(class_obj, pipeline, data,
         if pixel_supervision_train or infer:
             sample_method = class_obj.extra_args["trans_sample_method"]
             if sample_method == "hardcode":
-                pass
+                net_args["wave"] = data["wave"]
+                net_args["trans"] = data["trans"]
+                net_args["nsmpl"] = data["nsmpl"]
             elif sample_method == "bandwise":
                 pass
             elif sample_method == "mixture":

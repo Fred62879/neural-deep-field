@@ -81,7 +81,7 @@ class HyperSpectralIntegrator(nn.Module):
 
     # @dot product
     def dot_prod_hdcd(self, spectra, trans, nsmpl):
-        return torch.einsum("ij,lj->il", spectra, kwargs["trans"]) / self.nsmpl
+        return torch.einsum("ij,lj->il", spectra, trans) / nsmpl
 
     def dot_prod_nonuniform_bdws(self, spectra, trans, nsmpl):
         """ Wave is sampled according to the transmission function

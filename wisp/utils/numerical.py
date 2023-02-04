@@ -82,33 +82,34 @@ def normalize(data, normcho, verbose=False, gt=None):
     elif normcho == 'clip':
         data = np.clip(data, 0, 1)
     elif normcho == 'zscale':
-        data = np.zscale_img(data, gt)
+        assert(gt is not None)
+        data = zscale_img(data, gt)
     else:
         raise Exception('Unsupported pixel normalizaton choice')
     return data
 
-def zscale_img(recon, gt):
+def zscale_img(data, gt):
     ''' Normalize to [0,1] based on zscale value of gt.
         Doesn't change value of input recon. Return new img instead.
         Steps: i) get z1 and z2 of gt
               ii) Normalize recon to have min as z1 and max as z2
              iii) Clip recon to [0,1]
         @Param
-          recon: image to normalize     [..]/[nbands,..]
-          gt: image to derive z1 and z2 [..]/[nbands,..]
+          recon: image to normalize     [..]/[...,nabnds]
+          gt: image to derive z1 and z2 [..]/[...,nbands]
     '''
     def zscale(a, b):
         z1, z2 = ZScaleInterval(contrast=.25).get_limits(b)
         a = (a - z1) / (z2 - z1)
         return np.clip(a, 0, 1)
 
-    if recon.ndim == 2:
-        return zscale(recon, gt)
+    if data.ndim == 2:
+        return zscale(data, gt)
 
-    nbands = len(recon)
+    nbands = data.shape[-1]
     for i in range(nbands):
-        recon[i] = zscale(recon[i], gt[i])
-    return recon
+        data[...,i] = zscale(data[...,i], gt[...,i])
+    return data
 
 def calculate_sam_spectrum(gen, gt, convert_to_degree=False):
     numerator = np.sum(np.multiply(gt, gen))
