@@ -9,8 +9,8 @@ global:
 
     #tasks: ['train']
 
-    #tasks: ['train','save_recon_during_train','infer','recon_img']
-    tasks: ['infer','recon_img']
+    tasks: ['train','save_recon_during_train','infer','recon_img']
+    #tasks: ['infer','recon_img']
 
     #tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
@@ -23,7 +23,7 @@ global:
 
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed']
-    #tasks: ['infer','recon_gt_spectra']
+    tasks: ['infer','recon_gt_spectra','save_redshift']
     #tasks: ['infer','recon_codebook_spectra']
 
 optimizer:
@@ -37,7 +37,7 @@ optimizer:
 net:
     nef_type: 'AstroHyperSpectralNerf'
     #nef_type: 'AstroNerf'
-    coords_encode_method: 'positional'
+    coords_encode_method: 'grid'
     wave_encode_method: 'positional'
     mlp_output_norm_method: 'sinh'
 
@@ -49,7 +49,7 @@ embedder:
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 1000
+    wave_embed_dim: 40
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -61,17 +61,17 @@ grid:
     grid_multiscale_type: 'cat'
     grid_feature_dim: 2
     grid_feature_std: 0.01
-    grid_num_lods: 16  # max / min = b**l
+    grid_num_lods: 20  # max / min = b**l
     tree_type: 'geometric'
-    min_grid_res: 8
-    max_grid_res: 200
-    codebook_bitwidth: 18
+    min_grid_res: 6 #4 #6
+    max_grid_res: 662 #160
+    codebook_bitwidth: 21
 
 decoder:
     decoder_num_layers: 1
     decoder_hidden_dim: 64
     decoder_layer_type: 'none'
-    decoder_activation_type: "relu"
+    decoder_activation_type: "sin"
 
     siren_seed: 0
     siren_first_w0: 24
@@ -81,7 +81,7 @@ decoder:
 
 qtz:
     generate_scaler: True
-    generate_redshift: False
+    generate_redshift: True
 
     qtz_latent_dim: 16
     qtz_num_embed: 4
@@ -118,10 +118,10 @@ trainer:
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks']
 
     pixel_supervision: True
-    spectra_supervision: False
+    spectra_supervision: True
     spectra_beta: 0.01
 
-    quantize_latent: False
+    quantize_latent: True
     weight_train: False
     train_use_all_wave: False
     resume_train: False
@@ -133,12 +133,12 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 1
+    num_supervision_spectra: 2
     spectra_neighbour_size: 1
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_batch_size: 1024 #4096 #36864
+    infer_batch_size: 4096 #36864
     infer_use_all_wave: True # enforced
     infer_last_model_only: True
 
@@ -174,8 +174,8 @@ dataset:
     fits_footprints: ['9812']
     fits_tile_ids: ['1']
     fits_subtile_ids: ['5']
-    fits_cutout_sizes: [64] #[256]
-    fits_cutout_start_pos: [[86,188]] #[[1970,758]] #[[1750,550]]
+    fits_cutout_sizes: [512] #[256]
+    fits_cutout_start_pos: [[1750,550]] #[[1970,758]] #[[1750,550]]
 
     # num_bands: 1
     # sensor_collection_name: '1_y'
@@ -207,7 +207,7 @@ dataset:
     hardcode_num_trans_samples: 35
     trans_sample_interval: 10
 
-    gt_spectra_choices: [5] #[2,3,4,5,6] #[1,2,3,4]
+    gt_spectra_choices: [1,5,2,3,4] #[5] #[2,3,4,5,6] #[1,2,3,4]
     spectra_smooth_sigma: 50
 
 inpaint:

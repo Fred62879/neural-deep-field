@@ -227,6 +227,7 @@ class SpectraData:
         self.data["gt_spectra_coords"] = self.data["gt_spectra_coords"].view(-1,1,coord_dim)
 
         if self.spectra_supervision_train:
+            #print('*', len(supervision_spectra))
             n = self.kwargs["num_supervision_spectra"]
             self.data["supervision_spectra"] = torch.FloatTensor(
                 np.array(supervision_spectra))[:n] #.to(self.device)
@@ -290,9 +291,10 @@ class SpectraData:
 
         # index coord from original coords array to get accurate coord
         # this only works if spectra coords is included in the loaded coords
-        (r, c) = worldToPix(header, ra, dec)
+        (r, c) = worldToPix(header, ra, dec) # r and c coord within full tile
         pixel_ids = self.fits_obj.get_pixel_ids(fits_id, r, c, neighbour_size)
         coords_accurate = self.fits_obj.get_coord(pixel_ids)
+        print(r, c, pixel_ids, coords_accurate, self.kwargs["fits_cutout_start_pos"])
         return coords_accurate, pixel_ids
 
     #############
@@ -385,7 +387,7 @@ def read_spectra_data(fname):
         data[colname] = np.array(data[colname]).astype(dtype)
     return data
 
-def convolve_spectra(spectra, std=50, border=True):
+def convolve_spectra(spectra, std=100, border=True):
     """ Smooth gt spectra with given std.
         If border is True, we add 1 padding at two ends when convolving.
     """

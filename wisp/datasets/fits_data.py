@@ -532,6 +532,11 @@ class FITSData:
         return self.data["weights"]
 
     def get_coord(self, idx):
+        if type(idx) == list:
+            for id in idx:
+                assert(id >= 0 and id < len(self.data["coords"]))
+        else:
+            assert(id >= 0 and id < len(self.data["coords"]))
         return self.data["coords"][idx]
 
     def get_coords(self):

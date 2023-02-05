@@ -135,6 +135,7 @@ def forward(class_obj, pipeline, data,
             save_scaler=False,
             save_spectra=False,
             save_latents=False,
+            save_redshift=False,
             save_embed_ids=False):
 
     # cannot in both train and infer mode
@@ -153,6 +154,7 @@ def forward(class_obj, pipeline, data,
         if save_scaler: requested_channels.append("scaler")
         if save_spectra: requested_channels.append("spectra")
         if save_latents: requested_channels.append("latents")
+        if save_redshift: requested_channels.append("redshift")
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if spectra_supervision_train: requested_channels.append("spectra")
 

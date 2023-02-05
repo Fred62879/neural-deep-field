@@ -62,9 +62,9 @@ class AstroInferrer(BaseInferrer):
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","metric_dir", "spectra_dir",
                  "codebook_spectra_dir", "embed_map_dir","latent_dir",
-                 "latent_embed_dir","zoomed_recon_dir"],
+                 "redshift_dir","latent_embed_dir","zoomed_recon_dir"],
                 ["models","recons","metrics","spectra","codebook_spectra",
-                 "embed_map","latents","latent_embed","zoomed_recon"]
+                 "embed_map","latents","redshift","latent_embed","zoomed_recon"]
         ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
@@ -93,6 +93,8 @@ class AstroInferrer(BaseInferrer):
             and self.quantize_latent and self.space_dim == 3
         self.plot_latent_embed = "plot_latent_embed" in tasks \
             and self.quantize_latent and self.space_dim == 3
+        self.save_redshift = "save_redshift" in tasks \
+            and self.quantize_latent and self.space_dim == 3
 
         # infer all coords using modified model
         self.recon_codebook_spectra = "recon_codebook_spectra" in tasks \
@@ -106,7 +108,7 @@ class AstroInferrer(BaseInferrer):
         self.group_tasks = []
 
         if self.recon_img or self.recon_flat_trans or \
-           self.plot_embed_map or self.plot_latent_embed:
+           self.plot_embed_map or self.plot_latent_embed or self.save_redshift:
             self.group_tasks.append("infer_all_coords_full_model")
 
         if self.recon_codebook_spectra:
@@ -183,6 +185,8 @@ class AstroInferrer(BaseInferrer):
                                        for option in self.metric_options ]
                 self.metric_fnames_z = [ join(self.metric_dir, f"{option}_zscale.npy")
                                          for option in self.metric_options ]
+        else:
+            self.calculate_metrics = False
 
     def post_inferrence_all_coords_full_model(self):
         if self.calculate_metrics:
@@ -243,6 +247,9 @@ class AstroInferrer(BaseInferrer):
         if self.plot_latent_embed:
             self.latents = []
 
+        if self.save_redshift:
+            self.redshifts = []
+
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
         epoch = checkpoint["epoch_trained"]
         model_state = checkpoint["model_state_dict"]
@@ -299,6 +306,19 @@ class AstroInferrer(BaseInferrer):
 
         if self.plot_latent_embed:
             plot_latent_embed(self.latents, self.embed, model_id, self.latent_embed_dir)
+
+        if self.save_redshift:
+            re_args = {
+                "fname": model_id,
+                "dir": self.redshift_dir,
+                "verbose": self.verbose,
+                "num_bands": 1,
+                "log_max": False,
+                "to_HDU": False,
+                "save_locally": True,
+                "calculate_metrics": False,
+            }
+            _, _ = self.dataset.restore_evaluate_tiles(self.redshifts, **re_args)
 
     def pre_checkpoint_selected_coords_partial_model(self, model_id):
         self.reset_data_iterator()
@@ -358,9 +378,11 @@ class AstroInferrer(BaseInferrer):
                         infer=True,
                         save_spectra=False,
                         save_latents=True,
+                        save_redshift=True,
                         save_embed_ids=self.plot_embed_map)
 
                 if self.recon_img: self.recon_pixels.extend(ret["intensity"])
+                if self.save_redshift: self.redshifts.extend(ret["redshift"])
                 if self.plot_latent_embed: self.latents.extend(ret["latents"])
                 if self.plot_embed_map: self.embed_ids.extend(ret["min_embed_ids"])
 

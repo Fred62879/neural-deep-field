@@ -113,6 +113,7 @@ class AstroTrainer(BaseTrainer):
             ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
         self.save_scaler =  self.pixel_supervision and self.quantize_latent and \
             "plot_save_scaler" in tasks
+        self.save_redshift =  self.quantize_latent and "save_redshift_during_train" in tasks
 
         self.plot_spectra = self.space_dim == 3 and "plot_spectra_during_train" in tasks
         self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
@@ -305,8 +306,9 @@ class AstroTrainer(BaseTrainer):
 
         if self.extra_args["save_local_every"] > -1 and self.epoch % self.extra_args["save_local_every"] == 0:
             self.save_data_to_local = True
-            if self.save_scaler: self.pixel_scaler = []
             if self.save_latents: self.latents = []
+            if self.save_redshift: self.redshifts = []
+            if self.save_scaler: self.pixel_scaler = []
             if self.plot_embed_map: self.embed_ids = []
             if self.plot_spectra: self.smpl_spectra = []
             if self.save_recon or self.save_cropped_recon: self.smpl_pixels = []
@@ -402,9 +404,10 @@ class AstroTrainer(BaseTrainer):
 
         #plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
         if self.save_data_to_local:
-            scaler, recon_spectra, embed_ids, latents = self.get_data_to_save(ret)
+            scaler, recon_spectra, embed_ids, latents, redshift = self.get_data_to_save(ret)
             if self.save_scaler: self.pixel_scaler.extend(scaler)
             if self.save_latents: self.latents.extend(latents)
+            if self.save_redshift: self.redshifts.extend(redshift)
             if self.plot_embed_map: self.embed_ids.extend(embed_ids)
             if self.plot_spectra: self.smpl_spectra.append(recon_spectra)
             if self.save_recon or self.save_cropped_recon:
@@ -494,6 +497,7 @@ class AstroTrainer(BaseTrainer):
                       save_scaler=self.save_data_to_local and self.save_scaler,
                       save_spectra=self.save_data_to_local and self.plot_spectra,
                       save_latents=self.save_data_to_local and self.save_latents,
+                      save_redshift=self.save_data_to_local and self.save_redshift,
                       save_embed_ids=self.save_data_to_local and self.plot_embed_map)
 
         # i) reconstruction loss (taking inpaint into account)
@@ -524,8 +528,12 @@ class AstroTrainer(BaseTrainer):
             (lo, hi) = data["recon_wave_bound_ids"][0]
             recon_spectra = ret["spectra"][:self.num_supervision_spectra,lo:hi]
 
-            spectra_loss = self.spectra_loss(gt_spectra, recon_spectra) * self.spectra_beta
-            self.log_dict["spectra_loss"] += spectra_loss.item()
+            #print(recon_spectra.shape, gt_spectra.shape)
+            if len(recon_spectra) == 0:
+                spectra_loss = 0
+            else:
+                spectra_loss = self.spectra_loss(gt_spectra, recon_spectra) * self.spectra_beta
+                self.log_dict["spectra_loss"] += spectra_loss.item()
 
         # iii) latent quantization codebook loss
         codebook_loss = 0
@@ -578,9 +586,10 @@ class AstroTrainer(BaseTrainer):
     def get_data_to_save(self, ret):
         scaler = None if not self.save_scaler else ret["scaler"]
         latents = None if not self.save_latents else ret["latents"]
-        embed_ids = None if not self.plot_embed_map else ret["min_embed_ids"]
+        redshift = None if not self.save_redshift else ret["redshift"]
         recon_spectra = None if not self.plot_spectra else ret["spectra"]
-        return scaler, recon_spectra, embed_ids, latents
+        embed_ids = None if not self.plot_embed_map else ret["min_embed_ids"]
+        return scaler, recon_spectra, embed_ids, latents, redshift
 
     def save_local(self):
         if self.save_latents:

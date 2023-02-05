@@ -28,7 +28,7 @@ class HyperSpectralConverter(nn.Module):
             nsmpl = wave.shape[1] # [bsz,nsmpl,1]
             wave += torch.exp(redshift) - 0.1
             # wave /= (1 + torch.exp(redshift))
-            #wave /= (1 + redshift)
+            # wave /= (1 + redshift)
         elif wave.ndim == 4:
             nsmpl = wave.shape[2] # [bsz,nbands,nsmpl,1]
             wave += torch.exp(redshift) - 0.1

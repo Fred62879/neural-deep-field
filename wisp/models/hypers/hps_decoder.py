@@ -45,9 +45,7 @@ class HyperSpectralDecoder(nn.Module):
         latents = self.convert(wave, latents, redshift)
         if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
-        # print(latents)
         spectra = self.spectra_decoder(latents)[...,0]
-        # print(spectra)
         if self.scale and scaler is not None:
             spectra = (torch.exp(scaler) * spectra.T).T
             #spectra = (scaler * spectra.T).T
@@ -59,7 +57,7 @@ class HyperSpectralDecoder(nn.Module):
         """ During training, some latents will be decoded, combining with full wave.
             Currently only supports spectra coords (incl. gt, dummy that requires
               spectrum plotting during training time).
-            Latents that require full wave are at the end of the tensor.
+            Latents that require full wave are placed at the end of the tensor.
         """
         latents = latents[-num_spectra_coords:]
         scaler = None if ret["scaler"] is None else ret["scaler"][-num_spectra_coords:]
