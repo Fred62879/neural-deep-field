@@ -9,7 +9,7 @@ global:
 
     #tasks: ['train']
 
-    tasks: ['train','save_recon_during_train','infer','recon_img']
+    #tasks: ['train','save_recon_during_train','infer','recon_img']
     #tasks: ['infer','recon_img']
 
     #tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
@@ -21,9 +21,9 @@ global:
     #tasks: ['train','plot_save_scaler','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
     #tasks: ['infer','recon_img','plot_embed_map','plot_latent_embed','plot_save_scaler']
 
-    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra']
+    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra','save_redshift']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed']
-    tasks: ['infer','recon_gt_spectra','save_redshift']
+    tasks: ['infer','recon_gt_spectra'] #,'save_redshift']
     #tasks: ['infer','recon_codebook_spectra']
 
 optimizer:
@@ -174,8 +174,8 @@ dataset:
     fits_footprints: ['9812']
     fits_tile_ids: ['1']
     fits_subtile_ids: ['5']
-    fits_cutout_sizes: [512] #[256]
-    fits_cutout_start_pos: [[1750,550]] #[[1970,758]] #[[1750,550]]
+    fits_cutout_sizes: [512]
+    fits_cutout_start_pos: [[1750,550]] #[[2009,917]] #[[1970,758]]
 
     # num_bands: 1
     # sensor_collection_name: '1_y'
@@ -205,10 +205,10 @@ dataset:
     trans_sample_method: 'mixture'
     trans_threshold: 1e-3
     hardcode_num_trans_samples: 35
-    trans_sample_interval: 10
+    trans_sample_interval: 30
 
-    gt_spectra_choices: [1,5,2,3,4] #[5] #[2,3,4,5,6] #[1,2,3,4]
-    spectra_smooth_sigma: 50
+    gt_spectra_choices: [1,5,2,3,4] #[2,3,4,5,6] #[1,2,3,4]
+    spectra_smooth_sigma: 140
 
 inpaint:
     inpaint_cho: 'no_inpaint' # 'spectral_inpaint'

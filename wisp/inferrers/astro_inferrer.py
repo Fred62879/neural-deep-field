@@ -94,6 +94,7 @@ class AstroInferrer(BaseInferrer):
         self.plot_latent_embed = "plot_latent_embed" in tasks \
             and self.quantize_latent and self.space_dim == 3
         self.save_redshift = "save_redshift" in tasks \
+            and self.extra_args["generate_redshift"] \
             and self.quantize_latent and self.space_dim == 3
 
         # infer all coords using modified model

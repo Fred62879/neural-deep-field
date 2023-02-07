@@ -93,6 +93,9 @@ class HyperSpectralDecoder(nn.Module):
 
         if self.kwargs["print_shape"]: print('hps_decoder',latents.shape)
 
+        if ret["redshift"] is not None:
+            ret["redshift"] = torch.exp(ret["redshift"])
+
         if num_spectra_coords > 0:
             self.train_with_full_wave(latents, full_wave, num_spectra_coords, ret)
             latents = latents[:-num_spectra_coords]

@@ -113,7 +113,8 @@ class AstroTrainer(BaseTrainer):
             ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
         self.save_scaler =  self.pixel_supervision and self.quantize_latent and \
             "plot_save_scaler" in tasks
-        self.save_redshift =  self.quantize_latent and "save_redshift_during_train" in tasks
+        self.save_redshift =  self.quantize_latent and self.extra_args["generate_redshift"] \
+            and "save_redshift_during_train" in tasks
 
         self.plot_spectra = self.space_dim == 3 and "plot_spectra_during_train" in tasks
         self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]

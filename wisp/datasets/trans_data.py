@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 
 from os.path import join, exists
 from wisp.utils.plot import plot_save
+#from astroquery.svo_fps import SvoFps
+#from unagi import filters as unagi_filters
 
 
 class TransData:
@@ -31,7 +33,7 @@ class TransData:
         self.u_scale = kwargs["u_band_scale"]
         self.trans_threshold = kwargs["trans_threshold"]
         self.smpl_interval = kwargs["trans_sample_interval"]
-        assert(self.smpl_interval == 10)
+        #assert(self.smpl_interval == 10)
 
         self.set_log_path(dataset_path)
         self.init_trans()
@@ -62,16 +64,16 @@ class TransData:
         self.processed_wave_fname = join(self.trans_dir, "processed_wave.txt")
         self.processed_trans_fname = join(self.trans_dir, "processed_trans.txt")
 
-        self.full_wave_fname = join(self.trans_dir, "full_wave")
-        self.full_trans_fname = join(self.trans_dir, "full_trans")
-        self.full_distrib_fname = join(self.trans_dir, 'full_distrib')
-        self.full_uniform_distrib_fname = join(self.trans_dir, 'full_uniform_distrib')
-        self.encd_ids_fname = join(self.trans_dir, "encd_ids.npy")
+        self.full_wave_fname = join(self.trans_dir, f"full_wave_{self.smpl_interval}")
+        self.full_trans_fname = join(self.trans_dir, f"full_trans_{self.smpl_interval}")
+        self.full_distrib_fname = join(self.trans_dir, f"full_distrib_{self.smpl_interval}")
+        self.full_uniform_distrib_fname = join(self.trans_dir, f"full_uniform_distrib_{self.smpl_interval}")
+        self.encd_ids_fname = join(self.trans_dir, f"encd_ids.npy_{self.smpl_interval}")
 
-        self.bdws_wave_fname = join(self.trans_dir, "bdws_wave")
-        self.bdws_trans_fname = join(self.trans_dir, "bdws_trans")
-        self.bdws_distrib_fname = join(self.trans_dir, 'bdws_distrib')
-        self.bdws_uniform_distrib_fname = join(self.trans_dir, 'bdws_uniform_distrib')
+        self.bdws_wave_fname = join(self.trans_dir, f"bdws_wave_{self.smpl_interval}")
+        self.bdws_trans_fname = join(self.trans_dir, f"bdws_trans_{self.smpl_interval}")
+        self.bdws_distrib_fname = join(self.trans_dir, f"bdws_distrib_{self.smpl_interval}")
+        self.bdws_uniform_distrib_fname = join(self.trans_dir, f"bdws_uniform_distrib_{self.smpl_interval}")
 
         hdcd_nsmpls = self.kwargs["hardcode_num_trans_samples"]
         self.hdcd_wave_fname = join(self.trans_dir, f"hdcd_wave_{hdcd_nsmpls}")
@@ -237,9 +239,8 @@ class TransData:
             wave, trans = trim_wave_trans(
                 source_wave, source_trans, self.filters, self.trans_threshold)
 
-            # unify discretization interval as 10 for all bands
-            if 'us' in self.filters: downsample_us(wave, trans)
-            if 'u' in self.filters: interpolate_u_band(wave, trans, self.smpl_interval)
+            # unify discretization interval for all bands
+            unify_discretization_interval(wave, trans, self.filters, self.smpl_interval)
             scale_trans(trans, source_trans, self.filters)
             wave, trans = map2list(wave, trans, self.filters)
 
@@ -558,19 +559,54 @@ def trim_wave_trans(wave, trans, bands, trans_threshold):
 
     return trimmed_wave, trimmed_trans
 
+def unify_discretization_interval(wave, trans, bands, new_smpl_interval):
+    """ Make sample interval the same for all bands.
+        Currently supports a 10-band collection - grizy,3*nb,u,u*
+    """
+    lo_wave, hi_wave = np.inf, 0
+    for band in bands:
+        if band == "us" or band == "u": continue
+        lo, hi = wave[band][0], wave[band][-1]
+        if lo < lo_wave: lo_wave = lo
+        if hi > hi_wave: hi_wave = hi
+
+    full_wave = np.arange(lo_wave, hi_wave+1, new_smpl_interval)
+
+    for i, band in enumerate(bands):
+        if band == "u": continue
+
+        orig_smpl_interval = wave[band][1] - wave[band][0]
+        interval =  new_smpl_interval // orig_smpl_interval
+        id_lo = np.where(full_wave >= wave[band][0])[0][0]
+        id_hi = np.where(full_wave <= wave[band][-1])[0][-1]
+
+        id_lo = np.where(wave[band] == full_wave[id_lo])[0][0]
+        id_hi = np.where(wave[band] == full_wave[id_hi])[0][0]
+        ids = np.arange(id_lo, id_hi+1, interval).astype(int)
+
+        wave[band] = np.array(wave[band])[ids]
+        trans[band] = np.array(trans[band])[ids]
+
+    # all bands except the u band has a uniform discretization interval
+    if 'u' in bands:
+        interpolate_u_band(wave, trans, full_wave, new_smpl_interval)
+
+'''
 def downsample_us(wave, trans):
     """ Downsample u* band from 20 to 10. Source u* wave interval is 20.
     """
     ids = np.arange(0, len(wave["us"]), 2)
     wave["us"] = np.array(wave["us"])[ids]
     trans["us"] = np.array(trans["us"])[ids]
+'''
 
-def interpolate_u_band(wave, trans, smpl_interval):
+def interpolate_u_band(wave, trans, full_wave, smpl_interval):
     """ Interpolate u band with discretization value 10.
         Source wave for u band is not uniformly spaced.
     """
     fu = interpolate.interp1d(wave["u"], trans["u"])
-    u_wave = np.arange(wave["u"][0], wave["u"][-1] + 1, smpl_interval)
+    lo = np.where(full_wave >= wave["u"][0])[0][0]
+    u_wave = np.arange(lo, wave["u"][-1] + 1, smpl_interval)
     u_trans = fu(u_wave)
     wave["u"] = u_wave
     trans["u"] = u_trans
