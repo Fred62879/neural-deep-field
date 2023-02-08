@@ -494,15 +494,14 @@ def heat(fig, arr, r, c, i):
     img=ax.imshow(arr, cmap='viridis', origin='lower')
     plt.colorbar(img,ax=ax)
 
-def heat_all(resid, fn, los=None, his=None):
-    nbands = len(resid)
+def heat_all(data, fn, los=None, his=None):
+    nbands = len(data)
     fig = plt.figure(figsize=(20,5))
     r, c = 1, nbands
-    for i, band in enumerate(resid):
+    for i, band in enumerate(data):
         if los is not None and his is not None:
             band = np.clip(fig, los[i], his[i])
         heat(fig, band, r, c, i+1)
-
     fig.tight_layout()
     plt.savefig(fn)
     plt.close()

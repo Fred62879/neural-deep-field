@@ -125,9 +125,14 @@ class TransData:
         nsmpl_within_each_band = None
 
         if use_full_wave:
-            smpl_trans = self.data["full_trans"] #[None,...].tile(batch_size,1,1)
-            smpl_wave = self.data["full_norm_wave"][None,:,None].tile(batch_size,1,1)
-            nsmpl_within_each_band = self.data["nsmpl_within_bands"] #[None,...].tile(batch_size,1)
+            smpl_trans = self.data["full_trans"]
+            smpl_wave = self.data["full_wave"][None,:,None]
+            nsmpl_within_each_band = self.data["nsmpl_within_bands"]
+
+            if type(smpl_wave).__module__ == "numpy":
+                smpl_wave = np.tile(smpl_wave, (batch_size,1,1))
+            elif type(smpl_wave).__module__ == "torch":
+                smpl_wave = smpl_wave.tile(batch_size,1,1)
 
         elif self.sample_method == "hardcode":
             smpl_wave, smpl_trans = None, self.trans
@@ -267,14 +272,16 @@ class TransData:
         """ Get trans data depending on sampling method.
         """
         if self.sample_method == "mixture":
-            self.trans_data = (self.data["full_norm_wave"],self.data["full_trans"],
+            #self.trans_data = (self.data["full_norm_wave"],self.data["full_trans"],
+            self.trans_data = (self.data["full_wave"],self.data["full_trans"],
                                self.data["distrib"],self.data["encd_ids"])
 
         elif self.sample_method == "bandwise":
             self.trans_data = self.load_bandwise_wave_trans(norm_wave, trans)
 
         elif self.sample_method == "hardcode":
-            self.trans_data = (self.data["hdcd_norm_wave"], self.data["hdcd_trans"])
+            self.trans_data = (self.data["hdcd_wave"], self.data["hdcd_trans"])
+            #self.trans_data = (self.data["hdcd_norm_wave"], self.data["hdcd_trans"])
 
         else:
             raise ValueError("Unrecognized transmission sampling method.")
@@ -310,11 +317,15 @@ class TransData:
             distrib = np.ones(len(full_wave)).astype(np.float64)
             distrib /= len(distrib)
 
-        self.data["full_wave"] = full_wave
-        self.data["distrib"] = torch.FloatTensor(distrib) #.to(self.device)
-        self.data["encd_ids"] = torch.FloatTensor(encd_ids) #.to(self.device)
-        self.data["full_trans"] = torch.FloatTensor(full_trans) #.to(self.device)
-        self.data["full_norm_wave"] = torch.FloatTensor(full_norm_wave) #.to(self.device)
+        bound = (full_wave[0], full_wave[-1])
+
+        self.data["full_wave"] = full_wave.astype('float32')
+        self.data["distrib"] = torch.FloatTensor(distrib)
+        self.data["encd_ids"] = torch.FloatTensor(encd_ids)
+        #self.data["full_wave"] = torch.FloatTensor(full_wave)
+        #self.data["full_wave_bound"] = torch.FloatTensor(bound)
+        self.data["full_trans"] = torch.FloatTensor(full_trans)
+        self.data["full_norm_wave"] = torch.FloatTensor(full_norm_wave)
 
     def load_hdcd_wave_trans(self):
         """ Load wave, trans, and distribution for hardcode sampling.
@@ -371,8 +382,9 @@ class TransData:
         norm_wave = [(cur_wave - min(cur_wave)) / (max(cur_wave) - min(cur_wave))
                      for cur_wave in wave]
 
-        wave = torch.FloatTensor(norm_wave)
+        wave = torch.FloatTensor(wave)
         trans = torch.FloatTensor(trans)
+        #wave = torch.FloatTensor(norm_wave)
         distrib = torch.FloatTensor(distrib)
         return wave, trans, distrib
 

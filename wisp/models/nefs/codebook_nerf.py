@@ -24,7 +24,7 @@ class CodebookNef(BaseNeuralField):
         channels = ["intensity"]
         self._register_forward_function( self.get_codebook_spectra, channels )
 
-    def get_codebook_spectra(self, coords, wave, trans, nsmpl):
+    def get_codebook_spectra(self, coords, wave, trans, nsmpl, full_wave_bound=None):
         """ Output given latents without any modifications.
             @Params:
               coords (torch.FloatTensor): tensor of shape [1, batch, num_samples, 2/3]
@@ -33,5 +33,5 @@ class CodebookNef(BaseNeuralField):
                 - Output intensity tensor of shape [batch, num_samples, 3]
         """
         ret = defaultdict(lambda: None)
-        self.hps_decoder(coords, wave, trans, nsmpl, ret)
+        self.hps_decoder(coords, wave, trans, nsmpl, ret, full_wave_bound=full_wave_bound)
         return ret

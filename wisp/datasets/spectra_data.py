@@ -349,16 +349,18 @@ class SpectraData:
             plt.plot(recon_wave, cur_spectra, color="black", label="spectrum")
 
             # plot gt spectra
-            if i < self.get_num_gt_spectra():
+            if i < self.get_num_gt_spectra() and not codebook:
                 cur_gt_spectra = self.get_gt_spectra()[i]
                 cur_gt_spectra_wave = self.get_gt_spectra_wave()[i]
                 cur_gt_spectra /= np.max(cur_gt_spectra)
                 plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
+            '''
             elif codebook:
                 cur_gt_spectra = self.get_gt_spectra()[0]
                 cur_gt_spectra_wave = self.get_gt_spectra_wave()[0]
                 cur_gt_spectra /= np.max(cur_gt_spectra)
                 plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
+            '''
 
             fname = join(spectra_dir, f"spectra_{i}_{name}")
             plt.savefig(fname)

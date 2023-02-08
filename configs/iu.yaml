@@ -21,10 +21,11 @@ global:
     #tasks: ['train','plot_save_scaler','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
     #tasks: ['infer','recon_img','plot_embed_map','plot_latent_embed','plot_save_scaler']
 
-    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra','save_redshift']
-    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed']
-    tasks: ['infer','recon_gt_spectra'] #,'save_redshift']
-    #tasks: ['infer','recon_codebook_spectra']
+    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra','plot_redshift']
+    tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed','plot_redshift']
+    #tasks: ['infer','recon_gt_spectra'] #,'save_redshift']
+    #tasks: ['infer','plot_redshift']
+    tasks: ['infer','recon_codebook_spectra']
 
 optimizer:
     optimizer_type: 'adam'
@@ -205,7 +206,7 @@ dataset:
     trans_sample_method: 'mixture'
     trans_threshold: 1e-3
     hardcode_num_trans_samples: 35
-    trans_sample_interval: 30
+    trans_sample_interval: 10
 
     gt_spectra_choices: [1,5,2,3,4] #[2,3,4,5,6] #[1,2,3,4]
     spectra_smooth_sigma: 140

@@ -1,5 +1,4 @@
 
-
 import torch
 import torch.nn as nn
 
@@ -19,20 +18,23 @@ class HyperSpectralConverter(nn.Module):
 
         self.wave_encoder = wave_encoder
 
+    def linear_norm_wave(self, wave, wave_bound):
+        (lo, hi) = wave_bound # 3940, 10870
+        return (wave - lo) / (hi - lo)
+
     def shift_wave(self, wave, redshift):
         if self.kwargs["print_shape"]: print('hps_converter, shift wave', wave.shape)
         if self.kwargs["print_shape"]: print('hps_converter, shift wave', redshift.shape)
         wave = wave.permute(1,2,0)
+        #print(torch.min(redshift), torch.max(redshift))
 
         if wave.ndim == 3:
             nsmpl = wave.shape[1] # [bsz,nsmpl,1]
-            wave += redshift #- 0.1
-            # wave /= (1 + torch.exp(redshift))
-            # wave /= (1 + redshift)
+            # wave += redshift #- 0.1
+            wave /= (1 + redshift)
         elif wave.ndim == 4:
             nsmpl = wave.shape[2] # [bsz,nbands,nsmpl,1]
             wave += redshift #- 0.1
-            # wave /= (1 + torch.exp(redshift))
             # wave /= (1 + redshift)
         else:
             raise Exception("Wrong wave dimension when doing wave shifting.")
@@ -61,7 +63,7 @@ class HyperSpectralConverter(nn.Module):
         del spatial, spectral
         return latents
 
-    def forward(self, wave, latents, redshift):
+    def forward(self, wave, latents, redshift, wave_bound):
         """ Process wave (refshift, encode, if required) and
               combine with RA/DEC (original state or encoded) to hyperspectral latents.
             @Param
@@ -75,9 +77,16 @@ class HyperSpectralConverter(nn.Module):
 
         num_samples = wave.shape[-2]
         coords_encode_dim = latents.shape[-1]
+        #print(wave.shape)
+        #print(wave[0,:20].T)
 
         if redshift is not None:
             wave = self.shift_wave(wave, redshift)
+        #print(wave[0,:20].T)
+
+        # normalize lambda values to [0,1]
+        wave = self.linear_norm_wave(wave, wave_bound)
+        #print(wave[0,:20].T)
 
         if self.wave_encode_method == "positional":
             assert(coords_encode_dim != 2)
@@ -92,5 +101,5 @@ class HyperSpectralConverter(nn.Module):
         if self.kwargs["print_shape"]: print('hps_converter, latents',latents.shape)
         latents = self.combine_spatial_spectral(latents, wave)
 
-        del wave, redshift
+        #del wave, redshift
         return latents

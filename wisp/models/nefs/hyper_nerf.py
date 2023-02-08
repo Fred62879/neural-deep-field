@@ -61,7 +61,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             channels.extend(["scaler","redshift","codebook_loss","min_embed_ids"])
         self._register_forward_function( self.hyperspectral, channels )
 
-    def hyperspectral(self, coords, wave=None, trans=None, nsmpl=None, full_wave=None, num_spectra_coords=-1, pidx=None, lod_idx=None):
+    def hyperspectral(self, coords, wave=None, trans=None, nsmpl=None, full_wave=None, full_wave_bound=None, num_spectra_coords=-1, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
               coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2/3]
@@ -86,5 +86,6 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             latents = self.qtz_decoder(latents, ret)
 
         timer.check("hyper nef decode")
-        self.hps_decoder(latents, wave, trans, nsmpl, ret, full_wave, num_spectra_coords)
+        self.hps_decoder(latents, wave, trans, nsmpl, ret, full_wave, full_wave_bound, num_spectra_coords)
+
         return ret

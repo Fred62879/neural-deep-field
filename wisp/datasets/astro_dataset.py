@@ -131,6 +131,8 @@ class AstroDataset(Dataset):
         """ Get transmission data (wave, trans, nsmpl etc.).
             These are not batched, we do monte carlo sampling at every step.
         """
+        out["full_wave_bound"] = self.trans_dataset.get_full_wave_bound()
+
         if self.kwargs["trans_sample_method"] == "hardcode":
             out["wave"] = self.trans_dataset.get_hdcd_wave()[None,:,None].tile(batch_size,1,1)
             out["trans"] = self.trans_dataset.get_hdcd_trans()
@@ -156,7 +158,8 @@ class AstroDataset(Dataset):
             out["coords"] = spectra_coords
 
         out["num_spectra_coords"] = len(spectra_coords)
-        out["full_wave"] = self.trans_dataset.get_full_norm_wave()
+        out["full_wave"] = self.trans_dataset.get_full_wave()
+        out["full_wave_bound"] = self.trans_dataset.get_full_wave_bound()
         out["recon_wave_bound_ids"] = self.spectra_dataset.get_recon_wave_bound_ids()
 
     def __len__(self):

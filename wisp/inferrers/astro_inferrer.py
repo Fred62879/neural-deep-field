@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from os.path import exists, join
 from wisp.inferrers import BaseInferrer
-from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_latent_embed
+from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_latent_embed, heat_all
 from wisp.utils.common import add_to_device, forward, load_model_weights, load_layer_weights, load_embed
 
 
@@ -93,7 +93,7 @@ class AstroInferrer(BaseInferrer):
             and self.quantize_latent and self.space_dim == 3
         self.plot_latent_embed = "plot_latent_embed" in tasks \
             and self.quantize_latent and self.space_dim == 3
-        self.save_redshift = "save_redshift" in tasks \
+        self.plot_redshift = "plot_redshift" in tasks \
             and self.extra_args["generate_redshift"] \
             and self.quantize_latent and self.space_dim == 3
 
@@ -109,7 +109,7 @@ class AstroInferrer(BaseInferrer):
         self.group_tasks = []
 
         if self.recon_img or self.recon_flat_trans or \
-           self.plot_embed_map or self.plot_latent_embed or self.save_redshift:
+           self.plot_embed_map or self.plot_latent_embed or self.plot_redshift:
             self.group_tasks.append("infer_all_coords_full_model")
 
         if self.recon_codebook_spectra:
@@ -248,7 +248,7 @@ class AstroInferrer(BaseInferrer):
         if self.plot_latent_embed:
             self.latents = []
 
-        if self.save_redshift:
+        if self.plot_redshift:
             self.redshifts = []
 
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
@@ -308,7 +308,7 @@ class AstroInferrer(BaseInferrer):
         if self.plot_latent_embed:
             plot_latent_embed(self.latents, self.embed, model_id, self.latent_embed_dir)
 
-        if self.save_redshift:
+        if self.plot_redshift:
             re_args = {
                 "fname": model_id,
                 "dir": self.redshift_dir,
@@ -317,6 +317,8 @@ class AstroInferrer(BaseInferrer):
                 "log_max": False,
                 "to_HDU": False,
                 "save_locally": True,
+                "plot_func": heat_all,
+                "zscale": False,
                 "calculate_metrics": False,
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.redshifts, **re_args)
@@ -378,12 +380,12 @@ class AstroInferrer(BaseInferrer):
                         calculate_codebook_loss=False,
                         infer=True,
                         save_spectra=False,
-                        save_latents=True,
-                        save_redshift=True,
+                        save_latents=self.plot_latent_embed,
+                        save_redshift=self.plot_redshift,
                         save_embed_ids=self.plot_embed_map)
 
                 if self.recon_img: self.recon_pixels.extend(ret["intensity"])
-                if self.save_redshift: self.redshifts.extend(ret["redshift"])
+                if self.plot_redshift: self.redshifts.extend(ret["redshift"])
                 if self.plot_latent_embed: self.latents.extend(ret["latents"])
                 if self.plot_embed_map: self.embed_ids.extend(ret["min_embed_ids"])
 

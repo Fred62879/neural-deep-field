@@ -158,6 +158,8 @@ def forward(class_obj, pipeline, data,
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if spectra_supervision_train: requested_channels.append("spectra")
 
+        net_args["full_wave_bound"] = data["full_wave_bound"]
+
         if pixel_supervision_train or infer:
             sample_method = class_obj.extra_args["trans_sample_method"]
             if sample_method == "hardcode":

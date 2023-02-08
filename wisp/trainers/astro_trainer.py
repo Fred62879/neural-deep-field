@@ -392,6 +392,7 @@ class AstroTrainer(BaseTrainer):
         self.optimizer.zero_grad(set_to_none=True)
         self.timer.check("zero grad")
 
+        #torch.autograd.set_detect_anomaly(True)
         #with torch.cuda.amp.autocast():
         total_loss, recon_pixels, ret = self.calculate_loss(data)
 
