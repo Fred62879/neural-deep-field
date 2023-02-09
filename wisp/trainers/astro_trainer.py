@@ -530,7 +530,6 @@ class AstroTrainer(BaseTrainer):
             (lo, hi) = data["recon_wave_bound_ids"][0]
             recon_spectra = ret["spectra"][:self.num_supervision_spectra,lo:hi]
 
-            #print(recon_spectra.shape, gt_spectra.shape)
             if len(recon_spectra) == 0:
                 spectra_loss = 0
             else:

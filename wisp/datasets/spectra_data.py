@@ -195,12 +195,22 @@ class SpectraData:
             recon_wave_bound = [source_spectra_data["trusted_wave_lo"][choice],
                                 source_spectra_data["trusted_wave_hi"][choice]]
 
-            (lo, hi) = recon_wave_bound
-            lo = self.full_wave[ np.where(self.full_wave <= lo)[0][-1] ]
-            hi = self.full_wave[ np.where(self.full_wave >= hi)[0][0] ]
+            # lambda value range where we want to supervise the spectra
+            # may not coincide exactly with the transmission sampling lambda
+            # find closest lambda instead
+            (id_lo, id_hi) = get_bound_id(recon_wave_bound, self.full_wave, within_full_wave=False)
+            recon_wave_bound_id = [id_lo, id_hi + 1]
 
+            #id_lo = np.where(self.full_wave <= lo)[0][-1]
+            #id_hi = np.where(self.full_wave >= hi)[0][0]
+            #id_lo = np.where(self.full_wave >= lo)[0][-1]
+            #id_hi = np.where(self.full_wave <= hi)[0][0]
+
+            lo = self.full_wave[id_lo]
+            hi = self.full_wave[id_hi]
             recon_wave = np.arange(lo, hi + 1, smpl_interval)
-            recon_wave_bound_id = get_bound_id([lo, hi], self.full_wave) # [206,407]
+
+            #recon_wave_bound_id = get_bound_id([lo, hi], self.full_wave) # [206,407]
             recon_waves.append(recon_wave)
             recon_bound_ids.append(recon_wave_bound_id)
 
@@ -354,13 +364,6 @@ class SpectraData:
                 cur_gt_spectra_wave = self.get_gt_spectra_wave()[i]
                 cur_gt_spectra /= np.max(cur_gt_spectra)
                 plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
-            '''
-            elif codebook:
-                cur_gt_spectra = self.get_gt_spectra()[0]
-                cur_gt_spectra_wave = self.get_gt_spectra_wave()[0]
-                cur_gt_spectra /= np.max(cur_gt_spectra)
-                plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
-            '''
 
             fname = join(spectra_dir, f"spectra_{i}_{name}")
             plt.savefig(fname)
@@ -368,7 +371,6 @@ class SpectraData:
 
             if save_spectra:
                 np.save(fname, cur_spectra)
-
 
 # SpectraData class ends
 #############
@@ -404,19 +406,31 @@ def convolve_spectra(spectra, std=140, border=True):
         return nume / denom
     return convolve(spectra, kernel)
 
-def get_bound_id(wave_bound, full_wave):
-    """ Get id of lambda values in full wave that tightly bounds given range.
-        full_wave[id_lo] >= wave_lo
-        full_wave[id_hi] <= wave_hi (before adding 1)
+def get_bound_id(wave_bound, full_wave, within_full_wave=True):
+    """ Get id of lambda values in full wave that bounds or is bounded by given wave_bound
+        if `within_full_wave`
+            full_wave[id_lo] <= wave_lo
+            full_wave[id_hi] >= wave_hi
+        else
+            full_wave[id_lo] >= wave_lo
+            full_wave[id_hi] <= wave_hi
     """
     if type(full_wave).__module__ == "torch":
         full_wave = full_wave.numpy()
 
     wave_lo, wave_hi = wave_bound
     wave_hi = int(min(wave_hi, int(max(full_wave))))
-    wave_id_hi = np.argmin((full_wave < wave_hi))
-    wave_id_lo = np.argmax((full_wave >= wave_lo))
-    return [wave_id_lo, wave_id_hi + 1]
+
+    if within_full_wave:
+        id_lo = np.argmax((full_wave > wave_lo)) - 1
+        id_hi = np.argmin((full_wave < wave_hi)) + 1
+        assert(full_wave[id_lo] <= wave_lo and full_wave[id_hi] >= wave_hi)
+    else:
+        id_lo = np.argmin((full_wave < wave_lo)) + 1
+        id_hi = np.argmax((full_wave > wave_hi)) - 1
+        assert(full_wave[id_lo] >= wave_lo and full_wave[id_hi] <= wave_hi)
+
+    return [id_lo, id_hi]
 
 def load_gt_spectra(fname, full_wave, recon_wave_bound, smpl_interval, interpolate=False, sigma=-1):
     """ Load gt spectra (intensity values) for spectra supervision and
@@ -443,17 +457,14 @@ def load_gt_spectra(fname, full_wave, recon_wave_bound, smpl_interval, interpola
         gt_spectra = convolve_spectra(gt_spectra, std=sigma)
     gt_spectra_for_supervision = None
 
-    #if sigma != -1:
-    #    gt_spectra = gaussian_filter1d(gt_spectra, sigma)
-
     if interpolate:
         f_gt = interp1d(gt_wave, gt_spectra)
 
-        # make sure wave range to interpolate stay within gt wave range
-        lo_id = np.where(full_wave >= min(gt_wave))[0][0]
-        hi_id = np.where(full_wave <= max(gt_wave))[0][-1]
-        lo = full_wave[lo_id]
-        hi = full_wave[hi_id]
+        # make sure wave range to interpolate stay within gt spectra wave range
+        # full_wave is full transmission wave
+        (lo_id, hi_id) = get_bound_id( ( min(gt_wave),max(gt_wave) ), full_wave, within_full_wave=False)
+        lo = full_wave[lo_id] # lo <= full_wave[lo_id]
+        hi = full_wave[hi_id] # hi >= full_wave[hi_id]
 
         # new gt wave range with same discretization value as trans
         gt_wave = np.arange(lo, hi + 1, smpl_interval)
@@ -461,8 +472,8 @@ def load_gt_spectra(fname, full_wave, recon_wave_bound, smpl_interval, interpola
         # interpolate new gt wave to get interpolated spectra
         gt_spectra = f_gt(gt_wave)
 
-        (lo, hi) = get_bound_id(recon_wave_bound, gt_wave)
-        gt_spectra_for_supervision = gt_spectra[lo:hi]
+        (lo_id, hi_id) = get_bound_id(recon_wave_bound, gt_wave, within_full_wave=False)
+        gt_spectra_for_supervision = gt_spectra[lo_id:hi_id + 1]
 
     gt_spectra /= np.max(gt_spectra)
     return gt_wave, gt_spectra, gt_spectra_for_supervision
@@ -474,8 +485,6 @@ def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
 
     gen_lo_id = np.argmax(gen_wave>gt_wave[0]) + 1
     gen_hi_id = np.argmin(gen_wave<gt_wave[-1])
-    #print(gen_lo_id, gen_hi_id)
-    #print(gt_wave[0], gt_wave[-1], np.min(gen_wave), np.max(gen_wave))
 
     wave = gen_wave[gen_lo_id:gen_hi_id]
     gen_spectra = gen_spectra[gen_lo_id:gen_hi_id]
