@@ -63,9 +63,6 @@ class SpectraData:
         if self.recon_dummy_spectra:
             self.load_dummy_spectra_data()
 
-        #if self.recon_codebook_spectra:
-        #    self.load_codebook_spectra_data()
-
         self.load_plot_spectra_data()
 
     #############
@@ -88,6 +85,14 @@ class SpectraData:
         """ Get coords of all selected spectra (gt & dummy, incl. neighbours).
         """
         return self.data["spectra_coords"]
+
+    def get_spectra_img_coords(self):
+        """ Get image coords of all selected spectra (gt & dummy, incl. neighbours).
+        """
+        return self.data["spectra_img_coords"]
+
+    def get_spectra_pixel_markers(self):
+        return ["1","2","3","4","+","x"]
 
     def get_num_spectra_coords(self):
         """ Get number of coords of all selected spectra
@@ -158,59 +163,53 @@ class SpectraData:
         self.data["dummy_spectra_coords"] = coords
 
     def load_gt_spectra_data(self):
-        """ Load gt spectra data. Note that:
-              During training, we only consider w/ supervision
-              During inferrence, the two options give same coords but different spectra
-
-            i) spectra data (w/ supervision) (used for training and inferrence):
+        """ Load gt spectra data.
+            i) spectra data (for supervision) (used for training and inferrence):
                gt spectra
                spectra coords
-           ii) spectra data (w/ o/ supervision) (for spectrum plotting only)
+           ii) spectra data (no supervision) (for spectrum plotting only)
                   (coord with gt spectra located at center of cutout)
                gt spectra
                spectra coords
+               Note that:
+              During training, we only load if do spectra supervision
+              During inferrence, the two options give same coords but different spectra
         """
         choices = self.kwargs["gt_spectra_choices"]
         smpl_interval = self.kwargs["trans_sample_interval"]
         source_spectra_data = read_spectra_data(self.spectra_data_fname)
 
-        all_coords, all_ids = [], []
         recon_bound_ids = []
         recon_waves, gt_waves = [], []
         spectra, supervision_spectra = [], []
+        all_img_coords, all_grid_coords, all_ids = [], [], []
 
         for i, choice in enumerate(choices):
             footprint = source_spectra_data["footprint"][choice]
             tile_id = source_spectra_data["tile_id"][choice]
             subtile_id = source_spectra_data["subtile_id"][choice]
             fits_id = f"{footprint}{tile_id}{subtile_id}"
+            index = self.fits_ids.index(fits_id)
 
-            # get (neighbour) coord & id of pixel(s) with gt spectra
-            coords, ids = self.get_gt_spectra_pixel_coords(
-                source_spectra_data, choice, self.kwargs["spectra_neighbour_size"])
+            # get img coord, grid coord, and id of pixel(s) (neighbour) with gt spectra
+            img_coords, grid_coords, ids = self.get_gt_spectra_pixel_coords(
+                source_spectra_data, choice, self.kwargs["spectra_neighbour_size"], index)
             all_ids.append(ids)       # [num_neighbours,1]
-            all_coords.append(coords) # [num_neighbours,2/3]
+            all_img_coords.append(img_coords)
+            all_grid_coords.append(grid_coords) # [num_neighbours,2/3]
 
             # get range of wave that we reconstruct spectra
+            # the specified range may not coincide exactly with the transmission
+            # sampling lambda, we thus find closest lambda instead
             recon_wave_bound = [source_spectra_data["trusted_wave_lo"][choice],
                                 source_spectra_data["trusted_wave_hi"][choice]]
-
-            # lambda value range where we want to supervise the spectra
-            # may not coincide exactly with the transmission sampling lambda
-            # find closest lambda instead
             (id_lo, id_hi) = get_bound_id(recon_wave_bound, self.full_wave, within_full_wave=False)
             recon_wave_bound_id = [id_lo, id_hi + 1]
-
-            #id_lo = np.where(self.full_wave <= lo)[0][-1]
-            #id_hi = np.where(self.full_wave >= hi)[0][0]
-            #id_lo = np.where(self.full_wave >= lo)[0][-1]
-            #id_hi = np.where(self.full_wave <= hi)[0][0]
 
             lo = self.full_wave[id_lo]
             hi = self.full_wave[id_hi]
             recon_wave = np.arange(lo, hi + 1, smpl_interval)
 
-            #recon_wave_bound_id = get_bound_id([lo, hi], self.full_wave) # [206,407]
             recon_waves.append(recon_wave)
             recon_bound_ids.append(recon_wave_bound_id)
 
@@ -231,11 +230,21 @@ class SpectraData:
         self.data["gt_spectra_wave"] = gt_waves
         self.data["gt_recon_wave"] = recon_waves
         self.data["gt_spectra_coord_ids"] = all_ids  # [num_coords,num_neighbours,1]
+        self.data["gt_spectra_img_coords"] = all_img_coords
         self.data["recon_wave_bound_ids"] = recon_bound_ids
 
         # [num_coords,num_neighbours,1,2/3]
-        self.data["gt_spectra_coords"] = torch.stack(all_coords).type(
-            torch.FloatTensor)[:,:,None] #.to(self.device)
+        self.data["gt_spectra_coords"] = torch.stack(all_grid_coords).type(
+            torch.FloatTensor)[:,:,None]
+
+        ## tmp, dummy redshift
+        if self.kwargs["redshift_supervision"]:
+            dummy_redshift = torch.arange(1, 1+len(all_ids), dtype=torch.float)
+            #print(dummy_redshift, self.fits_obj.data["redshift"].shape)
+            positions = np.array(all_ids).flatten()
+            #print(positions)
+            self.fits_obj.data["redshift"][positions,0] = dummy_redshift
+        ## ends
 
         coord_dim = 3 if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3 else 2
         self.data["gt_spectra_coords"] = self.data["gt_spectra_coords"].view(-1,1,coord_dim)
@@ -262,17 +271,21 @@ class SpectraData:
             ids.extend(self.data["dummy_spectra_coord_ids"])
         self.data["spectra_coord_ids"] = np.array(ids)
 
-        # get all spectra (gt and dummy) coords for inferrence
-        coords = []
+        # get all spectra (gt and dummy) (grid and img) coords for inferrence
+        coords, img_coords = [], []
+
         if self.recon_gt_spectra or self.spectra_supervision_train:
             coords.extend(self.data["gt_spectra_coords"])
+            img_coords.extend(self.data["gt_spectra_img_coords"])
         if self.recon_dummy_spectra:
             coords.extend(self.data["dummy_spectra_coords"])
+
         if len(coords) != 0:
             self.data["spectra_coords"] = torch.stack(coords)
-        else: self.data["spectra_coords"] = None
+        if len(img_coords) != 0:
+            self.data["spectra_img_coords"] = torch.stack(img_coords)
 
-    def get_gt_spectra_pixel_coords(self, spectra_data, choice, neighbour_size):
+    def get_gt_spectra_pixel_coords(self, spectra_data, choice, neighbour_size, fits_index):
         """ Get coordinate of pixel with gt spectra. We can either
              i) directly normalize the given ra/dec with coordinates range or
             ii) get pixel id based on ra/dec and index from loaded coordinates.
@@ -304,11 +317,18 @@ class SpectraData:
 
         # index coord from original coords array to get accurate coord
         # this only works if spectra coords is included in the loaded coords
-        (r, c) = worldToPix(header, ra, dec) # r and c coord within full tile
+        (r, c) = worldToPix(header, ra, dec) # image coord, r and c coord within full tile
+
+        if self.use_full_fits:
+            img_coords = torch.tensor([r, c])
+        else:
+            start_pos = self.fits_cutout_start_pos[fits_index]
+            img_coords = torch.tensor([r - start_pos[0], c - start_pos[1]])
+
         pixel_ids = self.fits_obj.get_pixel_ids(fits_id, r, c, neighbour_size)
         coords_accurate = self.fits_obj.get_coord(pixel_ids)
         #print(r, c, pixel_ids, coords_accurate, self.kwargs["fits_cutout_start_pos"])
-        return coords_accurate, pixel_ids
+        return img_coords, coords_accurate, pixel_ids
 
     #############
     # Utilities

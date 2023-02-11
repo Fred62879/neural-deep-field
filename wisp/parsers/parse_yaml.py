@@ -368,6 +368,7 @@ def define_cmd_line_args():
 
     train_group.add_argument("--pixel-loss-cho",type=str, choices=["l1","l2"])
     train_group.add_argument("--spectra-loss-cho",type=str, choices=["l1","l2"])
+    train_group.add_argument("--redshift-loss-cho",type=str, choices=["l1","l2"])
     train_group.add_argument("--train-pixel-ratio", type=float, default=1,
                              help="ratio of (unmasked) pixels used for training per epoch")
     # train_group.add_argument("--masked_pixl_ratio_per_epoch", type=float, default=1,
@@ -380,7 +381,10 @@ def define_cmd_line_args():
                              help="whether training supervised by pixel values or not.")
     train_group.add_argument("--spectra-supervision", action="store_true",
                              help="whether training supervised by spectra or not.")
+    train_group.add_argument("--redshift-supervision", action="store_true",
+                             help="whether training supervised by redshift or not.")
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")
+    train_group.add_argument("--redshift-beta", type=float, help="redshift loss weight scaler.")
     train_group.add_argument("--quantize-latent", action="store_true")
     # train_group.add_argument("--cutout_based_train", action="store_true")
     train_group.add_argument("--resume-train", action="store_true")

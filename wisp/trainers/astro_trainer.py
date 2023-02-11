@@ -22,11 +22,10 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
     RandomSampler, DataLoader
 
 from wisp.datasets import default_collate
-from wisp.loss import spectra_supervision_loss
 from wisp.utils.plot import plot_horizontally, plot_embed_map
-from wisp.loss import spectra_supervision_loss, spectral_masking_loss
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 from wisp.utils.common import get_gpu_info, add_to_device, sorted_nicely, forward
+from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
 
 class AstroTrainer(BaseTrainer):
@@ -55,6 +54,7 @@ class AstroTrainer(BaseTrainer):
         self.gpu_fields = self.extra_args["gpu_data"]
         self.weight_train = self.extra_args["weight_train"]
         self.spectra_beta = self.extra_args["spectra_beta"]
+        self.redshift_beta = self.extra_args["redshift_beta"]
 
         self.set_log_path()
         self.summarize_training_tasks()
@@ -88,6 +88,9 @@ class AstroTrainer(BaseTrainer):
         if self.spectra_supervision:
             fields.append("spectra_supervision_data")
 
+        if self.redshift_supervision:
+            fields.append("redshift")
+
         length = self.get_dataset_length()
 
         #self.dataset.set_dataset_mode("train")
@@ -118,6 +121,7 @@ class AstroTrainer(BaseTrainer):
 
         self.plot_spectra = self.space_dim == 3 and "plot_spectra_during_train" in tasks
         self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
+        self.redshift_supervision = self.space_dim == 3 and self.extra_args["quantize_latent"] and self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"]
 
         if self.save_cropped_recon:
             # save selected-cropped train image reconstruction
@@ -175,6 +179,10 @@ class AstroTrainer(BaseTrainer):
         if self.spectra_supervision:
             loss = self.get_loss(self.extra_args["spectra_loss_cho"])
             self.spectra_loss = partial(spectra_supervision_loss, loss)
+
+        if self.redshift_supervision:
+            loss = self.get_loss(self.extra_args["redshift_loss_cho"])
+            self.redshift_loss = partial(redshift_supervision_loss, loss)
 
         if self.pixel_supervision:
             loss = self.get_loss(self.extra_args["pixel_loss_cho"])
@@ -374,6 +382,7 @@ class AstroTrainer(BaseTrainer):
         self.log_dict["recon_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
         self.log_dict["codebook_loss"] = 0.0
+        self.log_dict["redshift_loss"] = 0.0
 
     def pre_step(self):
         # if self.epoch == 0 and self.extra_args["log_gpu_every"] > -1 \
@@ -493,6 +502,7 @@ class AstroTrainer(BaseTrainer):
         ret = forward(self, self.pipeline, data,
                       pixel_supervision_train=self.pixel_supervision,
                       spectra_supervision_train=self.spectra_supervision,
+                      redshift_supervision_train=self.redshift_supervision,
                       quantize_latent=self.quantize_latent,
                       calculate_codebook_loss=self.quantize_latent,
                       infer=False,
@@ -536,7 +546,18 @@ class AstroTrainer(BaseTrainer):
                 spectra_loss = self.spectra_loss(gt_spectra, recon_spectra) * self.spectra_beta
                 self.log_dict["spectra_loss"] += spectra_loss.item()
 
-        # iii) latent quantization codebook loss
+        # iii) redshift loss
+        redshift_loss = 0
+        if self.redshift_supervision:
+            gt_redshift = data["redshift"]
+            ids = gt_redshift != -1
+
+            pred_redshift = ret["redshift"]
+            if len(ids) != 0:
+                redshift_loss = self.redshift_loss(gt_redshift, pred_redshift) * self.redshift_beta
+                self.log_dict["redshift_loss"] += redshift_loss.item()
+
+        # iv) latent quantization codebook loss
         codebook_loss = 0
         if self.quantize_latent:
             codebook_loss = ret["codebook_loss"]
@@ -561,6 +582,8 @@ class AstroTrainer(BaseTrainer):
             log_text += " | codebook loss: {:>.3E}".format(self.log_dict["codebook_loss"] / n)
         if self.spectra_supervision:
             log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
+        if self.redshift_supervision:
+            log_text += " | redshift loss: {:>.3E}".format(self.log_dict["redshift_loss"] / n)
         log.info(log_text)
 
     def save_model(self):

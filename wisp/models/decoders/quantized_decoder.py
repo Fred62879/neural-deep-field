@@ -35,6 +35,7 @@ class QuantizedDecoder(nn.Module):
 
         self.init_decoder()
         self.redshift_adjust = nn.ReLU(inplace=True)
+        #self.redshift_adjust = torch.exp
         self.init_codebook(kwargs["qtz_seed"])
 
     def init_decoder(self):
@@ -93,7 +94,7 @@ class QuantizedDecoder(nn.Module):
         if self.output_scaler:
             if self.output_redshift:
                 scaler = z[:,0,-2]
-                #redshift = z[:,0,-1]
+                # redshift = z[:,0,-1]
                 redshift = self.redshift_adjust(z[:,0,-1])
                 z = z[...,:-2]
             else:

@@ -129,6 +129,7 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
 def forward(class_obj, pipeline, data,
             pixel_supervision_train=True,
             spectra_supervision_train=False,
+            redshift_supervision_train=False,
             quantize_latent=False,
             calculate_codebook_loss=False,
             infer=False,
@@ -139,7 +140,8 @@ def forward(class_obj, pipeline, data,
             save_embed_ids=False):
 
     # cannot in both train and infer mode
-    assert( (pixel_supervision_train or spectra_supervision_train) != infer )
+    train = pixel_supervision_train or spectra_supervision_train or redshift_supervision_train
+    assert( train != infer )
 
     requested_channels = []
     net_args = {"coords": data["coords"] }
@@ -154,9 +156,9 @@ def forward(class_obj, pipeline, data,
         if save_scaler: requested_channels.append("scaler")
         if save_spectra: requested_channels.append("spectra")
         if save_latents: requested_channels.append("latents")
-        if save_redshift: requested_channels.append("redshift")
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if spectra_supervision_train: requested_channels.append("spectra")
+        if save_redshift or redshift_supervision_train: requested_channels.append("redshift")
 
         net_args["full_wave_bound"] = data["full_wave_bound"]
 

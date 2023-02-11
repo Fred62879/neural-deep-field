@@ -60,10 +60,11 @@ class FITSData:
         self.require_weights = "train" in tasks and self.load_weights
         self.require_pixels = len(tasks.intersection({"train","recon_img"})) != 0
         self.require_masks = "train" in tasks and self.spectral_inpaint
+        self.require_redshifts = self.kwargs["space_dim"] == 3 and self.kwargs["quantize_latent"] and self.kwargs["generate_redshift"] and self.kwargs["redshift_supervision"]
 
         return self.require_coords or self.require_pixels or \
             self.require_weights or self.require_masks or \
-            "recon_codebook_spectra" in tasks
+            self.require_redshifts or "recon_codebook_spectra" in tasks
 
     def init(self):
         """ Load all needed data. """
@@ -75,9 +76,9 @@ class FITSData:
 
         if self.require_pixels:
             self.load_all_fits()
-            self.data["pixels"] = self.get_pixels()
-            if self.require_weights:
-                self.data["weights"] = self.get_weights()
+
+        if self.require_redshifts:
+            self.get_redshift_all_fits()
 
         if self.require_masks:
             self.get_masks()
@@ -320,9 +321,31 @@ class FITSData:
         log.info(f"train pixels max {pixel_max}")
         log.info(f"train pixels min {pixel_min}")
 
-        self.data["pixels"] = torch.FloatTensor(pixels) #.to(self.device)
+        self.data["pixels"] = torch.FloatTensor(pixels)
         if self.load_weights:
-            self.data["weights"] = torch.FloatTensor(weights) #.to(self.device)
+            self.data["weights"] = torch.FloatTensor(weights)
+
+    ##############
+    # Load redshifts
+    ##############
+
+    def get_redshift_one_fits(self, id, fits_id):
+        if self.use_full_fits:
+            num_rows, num_cols = self.num_rows[fits_id], self.num_cols[fits_id]
+            redshifts = -1 * np.ones((num_rows, num_cols))
+        else:
+            size = self.fits_cutout_sizes[id]
+            # (r, c) = self.fits_cutout_start_pos[id] # start position (r/c)
+            redshifts = -1 * np.ones((size, size))
+        return redshifts
+
+    def get_redshift_all_fits(self):
+        """ Load dummy redshift values for now.
+        """
+        redshift = [ self.get_redshift_one_fits(id, fits_id)
+                     for id, fits_id in enumerate(self.fits_ids) ]
+        redshift = np.array(redshift).reshape((-1,1))
+        self.data["redshift"] = torch.FloatTensor(redshift)
 
     ##############
     # Load coords
@@ -531,6 +554,9 @@ class FITSData:
     def get_weights(self):
         return self.data["weights"]
 
+    def get_redshifts(self):
+        return self.data["redshift"]
+
     def get_coord(self, idx):
         if type(idx) == list:
             for id in idx:
@@ -626,7 +652,6 @@ class FITSData:
             ids = [local_id + base_count]
         else:
             ids = self.calculate_neighbour_ids(base_count, r, c, neighbour_size, index, fits_id)
-        #print("neighbouring pixel", ids)
         return ids
 
     def evaluate(self, fits_id, recon_tile, **re_args):

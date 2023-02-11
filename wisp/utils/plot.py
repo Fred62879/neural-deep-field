@@ -506,6 +506,20 @@ def heat_all(data, fn, los=None, his=None):
     plt.savefig(fn)
     plt.close()
 
+def annotated_heat(xs, ys, markers, data, fn, los=None, his=None):
+    nbands = len(data)
+    fig = plt.figure(figsize=(20,5))
+    r, c = 1, nbands
+    for i, band in enumerate(data):
+        if los is not None and his is not None:
+            band = np.clip(fig, los[i], his[i])
+        heat(fig, band, r, c, i+1)
+    fig.tight_layout()
+    for x,y,marker in zip(xs, ys, markers):
+        plt.scatter(x, y, marker=marker, markersize=10)
+    plt.savefig(fn)
+    plt.close()
+
 def batch_heat(arrs, lo=None, hi=None, heat_range=True):
     #names=['ours','s2s','pnp-dip']
 

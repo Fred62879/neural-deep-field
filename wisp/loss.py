@@ -13,6 +13,16 @@ def spectra_supervision_loss(loss, gt_spectra, recon_spectra):
     '''
     return loss(gt_spectra, recon_spectra)
 
+def redshift_supervision_loss(loss, gt_redshift, recon_redshift):
+    ''' Loss function for few-shot redshift supervision
+        @Param
+          loss: l1/l2 as specified in config
+          wave_rnge: Trusted lambda range of redshift
+          redshift_ids: ids of redshift to supervise
+          redshift: [bsz, num_smpls]
+    '''
+    return loss(gt_redshift, recon_redshift)
+
 def spectral_masking_loss(loss, relative_train_bands, relative_inpaint_bands,
                           gt_pixls, recon_pixls, mask):
     ''' Loss function for spectral inpainting

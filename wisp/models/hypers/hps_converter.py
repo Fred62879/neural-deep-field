@@ -34,8 +34,8 @@ class HyperSpectralConverter(nn.Module):
             wave /= (1 + redshift)
         elif wave.ndim == 4:
             nsmpl = wave.shape[2] # [bsz,nbands,nsmpl,1]
-            wave += redshift #- 0.1
-            # wave /= (1 + redshift)
+            # wave += redshift #- 0.1
+            wave /= (1 + redshift)
         else:
             raise Exception("Wrong wave dimension when doing wave shifting.")
 

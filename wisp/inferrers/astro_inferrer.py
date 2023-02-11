@@ -6,9 +6,10 @@ import logging as log
 import matplotlib.pyplot as plt
 
 from pathlib import Path
+from functools import partial
 from os.path import exists, join
 from wisp.inferrers import BaseInferrer
-from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_latent_embed, heat_all
+from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_latent_embed, annotated_heat
 from wisp.utils.common import add_to_device, forward, load_model_weights, load_layer_weights, load_embed
 
 
@@ -309,6 +310,10 @@ class AstroInferrer(BaseInferrer):
             plot_latent_embed(self.latents, self.embed, model_id, self.latent_embed_dir)
 
         if self.plot_redshift:
+            positions = self.dataset.get_spectra_img_coords()
+            # print(positions)
+            annotated_heat_map = partial(annotated_heat, positions[:,1], positions[:,0],
+                                         self.dataset.get_spectra_pixel_markers())
             re_args = {
                 "fname": model_id,
                 "dir": self.redshift_dir,
@@ -317,7 +322,7 @@ class AstroInferrer(BaseInferrer):
                 "log_max": False,
                 "to_HDU": False,
                 "save_locally": True,
-                "plot_func": heat_all,
+                "plot_func": annotated_heat_map,
                 "zscale": False,
                 "calculate_metrics": False,
             }

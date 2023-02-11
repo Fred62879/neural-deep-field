@@ -102,6 +102,12 @@ class AstroDataset(Dataset):
     def get_spectra_coord_ids(self):
         return self.spectra_dataset.get_spectra_coord_ids()
 
+    def get_spectra_img_coords(self):
+        return self.spectra_dataset.get_spectra_img_coords()
+
+    def get_spectra_pixel_markers(self):
+        return self.spectra_dataset.get_spectra_pixel_markers()
+
     def get_num_gt_spectra(self):
         return self.spectra_dataset.get_num_gt_spectra()
 
@@ -121,6 +127,8 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_pixels()
         elif field == "weights":
             data = self.fits_dataset.get_weights()
+        elif field == "redshift":
+            data = self.fits_dataset.get_redshifts()
         elif field == "masks":
             data = self.fits_dataset.get_mask()
         else:
