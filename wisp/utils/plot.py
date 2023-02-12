@@ -11,19 +11,19 @@ from astropy.visualization import ZScaleInterval
 from wisp.utils.numerical import calculate_sam_spectrum
 
 
-#def plot_latent_embed(fname, latent_dir, out_dir, model_dict=None, plot_latent_only=False):
 def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):
-    # plot latent variables only
-    # latent = np.load(join(latent_dir, f"{fname}.npy"))
-
+    """ Plot latent variable distributions and each codebook embedding.
+    """
     if type(latents) is list:
         latents = torch.stack(latents)
     if type(latents).__module__ == "torch":
         if latents.device != "cpu":
             latents = latents.detach().cpu()
         latents = latents.numpy()
+
     latents = latents.reshape((-1,latents.shape[-1]))
 
+    # plot latent variables only
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
     ax.scatter(latents[:,0],latents[:,1],latents[:,2],marker='v',color='orange')
@@ -50,11 +50,26 @@ def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):
     plt.savefig(png_fname)
     plt.close()
 
-def plot_embed_map(embed_ids, embed_map_fn):
+def plot_embed_map(coords, embed_ids, embed_map_fn, fits_id):
+    """ Plot embed map whose pixel value is the embed id of the corresponding pixel.
+        Note, the embed map is plotted for one tile at a time.
+        @Param
+          coords:    coord of pixel to log embed id
+          embed_ids: embed id array [num_rows,num_cols]
+          fits_id:   fits id of current tile
+    """
+    import logging as log
+
     if embed_ids.ndim == 3:
         embed_ids = embed_ids[0]
-    #num_ids = len(set(list(embd_ids.flatten())))
     embed_ids = np.clip(embed_ids, 0, 255)
+
+    pos = []
+    for (r,c,cur_fits_id) in coords:
+        if cur_fits_id != fits_id: continue
+        cur_embed_id = embed_ids[r, c]
+        log.info(f"embed id of {fits_id}_{r}_{c} is: {cur_embed_id}")
+
     plt.imshow(embed_ids, cmap='gray',origin='lower')
     plt.savefig(embed_map_fn)
     plt.close()
@@ -506,7 +521,13 @@ def heat_all(data, fn, los=None, his=None):
     plt.savefig(fn)
     plt.close()
 
-def annotated_heat(xs, ys, markers, data, fn, los=None, his=None):
+def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
+    """ Plot heat map with markers for given coordinate positions.
+        @Param
+          coords: [n,3]: r,c,fits id
+          markers: markers choices, different for each coord
+          fits_id: fits id of current tile, only draw coord with same fits id
+    """
     nbands = len(data)
     fig = plt.figure(figsize=(20,5))
     r, c = 1, nbands
@@ -515,8 +536,9 @@ def annotated_heat(xs, ys, markers, data, fn, los=None, his=None):
             band = np.clip(fig, los[i], his[i])
         heat(fig, band, r, c, i+1)
     fig.tight_layout()
-    for x,y,marker in zip(xs, ys, markers):
-        plt.scatter(x, y, marker=marker, markersize=10)
+    for (y, x, cur_fits_id), marker in zip(coords, markers):
+        if cur_fits_id != fits_id: continue
+        plt.scatter(x, y, marker=marker)
     plt.savefig(fn)
     plt.close()
 

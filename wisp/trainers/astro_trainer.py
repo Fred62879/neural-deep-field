@@ -125,7 +125,7 @@ class AstroTrainer(BaseTrainer):
 
         if self.save_cropped_recon:
             # save selected-cropped train image reconstruction
-            self.recon_cutout_fits_ids = self.extra_args["recon_cutout_fits_ids"]
+            self.recon_cutout_fits_uids = self.extra_args["recon_cutout_fits_uids"]
             self.recon_cutout_sizes = self.extra_args["recon_cutout_sizes"]
             self.recon_cutout_start_pos = self.extra_args["recon_cutout_start_pos"]
 
@@ -719,16 +719,16 @@ class AstroTrainer(BaseTrainer):
         self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra, bound=bound_spectra)
 
     def save_cropped_recon_locally(self, **re_args):
-        for i, fits_id in enumerate(self.extra_args["recon_cutout_fits_ids"]):
+        for index, fits_uid in enumerate(self.extra_args["recon_cutout_fits_uids"]):
             if re_args["zscale_ranges"]:
-                zscale_ranges = self.dataset.get_zscale_ranges(fits_id)
+                zscale_ranges = self.dataset.get_zscale_ranges(fits_uid)
 
-            np_fname = join(re_args["dir"], f"{fits_id}_{self.epoch}.npy")
+            np_fname = join(re_args["dir"], f"{fits_uid}_{self.epoch}.npy")
             recon = np.load(np_fname) # [nbands,sz,sz]
 
-            for (size, (r,c)) in zip(self.extra_args["recon_cutout_sizes"][i],
-                                     self.extra_args["recon_cutout_start_pos"][i]):
-                fname = join(re_args["dir"], f"{fits_id}_{r}_{c}_{size}")
+            for (size, (r,c)) in zip(self.extra_args["recon_cutout_sizes"][index],
+                                     self.extra_args["recon_cutout_start_pos"][index]):
+                fname = join(re_args["dir"], f"{fits_uid}_{r}_{c}_{size}")
                 np.save(fname, recon[:,r:r+size,c:c+size])
                 if re_args["zscale"]:
                     plot_horizontally(recon[:,r:r+size,c:c+size], fname, zscale_ranges=zscale_ranges)

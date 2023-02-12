@@ -124,7 +124,7 @@ class AstroInferrer(BaseInferrer):
         self.infer_hardcode_coords_modified_model = False
         self.infer_selected_coords_partial_model = False
 
-        log.info(f"inferrence group tasks: {self.group_tasks}.")
+        # log.info(f"inferrence group tasks: {self.group_tasks}.")
 
     def generate_inferrence_funcs(self):
         self.infer_funcs = {}
@@ -160,7 +160,7 @@ class AstroInferrer(BaseInferrer):
     #############
 
     def pre_inferrence_all_coords_full_model(self):
-        self.fits_ids = self.dataset.get_fits_ids()
+        self.fits_uids = self.dataset.get_fits_uids()
         self.coords_source = "fits"
         self.batched_fields = ["coords"]
         if self.recon_img: self.batched_fields.append("pixels")
@@ -276,7 +276,7 @@ class AstroInferrer(BaseInferrer):
                 "calculate_metrics": self.calculate_metrics,
                 "recon_flat_trans": self.recon_flat_trans_now,
                 "zoom": self.extra_args["recon_zoomed"],
-                "cutout_fits_ids": self.extra_args["recon_cutout_fits_ids"],
+                "cutout_fits_uids": self.extra_args["recon_cutout_fits_uids"],
                 "cutout_sizes": self.extra_args["recon_cutout_sizes"],
                 "cutout_start_pos": self.extra_args["recon_cutout_start_pos"],
                 "zoomed_recon_dir": self.zoomed_recon_dir,
@@ -291,7 +291,13 @@ class AstroInferrer(BaseInferrer):
                 self.metrics_zscale = np.concatenate((
                     self.metrics_zscale, cur_metrics_zscale[:,None]), axis=1)
 
+        if self.plot_latent_embed:
+            plot_latent_embed(self.latents, self.embed, model_id, self.latent_embed_dir)
+
         if self.plot_embed_map:
+            coords = self.dataset.get_spectra_img_coords()
+            plot_embed_map_log = partial(plot_embed_map, coords)
+
             re_args = {
                 "fname": model_id,
                 "dir": self.embed_map_dir,
@@ -299,21 +305,19 @@ class AstroInferrer(BaseInferrer):
                 "num_bands": 1,
                 "log_max": False,
                 "save_locally": True,
-                "plot_func": plot_embed_map,
+                "plot_func": plot_embed_map_log,
                 "zscale": False,
                 "to_HDU": False,
+                "match_fits": True,
                 "calculate_metrics": False,
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.embed_ids, **re_args)
 
-        if self.plot_latent_embed:
-            plot_latent_embed(self.latents, self.embed, model_id, self.latent_embed_dir)
-
         if self.plot_redshift:
-            positions = self.dataset.get_spectra_img_coords()
-            # print(positions)
-            annotated_heat_map = partial(annotated_heat, positions[:,1], positions[:,0],
-                                         self.dataset.get_spectra_pixel_markers())
+            positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/fits_id
+            plot_annotated_heat_map = partial(
+                annotated_heat, positions, self.dataset.get_spectra_pixel_markers())
+
             re_args = {
                 "fname": model_id,
                 "dir": self.redshift_dir,
@@ -322,7 +326,8 @@ class AstroInferrer(BaseInferrer):
                 "log_max": False,
                 "to_HDU": False,
                 "save_locally": True,
-                "plot_func": annotated_heat_map,
+                "plot_func": plot_annotated_heat_map,
+                "match_fits": True,
                 "zscale": False,
                 "calculate_metrics": False,
             }
@@ -395,7 +400,7 @@ class AstroInferrer(BaseInferrer):
                 if self.plot_embed_map: self.embed_ids.extend(ret["min_embed_ids"])
 
             except StopIteration:
-                log.info("all coords inferrence done")
+                # log.info("all coords inferrence done")
                 break
 
     def infer_spectra(self, model_id, checkpoint):
@@ -424,11 +429,11 @@ class AstroInferrer(BaseInferrer):
                 self.recon_spectra.extend(spectra)
 
             except StopIteration:
-                log.info("spectra inferrence done")
+                # log.info("spectra inferrence done")
                 break
 
     def calculate_recon_spectra_pixel_values(self):
-        for fits_id in self.fits_ids:
+        for fits_uid in self.fits_uids:
             # calculate spectrum pixel recon value
             if args.plot_spectrum:
                 print("recon spectrum pixel", recon[args.spectrum_pos])
@@ -465,7 +470,7 @@ class AstroInferrer(BaseInferrer):
                 self.codebook_spectra.extend(spectra)
 
             except StopIteration:
-                log.info("codebook spectra inferrence done")
+                # log.info("codebook spectra inferrence done")
                 break
 
     def _configure_dataset(self):

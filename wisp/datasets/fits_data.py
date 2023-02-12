@@ -95,15 +95,15 @@ class FITSData:
         norm = self.kwargs["gt_img_norm_cho"]
 
         if self.use_full_fits:
-            for fits_id in self.fits_ids:
-                suffix += f"_{fits_id}"
-                self.gt_img_fnames[fits_id] = join(img_data_path, f"gt_img_{norm}_{fits_id}")
+            for fits_uid in self.fits_uids:
+                suffix += f"_{fits_uid}"
+                self.gt_img_fnames[fits_uid] = join(img_data_path, f"gt_img_{norm}_{fits_uid}")
         else:
-            for (fits_id, size, (r,c)) in zip(
-                    self.fits_ids, self.fits_cutout_sizes, self.fits_cutout_start_pos):
-                suffix += f"_{fits_id}_{size}_{r}_{c}"
-                self.gt_img_fnames[fits_id] = join(
-                    img_data_path, f"gt_img_{norm}_{fits_id}_{size}_{r}_{c}")
+            for (fits_uid, size, (r,c)) in zip(
+                    self.fits_uids, self.fits_cutout_sizes, self.fits_cutout_start_pos):
+                suffix += f"_{fits_uid}_{size}_{r}_{c}"
+                self.gt_img_fnames[fits_uid] = join(
+                    img_data_path, f"gt_img_{norm}_{fits_uid}_{size}_{r}_{c}")
 
         norm_str = self.kwargs["train_pixels_norm"]
 
@@ -137,7 +137,7 @@ class FITSData:
         subtile_ids = self.kwargs["fits_subtile_ids"]
         footprints.sort();tile_ids.sort();subtile_ids.sort()
 
-        self.fits_ids, self.fits_groups, self.fits_wgroups = [], {}, {}
+        self.fits_uids, self.fits_groups, self.fits_wgroups = [], {}, {}
 
         for footprint, tile_id, subtile_id in zip(footprints, tile_ids, subtile_ids):
             utile= tile_id + "c" + subtile_id
@@ -145,11 +145,11 @@ class FITSData:
 
             # fits ids can be duplicated only if we crop cutout from full fits
             # where we may have multiple cutouts from the same fits (thus same ids)
-            fits_id = footprint + tile_id + subtile_id
-            self.fits_ids.append(fits_id)
+            fits_uid = footprint + tile_id + subtile_id
+            self.fits_uids.append(fits_uid)
 
             # avoid duplication
-            if fits_id in self.fits_groups and fits_id in self.fits_wgroups:
+            if fits_uid in self.fits_groups and fits_uid in self.fits_wgroups:
                 continue
 
             hsc_fits_fname = np.array(
@@ -165,26 +165,26 @@ class FITSData:
                 ["Mega-" + band + "_" + footprint + "_" + utile + ".weight.fits"
                 for band in self.kwargs["sensors_full_name"] if "u" in band])
 
-            self.fits_groups[fits_id] = np.concatenate(
+            self.fits_groups[fits_uid] = np.concatenate(
                 (hsc_fits_fname, nb_fits_fname, megau_fits_fname))
 
-            self.fits_wgroups[fits_id] = np.concatenate(
+            self.fits_wgroups[fits_uid] = np.concatenate(
                 (hsc_fits_fname, nb_fits_fname, megau_weights_fname))
 
-        self.num_fits = len(self.fits_ids)
+        self.num_fits = len(self.fits_uids)
 
         # make sure no duplicate fits ids exist if use full tile
         if self.use_full_fits:
-            assert( len(self.fits_ids) ==
-                    len(set(self.fits_id)))
+            assert( len(self.fits_uids) ==
+                    len(set(self.fits_uid)))
 
     ###############
     # Load FITS data
     ###############
 
-    def load_header(self, index, fits_id, full_fits):
+    def load_header(self, index, fits_uid, full_fits):
         """ Load header for both full tile and current cutout. """
-        fits_fname = self.fits_groups[fits_id][0]
+        fits_fname = self.fits_groups[fits_uid][0]
         id = 0 if "Mega-u" in fits_fname else 1
         hdu = fits.open(join(self.input_fits_path, fits_fname))[id]
         header = hdu.header
@@ -200,15 +200,15 @@ class FITSData:
             header = cutout.wcs.to_header()
             num_rows, num_cols = self.fits_cutout_size, self.fits_cutout_size
 
-        self.headers[fits_id] = header
-        self.num_rows[fits_id] = num_rows
-        self.num_cols[fits_id] = num_cols
+        self.headers[fits_uid] = header
+        self.num_rows[fits_uid] = num_rows
+        self.num_cols[fits_uid] = num_cols
 
     def load_headers(self):
-        for index, fits_id in enumerate(self.fits_ids):
-            self.load_header(index, fits_id, True)
+        for index, fits_uid in enumerate(self.fits_uids):
+            self.load_header(index, fits_uid, True)
 
-    def load_one_fits(self, index, fits_id, load_pixels=True):
+    def load_one_fits(self, index, fits_uid, load_pixels=True):
         """ Load pixel values or variance from one FITS file (tile_id/subtile_id).
             Load pixel and weights separately to avoid using up mem.
         """
@@ -216,7 +216,7 @@ class FITSData:
 
         for i in range(self.num_bands):
             if load_pixels:
-                fits_fname = self.fits_groups[fits_id][i]
+                fits_fname = self.fits_groups[fits_uid][i]
 
                 # u band pixel vals in first hdu, others in 2nd hdu
                 is_u = "Mega-u" in fits_fname
@@ -236,7 +236,7 @@ class FITSData:
                 cur_data.append(pixels)
 
             else: # load weights
-                fits_wfname = self.fits_wgroups[fits_id][i]
+                fits_wfname = self.fits_wgroups[fits_uid][i]
                 # u band weights in first hdu, others in 4th hdu
                 id = 0 if "Mega-u" in fits_wfname else 3
                 var = fits.open(join(self.input_fits_path, fits_wfname))[id].data
@@ -256,12 +256,12 @@ class FITSData:
             # save gt np img individually for each fits file
             # since different fits may differ in size
             cur_data = np.array(cur_data)    # [nbands,sz,sz]
-            np.save(self.gt_img_fnames[fits_id], cur_data)
-            plot_horizontally(cur_data, self.gt_img_fnames[fits_id])
+            np.save(self.gt_img_fnames[fits_uid], cur_data)
+            plot_horizontally(cur_data, self.gt_img_fnames[fits_uid])
 
             if self.kwargs["to_HDU"]:
-                generate_hdu(self.headers[fits_id], cur_data,
-                             self.gt_img_fnames[fits_id] + ".fits")
+                generate_hdu(self.headers[fits_uid], cur_data,
+                             self.gt_img_fnames[fits_uid] + ".fits")
 
             # flatten into pixels for ease of training
             cur_data = cur_data.reshape(self.num_bands, -1).T
@@ -293,14 +293,14 @@ class FITSData:
             if self.verbose: log.info("Loading FITS data.")
             if self.load_weights:
                 if self.verbose: log.info("Loading weights.")
-                weights = np.concatenate([ self.load_one_fits(index, fits_id, load_pixels=False)
-                                           for index, fits_id in enumerate(self.fits_ids) ])
+                weights = np.concatenate([ self.load_one_fits(index, fits_uid, load_pixels=False)
+                                           for index, fits_uid in enumerate(self.fits_uids) ])
                 np.save(self.weights_fname, weights)
             else: weights = None
 
             if self.verbose: log.info("Loading pixels.")
-            pixels = [ self.load_one_fits(index, fits_id) # nfits*[npixels,nbands]
-                       for index, fits_id in enumerate(self.fits_ids) ]
+            pixels = [ self.load_one_fits(index, fits_uid) # nfits*[npixels,nbands]
+                       for index, fits_uid in enumerate(self.fits_uids) ]
 
             # calcualte zscale range for pixel normalization
             zscale_ranges = calculate_zscale_ranges_multiple_FITS(pixels)
@@ -329,9 +329,9 @@ class FITSData:
     # Load redshifts
     ##############
 
-    def get_redshift_one_fits(self, id, fits_id):
+    def get_redshift_one_fits(self, id, fits_uid):
         if self.use_full_fits:
-            num_rows, num_cols = self.num_rows[fits_id], self.num_cols[fits_id]
+            num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
             redshifts = -1 * np.ones((num_rows, num_cols))
         else:
             size = self.fits_cutout_sizes[id]
@@ -342,8 +342,8 @@ class FITSData:
     def get_redshift_all_fits(self):
         """ Load dummy redshift values for now.
         """
-        redshift = [ self.get_redshift_one_fits(id, fits_id)
-                     for id, fits_id in enumerate(self.fits_ids) ]
+        redshift = [ self.get_redshift_one_fits(id, fits_uid)
+                     for id, fits_uid in enumerate(self.fits_uids) ]
         redshift = np.array(redshift).reshape((-1,1))
         self.data["redshift"] = torch.FloatTensor(redshift)
 
@@ -351,18 +351,18 @@ class FITSData:
     # Load coords
     ##############
 
-    def get_world_coords_one_fits(self, id, fits_id):
+    def get_world_coords_one_fits(self, id, fits_uid):
         """ Get ra/dec coords from one fits file and normalize.
             pix2world calculate coords in x-y order
               coords can be indexed using r-c
             @Return
               coords: 2D coordinates [npixels,2]
         """
-        num_rows, num_cols = self.num_rows[fits_id], self.num_cols[fits_id]
+        num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
         xids = np.tile(np.arange(0, num_cols), num_rows)
         yids = np.repeat(np.arange(0, num_rows), num_cols)
 
-        wcs = WCS(self.headers[fits_id])
+        wcs = WCS(self.headers[fits_uid])
         ras, decs = wcs.all_pix2world(xids, yids, 0) # x-y pixel coord
         if self.use_full_fits:
             coords = np.array([ras, decs]).T
@@ -384,8 +384,8 @@ class FITSData:
             coords = np.load(self.coords_fname)
         else:
             log.info("Generating coords.")
-            coords = np.concatenate([ self.get_world_coords_one_fits(id, fits_id)
-                                      for id, fits_id in enumerate(self.fits_ids) ])
+            coords = np.concatenate([ self.get_world_coords_one_fits(id, fits_uid)
+                                      for id, fits_uid in enumerate(self.fits_uids) ])
             coords, coords_range = normalize_coords(coords)
             np.save(self.coords_fname, coords)
             np.save(self.coords_range_fname, np.array(coords_range))
@@ -394,9 +394,9 @@ class FITSData:
 
     def get_pixel_coords_all_fits(self):
         assert(not self.use_full_fits)
-        assert(len(self.fits_ids) == 1)
-        for id, fits_id in enumerate(self.fits_ids):
-            # num_rows, num_cols = self.num_rows[fits_id], self.num_cols[fits_id]
+        assert(len(self.fits_uids) == 1)
+        for id, fits_uid in enumerate(self.fits_uids):
+            # num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
             # assert(num_rows == num_cols
             size = self.fits_cutout_sizes[id]
             self.get_mgrid_np(size)
@@ -523,15 +523,15 @@ class FITSData:
     # Getters
     #############
 
-    def get_zscale_ranges(self, fits_id=None):
+    def get_zscale_ranges(self, fits_uid=None):
         zscale_ranges = np.load(self.zscale_ranges_fname)
-        if fits_id is not None:
-            id = self.fits_ids.index(fits_id)
+        if fits_uid is not None:
+            id = self.fits_uids.index(fits_uid)
             zscale_ranges = zscale_ranges[id]
         return zscale_ranges
 
-    def get_fits_ids(self):
-        return self.fits_ids
+    def get_fits_uids(self):
+        return self.fits_uids
 
     def get_num_rows(self):
         return self.num_rows
@@ -591,12 +591,12 @@ class FITSData:
     # Utilities
     ############
 
-    def calculate_local_id(self, r, c, index, fits_id):
+    def calculate_local_id(self, r, c, index, fits_uid):
         """ Count number of pixels before given position in given tile.
         """
         if self.use_full_fits:
             r_lo, c_lo = 0, 0
-            total_cols = self.num_cols[fits_id]
+            total_cols = self.num_cols[fits_uid]
         else:
             (r_lo, c_lo) = self.fits_cutout_start_pos[index]
             total_cols = self.fits_cutout_sizes[index]
@@ -604,9 +604,9 @@ class FITSData:
         local_id = total_cols * (r - r_lo) + c - c_lo
         return local_id
 
-    def calculate_global_offset(self, fits_id):
+    def calculate_global_offset(self, fits_uid):
         """ Count total number of pixels before the given tile.
-            Assume given fits_id is included in loaded fits ids which
+            Assume given fits_uid is included in loaded fits ids which
               is sorted in alphanumerical order.
             @Return
                id: index of given fits id inside all loaded tiles
@@ -615,17 +615,17 @@ class FITSData:
         id, base_count, found = 0, 0, False
 
         # count total number of pixels before the given tile
-        for cur_fits_id in self.fits_ids:
-            if cur_fits_id == fits_id: found = True; break
+        for cur_fits_uid in self.fits_uids:
+            if cur_fits_uid == fits_uid: found = True; break
             if self.use_full_fits:
-                base_count += self.num_rows[cur_fits_id] * self.num_cols[cur_fits_id]
+                base_count += self.num_rows[cur_fits_uid] * self.num_cols[cur_fits_uid]
             else: base_count += self.fits_cutout_sizes[i]**2
             id += 1
 
         assert(found)
         return id, base_count
 
-    def calculate_neighbour_ids(self, base_count, r, c, neighbour_size, index, fits_id):
+    def calculate_neighbour_ids(self, base_count, r, c, neighbour_size, index, fits_uid):
         """ Get global id of coords within neighbour_size of given coord (specified by r/c).
             For neighbour_size being: 2, 3, 4, the collected ids:
             . .   . . .   . . . .
@@ -637,27 +637,27 @@ class FITSData:
         offset = neighbour_size // 2
         for i in range(r - offset, r + (neighbour_size - offset)):
             for j in range(c - offset, c + (neighbour_size - offset)):
-                local_id = self.calculate_local_id(i, j, index, fits_id)
+                local_id = self.calculate_local_id(i, j, index, fits_uid)
                 ids.append(base_count + local_id)
         return ids
 
-    def get_pixel_ids(self, fits_id, r, c, neighbour_size):
+    def get_pixel_ids(self, fits_uid, r, c, neighbour_size):
         """ Get global id of given position based on its
               local r/c position in given fits tile.
             If neighbour_size is > 1, also find id of neighbour pixels within neighbour_size.
         """
-        index, base_count = self.calculate_global_offset(fits_id)
+        index, base_count = self.calculate_global_offset(fits_uid)
         if neighbour_size <= 1:
-            local_id = self.calculate_local_id(r, c, index, fits_id)
+            local_id = self.calculate_local_id(r, c, index, fits_uid)
             ids = [local_id + base_count]
         else:
-            ids = self.calculate_neighbour_ids(base_count, r, c, neighbour_size, index, fits_id)
+            ids = self.calculate_neighbour_ids(base_count, r, c, neighbour_size, index, fits_uid)
         return ids
 
-    def evaluate(self, fits_id, recon_tile, **re_args):
+    def evaluate(self, index, fits_uid, recon_tile, **re_args):
         """ Image evaluation function (e.g. saving, metric calculation).
             @Param:
-              fits_id:     id of current fits tile to evaluate
+              fits_uid:     id of current fits tile to evaluate
               recon_tile:  restored fits tile [nbands,sz,sz]
             @Return:
               metrics(_z): metrics of current model for current fits tile, [n_metrics,1,nbands]
@@ -681,24 +681,27 @@ class FITSData:
             log.info(f"recon. pixel max {recon_max}")
 
         if re_args["save_locally"]:
-            np_fname = join(dir, f"{fits_id}_{fname}.npy")
+            np_fname = join(dir, f"{fits_uid}_{fname}.npy")
             #if restore_args["recon_norm"]: recon_fname += "_norm"
             #if restore_args["recon_flat_trans"]: recon_fname += "_flat"
             np.save(np_fname, recon_tile)
 
         if re_args["to_HDU"]:
-            fits_fname = join(dir, f"{fits_id}_{fname}.fits")
-            generate_hdu(class_obj.headers[fits_id], recon_tile, fits_fname)
+            fits_fname = join(dir, f"{fits_uid}_{fname}.fits")
+            generate_hdu(class_obj.headers[fits_uid], recon_tile, fits_fname)
 
         if "plot_func" in re_args:
-            png_fname = join(dir, f"{fits_id}_{fname}.png")
+            png_fname = join(dir, f"{fits_uid}_{fname}.png")
             if re_args["zscale"]:
-                zscale_ranges = self.get_zscale_ranges(fits_id)
+                zscale_ranges = self.get_zscale_ranges(fits_uid)
                 re_args["plot_func"](recon_tile, png_fname, zscale_ranges=zscale_ranges)
-            else: re_args["plot_func"](recon_tile, png_fname)
+            elif re_args["match_fits"]:
+                re_args["plot_func"](recon_tile, png_fname, index)
+            else:
+                re_args["plot_func"](recon_tile, png_fname)
 
         if re_args["calculate_metrics"]:
-            gt_fname = self.gt_img_fnames[fits_id] + ".npy"
+            gt_fname = self.gt_img_fnames[fits_uid] + ".npy"
             gt_tile = np.load(gt_fname)
             gt_max = np.round(np.max(gt_tile, axis=(1,2)), 1)
             if verbose: log.info(f"GT. pixel max {gt_max}")
@@ -710,38 +713,38 @@ class FITSData:
             return metrics, metrics_zscale
         return None, None
 
-    def restore_evaluate_zoomed_tile(self, recon_tile, fits_id, **re_args):
+    def restore_evaluate_zoomed_tile(self, recon_tile, fits_uid, **re_args):
         """ Crop smaller cutouts from reconstructed image.
             Helpful to evaluate local reconstruction quality when recon is large.
         """
-        id = re_args["cutout_fits_ids"].index(fits_id)
-        zscale_ranges = self.get_zscale_ranges(fits_id)
+        id = re_args["cutout_fits_uids"].index(fits_uid)
+        zscale_ranges = self.get_zscale_ranges(fits_uid)
 
         for i, (size, (r,c)) in enumerate(
                 zip(re_args["cutout_sizes"][id], re_args["cutout_start_pos"][id])
         ):
-            zoomed_gt = np.load(self.gt_img_fnames[fits_id] + ".npy")[:,r:r+size,c:c+size]
-            zoomed_gt_fname = str(self.gt_img_fnames[fits_id]) + f"_zoomed_{size}_{r}_{c}"
+            zoomed_gt = np.load(self.gt_img_fnames[fits_uid] + ".npy")[:,r:r+size,c:c+size]
+            zoomed_gt_fname = str(self.gt_img_fnames[fits_uid]) + f"_zoomed_{size}_{r}_{c}"
             plot_horizontally(zoomed_gt, zoomed_gt_fname)
 
             zoomed_recon = recon_tile[:,r:r+size,c:c+size]
             zoomed_recon_fname = join(re_args["zoomed_recon_dir"],
-                                      str(re_args["zoomed_recon_fname"]) + f"_{fits_id}_{i}")
+                                      str(re_args["zoomed_recon_fname"]) + f"_{fits_uid}_{i}")
             plot_horizontally(zoomed_recon, zoomed_recon_fname, zscale_ranges=zscale_ranges)
 
-    def restore_evaluate_one_tile(self, index, fits_id, num_pixels_acc, pixels, **re_args):
+    def restore_evaluate_one_tile(self, index, fits_uid, num_pixels_acc, pixels, **re_args):
         if self.use_full_fits:
-            num_rows, num_cols = self.num_rows[fits_id], self.num_cols[fits_id]
+            num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
         else: num_rows, num_cols = self.fits_cutout_sizes[index], self.fits_cutout_sizes[index]
         cur_num_pixels = num_rows * num_cols
 
         cur_tile = np.array(pixels[num_pixels_acc : num_pixels_acc + cur_num_pixels]).T. \
             reshape((re_args["num_bands"], num_rows, num_cols))
 
-        if "zoom" in re_args and re_args["zoom"] and fits_id in re_args["cutout_fits_ids"]:
-            self.restore_evaluate_zoomed_tile(cur_tile, fits_id, **re_args)
+        if "zoom" in re_args and re_args["zoom"] and fits_uid in re_args["cutout_fits_uids"]:
+            self.restore_evaluate_zoomed_tile(cur_tile, fits_uid, **re_args)
 
-        cur_metrics, cur_metrics_zscale = self.evaluate(fits_id, cur_tile, **re_args)
+        cur_metrics, cur_metrics_zscale = self.evaluate(index, fits_uid, cur_tile, **re_args)
         num_pixels_acc += cur_num_pixels
         return num_pixels_acc, cur_metrics, cur_metrics_zscale
 
@@ -769,9 +772,9 @@ class FITSData:
         else: metrics, metrics_zscale = None, None
 
         num_pixels_acc = 0
-        for index, fits_id in enumerate(self.fits_ids):
+        for index, fits_uid in enumerate(self.fits_uids):
             num_pixels_acc, cur_metrics, cur_metrics_zscale = self.restore_evaluate_one_tile(
-                index, fits_id, num_pixels_acc, pixels, **re_args)
+                index, fits_uid, num_pixels_acc, pixels, **re_args)
 
             if re_args["calculate_metrics"]:
                 metrics = np.concatenate((metrics, cur_metrics), axis=1)

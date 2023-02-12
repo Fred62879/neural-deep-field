@@ -44,7 +44,7 @@ class SpectraData:
 
     def load_accessory_data(self):
         self.use_full_fits = self.kwargs["use_full_fits"]
-        self.fits_ids = self.fits_obj.get_fits_ids()
+        self.fits_uids = self.fits_obj.get_fits_uids()
         self.num_rows = self.fits_obj.get_num_rows()
         self.num_cols = self.fits_obj.get_num_cols()
         self.fits_cutout_sizes = self.fits_obj.get_fits_cutout_sizes()
@@ -78,7 +78,7 @@ class SpectraData:
         """ Get number of gt spectra (doesn't count neighbours).
         """
         if self.recon_gt_spectra or self.spectra_supervision_train:
-            return len(self.kwargs["gt_spectra_choices"])
+            return len(self.kwargs["gt_spectra_ids"])
         return 0
 
     def get_spectra_coords(self):
@@ -143,7 +143,7 @@ class SpectraData:
         positions = [[32,32],[10,21],
                      [10,21],[2,2]]
 
-        # for i, fits_id in enumerate(self.fits_ids):
+        # for i, fits_uid in enumerate(self.fits_uids):
         #     pixel_ids = []
         #     for (r,c) in positions:
         #         neighbours = [ [r-i,c-j] for i in range(size) for j in range(size)]
@@ -157,7 +157,7 @@ class SpectraData:
 
         #     # accumulatively count number of pixels
         #     if self.use_full_fits:
-        #         acc += self.num_rows[fits_id] * self.cols[fits_id]
+        #         acc += self.num_rows[fits_uid] * self.cols[fits_uid]
         #     else: acc += self.fits_cutout_sizes[i]**2
 
         self.data["dummy_spectra_coords"] = coords
@@ -175,7 +175,7 @@ class SpectraData:
               During training, we only load if do spectra supervision
               During inferrence, the two options give same coords but different spectra
         """
-        choices = self.kwargs["gt_spectra_choices"]
+        spectra_ids = self.kwargs["gt_spectra_ids"]
         smpl_interval = self.kwargs["trans_sample_interval"]
         source_spectra_data = read_spectra_data(self.spectra_data_fname)
 
@@ -184,16 +184,18 @@ class SpectraData:
         spectra, supervision_spectra = [], []
         all_img_coords, all_grid_coords, all_ids = [], [], []
 
-        for i, choice in enumerate(choices):
-            footprint = source_spectra_data["footprint"][choice]
-            tile_id = source_spectra_data["tile_id"][choice]
-            subtile_id = source_spectra_data["subtile_id"][choice]
-            fits_id = f"{footprint}{tile_id}{subtile_id}"
-            index = self.fits_ids.index(fits_id)
+        for i, spectra_id in enumerate(spectra_ids):
+            footprint = source_spectra_data["footprint"][spectra_id]
+            tile_id = source_spectra_data["tile_id"][spectra_id]
+            subtile_id = source_spectra_data["subtile_id"][spectra_id]
+            fits_uid = f"{footprint}{tile_id}{subtile_id}"
+            fits_id = self.fits_uids.index(fits_uid)
 
             # get img coord, grid coord, and id of pixel(s) (neighbour) with gt spectra
             img_coords, grid_coords, ids = self.get_gt_spectra_pixel_coords(
-                source_spectra_data, choice, self.kwargs["spectra_neighbour_size"], index)
+                fits_id, spectra_id, self.kwargs["spectra_neighbour_size"],
+                source_spectra_data)
+
             all_ids.append(ids)       # [num_neighbours,1]
             all_img_coords.append(img_coords)
             all_grid_coords.append(grid_coords) # [num_neighbours,2/3]
@@ -201,8 +203,8 @@ class SpectraData:
             # get range of wave that we reconstruct spectra
             # the specified range may not coincide exactly with the transmission
             # sampling lambda, we thus find closest lambda instead
-            recon_wave_bound = [source_spectra_data["trusted_wave_lo"][choice],
-                                source_spectra_data["trusted_wave_hi"][choice]]
+            recon_wave_bound = [source_spectra_data["trusted_wave_lo"][spectra_id],
+                                source_spectra_data["trusted_wave_hi"][spectra_id]]
             (id_lo, id_hi) = get_bound_id(recon_wave_bound, self.full_wave, within_full_wave=False)
             recon_wave_bound_id = [id_lo, id_hi + 1]
 
@@ -214,8 +216,8 @@ class SpectraData:
             recon_bound_ids.append(recon_wave_bound_id)
 
             # load gt spectra data
-            fname = join(self.spectra_path, fits_id,
-                         source_spectra_data["spectra_fname"][choice] + ".npy")
+            fname = join(self.spectra_path, fits_uid,
+                         source_spectra_data["spectra_fname"][spectra_id] + ".npy")
             gt_wave, gt_spectra, gt_spectra_for_supervision = load_gt_spectra(
                 fname, self.full_wave, recon_wave_bound, smpl_interval,
                 interpolate=self.spectra_supervision_train,
@@ -285,8 +287,15 @@ class SpectraData:
         if len(img_coords) != 0:
             self.data["spectra_img_coords"] = torch.stack(img_coords)
 
-    def get_gt_spectra_pixel_coords(self, spectra_data, choice, neighbour_size, fits_index):
-        """ Get coordinate of pixel with gt spectra. We can either
+    def get_gt_spectra_pixel_coords(self, fits_id, spectra_id, neighbour_size, spectra_data):
+        """ Get coordinate of pixel with gt spectra.
+            @Param:
+               fits_id:        index of fits where the selected spectra comes from
+               spectra_id:     index of the selected spectra
+               neighbour_size: size of neighbouring pixels to average for spectra
+               spectra_data
+
+            We can either
              i) directly normalize the given ra/dec with coordinates range or
             ii) get pixel id based on ra/dec and index from loaded coordinates.
 
@@ -298,11 +307,11 @@ class SpectraData:
 
            Neighbour_Size specify the neighbourhood of the given spectra to average.
         """
-        ra, dec = spectra_data["ra"][choice], spectra_data["dec"][choice]
-        footprint = spectra_data["footprint"][choice]
-        tile_id = spectra_data["tile_id"][choice]
-        subtile_id = spectra_data["subtile_id"][choice]
-        fits_id = footprint + tile_id + subtile_id
+        ra, dec = spectra_data["ra"][spectra_id], spectra_data["dec"][spectra_id]
+        footprint = spectra_data["footprint"][spectra_id]
+        tile_id = spectra_data["tile_id"][spectra_id]
+        subtile_id = spectra_data["subtile_id"][spectra_id]
+        fits_uid = footprint + tile_id + subtile_id
 
         # ra/dec values from spectra data may not be exactly the same as real coords
         # this normalized ra/dec may thus be slightly different from real coords
@@ -320,12 +329,12 @@ class SpectraData:
         (r, c) = worldToPix(header, ra, dec) # image coord, r and c coord within full tile
 
         if self.use_full_fits:
-            img_coords = torch.tensor([r, c])
+            img_coords = torch.tensor([r, c, fits_id])
         else:
-            start_pos = self.fits_cutout_start_pos[fits_index]
-            img_coords = torch.tensor([r - start_pos[0], c - start_pos[1]])
+            start_pos = self.fits_cutout_start_pos[fits_id]
+            img_coords = torch.tensor([r - start_pos[0], c - start_pos[1], fits_id])
 
-        pixel_ids = self.fits_obj.get_pixel_ids(fits_id, r, c, neighbour_size)
+        pixel_ids = self.fits_obj.get_pixel_ids(fits_uid, r, c, neighbour_size)
         coords_accurate = self.fits_obj.get_coord(pixel_ids)
         #print(r, c, pixel_ids, coords_accurate, self.kwargs["fits_cutout_start_pos"])
         return img_coords, coords_accurate, pixel_ids

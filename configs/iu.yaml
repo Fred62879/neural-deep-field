@@ -24,7 +24,8 @@ global:
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra','plot_redshift']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed','plot_redshift']
     #tasks: ['infer','recon_gt_spectra'] #,'save_redshift']
-    tasks: ['infer','plot_redshift']
+    #tasks: ['infer','plot_redshift']
+    tasks: ['infer','plot_embed_map'] 
     #tasks: ['infer','recon_codebook_spectra']
 
 optimizer:
@@ -152,7 +153,7 @@ infer:
     metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
-    recon_cutout_fits_ids: ['981215'] #,'981217']
+    recon_cutout_fits_uids: ['981215'] #,'981217']
     # each fits may have multiple cutouts
     recon_cutout_sizes: [ [64] ] #, [32] ]
     recon_cutout_start_pos: [ [[256,256]] ] #, [[86,188]] ] #[86,188]
@@ -211,7 +212,7 @@ dataset:
     hardcode_num_trans_samples: 35
     trans_sample_interval: 10
 
-    gt_spectra_choices: [1,5,2,3,4] #[2,3,4,5,6] #[1,2,3,4]
+    gt_spectra_ids: [1,5,2,3,4] #[2,3,4,5,6] #[1,2,3,4]
     spectra_smooth_sigma: 50
 
 inpaint:

@@ -290,7 +290,7 @@ def define_cmd_line_args():
     # trans data
     data_group.add_argument("--trans-sample-method", type=str,
                             choices=["hardcode","bandwise","mixture"])
-    data_group.add_argument("--gt-spectra-cho", type=int)
+    data_group.add_argument("--gt-spectra-ids", type=int)
     #data_group.add_argument("--trans-cho", type=str, default="orig_trans")
     data_group.add_argument("--wave-lo", type=int, default=3000,
                             help="smallest lambda value for transmission data (angstrom)")
@@ -462,7 +462,7 @@ def define_cmd_line_args():
     infer_group.add_argument("--recon-zoomed", action="store_true",
                              help="whether reconstruct zoomed in cutouts or not. \
                              If true, the three below args needs to be specified")
-    infer_group.add_argument("--recon-cutout-fits-ids", nargs="+", type=str,
+    infer_group.add_argument("--recon-cutout-fits-uids", nargs="+", type=str,
                              help="id of tiles to generate reconstructed cutout")
     infer_group.add_argument("--recon-cutout-sizes", nargs="+", type=list,
                              help="list of sizes of each cutout for each tile")

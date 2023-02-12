@@ -87,17 +87,17 @@ class AstroDataset(Dataset):
     # Getters
     ############
 
-    def get_fits_ids(self):
-        return self.fits_dataset.get_fits_ids()
+    def get_fits_uids(self):
+        return self.fits_dataset.get_fits_uids()
 
     def get_num_fits(self):
-        return len(self.get_fits_ids())
+        return len(self.get_fits_uids())
 
     def get_num_coords(self):
         return self.fits_dataset.get_num_coords()
 
-    def get_zscale_ranges(self, fits_id=None):
-        return self.fits_dataset.get_zscale_ranges(fits_id)
+    def get_zscale_ranges(self, fits_uid=None):
+        return self.fits_dataset.get_zscale_ranges(fits_uid)
 
     def get_spectra_coord_ids(self):
         return self.spectra_dataset.get_spectra_coord_ids()
