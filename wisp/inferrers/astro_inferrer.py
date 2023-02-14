@@ -167,7 +167,7 @@ class AstroInferrer(BaseInferrer):
         self.dataset_length = self.dataset.get_num_coords()
 
         self.batch_size = self.extra_args["infer_batch_size"]
-        self.reset_dataloader()
+        self.reset_dataloader(drop_last=False)
 
         num_fits = self.dataset.get_num_fits()
         # num_coords = self.dataset.get_num_coords()

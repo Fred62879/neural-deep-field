@@ -74,12 +74,12 @@ class BaseInferrer(ABC):
     # Dataloader
     #############
 
-    def init_dataloader(self):
+    def init_dataloader(self, drop_last=True):
         self.infer_data_loader = DataLoader(
             self.dataset,
             batch_size=None,
             sampler=BatchSampler(
-                SequentialSampler(self.dataset), batch_size=self.batch_size, drop_last=True),
+                SequentialSampler(self.dataset), batch_size=self.batch_size, drop_last=drop_last),
             pin_memory=True,
             num_workers=self.extra_args["dataset_num_workers"]
         )
@@ -92,12 +92,12 @@ class BaseInferrer(ABC):
         """ Actually iterate the data loader. """
         return next(self.infer_data_loader_iter)
 
-    def reset_dataloader(self):
+    def reset_dataloader(self, drop_last=True):
         """ Configure dataset based on current inferrence task.
             Then re-init dataloader.
         """
         self._configure_dataset()
-        self.init_dataloader()
+        self.init_dataloader(drop_last=drop_last)
         self.reset_data_iterator()
 
     #############

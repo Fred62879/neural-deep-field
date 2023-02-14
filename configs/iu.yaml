@@ -142,7 +142,7 @@ trainer:
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_batch_size: 4096 #36864
+    infer_batch_size: 22000 #36864
     infer_use_all_wave: True # enforced
     infer_last_model_only: True
 
