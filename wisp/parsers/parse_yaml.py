@@ -268,6 +268,10 @@ def define_cmd_line_args():
 
     data_group.add_argument("--use-full-fits", action="store_true")
     data_group.add_argument("--load-fits-data-cache", action="store_true")
+    data_group.add_argument("--fits-cutout-num-rows",nargs="+", type=int,
+                            help="size of cutout from fits (if not using full fits)")
+    data_group.add_argument("--fits-cutout-num-cols",nargs="+", type=int,
+                            help="size of cutout from fits (if not using full fits)")
     data_group.add_argument("--fits-cutout-sizes",nargs="+", type=int,
                             help="size of cutout from fits (if not using full fits)")
     data_group.add_argument("--fits-cutout-start-pos", nargs="+", type=list,
@@ -470,7 +474,9 @@ def define_cmd_line_args():
                              help="list of start (r/c) positions of each cutout for each tile")
 
     infer_group.add_argument("--average-spectra", action="store_true")
+    infer_group.add_argument("--plot-spectrum-with-gt", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-trans", action="store_true")
+    infer_group.add_argument("--plot-spectrum-within-trusted-range", action="store_true")
     infer_group.add_argument("--infer-spectra-individually", action="store_true")
 
     infer_group.add_argument("--plot-labels", nargs="+", type=str)

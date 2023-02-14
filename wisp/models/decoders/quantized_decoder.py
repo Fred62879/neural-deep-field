@@ -35,7 +35,6 @@ class QuantizedDecoder(nn.Module):
 
         self.init_decoder()
         self.redshift_adjust = nn.ReLU(inplace=True)
-        #self.redshift_adjust = torch.exp
         self.init_codebook(kwargs["qtz_seed"])
 
     def init_decoder(self):

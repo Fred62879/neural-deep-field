@@ -33,13 +33,12 @@ class FITSData:
         self.load_fits_data_cache = kwargs["load_fits_data_cache"]
 
         self.use_full_fits = kwargs["use_full_fits"]
+        self.fits_cutout_num_rows = kwargs["fits_cutout_num_rows"]
+        self.fits_cutout_num_cols = kwargs["fits_cutout_num_cols"]
         self.fits_cutout_sizes = kwargs["fits_cutout_sizes"]
         self.fits_cutout_start_pos = kwargs["fits_cutout_start_pos"]
 
         self.data = {}
-        self.headers = {}
-        self.num_rows = {}
-        self.num_cols = {}
 
         self.compile_fits_fnames()
         self.set_path(dataset_path)
@@ -104,6 +103,11 @@ class FITSData:
                 suffix += f"_{fits_uid}_{size}_{r}_{c}"
                 self.gt_img_fnames[fits_uid] = join(
                     img_data_path, f"gt_img_{norm}_{fits_uid}_{size}_{r}_{c}")
+            # for (fits_uid, num_rows, num_cols, (r,c)) in zip(
+            #         self.fits_uids, self.fits_cutout_rows, self.fits_cutout_cols, self.fits_cutout_start_pos):
+            #     suffix += f"_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}"
+            #     self.gt_img_fnames[fits_uid] = join(
+            #         img_data_path, f"gt_img_{norm}_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}")
 
         norm_str = self.kwargs["train_pixels_norm"]
 
@@ -175,8 +179,7 @@ class FITSData:
 
         # make sure no duplicate fits ids exist if use full tile
         if self.use_full_fits:
-            assert( len(self.fits_uids) ==
-                    len(set(self.fits_uid)))
+            assert( len(self.fits_uids) == len(set(self.fits_uids)))
 
     ###############
     # Load FITS data
@@ -193,10 +196,14 @@ class FITSData:
             num_rows, num_cols = header["NAXIS2"], header["NAXIS1"]
         else:
             size = self.fits_cutout_sizes[index]
+            num_rows = self.fits_cutout_num_rows[index]
+            num_cols = self.fits_cutout_num_cols[index]
             (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
             pos = (c + size//2, r + size//2)           # center position (x/y)
+            pos = (c + num_cols//2, r + num_rows//2)
             wcs = WCS(header)
             cutout = Cutout2D(hdu.data, position=pos, size=self.fits_cutout_size, wcs=wcs)
+            cutout = Cutout2D(hdu.data, position=pos, size=(num_rows,num_cols), wcs=wcs)
             header = cutout.wcs.to_header()
             num_rows, num_cols = self.fits_cutout_size, self.fits_cutout_size
 
@@ -205,6 +212,7 @@ class FITSData:
         self.num_cols[fits_uid] = num_cols
 
     def load_headers(self):
+        self.headers, self.num_rows, self.num_cols = {}, {}, {}
         for index, fits_uid in enumerate(self.fits_uids):
             self.load_header(index, fits_uid, True)
 
@@ -228,8 +236,11 @@ class FITSData:
 
                 if not self.use_full_fits:
                     size = self.fits_cutout_sizes[index]
+                    num_rows = self.fits_cutout_num_rows[index]
+                    num_cols = self.fits_cutout_num_cols[index]
                     (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
                     pixels = pixels[r:r+size, c:c+size]
+                    pixels = pixels[r:r+num_rows, c:c+num_cols]
 
                 if not self.kwargs["train_pixels_norm"] == "linear":
                     pixels = normalize(pixels, self.kwargs["train_pixels_norm"], gt=pixels)
@@ -248,8 +259,11 @@ class FITSData:
                     cur_data.append(weight.flatten())
                 else:
                     size = self.fits_cutout_sizes[index]
+                    num_rows = self.fits_cutout_num_rows[index]
+                    num_cols = self.fits_cutout_num_cols[index]
                     (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
                     var = var[r:r+size, c:c+size].flatten()
+                    var = var[r:r+num_rows, c:c+num_cols].flatten()
                     cur_data.append(var)
 
         if load_pixels:
@@ -335,8 +349,11 @@ class FITSData:
             redshifts = -1 * np.ones((num_rows, num_cols))
         else:
             size = self.fits_cutout_sizes[id]
+            num_rows = self.fits_cutout_num_rows[index]
+            num_cols = self.fits_cutout_num_cols[index]
             # (r, c) = self.fits_cutout_start_pos[id] # start position (r/c)
             redshifts = -1 * np.ones((size, size))
+            redshifts = -1 * np.ones((num_rows, num_cols))
         return redshifts
 
     def get_redshift_all_fits(self):
@@ -344,7 +361,7 @@ class FITSData:
         """
         redshift = [ self.get_redshift_one_fits(id, fits_uid)
                      for id, fits_uid in enumerate(self.fits_uids) ]
-        redshift = np.array(redshift).reshape((-1,1))
+        redshift = np.array(redshift).flatten()
         self.data["redshift"] = torch.FloatTensor(redshift)
 
     ##############
@@ -393,19 +410,26 @@ class FITSData:
         self.data["coords"] = self.add_dummy_dim(coords)
 
     def get_pixel_coords_all_fits(self):
-        assert(not self.use_full_fits)
+        # assert(not self.use_full_fits)
         assert(len(self.fits_uids) == 1)
         for id, fits_uid in enumerate(self.fits_uids):
-            # num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
-            # assert(num_rows == num_cols
-            size = self.fits_cutout_sizes[id]
-            self.get_mgrid_np(size)
+            num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
+            self.get_mgrid_np(num_rows, num_cols)
+            # assert(num_rows == num_cols)
+            # size = self.fits_cutout_sizes[id]
+            # self.get_mgrid_np(size)
 
-    def get_mgrid_np(self, sidelen, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
+    def get_mgrid_np(self, num_rows, num_cols, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
+    #def get_mgrid_np(self, sidelen, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
         """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version).
         """
-        arrays = tuple(dim * [np.linspace(lo, hi, num=sidelen)])
-        mgrid = np.stack(np.meshgrid(*arrays, indexing=indexing), axis=-1)
+        # arrays = tuple(dim * [np.linspace(lo, hi, num=sidelen)])
+        # mgrid = np.stack(np.meshgrid(*arrays, indexing=indexing), axis=-1)
+
+        x = np.linspace(lo, hi, num=num_cols)
+        y = np.linspace(lo, hi, num=num_rows)
+        mgrid = np.stack(np.meshgrid(x, y, indexing=indexing), axis=-1)
+
         if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
         self.data["coords"] = self.add_dummy_dim(mgrid)
 

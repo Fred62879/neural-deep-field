@@ -403,6 +403,10 @@ def batch_plot_mask(sz, dim, path):
         mask_fn = join(path, fn)
         plot_mask(sz, dim, np.load(mask_fn), mask_fn[:-4]+'.png')
 
+############
+# Histogram plot
+############
+
 def hist(fig, bins, img, r, c, id, lo, hi, nm, clip_v2, w, xhi, yhi):
     if clip_v2:
         v1, v2 = ZScaleInterval(contrast=.25).get_limits(img)
@@ -492,6 +496,10 @@ def batch_hist(gt_fn, img_fns, bins, yhi, chnl, nms):
         hist(fig, img, r, c, i+2, nms[i])
     plt.show()
 
+############
+# heatmap plot
+############
+
 def heat_range(arr,lo,hi):
     ''' only show heats within range '''
     my_cmap = copy(plt.cm.YlGnBu)
@@ -502,7 +510,6 @@ def heat_range(arr,lo,hi):
     g.tick_params(left=False, bottom=False)
     #g.set_title("Semantic Textual Similarity")
 
-# plot residual heat map
 def heat(fig, arr, r, c, i):
     ax = fig.add_subplot(r, c, i)
     ax.axis('off')
@@ -523,11 +530,15 @@ def heat_all(data, fn, los=None, his=None):
 
 def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
     """ Plot heat map with markers for given coordinate positions.
+        Currently only used to plot heatmap for redshift.
         @Param
-          coords: [n,3]: r,c,fits id
+          coords:  [n,3]: r,c,fits id
           markers: markers choices, different for each coord
+          data:    data to heat [1,num_rwos,num_cols]
           fits_id: fits id of current tile, only draw coord with same fits id
     """
+    import logging as log
+
     nbands = len(data)
     fig = plt.figure(figsize=(20,5))
     r, c = 1, nbands
@@ -536,9 +547,13 @@ def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
             band = np.clip(fig, los[i], his[i])
         heat(fig, band, r, c, i+1)
     fig.tight_layout()
+
     for (y, x, cur_fits_id), marker in zip(coords, markers):
         if cur_fits_id != fits_id: continue
-        plt.scatter(x, y, marker=marker)
+        #plt.scatter(x, y, marker=marker)
+        plt.scatter(x, y, test=marker)
+        cur_redshift = data[0,y,x]
+        log.info(f"redshift value of {fits_id}_{y}_{x} is: {cur_redshift}")
     plt.savefig(fn)
     plt.close()
 

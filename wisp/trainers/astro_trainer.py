@@ -553,8 +553,8 @@ class AstroTrainer(BaseTrainer):
             ids = gt_redshift != -1
 
             pred_redshift = ret["redshift"]
-            if len(ids) != 0:
-                redshift_loss = self.redshift_loss(gt_redshift, pred_redshift) * self.redshift_beta
+            if torch.count_nonzero(ids) != 0:
+                redshift_loss = self.redshift_loss(gt_redshift[ids], pred_redshift[ids]) * self.redshift_beta
                 self.log_dict["redshift_loss"] += redshift_loss.item()
 
         # iv) latent quantization codebook loss

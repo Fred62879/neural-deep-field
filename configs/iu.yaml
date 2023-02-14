@@ -21,12 +21,11 @@ global:
     #tasks: ['train','plot_save_scaler','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
     #tasks: ['infer','recon_img','plot_embed_map','plot_latent_embed','plot_save_scaler']
 
-    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra','plot_redshift']
+    tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra','plot_redshift']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed','plot_redshift']
-    #tasks: ['infer','recon_gt_spectra'] #,'save_redshift']
-    #tasks: ['infer','plot_redshift']
-    tasks: ['infer','plot_embed_map'] 
+    #tasks: ['infer','recon_gt_spectra']
     #tasks: ['infer','recon_codebook_spectra']
+    tasks: ['infer','plot_redshift','plot_embed_map']
 
 optimizer:
     optimizer_type: 'adam'
@@ -51,7 +50,7 @@ embedder:
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 40
+    wave_embed_dim: 32
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -63,11 +62,11 @@ grid:
     grid_multiscale_type: 'cat'
     grid_feature_dim: 2
     grid_feature_std: 0.01
-    grid_num_lods: 20  # max / min = b**l
+    grid_num_lods: 16  #20 # max / min = b**l
     tree_type: 'geometric'
-    min_grid_res: 6 #4 #6
-    max_grid_res: 662 #160
-    codebook_bitwidth: 21
+    min_grid_res: 16 #6 #4 #6
+    max_grid_res: 2831 #662 #160
+    codebook_bitwidth: 20
 
 decoder:
     decoder_num_layers: 1
@@ -107,12 +106,12 @@ trainer:
     pixel_loss_cho: l1
     spectra_loss_cho: l2
     redshift_loss_cho: l2
-    num_epochs: 6000
-    batch_size: 104857 #262144 #147456 #131072
-    save_every: 600
+    num_epochs: 1000
+    batch_size: 209715 #104857 #262144 #147456 #131072
+    save_every: 100
     render_tb_every: -1
     log_tb_every: 10
-    log_cli_every: 600
+    log_cli_every: 100
     log_gpu_every: -1
     save_local_every: -1
     save_as_new: True
@@ -138,7 +137,7 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 2
+    num_supervision_spectra: 3
     spectra_neighbour_size: 1
 
 infer:
@@ -160,7 +159,9 @@ infer:
 
     # recon spectra
     average_spectra: True
-    plot_spectrum_with_trans: True
+    plot_spectrum_with_gt: False
+    plot_spectrum_with_trans: False
+    plot_spectrum_within_trusted_range: True
     infer_spectra_individually: True
 
 dataset:
@@ -172,15 +173,17 @@ dataset:
     gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
 
-    use_full_fits: False
+    use_full_fits: True
 
     # if don't use full fits, we can select cutout from tiles
     # the order of the following 5 fields corresponds to each other
     fits_footprints: ['9812']
     fits_tile_ids: ['1']
     fits_subtile_ids: ['5']
-    fits_cutout_sizes: [512]
-    fits_cutout_start_pos: [[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    fits_cutout_num_rows: [2200]
+    fits_cutout_num_cols: [800]
+    fits_cutout_sizes: [2048] # [512
+    fits_cutout_start_pos: [[100,200]] #[[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
     # num_bands: 1
     # sensor_collection_name: '1_y'
@@ -212,7 +215,7 @@ dataset:
     hardcode_num_trans_samples: 35
     trans_sample_interval: 10
 
-    gt_spectra_ids: [1,5,2,3,4] #[2,3,4,5,6] #[1,2,3,4]
+    gt_spectra_ids: [0,1,2,3,4,5,6,7,8,9,10] #[0,1,5,2,3,4] #[2,3,4,5,6] #[1,2,3,4]
     spectra_smooth_sigma: 50
 
 inpaint:

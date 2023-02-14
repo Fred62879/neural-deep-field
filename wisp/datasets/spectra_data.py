@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
+from pathlib import Path
 from astropy.io import fits
 from os.path import join, exists
 from collections import defaultdict
@@ -27,14 +28,24 @@ class SpectraData:
 
     def require_any_data(self, tasks):
         tasks = set(tasks)
-        self.spectra_supervision_train = self.kwargs["spectra_supervision"]
 
         self.recon_gt_spectra = "recon_gt_spectra" in tasks
         self.recon_dummy_spectra = "recon_dummy_spectra" in tasks
         self.recon_codebook_spectra = "recon_codebook_spectra" in tasks
-        return self.kwargs["space_dim"] == 3 and (self.recon_gt_spectra or \
-            self.recon_dummy_spectra or self.spectra_supervision_train or \
-            self.recon_codebook_spectra)
+        self.spectra_supervision_train = "train" in tasks and self.kwargs["spectra_supervision"]
+
+        # requires actual spectra data (incl. wave, bound, coords, spectra)
+        self.require_spectra = self.recon_gt_spectra or \
+            self.recon_dummy_spectra or \
+            self.recon_codebook_spectra or \
+            self.spectra_supervision_train
+
+        # requires spectra coords only
+        self.require_spectra_coords = "plot_redshift" in tasks or "plot_embed_map" in tasks or \
+            self.recon_gt_spectra
+
+        return self.kwargs["space_dim"] == 3 and (
+            self.require_spectra or self.require_spectra_coords)
 
     def set_path(self, dataset_path):
         input_path = join(dataset_path, "input")
@@ -57,7 +68,10 @@ class SpectraData:
         """ Load gt and/or dummy spectra data.
         """
         self.data = defaultdict(lambda: None)
-        if self.spectra_supervision_train or self.recon_gt_spectra:
+
+        if self.spectra_supervision_train or \
+           self.require_spectra_coords or \
+           (self.recon_gt_spectra and self.kwargs["plot_spectrum_with_gt"]):
             self.load_gt_spectra_data()
 
         if self.recon_dummy_spectra:
@@ -191,26 +205,40 @@ class SpectraData:
             fits_uid = f"{footprint}{tile_id}{subtile_id}"
             fits_id = self.fits_uids.index(fits_uid)
 
-            # get img coord, grid coord, and id of pixel(s) (neighbour) with gt spectra
+            # get img coord, grid coord, and id of pixels (neighbour) correspond to gt spectra
             img_coords, grid_coords, ids = self.get_gt_spectra_pixel_coords(
                 fits_id, spectra_id, self.kwargs["spectra_neighbour_size"],
                 source_spectra_data)
 
-            all_ids.append(ids)       # [num_neighbours,1]
+            all_ids.append(ids)                 # [num_neighbours,1]
             all_img_coords.append(img_coords)
             all_grid_coords.append(grid_coords) # [num_neighbours,2/3]
 
+            # load spectra coords only
+            if not self.require_spectra:
+                continue
+
             # get range of wave that we reconstruct spectra
-            # the specified range may not coincide exactly with the transmission
-            # sampling lambda, we thus find closest lambda instead
-            recon_wave_bound = [source_spectra_data["trusted_wave_lo"][spectra_id],
-                                source_spectra_data["trusted_wave_hi"][spectra_id]]
-            (id_lo, id_hi) = get_bound_id(recon_wave_bound, self.full_wave, within_full_wave=False)
-            recon_wave_bound_id = [id_lo, id_hi + 1]
+            if self.kwargs["plot_spectrum_within_trusted_range"]:
+
+                # plot only within a given range
+                recon_wave_bound = [source_spectra_data["trusted_wave_lo"][spectra_id],
+                                    source_spectra_data["trusted_wave_hi"][spectra_id]]
+
+                # the range may not coincide exactly with the transmission lambda
+                # here we replace with closest transmission lambda
+                (id_lo, id_hi) = get_bound_id(
+                    recon_wave_bound, self.full_wave, within_full_wave=False)
+            else:
+                recon_wave_bound = [ self.full_wave[0], self.full_wave[-1] ]
+                # id_lo, id_hi = 0, len(self.full_wave) - 2
+                (id_lo, id_hi) = get_bound_id(
+                    recon_wave_bound, self.full_wave, within_full_wave=False)
 
             lo = self.full_wave[id_lo]
             hi = self.full_wave[id_hi]
             recon_wave = np.arange(lo, hi + 1, smpl_interval)
+            recon_wave_bound_id = [id_lo, id_hi + 1]
 
             recon_waves.append(recon_wave)
             recon_bound_ids.append(recon_wave_bound_id)
@@ -234,18 +262,15 @@ class SpectraData:
         self.data["gt_spectra_coord_ids"] = all_ids  # [num_coords,num_neighbours,1]
         self.data["gt_spectra_img_coords"] = all_img_coords
         self.data["recon_wave_bound_ids"] = recon_bound_ids
-
-        # [num_coords,num_neighbours,1,2/3]
         self.data["gt_spectra_coords"] = torch.stack(all_grid_coords).type(
-            torch.FloatTensor)[:,:,None]
+            torch.FloatTensor)[:,:,None] # [num_coords,num_neighbours,1,2/3]
 
         ## tmp, dummy redshift
         if self.kwargs["redshift_supervision"]:
             dummy_redshift = torch.arange(1, 1+len(all_ids), dtype=torch.float)
-            #print(dummy_redshift, self.fits_obj.data["redshift"].shape)
             positions = np.array(all_ids).flatten()
-            #print(positions)
-            self.fits_obj.data["redshift"][positions,0] = dummy_redshift
+            # print(dummy_redshift, self.fits_obj.data["redshift"].shape, positions)
+            self.fits_obj.data["redshift"][positions] = dummy_redshift
         ## ends
 
         coord_dim = 3 if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3 else 2
@@ -254,38 +279,35 @@ class SpectraData:
         if self.spectra_supervision_train:
             n = self.kwargs["num_supervision_spectra"]
             self.data["supervision_spectra"] = torch.FloatTensor(
-                np.array(supervision_spectra))[:n] #.to(self.device)
+                np.array(supervision_spectra))[:n]
 
     def load_plot_spectra_data(self):
         wave = []
-        if self.recon_gt_spectra or self.spectra_supervision_train:
+        if (self.recon_gt_spectra and self.kwargs["plot_spectrum_with_gt"]) or \
+           self.spectra_supervision_train:
             wave.extend(self.data["gt_recon_wave"])
+
         if self.recon_dummy_spectra:
             wave.extend(self.data["dummy_recon_wave"])
         #if self.recon_codebook_spectra:
         #    wave.extend(self.data["codebook_recon_wave"])
         self.data["recon_wave"] = wave
 
-        ids = []
-        if self.recon_gt_spectra or self.spectra_supervision_train:
-            ids.extend(self.data["gt_spectra_coord_ids"])
-        if self.recon_dummy_spectra:
-            ids.extend(self.data["dummy_spectra_coord_ids"])
-        self.data["spectra_coord_ids"] = np.array(ids)
-
         # get all spectra (gt and dummy) (grid and img) coords for inferrence
-        coords, img_coords = [], []
+        ids, coords, img_coords = [], [], []
 
-        if self.recon_gt_spectra or self.spectra_supervision_train:
+        if self.recon_gt_spectra or self.spectra_supervision_train or self.require_spectra_coords:
+            ids.extend(self.data["gt_spectra_coord_ids"])
             coords.extend(self.data["gt_spectra_coords"])
             img_coords.extend(self.data["gt_spectra_img_coords"])
+
         if self.recon_dummy_spectra:
+            ids.extend(self.data["dummy_spectra_coord_ids"])
             coords.extend(self.data["dummy_spectra_coords"])
 
-        if len(coords) != 0:
-            self.data["spectra_coords"] = torch.stack(coords)
-        if len(img_coords) != 0:
-            self.data["spectra_img_coords"] = torch.stack(img_coords)
+        if len(ids) != 0:        self.data["spectra_coord_ids"] = np.array(ids)
+        if len(coords) != 0:     self.data["spectra_coords"] = torch.stack(coords)
+        if len(img_coords) != 0: self.data["spectra_img_coords"] = torch.stack(img_coords)
 
     def get_gt_spectra_pixel_coords(self, fits_id, spectra_id, neighbour_size, spectra_data):
         """ Get coordinate of pixel with gt spectra.
@@ -336,7 +358,7 @@ class SpectraData:
 
         pixel_ids = self.fits_obj.get_pixel_ids(fits_uid, r, c, neighbour_size)
         coords_accurate = self.fits_obj.get_coord(pixel_ids)
-        #print(r, c, pixel_ids, coords_accurate, self.kwargs["fits_cutout_start_pos"])
+        # print(r, c, pixel_ids, coords_accurate, self.kwargs["fits_cutout_start_pos"])
         return img_coords, coords_accurate, pixel_ids
 
     #############
@@ -353,14 +375,16 @@ class SpectraData:
         bound_ids = self.get_recon_wave_bound_ids()
 
         for i, cur_spectra in enumerate(recon_spectra):
+            sub_dir = ""
 
             # clip spectra to range, if specified
             if bound and bound_ids is not None and i < len(bound_ids):
                 (lo, hi) = bound_ids[i]
                 cur_spectra = cur_spectra[...,lo:hi]
-            elif codebook:
-                (lo, hi) = bound_ids[0]
-                cur_spectra = cur_spectra[...,lo:hi]
+                sub_dir += "clipped_"
+            # elif codebook:
+            #     (lo, hi) = bound_ids[0]
+            #     cur_spectra = cur_spectra[...,lo:hi]
 
             # average spectra over neighbours, if required
             if cur_spectra.ndim == 2:
@@ -383,18 +407,30 @@ class SpectraData:
                 recon_wave = full_wave
 
             if self.kwargs["plot_spectrum_with_trans"]:
+                sub_dir += "with_trans_"
                 self.trans_obj.plot_trans()
 
             plt.plot(recon_wave, cur_spectra, color="black", label="spectrum")
 
             # plot gt spectra
-            if i < self.get_num_gt_spectra() and not codebook:
+            if self.kwargs["plot_spectrum_with_gt"] and \
+               i < self.get_num_gt_spectra() and not codebook:
+                sub_dir += "with_gt"
+
                 cur_gt_spectra = self.get_gt_spectra()[i]
                 cur_gt_spectra_wave = self.get_gt_spectra_wave()[i]
                 cur_gt_spectra /= np.max(cur_gt_spectra)
                 plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
 
-            fname = join(spectra_dir, f"spectra_{i}_{name}")
+            if sub_dir != "":
+                cur_spectra_dir = join(spectra_dir, sub_dir)
+            else:
+                cur_spectra_dir = spectra_dir
+
+            if not exists(cur_spectra_dir):
+                Path(cur_spectra_dir).mkdir(parents=True, exist_ok=True)
+
+            fname = join(cur_spectra_dir, f"spectra_{i}_{name}")
             plt.savefig(fname)
             plt.close()
 
@@ -451,12 +487,18 @@ def get_bound_id(wave_bound, full_wave, within_full_wave=True):
     wave_hi = int(min(wave_hi, int(max(full_wave))))
 
     if within_full_wave:
+        assert(False)
+        # todo: adapt to special case where wave_lo <= min(full_wave) like below
         id_lo = np.argmax((full_wave > wave_lo)) - 1
         id_hi = np.argmin((full_wave < wave_hi)) + 1
         assert(full_wave[id_lo] <= wave_lo and full_wave[id_hi] >= wave_hi)
     else:
-        id_lo = np.argmin((full_wave < wave_lo)) + 1
-        id_hi = np.argmax((full_wave > wave_hi)) - 1
+        if wave_lo <= min(full_wave): id_lo = 0
+        else: id_lo = np.argmin((full_wave < wave_lo)) + 1
+
+        if wave_hi >= max(full_wave): id_hi = len(full_wave) - 1
+        else: id_hi = np.argmax((full_wave > wave_hi)) - 1
+
         assert(full_wave[id_lo] >= wave_lo and full_wave[id_hi] <= wave_hi)
 
     return [id_lo, id_hi]
@@ -491,6 +533,7 @@ def load_gt_spectra(fname, full_wave, recon_wave_bound, smpl_interval, interpola
 
         # make sure wave range to interpolate stay within gt spectra wave range
         # full_wave is full transmission wave
+        # print(gt_wave[0], gt_wave[-1], full_wave[0], full_wave[-1])
         (lo_id, hi_id) = get_bound_id( ( min(gt_wave),max(gt_wave) ), full_wave, within_full_wave=False)
         lo = full_wave[lo_id] # lo <= full_wave[lo_id]
         hi = full_wave[hi_id] # hi >= full_wave[hi_id]

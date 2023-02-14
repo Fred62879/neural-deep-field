@@ -75,7 +75,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames.sort()
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -304,7 +304,7 @@ class AstroInferrer(BaseInferrer):
                 "verbose": self.verbose,
                 "num_bands": 1,
                 "log_max": False,
-                "save_locally": True,
+                "save_locally": False,
                 "plot_func": plot_embed_map_log,
                 "zscale": False,
                 "to_HDU": False,
@@ -315,8 +315,9 @@ class AstroInferrer(BaseInferrer):
 
         if self.plot_redshift:
             positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/fits_id
-            plot_annotated_heat_map = partial(
-                annotated_heat, positions, self.dataset.get_spectra_pixel_markers())
+            markers = [str(i) for i in range(len(positions))]
+            plot_annotated_heat_map = partial(annotated_heat, positions, markers)
+            #annotated_heat, positions, self.dataset.get_spectra_pixel_markers())
 
             re_args = {
                 "fname": model_id,
@@ -325,7 +326,7 @@ class AstroInferrer(BaseInferrer):
                 "num_bands": 1,
                 "log_max": False,
                 "to_HDU": False,
-                "save_locally": True,
+                "save_locally": False,
                 "plot_func": plot_annotated_heat_map,
                 "match_fits": True,
                 "zscale": False,
@@ -346,8 +347,10 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()
 
-        self.dataset.plot_spectrum(self.spectra_dir, model_id, self.recon_spectra,
-                                   save_spectra=True)
+        self.dataset.plot_spectrum(
+            self.spectra_dir, model_id, self.recon_spectra, save_spectra=False,
+            bound=self.extra_args["plot_spectrum_within_trusted_range"])
+
         #self.calculate_recon_spectra_pixel_values()
 
     def pre_checkpoint_hardcode_coords_modified_model(self, model_id):
@@ -361,7 +364,8 @@ class AstroInferrer(BaseInferrer):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
         self.dataset.plot_spectrum(
             self.codebook_spectra_dir, model_id, self.codebook_spectra,
-            save_spectra=True, codebook=True)
+            save_spectra=False, codebook=True,
+            bound=self.extra_args["plot_spectrum_within_trusted_range"])
 
     #############
     # Helpers
