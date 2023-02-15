@@ -75,7 +75,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames.sort()
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames[-1:]
+            self.selected_model_fnames = self.selected_model_fnames #[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -161,6 +161,7 @@ class AstroInferrer(BaseInferrer):
 
     def pre_inferrence_all_coords_full_model(self):
         self.fits_uids = self.dataset.get_fits_uids()
+        self.model_output = "pixel_intensity"
         self.coords_source = "fits"
         self.batched_fields = ["coords"]
         if self.recon_img: self.batched_fields.append("pixels")
@@ -200,6 +201,7 @@ class AstroInferrer(BaseInferrer):
             log.info(f"zscale metrics: {np.round(self.metrics_zscale[:,-1,0], 3)}")
 
     def pre_inferrence_selected_coords_partial_model(self):
+        self.model_output = "spectra"
         self.coords_source = "spectra"
         self.batched_fields = ["coords"]
         self.dataset_length = self.dataset.get_num_spectra_coords()
@@ -218,8 +220,10 @@ class AstroInferrer(BaseInferrer):
         pass
 
     def pre_inferrence_hardcode_coords_modified_model(self):
-        self.coords_source = "codebook_latents"
+        self.model_output = "spectra"
         self.batched_fields = ["coords"]
+        self.coords_source = "codebook_latents"
+
         self.dataset_length = self.extra_args["qtz_num_embed"]
 
         self.batch_size = min(self.extra_args["infer_batch_size"],
@@ -315,9 +319,9 @@ class AstroInferrer(BaseInferrer):
 
         if self.plot_redshift:
             positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/fits_id
-            markers = [str(i) for i in range(len(positions))]
-            plot_annotated_heat_map = partial(annotated_heat, positions, markers)
-            #annotated_heat, positions, self.dataset.get_spectra_pixel_markers())
+            # markers = [str(i) for i in range(len(positions))]
+            plot_annotated_heat_map = partial(annotated_heat, positions,
+                                              self.dataset.get_spectra_pixel_markers())
 
             re_args = {
                 "fname": model_id,
@@ -349,7 +353,7 @@ class AstroInferrer(BaseInferrer):
 
         self.dataset.plot_spectrum(
             self.spectra_dir, model_id, self.recon_spectra, save_spectra=False,
-            bound=self.extra_args["plot_spectrum_within_trusted_range"])
+            clip=self.extra_args["plot_clipped_spectrum"])
 
         #self.calculate_recon_spectra_pixel_values()
 
@@ -364,8 +368,7 @@ class AstroInferrer(BaseInferrer):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
         self.dataset.plot_spectrum(
             self.codebook_spectra_dir, model_id, self.codebook_spectra,
-            save_spectra=False, codebook=True,
-            bound=self.extra_args["plot_spectrum_within_trusted_range"])
+            save_spectra=False, codebook=True, clip=False)
 
     #############
     # Helpers
@@ -387,12 +390,17 @@ class AstroInferrer(BaseInferrer):
 
                 with torch.no_grad():
                     ret = forward(
-                        self, self.full_pipeline, data,
+                        data,
+                        self.full_pipeline,
+                        self.space_dim,
+                        self.extra_args["trans_sample_method"],
                         pixel_supervision_train=False,
                         spectra_supervision_train=False,
                         quantize_latent=self.quantize_latent,
                         calculate_codebook_loss=False,
-                        infer=True,
+                        recon_img=self.recon_img,
+                        recon_spectra=False,
+                        recon_codebook_spectra=False,
                         save_spectra=False,
                         save_latents=self.plot_latent_embed,
                         save_redshift=self.plot_redshift,
@@ -418,12 +426,17 @@ class AstroInferrer(BaseInferrer):
 
                 with torch.no_grad():
                     spectra = forward(
-                        self, self.spectra_infer_pipeline, data,
+                        data,
+                        self.spectra_infer_pipeline,
+                        self.space_dim,
+                        self.extra_args["trans_sample_method"],
                         pixel_supervision_train=False,
                         spectra_supervision_train=False,
                         quantize_latent=self.quantize_latent,
                         calculate_codebook_loss=False,
-                        infer=True,
+                        recon_img=False,
+                        recon_spectra=True,
+                        recon_codebook_spectra=False,
                         save_spectra=False,
                         save_latents=False,
                         save_embed_ids=False)["intensity"]
@@ -445,13 +458,12 @@ class AstroInferrer(BaseInferrer):
     def infer_codebook_spectra(self, model_id, checkpoint):
         load_model_weights(self.codebook_pipeline, checkpoint)
         self.codebook_pipeline.eval()
-        #print(self.codebook_pipeline)
 
         codebook_latents = load_layer_weights(
             checkpoint, lambda n: "grid" not in n and "codebook" in n)
         codebook_latents = codebook_latents.T[:,None] # [num_embd, 1, latent_dim]
         codebook_latents = codebook_latents.detach().cpu().numpy()
-        # print(codebook_latents[:,0])
+
         self.dataset.set_hardcode_data(self.coords_source, codebook_latents)
 
         while True:
@@ -461,12 +473,17 @@ class AstroInferrer(BaseInferrer):
 
                 with torch.no_grad():
                     spectra = forward(
-                        self, self.codebook_pipeline, data,
+                        data,
+                        self.codebook_pipeline,
+                        self.space_dim,
+                        self.extra_args["trans_sample_method"],
                         pixel_supervision_train=False,
                         spectra_supervision_train=False,
                         quantize_latent=False,
                         calculate_codebook_loss=False,
-                        infer=True,
+                        recon_img=False,
+                        recon_spectra=False,
+                        recon_codebook_spectra=True,
                         save_spectra=False,
                         save_latents=False,
                         save_embed_ids=False)["intensity"]
@@ -482,7 +499,7 @@ class AstroInferrer(BaseInferrer):
         """
         if self.space_dim == 3: self.batched_fields.extend(["trans_data"])
 
-        # self.dataset.set_dataset_mode("infer")
+        self.dataset.set_model_output(self.model_output)
         self.dataset.set_wave_sample_mode(use_full_wave=True)
         self.dataset.set_dataset_length(self.dataset_length)
         self.dataset.set_dataset_fields(self.batched_fields)

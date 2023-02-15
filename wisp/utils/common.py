@@ -8,6 +8,7 @@ import numpy as np
 from os.path import join
 from astropy.io import fits
 from astropy.wcs import WCS
+from functools import reduce
 from astropy.coordinates import SkyCoord
 
 
@@ -126,30 +127,37 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
     #coords = reshape_coords(coords, args, infer=infer, spectrum=spectrum, coord_wave=coord_wave)
     return coords
 
-def forward(class_obj, pipeline, data,
+def forward(data,
+            pipeline,
+            space_dim,
+            trans_sample_method,
             pixel_supervision_train=True,
             spectra_supervision_train=False,
             redshift_supervision_train=False,
+            recon_img=False, # reconstruct img, embed map, redshift heatmap, etc.
+            recon_spectra=False,
+            recon_codebook_spectra=False,
             quantize_latent=False,
             calculate_codebook_loss=False,
-            infer=False,
             save_scaler=False,
             save_spectra=False,
             save_latents=False,
             save_redshift=False,
             save_embed_ids=False):
 
-    # cannot in both train and infer mode
+    # forward can only be done for one of the four states
     train = pixel_supervision_train or spectra_supervision_train or redshift_supervision_train
-    assert( train != infer )
+    is_valid = reduce(lambda x, y: x ^ y,
+                      [train, recon_img, recon_spectra, recon_codebook_spectra])
+    assert(is_valid)
 
     requested_channels = []
     net_args = {"coords": data["coords"] }
 
-    if class_obj.space_dim == 2:
+    if space_dim == 2:
         requested_channels = ["intensity"]
 
-    elif class_obj.space_dim == 3:
+    elif space_dim == 3:
         requested_channels = ["intensity"]
         if quantize_latent and calculate_codebook_loss:
             requested_channels.append("codebook_loss")
@@ -160,21 +168,25 @@ def forward(class_obj, pipeline, data,
         if spectra_supervision_train: requested_channels.append("spectra")
         if save_redshift or redshift_supervision_train: requested_channels.append("redshift")
 
+        # transmission wave min and max value (used for linear normalization)
         net_args["full_wave_bound"] = data["full_wave_bound"]
 
-        if pixel_supervision_train or infer:
-            sample_method = class_obj.extra_args["trans_sample_method"]
-            if sample_method == "hardcode":
+        if pixel_supervision_train or recon_img:
+            if trans_sample_method == "hardcode":
                 net_args["wave"] = data["wave"]
                 net_args["trans"] = data["trans"]
                 net_args["nsmpl"] = data["nsmpl"]
-            elif sample_method == "bandwise":
+            elif trans_sample_method == "bandwise":
                 pass
-            elif sample_method == "mixture":
+            elif trans_sample_method == "mixture":
                 net_args["wave"] = data["wave"]
                 net_args["trans"] = data["trans"]
                 net_args["nsmpl"] = data["nsmpl"]
             else: raise ValueError("Unrecognized transmission sampling method.")
+
+        if recon_spectra or recon_codebook_spectra:
+            net_args["wave"] = data["wave"]
+            # print('**', data["wave"].shape)
 
         if spectra_supervision_train:
             net_args["full_wave"] = data["full_wave"]

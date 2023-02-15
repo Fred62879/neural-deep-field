@@ -7,6 +7,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from os.path import join, exists
 from astropy.nddata import Cutout2D
+from wisp.utils.common import worldToPix
 from astropy.coordinates import SkyCoord
 
 from wisp.utils.common import generate_hdu
@@ -98,16 +99,19 @@ class FITSData:
                 suffix += f"_{fits_uid}"
                 self.gt_img_fnames[fits_uid] = join(img_data_path, f"gt_img_{norm}_{fits_uid}")
         else:
-            for (fits_uid, size, (r,c)) in zip(
-                    self.fits_uids, self.fits_cutout_sizes, self.fits_cutout_start_pos):
-                suffix += f"_{fits_uid}_{size}_{r}_{c}"
-                self.gt_img_fnames[fits_uid] = join(
-                    img_data_path, f"gt_img_{norm}_{fits_uid}_{size}_{r}_{c}")
-            # for (fits_uid, num_rows, num_cols, (r,c)) in zip(
-            #         self.fits_uids, self.fits_cutout_rows, self.fits_cutout_cols, self.fits_cutout_start_pos):
-            #     suffix += f"_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}"
+            # for (fits_uid, size, (r,c)) in zip(
+            #         self.fits_uids, self.fits_cutout_sizes, self.fits_cutout_start_pos):
+            #     suffix += f"_{fits_uid}_{size}_{r}_{c}"
             #     self.gt_img_fnames[fits_uid] = join(
-            #         img_data_path, f"gt_img_{norm}_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}")
+            #         img_data_path, f"gt_img_{norm}_{fits_uid}_{size}_{r}_{c}")
+
+            for (fits_uid, num_rows, num_cols, (r,c)) in zip(
+                    self.fits_uids, self.fits_cutout_num_rows,
+                    self.fits_cutout_num_cols, self.fits_cutout_start_pos):
+
+                suffix += f"_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}"
+                self.gt_img_fnames[fits_uid] = join(
+                    img_data_path, f"gt_img_{norm}_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}")
 
         norm_str = self.kwargs["train_pixels_norm"]
 
@@ -185,27 +189,28 @@ class FITSData:
     # Load FITS data
     ###############
 
-    def load_header(self, index, fits_uid, full_fits):
+    def load_header(self, index, fits_uid):
         """ Load header for both full tile and current cutout. """
         fits_fname = self.fits_groups[fits_uid][0]
         id = 0 if "Mega-u" in fits_fname else 1
         hdu = fits.open(join(self.input_fits_path, fits_fname))[id]
         header = hdu.header
 
-        if full_fits:
+        if self.use_full_fits:
             num_rows, num_cols = header["NAXIS2"], header["NAXIS1"]
         else:
-            size = self.fits_cutout_sizes[index]
+            (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
             num_rows = self.fits_cutout_num_rows[index]
             num_cols = self.fits_cutout_num_cols[index]
-            (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
-            pos = (c + size//2, r + size//2)           # center position (x/y)
             pos = (c + num_cols//2, r + num_rows//2)
+            # size = self.fits_cutout_sizes[index]
+            # pos = (c + size//2, r + size//2)      # center position (x/y)
+            # num_rows, num_cols = self.fits_cutout_size, self.fits_cutout_size
+
             wcs = WCS(header)
-            cutout = Cutout2D(hdu.data, position=pos, size=self.fits_cutout_size, wcs=wcs)
+            # cutout = Cutout2D(hdu.data, position=pos, size=self.fits_cutout_size, wcs=wcs)
             cutout = Cutout2D(hdu.data, position=pos, size=(num_rows,num_cols), wcs=wcs)
             header = cutout.wcs.to_header()
-            num_rows, num_cols = self.fits_cutout_size, self.fits_cutout_size
 
         self.headers[fits_uid] = header
         self.num_rows[fits_uid] = num_rows
@@ -214,7 +219,7 @@ class FITSData:
     def load_headers(self):
         self.headers, self.num_rows, self.num_cols = {}, {}, {}
         for index, fits_uid in enumerate(self.fits_uids):
-            self.load_header(index, fits_uid, True)
+            self.load_header(index, fits_uid)
 
     def load_one_fits(self, index, fits_uid, load_pixels=True):
         """ Load pixel values or variance from one FITS file (tile_id/subtile_id).
@@ -235,11 +240,11 @@ class FITSData:
                     pixels /= self.u_band_scale
 
                 if not self.use_full_fits:
-                    size = self.fits_cutout_sizes[index]
-                    num_rows = self.fits_cutout_num_rows[index]
-                    num_cols = self.fits_cutout_num_cols[index]
                     (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
-                    pixels = pixels[r:r+size, c:c+size]
+                    # size = self.fits_cutout_sizes[index]
+                    # pixels = pixels[r:r+size, c:c+size]
+                    num_rows = self.num_rows[fits_uid]
+                    num_cols = self.num_cols[fits_uid]
                     pixels = pixels[r:r+num_rows, c:c+num_cols]
 
                 if not self.kwargs["train_pixels_norm"] == "linear":
@@ -258,18 +263,18 @@ class FITSData:
                 if self.use_full_fits:
                     cur_data.append(weight.flatten())
                 else:
-                    size = self.fits_cutout_sizes[index]
+                    (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
+                    # size = self.fits_cutout_sizes[index]
+                    # var = var[r:r+size, c:c+size].flatten()
                     num_rows = self.fits_cutout_num_rows[index]
                     num_cols = self.fits_cutout_num_cols[index]
-                    (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
-                    var = var[r:r+size, c:c+size].flatten()
                     var = var[r:r+num_rows, c:c+num_cols].flatten()
                     cur_data.append(var)
 
         if load_pixels:
             # save gt np img individually for each fits file
             # since different fits may differ in size
-            cur_data = np.array(cur_data)    # [nbands,sz,sz]
+            cur_data = np.array(cur_data) # [nbands,sz,sz]
             np.save(self.gt_img_fnames[fits_uid], cur_data)
             plot_horizontally(cur_data, self.gt_img_fnames[fits_uid])
 
@@ -348,12 +353,13 @@ class FITSData:
             num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
             redshifts = -1 * np.ones((num_rows, num_cols))
         else:
-            size = self.fits_cutout_sizes[id]
+            # (r, c) = self.fits_cutout_start_pos[id] # start position (r/c)
             num_rows = self.fits_cutout_num_rows[index]
             num_cols = self.fits_cutout_num_cols[index]
-            # (r, c) = self.fits_cutout_start_pos[id] # start position (r/c)
-            redshifts = -1 * np.ones((size, size))
             redshifts = -1 * np.ones((num_rows, num_cols))
+            # size = self.fits_cutout_sizes[id]
+            # redshifts = -1 * np.ones((size, size))
+
         return redshifts
 
     def get_redshift_all_fits(self):
@@ -386,9 +392,12 @@ class FITSData:
         else:
             coords = np.concatenate(( ras.reshape((num_rows, num_cols, 1)),
                                       decs.reshape((num_rows, num_cols, 1)) ), axis=2)
-            size = self.fits_cutout_sizes[id]
+            # size = self.fits_cutout_sizes[id]
+            num_rows = self.num_rows[fits_uid]
+            num_cols = self.num_cols[fits_uid]
+
             (r, c) = self.fits_cutout_start_pos[id] # start position (r/c)
-            coords = coords[r:r+size,c:c+size].reshape(-1,2)
+            coords = coords[r:r+num_rows,c:c+num_cols].reshape(-1,2)
         return coords
 
     def get_world_coords_all_fits(self):
@@ -615,6 +624,53 @@ class FITSData:
     # Utilities
     ############
 
+    def convert_from_world_coords(self, ra, dec, neighbour_size, footprint, tile_id, subtile_id):
+        """ Get coordinate of pixel with given ra/dec
+            @Param:
+               fits_id:        index of fits where the selected spectra comes from
+               spectra_id:     index of the selected spectra
+               neighbour_size: size of neighbouring area to average for spectra
+               spectra_data
+
+            We can either
+             i) directly normalize the given ra/dec with coordinates range or
+            ii) get pixel id based on ra/dec and index from loaded coordinates.
+
+            Since ra/dec values from spectra data may not be as precise as
+              real coordinates calculated from wcs package, method i) tends to
+              be inaccurate and method ii) is more reliable.
+            However, if given ra/dec is not within loaded coordinates, we
+              can only use method i)
+        """
+        fits_uid = footprint + tile_id + subtile_id
+        fits_id = self.fits_uids.index(fits_uid)
+
+        # ra/dec values from spectra data may not be exactly the same as real coords
+        # this normalized ra/dec may thus be slightly different from real coords
+        # (ra_lo, ra_hi, dec_lo, dec_hi) = np.load(self.fits_obj.coords_range_fname)
+        # coord_loose = ((ra - ra_lo) / (ra_hi - ra_lo),
+        #                (dec - dec_lo) / (dec_hi - dec_lo))
+
+        # get a random header
+        random_name = f"calexp-HSC-G-{footprint}-{tile_id}%2C{subtile_id}.fits"
+        fits_fname = join(self.input_fits_path, random_name)
+        header = fits.open(fits_fname)[1].header
+
+        # index coord from original coords array to get accurate coord
+        # this only works if spectra coords is included in the loaded coords
+        (r, c) = worldToPix(header, ra, dec) # image coord, r and c coord within full tile
+
+        if self.use_full_fits:
+            img_coords = torch.tensor([r, c, fits_id])
+        else:
+            start_pos = self.fits_cutout_start_pos[fits_id]
+            img_coords = torch.tensor([r - start_pos[0], c - start_pos[1], fits_id])
+
+        pixel_ids = self.get_pixel_ids(fits_uid, r, c, neighbour_size)
+        grid_coords = self.get_coord(pixel_ids)
+        # print(r, c, pixel_ids, coords_accurate, self.kwargs["fits_cutout_start_pos"])
+        return img_coords, grid_coords, pixel_ids
+
     def calculate_local_id(self, r, c, index, fits_uid):
         """ Count number of pixels before given position in given tile.
         """
@@ -623,7 +679,8 @@ class FITSData:
             total_cols = self.num_cols[fits_uid]
         else:
             (r_lo, c_lo) = self.fits_cutout_start_pos[index]
-            total_cols = self.fits_cutout_sizes[index]
+            # total_cols = self.fits_cutout_sizes[index]
+            total_cols = self.num_cols[fits_uid]
 
         local_id = total_cols * (r - r_lo) + c - c_lo
         return local_id
@@ -643,7 +700,9 @@ class FITSData:
             if cur_fits_uid == fits_uid: found = True; break
             if self.use_full_fits:
                 base_count += self.num_rows[cur_fits_uid] * self.num_cols[cur_fits_uid]
-            else: base_count += self.fits_cutout_sizes[i]**2
+            else:
+                base_count += self.num_rows[cur_fits_uid] * self.num_cols[cur_fits_uid]
+                # base_count += self.fits_cutout_sizes[id]**2
             id += 1
 
         assert(found)
@@ -759,7 +818,9 @@ class FITSData:
     def restore_evaluate_one_tile(self, index, fits_uid, num_pixels_acc, pixels, **re_args):
         if self.use_full_fits:
             num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
-        else: num_rows, num_cols = self.fits_cutout_sizes[index], self.fits_cutout_sizes[index]
+        else:
+            num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
+            # num_rows, num_cols = self.fits_cutout_sizes[index], self.fits_cutout_sizes[index]
         cur_num_pixels = num_rows * num_cols
 
         cur_tile = np.array(pixels[num_pixels_acc : num_pixels_acc + cur_num_pixels]).T. \

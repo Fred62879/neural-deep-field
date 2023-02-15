@@ -75,18 +75,15 @@ class HyperSpectralConverter(nn.Module):
         """
         if self.kwargs["print_shape"]: print('hps_converter',latents.shape)
 
+        # print(wave.shape, latents.shape)
         num_samples = wave.shape[-2]
         coords_encode_dim = latents.shape[-1]
-        #print(wave.shape)
-        #print(wave[0,:20].T)
 
         if redshift is not None:
             wave = self.shift_wave(wave, redshift)
-        #print(wave[0,:20].T)
 
         # normalize lambda values to [0,1]
         wave = self.linear_norm_wave(wave, wave_bound)
-        #print(wave[0,:20].T)
 
         if self.wave_encode_method == "positional":
             assert(coords_encode_dim != 2)

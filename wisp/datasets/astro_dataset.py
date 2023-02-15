@@ -52,6 +52,7 @@ class AstroDataset(Dataset):
         # randomly initialize
         #self.mode = "train"
         self.coords_source = "fits"
+        self.model_output = "pixel_intensity"
         self.use_full_wave = False
         self.set_dataset_length(1000)
 
@@ -62,11 +63,12 @@ class AstroDataset(Dataset):
     def set_wave_sample_mode(self, use_full_wave: bool):
         self.use_full_wave = use_full_wave
 
-    # def set_dataset_mode(self, mode):
-    #     """ Set dataset to be in train or infer mode, which determines
-    #           i) number of transmission samples (use all samples for inferrence)
-    #     """
-    #     self.mode = mode
+    def set_model_output(self, model_output):
+        """ Set expected model output.
+            If output pixel intensity, we give wave, trans, nsmpl
+            If output spectra, only give wave
+        """
+        self.model_output = model_output
 
     def set_dataset_coords_source(self, coords_source):
         """ Set dataset source of coords that controls:
@@ -133,22 +135,30 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_mask()
         else:
             raise ValueError("Unrecognized data field.")
+
         return data[idx]
 
     def get_trans_data(self, batch_size, out):
         """ Get transmission data (wave, trans, nsmpl etc.).
             These are not batched, we do monte carlo sampling at every step.
         """
+
+        # trans wave min and max value (used for linear normalization)
         out["full_wave_bound"] = self.trans_dataset.get_full_wave_bound()
 
-        if self.kwargs["trans_sample_method"] == "hardcode":
-            out["wave"] = self.trans_dataset.get_hdcd_wave()[None,:,None].tile(batch_size,1,1)
-            out["trans"] = self.trans_dataset.get_hdcd_trans()
-            out["nsmpl"] = self.trans_dataset.get_hdcd_nsmpl()
-        else:
-            out["wave"], out["trans"], out["nsmpl"] = \
-                self.trans_dataset.sample_wave_trans(
-                    batch_size, self.nsmpls, use_full_wave=self.use_full_wave)
+        if self.model_output == "pixel_intensity":
+            if self.kwargs["trans_sample_method"] == "hardcode":
+                out["wave"] = self.trans_dataset.get_hdcd_wave()[None,:,None].tile(batch_size,1,1)
+                out["trans"] = self.trans_dataset.get_hdcd_trans()
+                out["nsmpl"] = self.trans_dataset.get_hdcd_nsmpl()
+            else:
+                out["wave"], out["trans"], out["nsmpl"] = \
+                    self.trans_dataset.sample_wave_trans(
+                        batch_size, self.nsmpls, use_full_wave=self.use_full_wave)
+
+        elif self.model_output == "spectra":
+            out["wave"] = torch.FloatTensor(self.trans_dataset.get_full_wave())
+            out["wave"] = out["wave"][None,:,None].tile(batch_size,1,1)
 
     def get_spectra_data(self, out):
         """ Get unbatched spectra data (only for spectra supervision training).
@@ -168,7 +178,7 @@ class AstroDataset(Dataset):
         out["num_spectra_coords"] = len(spectra_coords)
         out["full_wave"] = self.trans_dataset.get_full_wave()
         out["full_wave_bound"] = self.trans_dataset.get_full_wave_bound()
-        out["recon_wave_bound_ids"] = self.spectra_dataset.get_recon_wave_bound_ids()
+        out["spectra_supervision_wave_bound_ids"] = self.spectra_dataset.get_spectra_supervision_wave_bound_ids()
 
     def __len__(self):
         """ Length of the dataset in number of coords.
@@ -208,6 +218,6 @@ class AstroDataset(Dataset):
         """
         return self.fits_dataset.restore_evaluate_tiles(recon_pixels, **re_args)
 
-    def plot_spectrum(self, spectra_dir, name, recon_spectra, save_spectra=False, bound=True, codebook=False):
+    def plot_spectrum(self, spectra_dir, name, recon_spectra, save_spectra=False, clip=True, codebook=False):
         self.spectra_dataset.plot_spectrum(
-            spectra_dir, name, recon_spectra, save_spectra=save_spectra, bound=bound, codebook=codebook)
+            spectra_dir, name, recon_spectra, save_spectra=save_spectra, clip=clip, codebook=codebook)

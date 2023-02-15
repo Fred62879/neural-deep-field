@@ -93,10 +93,10 @@ class AstroTrainer(BaseTrainer):
 
         length = self.get_dataset_length()
 
-        #self.dataset.set_dataset_mode("train")
         self.dataset.set_dataset_length(length)
         self.dataset.set_dataset_fields(fields)
         self.dataset.set_dataset_coords_source("fits")
+        self.dataset.set_model_output("pixel_intensity")
 
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
@@ -499,13 +499,18 @@ class AstroTrainer(BaseTrainer):
         total_loss = 0
         add_to_device(data, self.extra_args["gpu_data"], self.device)
 
-        ret = forward(self, self.pipeline, data,
+        ret = forward(data,
+                      self.pipeline,
+                      self.space_dim,
+                      self.extra_args["trans_sample_method"],
                       pixel_supervision_train=self.pixel_supervision,
                       spectra_supervision_train=self.spectra_supervision,
                       redshift_supervision_train=self.redshift_supervision,
                       quantize_latent=self.quantize_latent,
                       calculate_codebook_loss=self.quantize_latent,
-                      infer=False,
+                      recon_img=False,
+                      recon_spectra=False,
+                      recon_codebook_spectra=False,
                       save_scaler=self.save_data_to_local and self.save_scaler,
                       save_spectra=self.save_data_to_local and self.plot_spectra,
                       save_latents=self.save_data_to_local and self.save_latents,
@@ -537,7 +542,7 @@ class AstroTrainer(BaseTrainer):
             gt_spectra = data["gt_spectra"]
 
             # todo: efficiently slice spectra with different bound
-            (lo, hi) = data["recon_wave_bound_ids"][0]
+            (lo, hi) = data["spectra_supervision_wave_bound_ids"][0]
             recon_spectra = ret["spectra"][:self.num_supervision_spectra,lo:hi]
 
             if len(recon_spectra) == 0:

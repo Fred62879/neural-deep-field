@@ -21,10 +21,10 @@ if __name__ == "__main__":
     def train():
         optim_cls, optim_params = get_optimizer_from_config(args)
 
-        if args.infer_during_train:
-            inferrer = globals()[args.inferrer_type](
-                pipelines, dataset, device, vars(args), info=args_str)
-        else: inferrer = None
+        # if args.infer_during_train:
+        #     inferrer = globals()[args.inferrer_type](
+        #         pipelines, dataset, device, vars(args), info=args_str)
+        # else: inferrer = None
 
         trainer = globals()[args.trainer_type](
             pipelines["full"], dataset, args.num_epochs, args.batch_size,
@@ -32,7 +32,7 @@ if __name__ == "__main__":
             args.grid_lr_weight, optim_params, args.log_dir, device,
             exp_name=args.exp_name, info=args_str, extra_args=vars(args),
             render_tb_every=args.render_tb_every, save_every=args.save_every,
-            inferrer=inferrer)
+            inferrer=None)
         trainer.train()
 
     def infer():
