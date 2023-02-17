@@ -64,7 +64,7 @@ class HyperSpectralDecoder(nn.Module):
         redshift = None if ret["redshift"] is None else ret["redshift"][-num_spectra_coords:]
         full_wave = full_wave[None,:,None].tile(num_spectra_coords,1,1)
 
-        if self.kwargs["print_shape"]: print('hps_decoder', spectra_latents.shape)
+        if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
         if self.kwargs["print_shape"]: print('hps_decoder, full wave', full_wave.shape)
 
         ret["spectra"] = self.reconstruct_spectra(full_wave, latents, scaler, redshift, full_wave_bound)
@@ -96,6 +96,7 @@ class HyperSpectralDecoder(nn.Module):
 
         # spectra supervision, train with all lambda values instead of sampled lambda
         if num_spectra_coords > 0:
+            #print('==== spectra supervision ====')
             self.train_with_full_wave(latents, full_wave, full_wave_bound, num_spectra_coords, ret)
 
             latents = latents[:-num_spectra_coords]
@@ -104,6 +105,7 @@ class HyperSpectralDecoder(nn.Module):
             if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
         if latents.shape[0] > 0:
+            #print('==== normal ====')
             #timer.check("hps decoder, reconstruct spectra")
             spectra = self.reconstruct_spectra(wave, latents, ret["scaler"], ret["redshift"], full_wave_bound)
             if "spectra" not in ret: ret["spectra"] = spectra

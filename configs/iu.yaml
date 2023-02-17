@@ -15,13 +15,13 @@ global:
     #tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
 
-    tasks: ['train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
+    #tasks: ['train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra','recon_img']
 
     #tasks: ['train','plot_save_scaler','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
     #tasks: ['infer','recon_img','plot_embed_map','plot_latent_embed','plot_save_scaler']
 
-    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra','plot_redshift']
+    tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_latent_embed','recon_codebook_spectra','plot_redshift']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed','plot_redshift']
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','plot_redshift','plot_embed_map']
@@ -71,7 +71,7 @@ decoder:
     decoder_num_layers: 1
     decoder_hidden_dim: 64
     decoder_layer_type: 'none'
-    decoder_activation_type: "sin"
+    decoder_activation_type: "relu"
 
     siren_seed: 0
     siren_first_w0: 24
@@ -124,7 +124,7 @@ trainer:
     spectra_beta: 1
     redshift_beta: 1
 
-    quantize_latent: False
+    quantize_latent: True
     weight_train: False
     train_use_all_wave: False
     resume_train: False
@@ -136,7 +136,7 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 1
+    num_supervision_spectra: 2
     spectra_neighbour_size: 1
 
 infer:
@@ -179,9 +179,9 @@ dataset:
     fits_footprints: ['9812']
     fits_tile_ids: ['1']
     fits_subtile_ids: ['5']
-    fits_cutout_num_rows: [64]
-    fits_cutout_num_cols: [64]
-    fits_cutout_start_pos: [[86,188]] #[[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    fits_cutout_num_rows: [512]
+    fits_cutout_num_cols: [512]
+    fits_cutout_start_pos: [[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
     # num_bands: 1
     # sensor_collection_name: '1_y'
@@ -213,7 +213,7 @@ dataset:
     hardcode_num_trans_samples: 35
     trans_sample_interval: 10
 
-    gt_spectra_ids: [0] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10] #[0,1,5,2,3,4] #[2,3,4,5,6] #[1,2,3,4]
+    gt_spectra_ids: [5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10] #[0,1,5,2,3,4] #[2,3,4,5,6] #[1,2,3,4]
     spectra_smooth_sigma: 50
 
 inpaint:

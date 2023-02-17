@@ -79,6 +79,9 @@ class HyperSpectralConverter(nn.Module):
         num_samples = wave.shape[-2]
         coords_encode_dim = latents.shape[-1]
 
+        #print(latents.shape, latents)
+        #if len(latents) > 1:
+        #    print(latents[2080])
         if redshift is not None:
             wave = self.shift_wave(wave, redshift)
 

@@ -75,10 +75,12 @@ class AstroHyperSpectralNerf(BaseNeuralField):
               }
         """
         timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
+        #print(coords[2080], coords[-1])
 
         ret = defaultdict(lambda: None)
 
         timer.check("hyper nef encode coord")
+        # print(coords.shape, wave.shape, trans.shape, nsmpl, full_wave.shape, full_wave_bound, num_spectra_coords)
         latents = self.coord_encoder(coords, lod_idx=lod_idx)
 
         if self.kwargs["quantize_latent"]:

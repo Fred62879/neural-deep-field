@@ -398,7 +398,7 @@ class AstroInferrer(BaseInferrer):
                         spectra_supervision_train=False,
                         quantize_latent=self.quantize_latent,
                         calculate_codebook_loss=False,
-                        recon_img=self.recon_img,
+                        recon_img=True,
                         recon_spectra=False,
                         recon_codebook_spectra=False,
                         save_spectra=False,

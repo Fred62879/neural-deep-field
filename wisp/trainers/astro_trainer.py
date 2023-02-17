@@ -197,8 +197,8 @@ class AstroTrainer(BaseTrainer):
         """
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
-        #sampler_cls = SequentialSampler
-        #sampler_cls = RandomSampler
+        # sampler_cls = SequentialSampler
+        # sampler_cls = RandomSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
@@ -710,18 +710,18 @@ class AstroTrainer(BaseTrainer):
             self.smpl_spectra = self.smpl_spectra.view(
                 -1, self.smpl_spectra.shape[-1])
             self.smpl_spectra = self.smpl_spectra[self.selected_spectra_ids]
-            bound_spectra = False
+            clip_spectra = False
         else:
             # smpl_spectra [bsz,num_spectra_coords,num_sampeles]
             # we get all spectra at each batch (duplications), thus average over batches
             self.smpl_spectra = torch.mean(self.smpl_spectra, dim=0)
-            bound_spectra = True
+            clip_spectra = True
 
         self.smpl_spectra = self.smpl_spectra.detach().cpu().numpy().reshape((
             self.dataset.get_num_gt_spectra(),
             self.extra_args["spectra_neighbour_size"]**2, -1))
 
-        self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra, bound=bound_spectra)
+        self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra, clip=clip_spectra)
 
     def save_cropped_recon_locally(self, **re_args):
         for index, fits_uid in enumerate(self.extra_args["recon_cutout_fits_uids"]):
