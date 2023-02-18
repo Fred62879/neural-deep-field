@@ -26,7 +26,6 @@ class HyperSpectralConverter(nn.Module):
         if self.kwargs["print_shape"]: print('hps_converter, shift wave', wave.shape)
         if self.kwargs["print_shape"]: print('hps_converter, shift wave', redshift.shape)
         wave = wave.permute(1,2,0)
-        #print(torch.min(redshift), torch.max(redshift))
 
         if wave.ndim == 3:
             nsmpl = wave.shape[1] # [bsz,nsmpl,1]
@@ -75,13 +74,9 @@ class HyperSpectralConverter(nn.Module):
         """
         if self.kwargs["print_shape"]: print('hps_converter',latents.shape)
 
-        # print(wave.shape, latents.shape)
         num_samples = wave.shape[-2]
         coords_encode_dim = latents.shape[-1]
 
-        #print(latents.shape, latents)
-        #if len(latents) > 1:
-        #    print(latents[2080])
         if redshift is not None:
             wave = self.shift_wave(wave, redshift)
 

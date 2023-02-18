@@ -11,7 +11,7 @@ from wisp.utils.common import worldToPix
 from astropy.coordinates import SkyCoord
 
 from wisp.utils.common import generate_hdu
-from wisp.utils.plot import plot_horizontally
+from wisp.utils.plot import plot_horizontally, mark_on_img
 from wisp.utils.numerical import normalize_coords, normalize, \
     calculate_metrics, calculate_zscale_ranges_multiple_FITS
 
@@ -624,6 +624,17 @@ class FITSData:
     # Utilities
     ############
 
+    def mark_on_img(self, coords, markers, fits_id):
+        """ Mark spectra pixels on gt image
+            @Param
+              coords: r, c
+        """
+        fits_uid = self.fits_uids[fits_id]
+        gt_img_fname = self.gt_img_fnames[fits_uid]
+        gt_img = np.load(gt_img_fname + ".npy")
+        png_fname = gt_img_fname + "_marked.png"
+        mark_on_img(png_fname, gt_img, coords, markers)
+
     def convert_from_world_coords(self, ra, dec, neighbour_size, footprint, tile_id, subtile_id):
         """ Get coordinate of pixel with given ra/dec
             @Param:
@@ -661,10 +672,10 @@ class FITSData:
         (r, c) = worldToPix(header, ra, dec) # image coord, r and c coord within full tile
 
         if self.use_full_fits:
-            img_coords = torch.tensor([r, c, fits_id])
+            img_coords = np.array([r, c, fits_id])
         else:
             start_pos = self.fits_cutout_start_pos[fits_id]
-            img_coords = torch.tensor([r - start_pos[0], c - start_pos[1], fits_id])
+            img_coords = np.array([r - start_pos[0], c - start_pos[1], fits_id])
 
         pixel_ids = self.get_pixel_ids(fits_uid, r, c, neighbour_size)
         grid_coords = self.get_coord(pixel_ids)

@@ -147,10 +147,9 @@ def forward(data,
 
     # forward can only be done for one of the four states
     train = pixel_supervision_train or spectra_supervision_train or redshift_supervision_train
-    #nothing = not train and not recon_img and not recon_spectra and not recon_codebook_spectra
     is_valid = reduce(lambda x, y: x ^ y,
                       [train, recon_img, recon_spectra, recon_codebook_spectra])
-    assert(is_valid) # or nothing)
+    assert(is_valid)
 
     requested_channels = []
     net_args = {"coords": data["coords"] }

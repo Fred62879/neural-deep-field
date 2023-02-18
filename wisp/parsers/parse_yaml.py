@@ -294,7 +294,6 @@ def define_cmd_line_args():
     # trans data
     data_group.add_argument("--trans-sample-method", type=str,
                             choices=["hardcode","bandwise","mixture"])
-    data_group.add_argument("--gt-spectra-ids", type=int)
     #data_group.add_argument("--trans-cho", type=str, default="orig_trans")
     data_group.add_argument("--wave-lo", type=int, default=3000,
                             help="smallest lambda value for transmission data (angstrom)")
@@ -310,8 +309,10 @@ def define_cmd_line_args():
     data_group.add_argument("--plot-trans", action="store_true")
 
     # spectra data
-    data_group.add_argument("--gt-spectra-choices", type=int, nargs='+',
-                             help="id of chosen gt spectra for supervision/recon etc.")
+    data_group.add_argument("--gt-spectra-ids", type=int, nargs='+',
+                            help="id of chosen gt spectra for supervision/recon etc.")
+    data_group.add_argument("--spectra-markers", type=int, nargs='+',
+                            help="marker to plot each spectra.")
     data_group.add_argument("--spectra_smooth_sigma",type=int, default=5)
 
     ###################

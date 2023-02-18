@@ -104,7 +104,7 @@ def plot_gt_recon(gt, recon, fn, cal_z_range=False):
     plt.savefig(fn)
     plt.close()
 
-def plot_horizontally(img, png_fname, zscale_ranges=None):
+def plot_horizontally(img, png_fname, zscale_ranges=None, save_close=True):
     """ Plot multiband image horizontally
         @Param
           img: multiband image [nbands,sz,sz]
@@ -121,9 +121,19 @@ def plot_horizontally(img, png_fname, zscale_ranges=None):
     fig = plt.figure(figsize=(3*num_bands + 1,3))
     plot_one_row(fig, 1, num_bands, 0, img, vmins, vmaxs, num_bands, cal_z_range=cal_z_range)
     fig.tight_layout()
+
+    if save_close:
+        plt.savefig(png_fname)
+        plt.close()
+
+def mark_on_img(png_fname, img, coords, markers, zscale=True):
+    if img.ndim == 3: img = img[0:1]
+
+    plot_horizontally(img, "", save_close=False)
+    for i, coord in enumerate(coords):
+        plt.scatter(coord[0], coord[1], marker=markers[i])
     plt.savefig(png_fname)
     plt.close()
-
 
 # not used
 def plot_save(fname, x, y):

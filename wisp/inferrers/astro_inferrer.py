@@ -320,8 +320,8 @@ class AstroInferrer(BaseInferrer):
         if self.plot_redshift:
             positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/fits_id
             # markers = [str(i) for i in range(len(positions))]
-            plot_annotated_heat_map = partial(annotated_heat, positions,
-                                              self.dataset.get_spectra_pixel_markers())
+            plot_annotated_heat_map = partial(
+                annotated_heat, positions, self.extra_args["spectra_markers"])
 
             re_args = {
                 "fname": model_id,

@@ -24,6 +24,7 @@ class SpectraData:
         self.set_path(dataset_path)
         self.load_accessory_data()
         self.load_spectra()
+        self.mark_spectra_on_img()
 
     def require_any_data(self, tasks):
         tasks = set(tasks)
@@ -60,9 +61,6 @@ class SpectraData:
         if self.require_spectra_coords or self.spectra_supervision_train or self.recon_gt_spectra:
             self.load_gt_spectra_data()
 
-        if self.recon_codebook_spectra:
-            self.load_codebook_spectra_data()
-
         self.load_plot_spectra_data()
 
     #############
@@ -81,24 +79,21 @@ class SpectraData:
             return len(self.kwargs["gt_spectra_ids"])
         return 0
 
-    def get_spectra_coords(self):
-        """ Get coords of all selected spectra (gt & dummy, incl. neighbours).
+    def get_spectra_grid_coords(self):
+        """ Get grid (training) coords of all selected spectra (gt & dummy, incl. neighbours).
         """
-        return self.data["spectra_coords"]
+        return self.data["spectra_grid_coords"]
 
     def get_spectra_img_coords(self):
         """ Get image coords of all selected spectra (gt & dummy, incl. neighbours).
         """
         return self.data["spectra_img_coords"]
 
-    def get_spectra_pixel_markers(self):
-        return ["1","2","3","4","+","x"]
-
     def get_num_spectra_coords(self):
         """ Get number of coords of all selected spectra
             (gt & dummy, incl. neighbours).
         """
-        return self.get_spectra_coords().shape[0]
+        return self.get_spectra_grid_coords().shape[0]
 
     def get_spectra_coord_ids(self):
         """ Get pixel id of all selected spectra (correspond to coords).
@@ -260,7 +255,7 @@ class SpectraData:
         coord_dim = 3 if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3 else 2
         self.data["gt_spectra_coord_ids"] = all_ids  # [num_coords,num_neighbours,1]
         self.data["gt_spectra_img_coords"] = all_img_coords
-        self.data["gt_spectra_coords"] = torch.stack(all_grid_coords).type(
+        self.data["gt_spectra_grid_coords"] = torch.stack(all_grid_coords).type(
             torch.FloatTensor)[:,:,None].view(-1,1,coord_dim) # [num_coords,num_neighbours,.]
 
         if self.spectra_supervision_train:
@@ -276,14 +271,11 @@ class SpectraData:
             self.data["spectra_recon_wave_bound_ids"] = spectra_recon_wave_bound_ids
 
         ## tmp, dummy redshift
-        if self.kwargs["redshift_supervision"]:
-            dummy_redshift = torch.arange(1, 1+len(all_ids), dtype=torch.float)
-            positions = np.array(all_ids).flatten()
-            self.fits_obj.data["redshift"][positions] = dummy_redshift
+        # if self.kwargs["redshift_supervision"]:
+        #     dummy_redshift = torch.arange(1, 1+len(all_ids), dtype=torch.float)
+        #     positions = np.array(all_ids).flatten()
+        #     self.fits_obj.data["redshift"][positions] = dummy_redshift
         ## ends
-
-    def load_codebook_spectra_data(self):
-        self.data[""]
 
     def load_plot_spectra_data(self):
         wave = []
@@ -301,20 +293,20 @@ class SpectraData:
         self.data["recon_wave"] = wave
 
         # get all spectra (gt and dummy) (grid and img) coords for inferrence
-        ids, coords, img_coords = [], [], []
+        ids, grid_coords, img_coords = [], [], []
 
         if self.recon_gt_spectra or self.spectra_supervision_train or self.require_spectra_coords:
             ids.extend(self.data["gt_spectra_coord_ids"])
-            coords.extend(self.data["gt_spectra_coords"])
+            grid_coords.extend(self.data["gt_spectra_grid_coords"])
             img_coords.extend(self.data["gt_spectra_img_coords"])
 
         if self.recon_dummy_spectra:
             ids.extend(self.data["dummy_spectra_coord_ids"])
-            coords.extend(self.data["dummy_spectra_coords"])
+            grid_coords.extend(self.data["dummy_spectra_coords"])
 
-        if len(ids) != 0:        self.data["spectra_coord_ids"] = np.array(ids)
-        if len(coords) != 0:     self.data["spectra_coords"] = torch.stack(coords)
-        if len(img_coords) != 0: self.data["spectra_img_coords"] = torch.stack(img_coords)
+        if len(ids) != 0:         self.data["spectra_coord_ids"] = np.array(ids)
+        if len(img_coords) != 0:  self.data["spectra_img_coords"] = np.array(img_coords)
+        if len(grid_coords) != 0: self.data["spectra_grid_coords"] = torch.stack(grid_coords)
 
     #############
     # Utilities
@@ -384,6 +376,23 @@ class SpectraData:
 
             if save_spectra:
                 np.save(fname, cur_spectra)
+
+    def mark_spectra_on_img(self):
+        spectra_img_coords = self.get_spectra_img_coords()
+        spectra_fits_ids = set(spectra_img_coords[:,-1])
+
+        for fits_id in spectra_fits_ids:
+
+            # collect spectra in the same tile
+            cur_coords = []
+            for (r, c, cur_fits_id) in spectra_img_coords:
+                if cur_fits_id == fits_id:
+                    cur_coords.append([r,c])
+
+            # mark on the corresponding tile
+            self.fits_obj.mark_on_img(
+                np.array(cur_coords), self.kwargs["spectra_markers"], fits_id)
+
 
 # SpectraData class ends
 #############

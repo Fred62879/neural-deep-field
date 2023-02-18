@@ -107,9 +107,6 @@ class AstroDataset(Dataset):
     def get_spectra_img_coords(self):
         return self.spectra_dataset.get_spectra_img_coords()
 
-    def get_spectra_pixel_markers(self):
-        return self.spectra_dataset.get_spectra_pixel_markers()
-
     def get_num_gt_spectra(self):
         return self.spectra_dataset.get_num_gt_spectra()
 
@@ -121,7 +118,7 @@ class AstroDataset(Dataset):
             if self.coords_source == "fits":
                 data = self.fits_dataset.get_coords()
             elif self.coords_source == "spectra":
-                data = self.spectra_dataset.get_spectra_coords()
+                data = self.spectra_dataset.get_spectra_grid_coords()
             else:
                 data = self.data[self.coords_source]
 
@@ -169,7 +166,7 @@ class AstroDataset(Dataset):
         # get all coords to plot all spectra (gt, dummy, incl. neighbours)
         # the first #num_supervision_spectra are gt coords for supervision
         # the others are forwarded only for spectrum plotting
-        spectra_coords = self.spectra_dataset.get_spectra_coords()
+        spectra_coords = self.spectra_dataset.get_spectra_grid_coords()
         if "coords" in out:
             out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
         else:
