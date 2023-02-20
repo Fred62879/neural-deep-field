@@ -195,10 +195,10 @@ class AstroTrainer(BaseTrainer):
     def init_dataloader(self):
         """ (Re-)Initialize dataloader.
         """
-        if self.shuffle_dataloader: sampler_cls = RandomSampler
-        else: sampler_cls = SequentialSampler
+        #if self.shuffle_dataloader: sampler_cls = RandomSampler
+        #else: sampler_cls = SequentialSampler
         # sampler_cls = SequentialSampler
-        # sampler_cls = RandomSampler
+        sampler_cls = RandomSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
@@ -239,6 +239,7 @@ class AstroTrainer(BaseTrainer):
         for epoch in range(self.num_epochs + 1):
             self.begin_epoch()
 
+            # print(self.num_iterations_cur_epoch)
             for batch in range(self.num_iterations_cur_epoch):
                 iter_start_time = time.time()
                 self.scene_state.optimization.iteration = self.iteration
@@ -516,6 +517,9 @@ class AstroTrainer(BaseTrainer):
                       save_latents=self.save_data_to_local and self.save_latents,
                       save_redshift=self.save_data_to_local and self.save_redshift,
                       save_embed_ids=self.save_data_to_local and self.plot_embed_map)
+
+        # print(ret['spectra'][0,:10].detach().cpu().numpy())
+        # print(ret['intensity'][:10,0].detach().cpu().numpy())
 
         # i) reconstruction loss (taking inpaint into account)
         recon_loss, recon_pixels = 0, None

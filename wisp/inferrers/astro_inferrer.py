@@ -75,7 +75,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames.sort()
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames[5:6] #[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -319,9 +319,9 @@ class AstroInferrer(BaseInferrer):
 
         if self.plot_redshift:
             positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/fits_id
-            # markers = [str(i) for i in range(len(positions))]
-            plot_annotated_heat_map = partial(
-                annotated_heat, positions, self.extra_args["spectra_markers"])
+            ids = self.extra_args["gt_spectra_ids"]
+            markers = np.array(self.extra_args["spectra_markers"])
+            plot_annotated_heat_map = partial(annotated_heat, positions, markers[ids])
 
             re_args = {
                 "fname": model_id,
@@ -368,7 +368,8 @@ class AstroInferrer(BaseInferrer):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
         self.dataset.plot_spectrum(
             self.codebook_spectra_dir, model_id, self.codebook_spectra,
-            save_spectra=False, codebook=True, clip=False)
+            save_spectra=False, codebook=True,
+            clip=self.extra_args["plot_clipped_spectrum"])
 
     #############
     # Helpers

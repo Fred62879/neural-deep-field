@@ -22,9 +22,11 @@ global:
     #tasks: ['infer','recon_img','plot_embed_map','plot_latent_embed','plot_save_scaler']
 
     tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift']
-    tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed','plot_redshift']
+    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed','plot_redshift']
+    tasks: ['infer','recon_codebook_spectra']
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
-    #tasks: ['infer','plot_redshift','plot_embed_map']
+    #tasks: ['infer','plot_redshift']
+    #tasks: ['infer','plot_embed_map','plot_redshift']
 
 optimizer:
     optimizer_type: 'adam'
@@ -43,7 +45,7 @@ net:
 
 embedder:
     coords_embed_bias: True
-    coords_embed_dim: 1000
+    coords_embed_dim: 32
     coords_embed_omega: 8
     coords_embed_sigma: 1.0
     coords_embed_seed: 2
@@ -63,8 +65,8 @@ grid:
     grid_feature_std: 0.01
     grid_num_lods: 16  #20 # max / min = b**l
     tree_type: 'geometric'
-    min_grid_res: 6 #16 #16 #6 #4 #6
-    max_grid_res: 160 #646 #1352 #2831 #662 #160
+    min_grid_res: 6 #6 #16
+    max_grid_res: 690 #330 #1443 #1352 #2831 #690 #160
     codebook_bitwidth: 20
 
 decoder:
@@ -106,15 +108,15 @@ trainer:
     spectra_loss_cho: l2
     redshift_loss_cho: l2
     num_epochs: 6000
-    batch_size: 209715 #104857 #262144 #147456 #131072
-    save_every: 600
+    batch_size: 262144 #209715 #104857 #262144 #147456 #131072
+    save_every: 1200
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 600
+    log_cli_every: 1200
     log_gpu_every: -1
     save_local_every: -1
     save_as_new: True
-    train_pixel_ratio: .1
+    train_pixel_ratio: .1 # change dataloader sampler
     #masked_pixl_ratio_per_epoch: 1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift']
 
@@ -141,13 +143,13 @@ trainer:
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_batch_size: 22000 #36864
+    infer_batch_size: 20000 #36864
     infer_use_all_wave: True # enforced
     infer_last_model_only: True
 
     # recon img
     to_HDU: False
-    #infer_log_fname: '20221219-175517'
+    infer_log_fname: '20230219-143732_512_512_grid_6000_0.1'
     metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
@@ -160,8 +162,9 @@ infer:
     average_spectra: True
     plot_clipped_spectrum: True
     plot_spectrum_with_gt: True
-    plot_spectrum_with_trans: False
+    plot_spectrum_with_trans: True
     infer_spectra_individually: True
+    codebook_spectra_clip_range: [5000,8000]
 
 dataset:
     dataset_num_workers: 0
@@ -179,8 +182,8 @@ dataset:
     fits_footprints: ['9812']
     fits_tile_ids: ['1']
     fits_subtile_ids: ['5']
-    fits_cutout_num_rows: [1024]
-    fits_cutout_num_cols: [1024]
+    fits_cutout_num_rows: [512]
+    fits_cutout_num_cols: [512]
     fits_cutout_start_pos: [[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
     # num_bands: 1
@@ -213,7 +216,7 @@ dataset:
     hardcode_num_trans_samples: 35
     trans_sample_interval: 10
 
-    gt_spectra_ids: [5,9,6,7,8] #[0,1,2,3,4,5,6,7,8,9] #,10]
+    gt_spectra_ids: [5,9,6,7,8] #[0,1,2,3,4,5,6,7,8,9]
     spectra_smooth_sigma: 50
     spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]
 

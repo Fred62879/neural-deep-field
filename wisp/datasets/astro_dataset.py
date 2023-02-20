@@ -132,7 +132,6 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_mask()
         else:
             raise ValueError("Unrecognized data field.")
-
         return data[idx]
 
     def get_trans_data(self, batch_size, out):

@@ -24,7 +24,6 @@ class SpectraData:
         self.set_path(dataset_path)
         self.load_accessory_data()
         self.load_spectra()
-        self.mark_spectra_on_img()
 
     def require_any_data(self, tasks):
         tasks = set(tasks)
@@ -55,13 +54,13 @@ class SpectraData:
         """
         self.data = defaultdict(lambda: None)
 
-        if self.recon_dummy_spectra:
-            self.load_dummy_spectra_data()
+        # if self.recon_dummy_spectra:
+        #    self.load_dummy_spectra_data()
 
         if self.require_spectra_coords or self.spectra_supervision_train or self.recon_gt_spectra:
             self.load_gt_spectra_data()
-
-        self.load_plot_spectra_data()
+            self.load_plot_spectra_data()
+            self.mark_spectra_on_img()
 
     #############
     # Getters
@@ -242,7 +241,7 @@ class SpectraData:
                         source_spectra_data["spectrum_plot_wave_lo"][spectra_id],
                         source_spectra_data["spectrum_plot_wave_hi"][spectra_id]]
                 else:
-                    wave_bound = [ self.full_wave[0], self.full_wave[-1] ]
+                    recon_spectra_wave_bound = [ self.full_wave[0], self.full_wave[-1] ]
 
                 (id_lo, id_hi) = get_bound_id(
                     recon_spectra_wave_bound, self.full_wave, within_bound=False)
@@ -279,16 +278,16 @@ class SpectraData:
 
     def load_plot_spectra_data(self):
         wave = []
-        if (self.recon_gt_spectra and self.kwargs["plot_spectrum_with_gt"]) or \
-           self.spectra_supervision_train:
+        if (self.recon_gt_spectra and self.kwargs["plot_spectrum_with_gt"]): # or \
+           #self.spectra_supervision_train:
             wave.extend(self.data["gt_recon_wave"])
 
         if self.recon_dummy_spectra:
             wave.extend(self.data["dummy_recon_wave"])
 
-        if self.recon_codebook_spectra:
-            # wave.extend(self.data["codebook_recon_wave"])
-            wave.extend(self.data["gt_recon_wave"])
+        #if self.recon_codebook_spectra:
+        # wave.extend(self.data["codebook_recon_wave"])
+        #    wave.extend(self.data["gt_recon_wave"])
 
         self.data["recon_wave"] = wave
 
@@ -317,20 +316,32 @@ class SpectraData:
             @Param
               recon_spectra: [num_spectra(,num_neighbours),full_num_smpl]
         """
-        gt_spectra = self.get_gt_spectra()
-        bound_ids = self.get_spectra_recon_wave_bound_ids()
-
         full_wave = self.get_full_wave()
-        gt_spectra_wave = self.get_gt_spectra_wave()
-        recon_spectra_wave = self.get_recon_spectra_wave()
+        gt_spectra = self.get_gt_spectra()
+
+        if codebook:
+            clip_range = self.kwargs["codebook_spectra_clip_range"]
+            bound_ids = get_bound_id(clip_range, full_wave, within_bound=True)
+            recon_spectra_wave = np.arange(
+                full_wave[bound_ids[0]], full_wave[bound_ids[-1]],
+                self.kwargs["trans_sample_interval"])
+        else:
+            bound_ids = self.get_spectra_recon_wave_bound_ids()
+            gt_spectra_wave = self.get_gt_spectra_wave()
+            recon_spectra_wave = self.get_recon_spectra_wave()
 
         for i, cur_spectra in enumerate(recon_spectra):
             sub_dir = ""
 
             # clip spectra use bound, if given
-            if not codebook and clip and bound_ids is not None and i < len(bound_ids):
+            if clip:
                 sub_dir += "clipped_"
-                (lo, hi) = bound_ids[i]
+
+                if codebook:
+                    (lo, hi) = bound_ids
+                elif codebook or (bound_ids is not None and i < len(bound_ids)):
+                    (lo, hi) = bound_ids[i]
+                else: lo, hi = 0, -1
                 cur_spectra = cur_spectra[...,lo:hi]
 
             # average spectra over neighbours, if required
@@ -343,7 +354,9 @@ class SpectraData:
             cur_spectra /= np.max(cur_spectra)
 
             # get wave values (x-axis)
-            if not codebook and recon_spectra_wave is not None and i < len(recon_spectra_wave):
+            if codebook:
+                recon_wave = recon_spectra_wave
+            elif recon_spectra_wave is not None and i < len(recon_spectra_wave):
                 recon_wave = recon_spectra_wave[i]
             else:
                 recon_wave = full_wave
@@ -363,6 +376,7 @@ class SpectraData:
                 plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
 
             if sub_dir != "":
+                if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]
                 cur_spectra_dir = join(spectra_dir, sub_dir)
             else:
                 cur_spectra_dir = spectra_dir
@@ -378,20 +392,24 @@ class SpectraData:
                 np.save(fname, cur_spectra)
 
     def mark_spectra_on_img(self):
+        markers = self.kwargs["spectra_markers"]
         spectra_img_coords = self.get_spectra_img_coords()
         spectra_fits_ids = set(spectra_img_coords[:,-1])
 
         for fits_id in spectra_fits_ids:
 
             # collect spectra in the same tile
-            cur_coords = []
-            for (r, c, cur_fits_id) in spectra_img_coords:
+            cur_coords, cur_markers = [], []
+            for i, (r, c, cur_fits_id) in zip(
+                    self.kwargs["gt_spectra_ids"], spectra_img_coords):
+
                 if cur_fits_id == fits_id:
                     cur_coords.append([r,c])
+                    cur_markers.append(markers[i])
 
             # mark on the corresponding tile
             self.fits_obj.mark_on_img(
-                np.array(cur_coords), self.kwargs["spectra_markers"], fits_id)
+                np.array(cur_coords), cur_markers, fits_id)
 
 
 # SpectraData class ends
