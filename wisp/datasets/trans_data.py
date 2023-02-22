@@ -5,6 +5,7 @@ import numpy as np
 import logging as log
 import matplotlib.pyplot as plt
 
+from pathlib import Path
 from os.path import join, exists
 from wisp.utils.plot import plot_save
 #from astroquery.svo_fps import SvoFps
@@ -80,6 +81,10 @@ class TransData:
         self.hdcd_trans_fname = join(self.trans_dir, f"hdcd_trans_{hdcd_nsmpls}")
 
         self.flat_trans_fname = join(self.trans_dir, "flat_trans")
+
+        # create path
+        for path in [source_trans_path, self.trans_dir]:
+            Path(path).mkdir(parents=True, exist_ok=True)
 
     #############
     # getters

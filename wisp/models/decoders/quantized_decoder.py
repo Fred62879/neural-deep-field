@@ -34,7 +34,8 @@ class QuantizedDecoder(nn.Module):
         self.output_redshift = kwargs["generate_redshift"]
 
         self.init_decoder()
-        self.redshift_adjust = nn.ReLU(inplace=True)
+        if self.output_redshift:
+            self.redshift_adjust = nn.ReLU(inplace=True)
         self.init_codebook(kwargs["qtz_seed"])
 
     def init_decoder(self):

@@ -34,7 +34,7 @@ class SpectraData:
 
         self.spectra_supervision_train = "train" in tasks and self.kwargs["spectra_supervision"]
         self.recon_spectra = self.recon_gt_spectra or self.recon_dummy_spectra or self.recon_codebook_spectra
-        self.require_spectra_coords = "plot_redshift" in tasks or "plot_embed_map" in tasks
+        self.require_spectra_coords = self.kwargs["mark_spectra"] and ("plot_redshift" in tasks or "plot_embed_map" in tasks)
 
         return self.kwargs["space_dim"] == 3 and (
             self.spectra_supervision_train or \
@@ -320,13 +320,15 @@ class SpectraData:
         gt_spectra = self.get_gt_spectra()
 
         if codebook:
-            clip_range = self.kwargs["codebook_spectra_clip_range"]
-            bound_ids = get_bound_id(clip_range, full_wave, within_bound=True)
-            recon_spectra_wave = np.arange(
-                full_wave[bound_ids[0]], full_wave[bound_ids[-1]],
-                self.kwargs["trans_sample_interval"])
+            if clip:
+                clip_range = self.kwargs["codebook_spectra_clip_range"]
+                bound_ids = get_bound_id(clip_range, full_wave, within_bound=True)
+                recon_spectra_wave = np.arange(
+                    full_wave[bound_ids[0]], full_wave[bound_ids[-1]],
+                    self.kwargs["trans_sample_interval"])
         else:
-            bound_ids = self.get_spectra_recon_wave_bound_ids()
+            if clip:
+                bound_ids = self.get_spectra_recon_wave_bound_ids()
             gt_spectra_wave = self.get_gt_spectra_wave()
             recon_spectra_wave = self.get_recon_spectra_wave()
 
@@ -354,7 +356,9 @@ class SpectraData:
             cur_spectra /= np.max(cur_spectra)
 
             # get wave values (x-axis)
-            if codebook:
+            if not clip:
+                recon_wave = full_wave
+            elif codebook:
                 recon_wave = recon_spectra_wave
             elif recon_spectra_wave is not None and i < len(recon_spectra_wave):
                 recon_wave = recon_spectra_wave[i]

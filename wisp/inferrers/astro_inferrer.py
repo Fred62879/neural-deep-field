@@ -9,7 +9,7 @@ from pathlib import Path
 from functools import partial
 from os.path import exists, join
 from wisp.inferrers import BaseInferrer
-from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_latent_embed, annotated_heat
+from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_latent_embed, annotated_heat, plot_simple
 from wisp.utils.common import add_to_device, forward, load_model_weights, load_layer_weights, load_embed
 
 
@@ -63,9 +63,11 @@ class AstroInferrer(BaseInferrer):
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","metric_dir", "spectra_dir",
                  "codebook_spectra_dir", "embed_map_dir","latent_dir",
-                 "redshift_dir","latent_embed_dir","zoomed_recon_dir"],
+                 "redshift_dir","latent_embed_dir","zoomed_recon_dir",
+                 "scaler_dir"],
                 ["models","recons","metrics","spectra","codebook_spectra",
-                 "embed_map","latents","redshift","latent_embed","zoomed_recon"]
+                 "embed_map","latents","redshift","latent_embed","zoomed_recon",
+                 "scaler"]
         ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
@@ -75,7 +77,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames.sort()
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames[5:6] #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames #[5:6] #[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -97,6 +99,8 @@ class AstroInferrer(BaseInferrer):
         self.plot_redshift = "plot_redshift" in tasks \
             and self.extra_args["generate_redshift"] \
             and self.quantize_latent and self.space_dim == 3
+        self.plot_scaler =  "plot_save_scaler" in tasks \
+            and self.quantize_latent and self.space_dim == 3
 
         # infer all coords using modified model
         self.recon_codebook_spectra = "recon_codebook_spectra" in tasks \
@@ -110,7 +114,8 @@ class AstroInferrer(BaseInferrer):
         self.group_tasks = []
 
         if self.recon_img or self.recon_flat_trans or \
-           self.plot_embed_map or self.plot_latent_embed or self.plot_redshift:
+           self.plot_embed_map or self.plot_latent_embed or \
+           self.plot_redshift or self.plot_scaler:
             self.group_tasks.append("infer_all_coords_full_model")
 
         if self.recon_codebook_spectra:
@@ -256,6 +261,9 @@ class AstroInferrer(BaseInferrer):
         if self.plot_redshift:
             self.redshifts = []
 
+        if self.plot_scaler:
+            self.scalers = []
+
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
         epoch = checkpoint["epoch_trained"]
         model_state = checkpoint["model_state_dict"]
@@ -299,7 +307,9 @@ class AstroInferrer(BaseInferrer):
             plot_latent_embed(self.latents, self.embed, model_id, self.latent_embed_dir)
 
         if self.plot_embed_map:
-            coords = self.dataset.get_spectra_img_coords()
+            if self.extra_args["mark_spectra"]:
+                coords = self.dataset.get_spectra_img_coords()
+            else: coords = []
             plot_embed_map_log = partial(plot_embed_map, coords)
 
             re_args = {
@@ -318,10 +328,13 @@ class AstroInferrer(BaseInferrer):
             _, _ = self.dataset.restore_evaluate_tiles(self.embed_ids, **re_args)
 
         if self.plot_redshift:
-            positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/fits_id
-            ids = self.extra_args["gt_spectra_ids"]
-            markers = np.array(self.extra_args["spectra_markers"])
-            plot_annotated_heat_map = partial(annotated_heat, positions, markers[ids])
+            if self.extra_args["mark_spectra"]:
+                positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/fits_id
+                ids = self.extra_args["gt_spectra_ids"]
+                markers = np.array(self.extra_args["spectra_markers"])
+            else:
+                positions, markers = [], []
+            plot_annotated_heat_map = partial(annotated_heat, positions, markers)
 
             re_args = {
                 "fname": model_id,
@@ -337,6 +350,22 @@ class AstroInferrer(BaseInferrer):
                 "calculate_metrics": False,
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.redshifts, **re_args)
+
+        if self.plot_scaler:
+            re_args = {
+                "fname": f'infer_{model_id}',
+                "dir": self.scaler_dir,
+                "verbose": self.verbose,
+                "num_bands": 1,
+                "log_max": False,
+                "to_HDU": False,
+                "save_locally": False,
+                "plot_func": plot_simple,
+                "match_fits": False,
+                "zscale": False,
+                "calculate_metrics": False,
+            }
+            _, _ = self.dataset.restore_evaluate_tiles(self.scalers, **re_args)
 
     def pre_checkpoint_selected_coords_partial_model(self, model_id):
         self.reset_data_iterator()
@@ -402,6 +431,7 @@ class AstroInferrer(BaseInferrer):
                         recon_img=True,
                         recon_spectra=False,
                         recon_codebook_spectra=False,
+                        save_scaler=self.plot_scaler,
                         save_spectra=False,
                         save_latents=self.plot_latent_embed,
                         save_redshift=self.plot_redshift,
@@ -411,6 +441,7 @@ class AstroInferrer(BaseInferrer):
                 if self.plot_redshift: self.redshifts.extend(ret["redshift"])
                 if self.plot_latent_embed: self.latents.extend(ret["latents"])
                 if self.plot_embed_map: self.embed_ids.extend(ret["min_embed_ids"])
+                if self.plot_scaler: self.scalers.extend(ret["scaler"])
 
             except StopIteration:
                 # log.info("all coords inferrence done")

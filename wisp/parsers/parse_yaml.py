@@ -474,6 +474,7 @@ def define_cmd_line_args():
     infer_group.add_argument("--recon-cutout-start-pos", nargs="+", type=list,
                              help="list of start (r/c) positions of each cutout for each tile")
 
+    infer_group.add_argument("--mark-spectra", action="store_true")
     infer_group.add_argument("--average-spectra", action="store_true")
     infer_group.add_argument("--plot-clipped-spectrum", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-gt", action="store_true")

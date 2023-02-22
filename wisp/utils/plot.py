@@ -135,6 +135,16 @@ def mark_on_img(png_fname, img, coords, markers, zscale=True):
     plt.savefig(png_fname)
     plt.close()
 
+def plot_simple(img, png_fname):
+    if img.ndim == 3:
+        for band in img:
+            plt.imshow(band)
+    else:
+        assert(img.ndim == 2)
+        plt.imshow(img)
+    plt.savefig(png_fname)
+    plt.close()
+
 # not used
 def plot_save(fname, x, y):
     # assert(y.ndim <= 2)

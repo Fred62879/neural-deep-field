@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import logging as log
 
+from pathlib import Path
 from astropy.io import fits
 from astropy.wcs import WCS
 from os.path import join, exists
@@ -135,6 +136,10 @@ class FITSData:
             self.masked_pixl_id_fn = join(mask_path, str(self.kwargs["fits_cutout_size"]) + mask_str + "_masked_id.npy")
         else:
             self.mask_fn, self.masked_pixl_id_fn = None, None
+
+        # create path
+        for path in [input_path, img_data_path, self.input_fits_path, mask_path]:
+            Path(path).mkdir(parents=True, exist_ok=True)
 
     def compile_fits_fnames(self):
         """ Get fnames of all given fits input for all bands.
