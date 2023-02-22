@@ -23,31 +23,43 @@ class QuantizedDecoder(nn.Module):
         self.beta = kwargs["qtz_beta"]
         self.num_embed = kwargs["qtz_num_embed"]
         self.latent_dim = kwargs["qtz_latent_dim"]
-
-        self.hidden_dim = kwargs["qtz_decod_hidden_dim"]
-        self.num_layers = kwargs["qtz_decod_num_hidden_layers"]
-        self.layer_type = kwargs["qtz_decod_layer_type"]
-        self.activation_type = kwargs["qtz_decod_activation_type"]
+        self.input_dim = get_input_latents_dim(**kwargs)
 
         self.calculate_loss = calculate_loss
         self.output_scaler = kwargs["generate_scaler"]
         self.output_redshift = kwargs["generate_redshift"]
 
         self.init_decoder()
+        if self.output_scaler:
+            self.init_scaler_decoder()
         if self.output_redshift:
+            self.init_redshift_decoder()
             self.redshift_adjust = nn.ReLU(inplace=True)
         self.init_codebook(kwargs["qtz_seed"])
 
-    def init_decoder(self):
-        input_dim = get_input_latents_dim(**self.kwargs)
-        output_dim = self.latent_dim + self.output_scaler + self.output_redshift
+    def init_scaler_decoder(self):
+        self.scaler_decoder = BasicDecoder(
+            self.input_dim, 1,
+            get_activation_class(self.kwargs["scaler_decod_activation_type"]),
+            bias=True, layer=get_layer_class(self.kwargs["scaler_decod_layer_type"]),
+            num_layers=self.kwargs["scaler_decod_num_hidden_layers"] + 1,
+            hidden_dim=self.kwargs["scaler_decod_hidden_dim"], skip=[])
 
+    def init_redshift_decoder(self):
+        self.redshift_decoder = BasicDecoder(
+            self.input_dim, 1,
+            get_activation_class(self.kwargs["redshift_decod_activation_type"]),
+            bias=True, layer=get_layer_class(self.kwargs["redshift_decod_layer_type"]),
+            num_layers=self.kwargs["redshift_decod_num_hidden_layers"] + 1,
+            hidden_dim=self.kwargs["redshift_decod_hidden_dim"], skip=[])
+
+    def init_decoder(self):
         self.decoder = BasicDecoder(
-            input_dim, output_dim,
-            get_activation_class(self.activation_type),
-            bias=True, layer=get_layer_class(self.layer_type),
-            num_layers=self.num_layers+1,
-            hidden_dim=self.hidden_dim, skip=[])
+            self.input_dim, self.latent_dim,
+            get_activation_class(self.kwargs["qtz_decod_activation_type"]),
+            bias=True, layer=get_layer_class(self.kwargs["qtz_decod_layer_type"]),
+            num_layers=self.kwargs["qtz_decod_num_hidden_layers"] + 1,
+            hidden_dim=self.kwargs["qtz_decod_hidden_dim"], skip=[])
 
     def init_codebook(self, seed):
         torch.manual_seed(seed)
@@ -74,13 +86,15 @@ class QuantizedDecoder(nn.Module):
         return z_q, min_embed_ids
 
     def partial_loss(self, z, z_q):
-        codebook_loss = torch.mean((z_q.detach() - z)**2) + \
-            torch.mean((z_q - z.detach())**2) * self.beta
+        #codebook_loss = torch.mean((z_q.detach() - z)**2) + \
+        #    torch.mean((z_q - z.detach())**2) * self.beta
+        codebook_loss = torch.mean((z_q.detach() - z)**2)
         return codebook_loss
 
     def forward(self, z, ret):
         """ Quantize latent variables
             @Param
+              z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
         """
         #timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
 
@@ -88,18 +102,17 @@ class QuantizedDecoder(nn.Module):
 
         # decode high-dim features into low dim latents
         #timer.check("quantization decode")
-        z = self.decoder(z)
-        scaler, redshift = None, None
 
         if self.output_scaler:
-            if self.output_redshift:
-                scaler = z[:,0,-2]
-                # redshift = z[:,0,-1]
-                redshift = self.redshift_adjust(z[:,0,-1])
-                z = z[...,:-2]
-            else:
-                scaler = z[:,0,-1]
-                z = z[...,:-1]
+            scaler = self.scaler_decoder(z[:,0])[...,0]
+        else: scaler = None
+
+        if self.output_redshift:
+            redshift = self.redshift_decoder(z[:,0])[...,0]
+            redshift = self.redshift_adjust(redshift)
+        else: redshift = None
+
+        z = self.decoder(z)
 
         ret["scaler"] = scaler
         ret["redshift"] = redshift

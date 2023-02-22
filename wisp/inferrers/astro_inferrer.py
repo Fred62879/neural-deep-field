@@ -77,7 +77,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames.sort()
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames #[5:6] #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames[-1:] #[5:6] #[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -352,6 +352,7 @@ class AstroInferrer(BaseInferrer):
             _, _ = self.dataset.restore_evaluate_tiles(self.redshifts, **re_args)
 
         if self.plot_scaler:
+            '''
             re_args = {
                 "fname": f'infer_{model_id}',
                 "dir": self.scaler_dir,
@@ -363,6 +364,20 @@ class AstroInferrer(BaseInferrer):
                 "plot_func": plot_simple,
                 "match_fits": False,
                 "zscale": False,
+                "calculate_metrics": False,
+            }
+            '''
+            re_args = {
+                "fname": f'infer_{model_id}',
+                "dir": self.scaler_dir,
+                "verbose": self.verbose,
+                "num_bands": self.extra_args["num_bands"],
+                "log_max": False,
+                "to_HDU": False,
+                "save_locally": False,
+                "plot_func": plot_horizontally,
+                "match_fits": False,
+                "zscale": True,
                 "calculate_metrics": False,
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.scalers, **re_args)

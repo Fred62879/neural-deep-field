@@ -11,6 +11,7 @@ global:
 
     tasks: ['train','save_recon_during_train','infer','recon_img','plot_save_scaler','plot_embed_map','plot_latent_embed']
     #tasks: ['infer','recon_img','plot_save_scaler','plot_embed_map','plot_latent_embed']
+    #tasks: ['infer','plot_save_scaler']
 
     #tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
     #tasks: ['infer','recon_gt_spectra']
@@ -39,13 +40,13 @@ optimizer:
 net:
     nef_type: 'AstroHyperSpectralNerf'
     #nef_type: 'AstroNerf'
-    coords_encode_method: 'none'
+    coords_encode_method: 'grid'
     wave_encode_method: 'positional'
     mlp_output_norm_method: 'sinh'
 
 embedder:
     coords_embed_bias: True
-    coords_embed_dim: 32
+    coords_embed_dim: 1000
     coords_embed_omega: 8
     coords_embed_sigma: 1.0
     coords_embed_seed: 2
@@ -70,10 +71,10 @@ grid:
     codebook_bitwidth: 20
 
 decoder:
-    decoder_num_layers: 3
-    decoder_hidden_dim: 256
+    decoder_num_layers: 1
+    decoder_hidden_dim: 64
     decoder_layer_type: 'none'
-    decoder_activation_type: "sin"
+    decoder_activation_type: "relu"
 
     siren_seed: 0
     siren_first_w0: 24
@@ -85,7 +86,7 @@ qtz:
     generate_scaler: True
     generate_redshift: False
 
-    qtz_latent_dim: 3
+    qtz_latent_dim: 16
     qtz_num_embed: 1
     qtz_beta: 0.01
     qtz_seed: 8
@@ -94,6 +95,16 @@ qtz:
     qtz_decod_num_hidden_layers: 1
     qtz_decod_layer_type: 'none'
     qtz_decod_activation_type: 'relu'
+
+    scaler_decod_hidden_dim: 64
+    scaler_decod_num_hidden_layers: 1
+    scaler_decod_layer_type: 'none'
+    scaler_decod_activation_type: 'relu'
+
+    redshift_decod_hidden_dim: 64
+    redshift_decod_num_hidden_layers: 1
+    redshift_decod_layer_type: 'none'
+    redshift_decod_activation_type: 'relu'
 
 hyperspectral:
     hps_combine_method: 'concat'
@@ -143,13 +154,13 @@ trainer:
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_batch_size: 20000 #36864
+    infer_batch_size: 4096 #20000 #36864
     infer_use_all_wave: True # enforced
     infer_last_model_only: True
 
     # recon img
     to_HDU: False
-    #infer_log_fname: '20230221-162505'
+    #infer_log_fname: '20230222-110603_debug_1band_3d_512'
     metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
@@ -184,8 +195,8 @@ dataset:
     fits_footprints: ['9812']
     fits_tile_ids: ['1']
     fits_subtile_ids: ['5']
-    fits_cutout_num_rows: [128]
-    fits_cutout_num_cols: [128]
+    fits_cutout_num_rows: [512]
+    fits_cutout_num_cols: [512]
     fits_cutout_start_pos: [[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
     num_bands: 1

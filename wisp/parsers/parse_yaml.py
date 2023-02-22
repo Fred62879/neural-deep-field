@@ -234,6 +234,20 @@ def define_cmd_line_args():
     qtz_group.add_argument("--qtz-decod-activation-type", type=str,
                            default="relu", choices=["relu", "sin"])
 
+    qtz_group.add_argument("--scaler-decod-hidden-dim", type=int)
+    qtz_group.add_argument("--scaler-decod-num-hidden-layers", type=int)
+    qtz_group.add_argument("--scaler-decod-layer-type", type=str, default='none',
+                           choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
+    qtz_group.add_argument("--scaler-decod-activation-type", type=str,
+                           default="relu", choices=["relu", "sin"])
+
+    qtz_group.add_argument("--redshift-decod-hidden-dim", type=int)
+    qtz_group.add_argument("--redshift-decod-num-hidden-layers", type=int)
+    qtz_group.add_argument("--redshift-decod-layer-type", type=str, default='none',
+                           choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
+    qtz_group.add_argument("--redshift-decod-activation-type", type=str,
+                           default="relu", choices=["relu", "sin"])
+
     ###################
     # Hyperspectral arguments
     ###################

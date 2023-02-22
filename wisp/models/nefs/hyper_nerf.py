@@ -85,7 +85,8 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             timer.check("hyper nef quantiza latent")
             latents = self.qtz_decoder(latents, ret)
 
-        timer.check("hyper nef decode")
-        self.hps_decoder(latents, wave, trans, nsmpl, ret, full_wave, full_wave_bound, num_spectra_coords)
+        ret["intensity"] = torch.sinh(ret["scaler"][:,None])
+        #timer.check("hyper nef decode")
+        #self.hps_decoder(latents, wave, trans, nsmpl, ret, full_wave, full_wave_bound, num_spectra_coords)
 
         return ret

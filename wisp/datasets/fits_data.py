@@ -54,18 +54,20 @@ class FITSData:
         """ Find all required data based on given self.tasks. """
         tasks = set(tasks)
 
-        self.require_coords = self.kwargs["spectra_supervision"] or len(tasks.intersection({
-            "train","recon_img","recon_flat","recon_gt_spectra"})) != 0
-        #"recon_codebook_spectra"})) != 0
-
         self.require_weights = "train" in tasks and self.load_weights
         self.require_pixels = len(tasks.intersection({"train","recon_img"})) != 0
         self.require_masks = "train" in tasks and self.spectral_inpaint
+        self.require_scaler = self.kwargs["space_dim"] == 3 and self.kwargs["quantize_latent"] and self.kwargs["generate_scaler"]
         self.require_redshifts = self.kwargs["space_dim"] == 3 and self.kwargs["quantize_latent"] and self.kwargs["generate_redshift"] and self.kwargs["redshift_supervision"]
+
+        self.require_coords = self.kwargs["spectra_supervision"] or len(tasks.intersection({
+            "train","recon_img","recon_flat","recon_gt_spectra"})) != 0 or \
+            self.require_scaler or self.require_redshift
 
         return self.require_coords or self.require_pixels or \
             self.require_weights or self.require_masks or \
-            self.require_redshifts or "recon_codebook_spectra" in tasks
+            self.require_redshifts or self.require_scaler or \
+            "recon_codebook_spectra" in tasks
 
     def init(self):
         """ Load all needed data. """

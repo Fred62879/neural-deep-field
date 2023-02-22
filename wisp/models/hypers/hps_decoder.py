@@ -114,4 +114,5 @@ class HyperSpectralDecoder(nn.Module):
             #timer.check("hps decoder, integration")
             intensity = self.inte(spectra, trans, nsmpl)
             if self.kwargs["print_shape"]: print('hps_decoder', intensity.shape)
+
             ret["intensity"] = intensity
