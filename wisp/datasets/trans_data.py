@@ -118,6 +118,9 @@ class TransData:
         return np.load(self.band_coverage_range_fname)
 
     def get_full_wave_bound(self):
+        if self.kwargs["trans_sample_method"] == "hardcode":
+            hdcd_wave = self.data["hdcd_wave"]
+            return (min(hdcd_wave), max(hdcd_wave))
         return ( min(self.data["full_wave"]), max(self.data["full_wave"]) )
 
     def sample_wave_trans(self, batch_size, num_samples, use_full_wave=False):

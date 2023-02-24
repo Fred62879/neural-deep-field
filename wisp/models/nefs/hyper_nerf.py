@@ -6,7 +6,7 @@ from collections import defaultdict
 from wisp.utils import PerfTimer
 from wisp.models.embedders import Encoder
 from wisp.models.nefs import BaseNeuralField
-from wisp.models.decoders import QuantizedDecoder
+from wisp.models.decoders import SpatialDecoder
 from wisp.models.hypers import HyperSpectralDecoder
 
 from wisp.utils.common import load_layer_weights
@@ -27,8 +27,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         self.space_dim = kwargs["space_dim"]
 
         self.init_encoder()
-        if kwargs["quantize_latent"]:
-            self.qtz_decoder = QuantizedDecoder(qtz_calculate_loss, **kwargs)
+        self.spatial_decoder = SpatialDecoder(qtz_calculate_loss, **kwargs)
         self.hps_decoder = HyperSpectralDecoder(
             integrate=integrate, scale=scale, **kwargs)
 
@@ -69,6 +68,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
                                        Unused in the current implementation.
               lod_idx (int): index into active_lods. If None, will use the maximum LOD.
                              Currently interpolation doesn't use this.
+              full_wave_bound: min and max of wave to normalize wave TODO make this requried
             @Return
               {"indensity": Output intensity tensor of shape [batch, num_samples, 3]
                "spectra":
@@ -80,13 +80,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
 
         timer.check("hyper nef encode coord")
         latents = self.coord_encoder(coords, lod_idx=lod_idx)
-
-        if self.kwargs["quantize_latent"]:
-            timer.check("hyper nef quantiza latent")
-            latents = self.qtz_decoder(latents, ret)
-
-        ret["intensity"] = torch.sinh(ret["scaler"][:,None])
-        #timer.check("hyper nef decode")
-        #self.hps_decoder(latents, wave, trans, nsmpl, ret, full_wave, full_wave_bound, num_spectra_coords)
-
+        latents = self.spatial_decoder(latents, ret)
+        self.hps_decoder(latents, wave, trans, nsmpl, ret,
+                         full_wave, full_wave_bound, num_spectra_coords)
         return ret

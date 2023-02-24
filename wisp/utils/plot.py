@@ -131,7 +131,7 @@ def mark_on_img(png_fname, img, coords, markers, zscale=True):
 
     plot_horizontally(img, "", save_close=False)
     for i, coord in enumerate(coords):
-        plt.scatter(coord[0], coord[1], marker=markers[i])
+        plt.scatter(coord[1], coord[0], marker=markers[i])
     plt.savefig(png_fname)
     plt.close()
 
@@ -571,9 +571,9 @@ def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
     for (y, x, cur_fits_id), marker in zip(coords, markers):
         if cur_fits_id != fits_id: continue
         plt.scatter(x, y, marker=marker)
-        #plt.scatter(x, y, test=marker)
         cur_redshift = data[0,y,x]
         log.info(f"redshift value of {fits_id}_{y}_{x} is: {cur_redshift}")
+
     plt.savefig(fn)
     plt.close()
 

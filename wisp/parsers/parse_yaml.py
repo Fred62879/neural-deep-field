@@ -217,36 +217,40 @@ def define_cmd_line_args():
     ###################
     # Quantization arguments
     ###################
-    qtz_group = parser.add_argument_group("quantization")
+    spatial_decod_group = parser.add_argument_group("quantization")
 
-    qtz_group.add_argument("--generate-scaler", action="store_true")
-    qtz_group.add_argument("--generate-redshift", action="store_true")
+    spatial_decod_group.add_argument("--generate-scaler", action="store_true")
+    spatial_decod_group.add_argument("--generate-redshift", action="store_true")
 
-    qtz_group.add_argument("--qtz-latent-dim", type=int)
-    qtz_group.add_argument("--qtz-num-embed", type=int)
-    qtz_group.add_argument("--qtz-beta", type=float, help="codebook loss weight")
-    qtz_group.add_argument("--qtz-seed", type=int)
+    spatial_decod_group.add_argument("--qtz-latent-dim", type=int)
+    spatial_decod_group.add_argument("--qtz-num-embed", type=int)
+    spatial_decod_group.add_argument("--qtz-beta", type=float, help="codebook loss weight")
+    spatial_decod_group.add_argument("--qtz-seed", type=int)
 
-    qtz_group.add_argument("--qtz-decod-hidden-dim", type=int)
-    qtz_group.add_argument("--qtz-decod-num-hidden-layers", type=int)
-    qtz_group.add_argument("--qtz-decod-layer-type", type=str, default='none',
-                           choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
-    qtz_group.add_argument("--qtz-decod-activation-type", type=str,
-                           default="relu", choices=["relu", "sin"])
+    spatial_decod_group.add_argument("--spatial-decod-hidden-dim", type=int)
+    spatial_decod_group.add_argument("--spatial-decod-num-hidden-layers", type=int)
+    spatial_decod_group.add_argument("--spatial-decod-output-dim", type=int)
+    spatial_decod_group.add_argument("--spatial-decod-layer-type", type=str, default='none',
+                                     choices=["none", "spectral_norm", "frobenius_norm",
+                                              "l_1_norm", "l_inf_norm"])
+    spatial_decod_group.add_argument("--spatial-decod-activation-type", type=str,
+                                     default="relu", choices=["relu", "sin"])
 
-    qtz_group.add_argument("--scaler-decod-hidden-dim", type=int)
-    qtz_group.add_argument("--scaler-decod-num-hidden-layers", type=int)
-    qtz_group.add_argument("--scaler-decod-layer-type", type=str, default='none',
-                           choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
-    qtz_group.add_argument("--scaler-decod-activation-type", type=str,
-                           default="relu", choices=["relu", "sin"])
+    spatial_decod_group.add_argument("--scaler-decod-hidden-dim", type=int)
+    spatial_decod_group.add_argument("--scaler-decod-num-hidden-layers", type=int)
+    spatial_decod_group.add_argument("--scaler-decod-layer-type", type=str, default='none',
+                                     choices=["none", "spectral_norm", "frobenius_norm",
+                                              "l_1_norm", "l_inf_norm"])
+    spatial_decod_group.add_argument("--scaler-decod-activation-type", type=str,
+                                     default="relu", choices=["relu", "sin"])
 
-    qtz_group.add_argument("--redshift-decod-hidden-dim", type=int)
-    qtz_group.add_argument("--redshift-decod-num-hidden-layers", type=int)
-    qtz_group.add_argument("--redshift-decod-layer-type", type=str, default='none',
-                           choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
-    qtz_group.add_argument("--redshift-decod-activation-type", type=str,
-                           default="relu", choices=["relu", "sin"])
+    spatial_decod_group.add_argument("--redshift-decod-hidden-dim", type=int)
+    spatial_decod_group.add_argument("--redshift-decod-num-hidden-layers", type=int)
+    spatial_decod_group.add_argument("--redshift-decod-layer-type", type=str, default='none',
+                                     choices=["none", "spectral_norm", "frobenius_norm",
+                                              "l_1_norm", "l_inf_norm"])
+    spatial_decod_group.add_argument("--redshift-decod-activation-type", type=str,
+                                     default="relu", choices=["relu", "sin"])
 
     ###################
     # Hyperspectral arguments
@@ -404,8 +408,10 @@ def define_cmd_line_args():
                              help="whether training supervised by redshift or not.")
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")
     train_group.add_argument("--redshift-beta", type=float, help="redshift loss weight scaler.")
+
     train_group.add_argument("--quantize-latent", action="store_true")
-    # train_group.add_argument("--cutout_based_train", action="store_true")
+    train_group.add_argument("--decode-spatial-embedding", action="store_true")
+
     train_group.add_argument("--resume-train", action="store_true")
     train_group.add_argument("--resume-log-dir", type=str)
     train_group.add_argument("--pretrained-model-name", type=str)

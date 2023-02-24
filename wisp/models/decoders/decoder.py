@@ -38,6 +38,8 @@ class Decoder(nn.Module):
         else: #if kwargs["space_dim"] == 3:
             if self.kwargs["quantize_latent"]:
                 latents_dim = self.kwargs["qtz_latent_dim"]
+            elif self.kwargs["decode_spatial_embedding"]:
+                latents_dim = self.kwargs["spatial_decod_output_dim"]
             else:
                 latents_dim = get_input_latents_dim(**self.kwargs)
 
@@ -59,7 +61,7 @@ class Decoder(nn.Module):
         return 1
 
     def init_decoder(self):
-        """ Initializes the decoder object.
+        """ Initializes MLP.
         """
         input_dim = self.get_input_dim()
         output_dim = self.get_output_dim()

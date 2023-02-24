@@ -2,6 +2,7 @@
 import csv
 import torch
 import numpy as np
+import logging as log
 import matplotlib.pyplot as plt
 
 from pathlib import Path
@@ -189,6 +190,8 @@ class SpectraData:
             tile_id = source_spectra_data["tile_id"][spectra_id]
             subtile_id = source_spectra_data["subtile_id"][spectra_id]
             fits_uid = f"{footprint}{tile_id}{subtile_id}"
+
+            log.info(f'spectra: {spectra_id}, {ra}/{dec}')
 
             # i) get img coord, grid coord, and pixel ids of selected gt spectra
             img_coords, grid_coords, ids = self.fits_obj.convert_from_world_coords(

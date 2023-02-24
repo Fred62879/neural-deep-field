@@ -9,8 +9,8 @@ global:
 
     #tasks: ['train']
 
-    tasks: ['train','save_recon_during_train','infer','recon_img','plot_save_scaler','plot_embed_map','plot_latent_embed']
-    #tasks: ['infer','recon_img','plot_save_scaler','plot_embed_map','plot_latent_embed']
+    #tasks: ['train','save_recon_during_train','infer','recon_img'] #,'plot_save_scaler']
+    #tasks: ['infer','recon_img','plot_save_scaler']
     #tasks: ['infer','plot_save_scaler']
 
     #tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
@@ -20,14 +20,22 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_img']
 
     #tasks: ['train','plot_save_scaler','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
-    #tasks: ['infer','recon_img','plot_embed_map','plot_latent_embed','plot_save_scaler']
+    #tasks: ['infer','recon_img','plot_embed_map','plot_save_scaler']
 
-    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift']
-    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_latent_embed','plot_redshift']
-    #tasks: ['infer','recon_codebook_spectra']
-    #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
-    #tasks: ['infer','plot_redshift']
+    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
+
+    tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler']
+    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map'] #,'plot_redshift']
     #tasks: ['infer','plot_embed_map','plot_redshift']
+    #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
+
+    tasks: ['infer','recon_img','plot_embed_map']
+    #tasks: ['infer','plot_redshift']
+    #tasks: ['infer','plot_save_scaler']
+    #tasks: ['infer','recon_gt_spectra']
+    #tasks: ['infer','recon_codebook_spectra']
+
+    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map']
 
 optimizer:
     optimizer_type: 'adam'
@@ -82,19 +90,20 @@ decoder:
     siren_coords_scaler: 8
     siren_last_linear: True
 
-qtz:
+spatial_decod:
     generate_scaler: True
-    generate_redshift: False
+    generate_redshift: True
 
     qtz_latent_dim: 16
-    qtz_num_embed: 1
+    qtz_num_embed: 4
     qtz_beta: 0.01
     qtz_seed: 8
 
-    qtz_decod_hidden_dim: 64
-    qtz_decod_num_hidden_layers: 1
-    qtz_decod_layer_type: 'none'
-    qtz_decod_activation_type: 'relu'
+    spatial_decod_hidden_dim: 64
+    spatial_decod_num_hidden_layers: 1
+    spatial_decod_output_dim: 16
+    spatial_decod_layer_type: 'none'
+    spatial_decod_activation_type: 'relu'
 
     scaler_decod_hidden_dim: 64
     scaler_decod_num_hidden_layers: 1
@@ -118,12 +127,12 @@ trainer:
     pixel_loss_cho: l1
     spectra_loss_cho: l2
     redshift_loss_cho: l2
-    num_epochs: 5000
+    num_epochs: 1000
     batch_size: 262144 #209715 #104857 #262144 #147456 #131072
-    save_every: 1000
+    save_every: 200
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 1000
+    log_cli_every: 200
     log_gpu_every: -1
     save_local_every: -1
     save_as_new: True
@@ -132,11 +141,12 @@ trainer:
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift']
 
     pixel_supervision: True
-    spectra_supervision: False
+    spectra_supervision: True
     redshift_supervision: False
     spectra_beta: 1
     redshift_beta: 1
 
+    decode_spatial_embedding: True
     quantize_latent: True
     weight_train: False
     train_use_all_wave: False
@@ -154,13 +164,13 @@ trainer:
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_batch_size: 4096 #20000 #36864
+    infer_batch_size: 20000 #36864
     infer_use_all_wave: True # enforced
     infer_last_model_only: True
 
     # recon img
     to_HDU: False
-    #infer_log_fname: '20230222-110603_debug_1band_3d_512'
+    #infer_log_fname: '20230223-131811_2048_no_spectra_supervision'
     metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
@@ -171,13 +181,13 @@ infer:
 
     # recon spectra
     average_spectra: True
-    plot_clipped_spectrum: False
+    plot_clipped_spectrum: True
     plot_spectrum_with_gt: True
     plot_spectrum_with_trans: True
     infer_spectra_individually: True
     codebook_spectra_clip_range: [5000,8000]
 
-    mark_spectra: False
+    mark_spectra: True
 
 dataset:
     dataset_num_workers: 0
@@ -195,27 +205,27 @@ dataset:
     fits_footprints: ['9812']
     fits_tile_ids: ['1']
     fits_subtile_ids: ['5']
-    fits_cutout_num_rows: [512]
-    fits_cutout_num_cols: [512]
-    fits_cutout_start_pos: [[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    fits_cutout_num_rows: [2048]
+    fits_cutout_num_cols: [2048]
+    fits_cutout_start_pos: [[0,0]] #[[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
-    num_bands: 1
-    sensor_collection_name: '1_i'
-    filter_ids: [2]
-    filters: [i]
-    sensors_full_name: [HSC-I]
-    plot_labels: ['i']
-    plot_colors: ['blue']
-    plot_styles: ['solid']
+    #num_bands: 1
+    #sensor_collection_name: '1_i'
+    #filter_ids: [2]
+    #filters: [i]
+    #sensors_full_name: [HSC-I]
+    #plot_labels: ['i']
+    #plot_colors: ['blue']
+    #plot_styles: ['solid']
 
-    # num_bands: 5
-    # sensor_collection_name: '5_grizy'
-    # filter_ids: [0,1,2,3,4]
-    # filters: [g,r,i,z,y]
-    # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y]
-    # plot_labels: ['g', 'r', 'i', 'z', 'y']
-    # plot_colors: ['green','red','blue','gray','yellow']
-    # plot_styles: ['solid','solid','solid','solid','solid']
+    num_bands: 5
+    sensor_collection_name: '5_grizy'
+    filter_ids: [0,1,2,3,4]
+    filters: [g,r,i,z,y]
+    sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y]
+    plot_labels: ['g', 'r', 'i', 'z', 'y']
+    plot_colors: ['green','red','blue','gray','yellow']
+    plot_styles: ['solid','solid','solid','solid','solid']
 
     # num_bands: 10
     # sensor_collection_name: '10'
@@ -229,7 +239,7 @@ dataset:
     plot_trans: True
     trans_sample_method: 'mixture'
     trans_threshold: 1e-3
-    hardcode_num_trans_samples: 35
+    hardcode_num_trans_samples: 12
     trans_sample_interval: 10
 
     gt_spectra_ids: [0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9] #[5,9,6,7,8]

@@ -7,6 +7,4 @@
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
 from .decoder import *
-#from .siren import *
-#from .basic_decoders import *
-from .quantized_decoder import *
+from .spatial_decoder import *

@@ -519,9 +519,6 @@ class AstroTrainer(BaseTrainer):
                       save_redshift=self.save_data_to_local and self.save_redshift,
                       save_embed_ids=self.save_data_to_local and self.plot_embed_map)
 
-        # print(ret['spectra'][0,:10].detach().cpu().numpy())
-        # print(ret['intensity'][:10,0].detach().cpu().numpy())
-
         # i) reconstruction loss (taking inpaint into account)
         recon_loss, recon_pixels = 0, None
         if self.pixel_supervision:
@@ -573,8 +570,7 @@ class AstroTrainer(BaseTrainer):
             codebook_loss = ret["codebook_loss"]
             self.log_dict["codebook_loss"] += codebook_loss.item()
 
-        # total_loss = recon_loss + spectra_loss + codebook_loss
-        total_loss = recon_loss
+        total_loss = recon_loss + spectra_loss + codebook_loss
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss")
         return total_loss, recon_pixels, ret

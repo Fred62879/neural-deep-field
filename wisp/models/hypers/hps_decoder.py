@@ -47,8 +47,8 @@ class HyperSpectralDecoder(nn.Module):
 
         spectra = self.spectra_decoder(latents)[...,0]
         if self.scale and scaler is not None:
-            spectra = (torch.exp(scaler) * spectra.T).T
-            #spectra = (scaler * spectra.T).T
+            # spectra = (torch.exp(scaler) * spectra.T).T
+            spectra = (scaler * spectra.T).T
 
         spectra = self.scale(spectra)
         return spectra
