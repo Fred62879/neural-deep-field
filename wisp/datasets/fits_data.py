@@ -55,7 +55,8 @@ class FITSData:
         tasks = set(tasks)
 
         self.require_weights = "train" in tasks and self.load_weights
-        self.require_pixels = len(tasks.intersection({"train","recon_img"})) != 0
+        self.require_pixels = len(tasks.intersection({
+            "train","recon_img","log_pixel_value"})) != 0
         self.require_masks = "train" in tasks and self.spectral_inpaint
         self.require_scaler = self.kwargs["space_dim"] == 3 and self.kwargs["quantize_latent"] and self.kwargs["generate_scaler"]
         self.require_redshifts = self.kwargs["space_dim"] == 3 and self.kwargs["quantize_latent"] and self.kwargs["generate_redshift"] and self.kwargs["redshift_supervision"]
@@ -588,7 +589,9 @@ class FITSData:
     def get_fits_cutout_start_pos(self):
         return self.fits_cutout_start_pos
 
-    def get_pixels(self):
+    def get_pixels(self, ids=None):
+        if ids is not None:
+            return self.data["pixels"][ids]
         return self.data["pixels"]
 
     def get_weights(self):

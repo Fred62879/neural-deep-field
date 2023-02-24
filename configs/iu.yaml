@@ -29,10 +29,10 @@ global:
     #tasks: ['infer','plot_embed_map','plot_redshift']
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
 
-    tasks: ['infer','recon_img','plot_embed_map']
+    #tasks: ['infer','recon_img','plot_embed_map']
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','plot_save_scaler']
-    #tasks: ['infer','recon_gt_spectra']
+    tasks: ['infer','recon_gt_spectra','log_pixel_value']
     #tasks: ['infer','recon_codebook_spectra']
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map']

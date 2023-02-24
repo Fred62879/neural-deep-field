@@ -77,7 +77,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames.sort()
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames #[5:6] #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames[1:] #[5:6] #[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -107,6 +107,7 @@ class AstroInferrer(BaseInferrer):
             and self.quantize_latent and self.space_dim == 3
 
         # infer selected coords using partial model
+        self.log_pixel_value = "log_pixel_value" in tasks # log spectra pixel value
         self.recon_gt_spectra = "recon_gt_spectra" in tasks and self.space_dim == 3
         self.recon_dummy_spectra = "recon_dummy_spectra" in tasks and self.space_dim == 3
 
@@ -330,7 +331,6 @@ class AstroInferrer(BaseInferrer):
         if self.plot_redshift:
             if self.extra_args["mark_spectra"]:
                 positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/fits_id
-                ids = self.extra_args["gt_spectra_ids"]
                 markers = np.array(self.extra_args["spectra_markers"])
             else:
                 positions, markers = [], []
@@ -399,7 +399,8 @@ class AstroInferrer(BaseInferrer):
             self.spectra_dir, model_id, self.recon_spectra, save_spectra=False,
             clip=self.extra_args["plot_clipped_spectrum"])
 
-        #self.calculate_recon_spectra_pixel_values()
+        if self.log_pixel_value:
+            self.dataset.log_spectra_pixel_values(self.recon_spectra)
 
     def pre_checkpoint_hardcode_coords_modified_model(self, model_id):
         self.reset_data_iterator()

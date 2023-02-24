@@ -408,6 +408,19 @@ class TransData:
                      label=self.kwargs["plot_labels"][j],
                      linestyle=self.kwargs["plot_styles"][j])
 
+    def integrate(self, spectra, all_wave=True):
+        """ Integrate spectra over transmission.
+            TODO: deal with cases where spectra pixel has multiple neighbour
+        """
+        if all_wave:
+            trans = self.data["full_trans"].numpy()
+            nsmpl = self.data["nsmpl_within_bands"].numpy()
+            spectra = spectra[:,0]
+            recon_pixels = np.einsum("ij,kj->ik", spectra, trans) / nsmpl
+        else:
+            raise ValueError("Not Implemented")
+        return recon_pixels
+
 # TransData class ends
 #################
 

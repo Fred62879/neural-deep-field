@@ -418,6 +418,16 @@ class SpectraData:
             self.fits_obj.mark_on_img(
                 np.array(cur_coords), cur_markers, fits_id)
 
+    def log_spectra_pixel_values(self, spectra):
+        gt_pixel_ids = self.get_spectra_coord_ids().flatten()
+        gt_pixels = self.fits_obj.get_pixels(ids=gt_pixel_ids).numpy()
+        gt_pixels = np.round(gt_pixels, 2)
+        np.set_printoptions(suppress = True)
+        log.info(f"GT spectra pixel values: {gt_pixels}")
+
+        recon_pixels = self.trans_obj.integrate(spectra)
+        recon_pixels = np.round(recon_pixels, 2)
+        log.info(f"Recon. spectra pixel values: {recon_pixels}")
 
 # SpectraData class ends
 #############
