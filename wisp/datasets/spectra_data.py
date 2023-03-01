@@ -537,7 +537,7 @@ def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1
         # interpolate new gt wave to get interpolated spectra
         gt_spectra = f_gt(gt_wave)
 
-    gt_spectra /= np.max(gt_spectra)
+    #gt_spectra /= np.max(gt_spectra) #
     return gt_wave, gt_spectra
 
 def overlay_spectrum(gt_fn, gen_wave, gen_spectra):

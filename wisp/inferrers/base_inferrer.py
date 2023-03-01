@@ -18,6 +18,7 @@ class BaseInferrer(ABC):
         self.device = device
         self.dataset = dataset
         self.pipelines = pipelines
+        self.run_model = True
 
         self.verbose = extra_args["verbose"]
         self.space_dim = extra_args["space_dim"]
@@ -113,14 +114,17 @@ class BaseInferrer(ABC):
 
             if self.verbose:
                 log.info(f"inferring for {group_task}")
-            self.pre_inferrence()
-            self.inferrence()
-            self.post_inferrence()
+            if self.run_model:
+                self.pre_inferrence()
+                self.inferrence_run_model()
+                self.post_inferrence()
+            else:
+                self.inferrence_no_model_run()
 
     def pre_inferrence(self):
         pass
 
-    def inferrence(self):
+    def inferrence_run_model(self):
         """ Perform current inferrence task using each selected checkpoints.
             Override if needed.
         """
@@ -132,6 +136,11 @@ class BaseInferrer(ABC):
             model_fname = join(self.model_dir, model_fname)
             checkpoint = torch.load(model_fname)
             self.infer_with_checkpoint(model_id, checkpoint)
+
+    def inferrence_no_model_run(self):
+        """ Perform inferrence loading data from local. No model running.
+        """
+        pass
 
     def post_inferrence(self):
         pass

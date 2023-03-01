@@ -211,17 +211,20 @@ class AstroTrainer(BaseTrainer):
         )
 
     def init_optimizer(self):
-        params, grid_params, rest_params = [], [], []
+        params, grid_params, qtz_params, rest_params = [], [], [], []
         params_dict = { name : param for name, param
                         in self.pipeline.named_parameters() }
 
         for name in params_dict:
             print(name)
             if "grid" in name: grid_params.append(params_dict[name])
+            elif "qtz_codebook" in name: qtz_params.append(params_dict[name])
             else: rest_params.append(params_dict[name])
 
         params.append({"params" : grid_params,
                        "lr": self.lr * self.grid_lr_weight})
+        params.append({"params" : qtz_params,
+                       "lr": self.extra_args["qtz_lr"]})
         params.append({"params" : rest_params,
                        "lr": self.extra_args["hps_lr"]})
 
@@ -540,7 +543,9 @@ class AstroTrainer(BaseTrainer):
 
         # ii) spectra loss
         spectra_loss, recon_spectra = 0, None
-        if self.spectra_supervision:
+        if self.spectra_supervision and \
+           self.epoch >= self.extra_args["spectra_supervision_start_epoch"]:
+
             gt_spectra = data["gt_spectra"]
 
             # todo: efficiently slice spectra with different bound
@@ -587,8 +592,11 @@ class AstroTrainer(BaseTrainer):
         log_text += " | recon loss: {:>.3E}".format(self.log_dict["recon_loss"] / n)
         if self.quantize_latent:
             log_text += " | codebook loss: {:>.3E}".format(self.log_dict["codebook_loss"] / n)
-        if self.spectra_supervision:
+
+        if self.spectra_supervision and \
+           self.epoch >= self.extra_args["spectra_supervision_start_epoch"]:
             log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
+
         if self.redshift_supervision:
             log_text += " | redshift loss: {:>.3E}".format(self.log_dict["redshift_loss"] / n)
         log.info(log_text)

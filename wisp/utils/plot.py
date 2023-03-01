@@ -11,6 +11,16 @@ from astropy.visualization import ZScaleInterval
 from wisp.utils.numerical import calculate_sam_spectrum
 
 
+def plot_save(fname, x, y):
+    # assert(y.ndim <= 2)
+    # if y.ndim == 2:
+    #     for sub_y in y:
+    #         plt.plot(x, sub_y)
+    # else: plt.plot(x, y)
+    plt.plot(x, y)
+    plt.savefig(fname)
+    plt.close()
+
 def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):
     """ Plot latent variable distributions and each codebook embedding.
     """
@@ -79,47 +89,60 @@ def plot_zscale(ax, data, vmin, vmax):
     ax.imshow(data, cmap='gray', interpolation='none', vmin=vmin,
               vmax=vmax, alpha=1.0, aspect='equal',origin='lower')
 
-def plot_one_row(fig, r, c, lo, img, vmins, vmaxs, num_bands, cal_z_range=False):
-    if cal_z_range:
-        vmins, vmaxs = [], []
+def plot_img_distrib_one_band(ax, data, bins=10, prob=True):
+    """ Plot pixel vlaue distribution for one band.
+    """
+    lo, hi = np.min(data), np.max(data)
+    rg = hi - lo
+    hist, bin_edges = np.histogram(data, bins=bins)
+    bin_edges = np.array([ (a + b) / 2 for a, b in zip(bin_edges[:-1], bin_edges[1:]) ])
+    if prob: hist = hist/np.sum(hist)
+    # ax.set_xlim(lo - rg/10, hi + rg/10)
+    # ax.set_ylim(0, 30)
+    ax.plot(bin_edges, hist)
+
+def plot_one_row(fig, r, c, lo, img, num_bands, plot_option, vmins, vmaxs, cal_z_range=False):
+    """ Plot current img (multiband) in one row based on plot_option
+        @Param
+           fig: global figure
+           r/c: size of fig
+           lo: starting subfigure position
+    """
+    if plot_option == "plot_img" and cal_z_range:
         for i in range(num_bands):
             vmin, vmax = ZScaleInterval(contrast=.25).get_limits(img[i])
             vmins.append(vmin);vmaxs.append(vmax)
 
     for i in range(num_bands):
         ax = fig.add_subplot(r, c, lo+i+1)
-        plot_zscale(ax, img[i], vmins[i], vmaxs[i])
+        if plot_option == "plot_img":
+            plot_zscale(ax, img[i], vmins[i], vmaxs[i])
+        elif plot_option == "plot_distrib":
+            plot_img_distrib_one_band(ax, img[i])
 
     if cal_z_range:
         return vmins,vmaxs
 
-def plot_gt_recon(gt, recon, fn, cal_z_range=False):
-    n = 1
-    nchls = gt.shape[0]
-    fig = plt.figure(figsize=(20,2*n+2))
-    r, c = n+1, nchls
-    vmins, vmaxs = plot_one_row(fig, r, c, 0, gt, [], [], True, nchls)
-    plot_one(fig, r, c, nchls, recon, vmins, vmaxs, nchls, cal_z_range=cal_z_range)
-    fig.tight_layout()
-    plt.savefig(fn)
-    plt.close()
-
-def plot_horizontally(img, png_fname, zscale_ranges=None, save_close=True):
-    """ Plot multiband image horizontally
+def plot_horizontally(img, png_fname, plot_option, zscale_ranges=None, save_close=True):
+    """ Plot multiband image horizontally.
+        Currently only supports plot one row.
         @Param
           img: multiband image [nbands,sz,sz]
           zscale_ranges: min and max value for zscaling [2,nbands]
     """
-    if zscale_ranges is None:
-        vmins, vmaxs = [], []
-        cal_z_range = True
-    else:
-        (vmins, vmaxs) = zscale_ranges
-        cal_z_range = False
+    if plot_option == "plot_img":
+        if zscale_ranges is None:
+            vmins, vmaxs = [], []
+            cal_z_range = True
+        else:
+            (vmins, vmaxs) = zscale_ranges
+            cal_z_range = False
+    else: vmins, vmaxs, cal_z_range = None, None, False
 
     num_bands = img.shape[0]
     fig = plt.figure(figsize=(3*num_bands + 1,3))
-    plot_one_row(fig, 1, num_bands, 0, img, vmins, vmaxs, num_bands, cal_z_range=cal_z_range)
+    plot_one_row(fig, 1, num_bands, 0, img, num_bands,
+                 plot_option, vmins, vmaxs, cal_z_range=cal_z_range)
     fig.tight_layout()
 
     if save_close:
@@ -129,7 +152,7 @@ def plot_horizontally(img, png_fname, zscale_ranges=None, save_close=True):
 def mark_on_img(png_fname, img, coords, markers, zscale=True):
     if img.ndim == 3: img = img[0:1]
 
-    plot_horizontally(img, "", save_close=False)
+    plot_horizontally(img, "", "plot_img", save_close=False)
     for i, coord in enumerate(coords):
         plt.scatter(coord[1], coord[0], marker=markers[i])
     plt.savefig(png_fname)
@@ -145,15 +168,118 @@ def plot_simple(img, png_fname):
     plt.savefig(png_fname)
     plt.close()
 
+
+############
+# heatmap plot
+############
+
+def heat_range(arr,lo,hi):
+    ''' only show heats within range '''
+    my_cmap = copy(plt.cm.YlGnBu)
+    my_cmap.set_over("blue")
+    my_cmap.set_under("white")
+    g = sns.heatmap(arr, vmin=lo, vmax=hi, xticklabels=False, yticklabels=False, cmap=my_cmap) #, linewidths=1.0, linecolor="grey")
+    #g.set_xticklabels(labels, rotation=rotation)
+    g.tick_params(left=False, bottom=False)
+    #g.set_title("Semantic Textual Similarity")
+
+def heat(fig, arr, r, c, i):
+    ax = fig.add_subplot(r, c, i)
+    ax.axis('off')
+    img=ax.imshow(arr, cmap='viridis', origin='lower')
+    plt.colorbar(img,ax=ax)
+
+def heat_all(data, fn, los=None, his=None):
+    nbands = len(data)
+    fig = plt.figure(figsize=(20,5))
+    r, c = 1, nbands
+    for i, band in enumerate(data):
+        if los is not None and his is not None:
+            band = np.clip(fig, los[i], his[i])
+        heat(fig, band, r, c, i+1)
+    fig.tight_layout()
+    plt.savefig(fn)
+    plt.close()
+
+def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
+    """ Plot heat map with markers for given coordinate positions.
+        Currently only used to plot heatmap for redshift.
+        @Param
+          coords:  [n,3]: r,c,fits id
+          markers: markers choices, different for each coord
+          data:    data to heat [1,num_rwos,num_cols]
+          fits_id: fits id of current tile, only draw coord with same fits id
+    """
+    import logging as log
+
+    nbands = len(data)
+    fig = plt.figure(figsize=(20,5))
+    r, c = 1, nbands
+    for i, band in enumerate(data):
+        if los is not None and his is not None:
+            band = np.clip(fig, los[i], his[i])
+        heat(fig, band, r, c, i+1)
+    fig.tight_layout()
+
+    for (y, x, cur_fits_id), marker in zip(coords, markers):
+        if cur_fits_id != fits_id: continue
+        plt.scatter(x, y, marker=marker)
+        cur_redshift = data[0,y,x]
+        log.info(f"redshift value of {fits_id}_{y}_{x} is: {cur_redshift}")
+
+    plt.savefig(fn)
+    plt.close()
+
+def batch_heat(arrs, lo=None, hi=None, heat_range=True):
+    #names=['ours','s2s','pnp-dip']
+
+    def heat_for_range(fig, arr, r, c, id, name):
+        ax = fig.add_subplot(r,c,id)
+        ax.axis('off')
+        g = sns.heatmap(arr, vmin=lo, vmax=hi, xticklabels=False, yticklabels=False, cmap=my_cmap)
+        g.tick_params(left=False, bottom=False)
+        g.set_title(name)
+
+    def heat(fig, arr, r, c, id):
+        ax = fig.add_subplot(r,c,id)
+        ax.axis('off')
+        im = ax.imshow(arr, cmap='viridis',origin='lower')
+        #im1 = ax1.imshow(m1, interpolation='None')
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        fig.colorbar(im, cax=cax, orientation='vertical')
+
+    my_cmap = copy(plt.cm.YlGnBu)
+    #my_cmap = copy(plt.cm.BuPu)
+    my_cmap.set_over("blue")
+    my_cmap.set_under("white")
+
+    n = len(arrs)
+    r, c = 1, n
+    fig = plt.figure(figsize=(3*n,3))
+    for i, (arr, name) in enumerate(zip(arrs,names)):
+        if lo is not None and hi is not None and not heat_range:
+            arr = np.clip(arr, lo, hi)
+        if heat_range:
+            heat_for_range(fig, arr, r, c, i+1, name)
+        else:
+            heat(fig, arr, r, c, i+1)
+
+    plt.show()
+
+###########
 # not used
-def plot_save(fname, x, y):
-    # assert(y.ndim <= 2)
-    # if y.ndim == 2:
-    #     for sub_y in y:
-    #         plt.plot(x, sub_y)
-    # else: plt.plot(x, y)
-    plt.plot(x, y)
-    plt.savefig(fname)
+###########
+'''
+def plot_gt_recon(gt, recon, fn, cal_z_range=False):
+    n = 1
+    nchls = gt.shape[0]
+    fig = plt.figure(figsize=(20,2*n+2))
+    r, c = n+1, nchls
+    vmins, vmaxs = plot_one_row(fig, r, c, 0, gt, [], [], True, nchls)
+    plot_one(fig, r, c, nchls, recon, vmins, vmaxs, nchls, cal_z_range=cal_z_range)
+    fig.tight_layout()
+    plt.savefig(fn)
     plt.close()
 
 def sdss_rgb(imgs, bands, scales=None, m = 0.02):
@@ -248,18 +374,6 @@ def plotLoss(n, lossfn, nepoch, intvl, title):
         plt.plot(x, loss[i], colors[i], label=lbs[i])
     plt.title(title);plt.xlabel('epochs');plt.ylabel('loss')
     plt.legend(loc="upper right");plt.show()
-
-def plotImageHist(img, bins=10, prob=True, fn=None):
-    lo, hi = np.min(img), np.max(img)
-    rg = hi - lo
-    hist, bin_edges = np.histogram(img, bins=bins)
-    bin_edges = np.array([ (a + b) / 2 for a, b in zip(bin_edges[:-1], bin_edges[1:]) ])
-    if prob: hist = hist/np.sum(hist)
-    plt.figure()#plt.xlim(lo - rg/10, hi + rg/10)
-    plt.ylim(0, 30)
-    plt.plot(bin_edges, hist)
-    if fn is not None: plt.savefig(fn);plt.close()
-    else: plt.show()
 
 def plotArr(arr, lb, color):
     x = np.arange(0, len(arr))
@@ -515,101 +629,4 @@ def batch_hist(gt_fn, img_fns, bins, yhi, chnl, nms):
         img = np.load(fn)[chnl]
         hist(fig, img, r, c, i+2, nms[i])
     plt.show()
-
-############
-# heatmap plot
-############
-
-def heat_range(arr,lo,hi):
-    ''' only show heats within range '''
-    my_cmap = copy(plt.cm.YlGnBu)
-    my_cmap.set_over("blue")
-    my_cmap.set_under("white")
-    g = sns.heatmap(arr, vmin=lo, vmax=hi, xticklabels=False, yticklabels=False, cmap=my_cmap) #, linewidths=1.0, linecolor="grey")
-    #g.set_xticklabels(labels, rotation=rotation)
-    g.tick_params(left=False, bottom=False)
-    #g.set_title("Semantic Textual Similarity")
-
-def heat(fig, arr, r, c, i):
-    ax = fig.add_subplot(r, c, i)
-    ax.axis('off')
-    img=ax.imshow(arr, cmap='viridis', origin='lower')
-    plt.colorbar(img,ax=ax)
-
-def heat_all(data, fn, los=None, his=None):
-    nbands = len(data)
-    fig = plt.figure(figsize=(20,5))
-    r, c = 1, nbands
-    for i, band in enumerate(data):
-        if los is not None and his is not None:
-            band = np.clip(fig, los[i], his[i])
-        heat(fig, band, r, c, i+1)
-    fig.tight_layout()
-    plt.savefig(fn)
-    plt.close()
-
-def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
-    """ Plot heat map with markers for given coordinate positions.
-        Currently only used to plot heatmap for redshift.
-        @Param
-          coords:  [n,3]: r,c,fits id
-          markers: markers choices, different for each coord
-          data:    data to heat [1,num_rwos,num_cols]
-          fits_id: fits id of current tile, only draw coord with same fits id
-    """
-    import logging as log
-
-    nbands = len(data)
-    fig = plt.figure(figsize=(20,5))
-    r, c = 1, nbands
-    for i, band in enumerate(data):
-        if los is not None and his is not None:
-            band = np.clip(fig, los[i], his[i])
-        heat(fig, band, r, c, i+1)
-    fig.tight_layout()
-
-    for (y, x, cur_fits_id), marker in zip(coords, markers):
-        if cur_fits_id != fits_id: continue
-        plt.scatter(x, y, marker=marker)
-        cur_redshift = data[0,y,x]
-        log.info(f"redshift value of {fits_id}_{y}_{x} is: {cur_redshift}")
-
-    plt.savefig(fn)
-    plt.close()
-
-def batch_heat(arrs, lo=None, hi=None, heat_range=True):
-    #names=['ours','s2s','pnp-dip']
-
-    def heat_for_range(fig, arr, r, c, id, name):
-        ax = fig.add_subplot(r,c,id)
-        ax.axis('off')
-        g = sns.heatmap(arr, vmin=lo, vmax=hi, xticklabels=False, yticklabels=False, cmap=my_cmap)
-        g.tick_params(left=False, bottom=False)
-        g.set_title(name)
-
-    def heat(fig, arr, r, c, id):
-        ax = fig.add_subplot(r,c,id)
-        ax.axis('off')
-        im = ax.imshow(arr, cmap='viridis',origin='lower')
-        #im1 = ax1.imshow(m1, interpolation='None')
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
-        fig.colorbar(im, cax=cax, orientation='vertical')
-
-    my_cmap = copy(plt.cm.YlGnBu)
-    #my_cmap = copy(plt.cm.BuPu)
-    my_cmap.set_over("blue")
-    my_cmap.set_under("white")
-
-    n = len(arrs)
-    r, c = 1, n
-    fig = plt.figure(figsize=(3*n,3))
-    for i, (arr, name) in enumerate(zip(arrs,names)):
-        if lo is not None and hi is not None and not heat_range:
-            arr = np.clip(arr, lo, hi)
-        if heat_range:
-            heat_for_range(fig, arr, r, c, i+1, name)
-        else:
-            heat(fig, arr, r, c, i+1)
-
-    plt.show()
+'''

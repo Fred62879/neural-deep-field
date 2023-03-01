@@ -22,7 +22,7 @@ global:
     #tasks: ['train','plot_save_scaler','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
     #tasks: ['infer','recon_img','plot_embed_map','plot_save_scaler']
 
-    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
+    tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
 
     tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map'] #,'plot_redshift']
@@ -32,18 +32,21 @@ global:
     #tasks: ['infer','recon_img','plot_embed_map']
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','plot_save_scaler']
-    tasks: ['infer','recon_gt_spectra','log_pixel_value']
+    #tasks: ['infer','recon_gt_spectra','log_pixel_value']
     #tasks: ['infer','recon_codebook_spectra']
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map']
+    #tasks: ['infer','plot_pixel_distrib']
 
 optimizer:
     optimizer_type: 'adam'
-    lr: 1e-3
     b1: 0.5
     b2: 0.999
-    weight_decay: 1e-5
+    lr: 1e-3
     hps_lr: 1e-4
+    qtz_lr: 1e-6
+    weight_decay: 1e-5
+    grid_lr_weight: 100
 
 net:
     nef_type: 'AstroHyperSpectralNerf'
@@ -145,6 +148,7 @@ trainer:
     redshift_supervision: False
     spectra_beta: 1
     redshift_beta: 1
+    spectra_supervision_start_epoch: 0
 
     decode_spatial_embedding: True
     quantize_latent: True
@@ -193,6 +197,7 @@ dataset:
     dataset_num_workers: 0
     space_dim: 3
     dataset_type: 'astro'
+    plot_img_distrib: True
     load_fits_data_cache: True
     dataset_path: '../../data/pdr3'
     gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)

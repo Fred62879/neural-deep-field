@@ -95,7 +95,7 @@ class FITSData:
 
         # suffix that uniquely identifies the currently selected group of
         # tiles with the corresponding cropping parameters, if any
-        suffix, self.gt_img_fnames = "", {}
+        suffix, self.gt_img_fnames, self.gt_img_distrib_fnames = "", {}, {}
         norm = self.kwargs["gt_img_norm_cho"]
 
         if self.use_full_fits:
@@ -116,6 +116,8 @@ class FITSData:
                 suffix += f"_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}"
                 self.gt_img_fnames[fits_uid] = join(
                     img_data_path, f"gt_img_{norm}_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}")
+                self.gt_img_distrib_fnames[fits_uid] = join(
+                    img_data_path, f"gt_img_distrib_{norm}_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}")
 
         norm_str = self.kwargs["train_pixels_norm"]
 
@@ -284,7 +286,7 @@ class FITSData:
             # since different fits may differ in size
             cur_data = np.array(cur_data) # [nbands,sz,sz]
             np.save(self.gt_img_fnames[fits_uid], cur_data)
-            plot_horizontally(cur_data, self.gt_img_fnames[fits_uid])
+            plot_horizontally(cur_data, self.gt_img_fnames[fits_uid], "plot_img")
 
             if self.kwargs["to_HDU"]:
                 generate_hdu(self.headers[fits_uid], cur_data,
@@ -342,6 +344,11 @@ class FITSData:
                 pixels = normalize(pixels, "zscale", gt=pixels)
 
             np.save(self.pixels_fname, pixels)
+
+        if self.kwargs["plot_img_distrib"]:
+            for fits_uid in self.fits_uids:
+                cur_data = np.load(self.gt_img_fnames[fits_uid] + ".npy")
+                plot_horizontally(cur_data, self.gt_img_distrib_fnames[fits_uid], "plot_distrib")
 
         pixel_max = np.round(np.max(pixels, axis=0), 3)
         pixel_min = np.round(np.min(pixels, axis=0), 3)
@@ -829,12 +836,13 @@ class FITSData:
         ):
             zoomed_gt = np.load(self.gt_img_fnames[fits_uid] + ".npy")[:,r:r+size,c:c+size]
             zoomed_gt_fname = str(self.gt_img_fnames[fits_uid]) + f"_zoomed_{size}_{r}_{c}"
-            plot_horizontally(zoomed_gt, zoomed_gt_fname)
+            plot_horizontally(zoomed_gt, zoomed_gt_fname, "plot_img")
 
             zoomed_recon = recon_tile[:,r:r+size,c:c+size]
             zoomed_recon_fname = join(re_args["zoomed_recon_dir"],
                                       str(re_args["zoomed_recon_fname"]) + f"_{fits_uid}_{i}")
-            plot_horizontally(zoomed_recon, zoomed_recon_fname, zscale_ranges=zscale_ranges)
+            plot_horizontally(zoomed_recon, zoomed_recon_fname,
+                              "plot_img", zscale_ranges=zscale_ranges)
 
     def restore_evaluate_one_tile(self, index, fits_uid, num_pixels_acc, pixels, **re_args):
         if self.use_full_fits:

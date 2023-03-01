@@ -285,6 +285,7 @@ def define_cmd_line_args():
     data_group.add_argument("--fits-footprints", nargs="+", help="footprints of chose FITS files")
 
     data_group.add_argument("--use-full-fits", action="store_true")
+    data_group.add_argument("--plot-img-distrib", action="store_true")
     data_group.add_argument("--load-fits-data-cache", action="store_true")
     data_group.add_argument("--fits-cutout-num-rows",nargs="+", type=int,
                             help="size of cutout from fits (if not using full fits)")
@@ -343,6 +344,7 @@ def define_cmd_line_args():
     optim_group.add_argument("--lr", type=float, default=0.001,
                              help="Learning rate.")
     optim_group.add_argument("--hps-lr", type=float, default=0.0001)
+    optim_group.add_argument("--qtz-lr", type=float, default=0.0001)
     optim_group.add_argument("--weight-decay", type=float, default=0,
                              help="Weight decay.")
     optim_group.add_argument("--grid-lr-weight", type=float, default=100.0,
@@ -406,6 +408,8 @@ def define_cmd_line_args():
                              help="whether training supervised by spectra or not.")
     train_group.add_argument("--redshift-supervision", action="store_true",
                              help="whether training supervised by redshift or not.")
+
+    train_group.add_argument("--spectra-supervision-start-epoch", type=int)
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")
     train_group.add_argument("--redshift-beta", type=float, help="redshift loss weight scaler.")
 

@@ -11,6 +11,7 @@ def spectra_supervision_loss(loss, gt_spectra, recon_spectra):
           spectra_ids: ids of spectra to supervise
           spectra: [bsz, num_smpls]
     '''
+    # norm spectra each so they sum to 1 (earth movers distance)
     return loss(gt_spectra, recon_spectra)
 
 def redshift_supervision_loss(loss, gt_redshift, recon_redshift):

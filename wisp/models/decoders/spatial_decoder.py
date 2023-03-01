@@ -39,7 +39,7 @@ class SpatialDecoder(nn.Module):
         self.init_model()
 
     def init_model(self):
-        if self.decode_spatial_embedding or self.quantize_z:
+        if self.decode_spatial_embedding: # or self.quantize_z:
             self.init_decoder()
 
         if self.quantize_z:
@@ -50,7 +50,6 @@ class SpatialDecoder(nn.Module):
 
         if self.output_redshift:
             self.init_redshift_decoder()
-            self.redshift_adjust = nn.ReLU(inplace=True)
 
     def init_scaler_decoder(self):
         self.scaler_decoder = BasicDecoder(
@@ -78,10 +77,10 @@ class SpatialDecoder(nn.Module):
 
     def init_codebook(self, seed):
         torch.manual_seed(seed)
-        self.codebook = nn.Embedding(self.latent_dim, self.num_embed)
-        self.codebook.weight.data.uniform_(
+        self.qtz_codebook = nn.Embedding(self.latent_dim, self.num_embed)
+        self.qtz_codebook.weight.data.uniform_(
             -1.0 / self.latent_dim, 1.0 / self.latent_dim)
-        self.codebook.weight.data /= 10
+        self.qtz_codebook.weight.data /= 10
 
     def quantize(self, z):
         # flatten input [...,]
@@ -89,12 +88,12 @@ class SpatialDecoder(nn.Module):
         z_shape = z.shape
         z_f = z.view(-1,self.latent_dim)
 
-        min_embed_ids = find_closest_tensor(z_f, self.codebook.weight) # [bsz]
+        min_embed_ids = find_closest_tensor(z_f, self.qtz_codebook.weight) # [bsz]
 
         # replace each z with closest embedding
         encodings = one_hot(min_embed_ids, self.num_embed) # [n,num_embed]
         encodings = encodings.type(z.dtype)
-        z_q = torch.matmul(encodings, self.codebook.weight.T).view(z_shape)
+        z_q = torch.matmul(encodings, self.qtz_codebook.weight.T).view(z_shape)
         return z_q, min_embed_ids
 
     def partial_loss(self, z, z_q):
@@ -114,11 +113,10 @@ class SpatialDecoder(nn.Module):
         else: scaler = None
 
         if self.output_redshift:
-            redshift = self.redshift_decoder(z[:,0])[...,0]
-            redshift = self.redshift_adjust(redshift)
+            redshift = self.redshift_decoder(z[:,0])[...,0] + 0.5
         else: redshift = None
 
-        if self.decode_spatial_embedding or self.quantize_z:
+        if self.decode_spatial_embedding: # or self.quantize_z:
             z = self.decoder(z)
 
         if self.quantize_z:

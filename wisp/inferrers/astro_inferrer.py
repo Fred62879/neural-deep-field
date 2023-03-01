@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from functools import partial
 from os.path import exists, join
+
 from wisp.inferrers import BaseInferrer
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_latent_embed, annotated_heat, plot_simple
 from wisp.utils.common import add_to_device, forward, load_model_weights, load_layer_weights, load_embed
@@ -64,10 +65,10 @@ class AstroInferrer(BaseInferrer):
                 ["model_dir","recon_dir","metric_dir", "spectra_dir",
                  "codebook_spectra_dir", "embed_map_dir","latent_dir",
                  "redshift_dir","latent_embed_dir","zoomed_recon_dir",
-                 "scaler_dir"],
+                 "scaler_dir","pixel_distrib_dir"],
                 ["models","recons","metrics","spectra","codebook_spectra",
                  "embed_map","latents","redshift","latent_embed","zoomed_recon",
-                 "scaler"]
+                 "scaler","pixel_distrib"]
         ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
@@ -77,7 +78,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames.sort()
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames[1:] #[5:6] #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames #[5:6] #[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -91,6 +92,7 @@ class AstroInferrer(BaseInferrer):
         self.recon_img = "recon_img" in tasks
         self.recon_HSI = "recon_HSI" in tasks
         self.recon_flat_trans = "recon_flat_trans" in tasks
+        self.plot_pixel_distrib = "plot_pixel_distrib" in tasks
 
         self.plot_embed_map = "plot_embed_map" in tasks \
             and self.quantize_latent and self.space_dim == 3
@@ -125,17 +127,23 @@ class AstroInferrer(BaseInferrer):
         if self.recon_dummy_spectra or self.recon_gt_spectra:
             self.group_tasks.append("infer_selected_coords_partial_model")
 
+        if self.plot_pixel_distrib:
+            self.group_tasks.append("infer_no_model_run")
+
         # set all grouped tasks to False, only required tasks will be toggled afterwards
         self.infer_all_coords_full_model = False
         self.infer_hardcode_coords_modified_model = False
         self.infer_selected_coords_partial_model = False
+        self.infer_without_model_run = False
 
         # log.info(f"inferrence group tasks: {self.group_tasks}.")
 
     def generate_inferrence_funcs(self):
         self.infer_funcs = {}
+
         for group_task in self.group_tasks:
             if group_task == "infer_all_coords_full_model":
+                self.run_model = True
                 self.infer_funcs[group_task] = [
                     self.pre_inferrence_all_coords_full_model,
                     self.post_inferrence_all_coords_full_model,
@@ -144,6 +152,7 @@ class AstroInferrer(BaseInferrer):
                     self.post_checkpoint_all_coords_full_model ]
 
             elif group_task == "infer_selected_coords_partial_model":
+                self.run_model = True
                 self.infer_funcs[group_task] = [
                     self.pre_inferrence_selected_coords_partial_model,
                     self.post_inferrence_selected_coords_partial_model,
@@ -152,12 +161,17 @@ class AstroInferrer(BaseInferrer):
                     self.post_checkpoint_selected_coords_partial_model ]
 
             elif group_task == "infer_hardcode_coords_modified_model":
+                self.run_model = True
                 self.infer_funcs[group_task] = [
                     self.pre_inferrence_hardcode_coords_modified_model,
                     self.post_inferrence_hardcode_coords_modified_model,
                     self.pre_checkpoint_hardcode_coords_modified_model,
                     self.run_checkpoint_hardcode_coords_modified_model,
                     self.post_checkpoint_hardcode_coords_modified_model ]
+
+            elif group_task == "infer_no_model_run":
+                self.run_model = False
+                self.infer_funcs[group_task] = [None]*5
 
             else: raise Exception("Unrecgonized group inferrence task.")
 
@@ -239,6 +253,16 @@ class AstroInferrer(BaseInferrer):
     def post_inferrence_hardcode_coords_modified_model(self):
         pass
 
+    def inferrence_no_model_run(self):
+        if self.plot_pixel_distrib:
+            assert(exists(self.recon_dir))
+            for fname in os.listdir(self.recon_dir):
+                if not "npy" in fname: continue
+                in_fname = join(self.recon_dir, fname)
+                out_fname = join(self.pixel_distrib_dir, fname[:-4] + ".png")
+                pixels = np.load(in_fname)
+                plot_horizontally(pixels, out_fname, "plot_distrib")
+
     #############
     # Infer with checkpoint
     #############
@@ -281,10 +305,10 @@ class AstroInferrer(BaseInferrer):
                 "metric_options": self.metric_options,
                 "verbose": self.verbose,
                 "num_bands": self.extra_args["num_bands"],
-                "log_max": True,
-                "save_locally": True,
                 "plot_func": plot_horizontally,
                 "zscale": True,
+                "log_max": True,
+                "save_locally": True,
                 "to_HDU": self.to_HDU_now,
                 "calculate_metrics": self.calculate_metrics,
                 "recon_flat_trans": self.recon_flat_trans_now,
