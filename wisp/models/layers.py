@@ -10,6 +10,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from torch.nn.functional import one_hot
+from wisp.utils.numerical import find_closest_tensor
+
+
 def normalize_frobenius(x):
     """Normalizes the matrix according to the Frobenius norm.
 
@@ -145,3 +149,58 @@ class TrainableEltwiseLayer(nn.Module):
     # input, [bsz,ndim]
     def forward(self, input):
         return input * self.weights
+
+class Quantization(nn.Module):
+    """ Quantization layer for latent variables.
+        @Param
+          calculate_loss: whether calculate codebook loss or not
+    """
+    def __init__(self, calculate_loss, **kwargs):
+        super(Quantization, self).__init__()
+        self.kwargs = kwargs
+
+        #self.quantize_strategy = kwargs["quantize_strategy"]
+
+        self.calculate_loss = calculate_loss
+        self.beta = kwargs["qtz_beta"]
+        self.num_embed = kwargs["qtz_num_embed"]
+        self.latent_dim = kwargs["qtz_latent_dim"]
+
+        self.init_codebook(kwargs["qtz_seed"])
+
+    def init_codebook(self, seed):
+        torch.manual_seed(seed)
+        self.qtz_codebook = nn.Embedding(self.latent_dim, self.num_embed)
+        self.qtz_codebook.weight.data.uniform_(
+            -1.0 / self.latent_dim, 1.0 / self.latent_dim)
+        self.qtz_codebook.weight.data /= 10
+
+    def quantize(self, z):
+        # flatten input [...,]
+        # assert(z.shape[-1] == self.latent_dim)
+        z_shape = z.shape
+        z_f = z.view(-1,self.latent_dim)
+
+        min_embed_ids = find_closest_tensor(z_f, self.qtz_codebook.weight) # [bsz]
+
+        # replace each z with closest embedding
+        encodings = one_hot(min_embed_ids, self.num_embed) # [n,num_embed]
+        encodings = encodings.type(z.dtype)
+        z_q = torch.matmul(encodings, self.qtz_codebook.weight.T).view(z_shape)
+        return z_q, min_embed_ids
+
+    def partial_loss(self, z, z_q):
+        codebook_loss = torch.mean((z_q.detach() - z)**2) + \
+            torch.mean((z_q - z.detach())**2) * self.beta
+        return codebook_loss
+
+    def forward(self, z, ret):
+        z_q, min_embed_ids = self.quantize(z)
+
+        ret["min_embed_ids"] = min_embed_ids
+        if self.calculate_loss:
+            ret["codebook_loss"] = self.partial_loss(z, z_q)
+
+        # straight-through estimator
+        z_q = z + (z_q - z).detach()
+        return z, z_q
