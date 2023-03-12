@@ -531,13 +531,12 @@ def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1
         lo = full_wave[lo_id] # lo <= full_wave[lo_id]
         hi = full_wave[hi_id] # hi >= full_wave[hi_id]
 
-        # new gt wave range with same discretization value as trans
+        # new gt wave range with same discretization value as transmission wave
         gt_wave = np.arange(lo, hi + 1, smpl_interval)
 
         # interpolate new gt wave to get interpolated spectra
         gt_spectra = f_gt(gt_wave)
 
-    #gt_spectra /= np.max(gt_spectra) #
     return gt_wave, gt_spectra
 
 def overlay_spectrum(gt_fn, gen_wave, gen_spectra):

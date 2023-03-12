@@ -7,6 +7,25 @@ from astropy.visualization import ZScaleInterval
 from skimage.metrics import structural_similarity
 
 
+def calculate_emd(distrib1, distrib2):
+    """ Calculate earth mover's distance between two distributions.
+        @Param
+           distrib: [...,num_bins] (assume they sum to 1)
+    """
+    # assert(distrib1.shape == distrib2.shape)
+    #print(distrib1.shape, distrib2.shape)
+    #print(torch.sum(distrib1, dim=-1))
+    #print(torch.sum(distrib2, dim=-1))
+    n = distrib1.shape[-1]
+
+    shape = list(distrib1.shape[:-1])
+    shape.append(distrib1.shape[-1] + 1)
+    emds = torch.zeros(shape).to(distrib1.device)
+    for i in range(n):
+        emds[...,i+1] = (distrib1[...,i] + emds[...,i]) - distrib2[...,i]
+    #print(emds.shape, emds)
+    return torch.sum(emds, dim=-1)
+
 def find_closest_tensor(tensor1, tensor2):
     ''' Calculate L2-normalized distance between the each tensor from tensor1 and
           tensor2. Then find id of closest tensor in tensor2 for each tensor in tensor1

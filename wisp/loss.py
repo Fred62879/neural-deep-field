@@ -1,18 +1,26 @@
 import torch
 import numpy as np
 
-#from skimage.metrics import structural_similarity
+from wisp.utils.numerical import calculate_emd
+
 
 def spectra_supervision_loss(loss, gt_spectra, recon_spectra):
     ''' Loss function for few-shot spectra supervision
         @Param
           loss: l1/l2 as specified in config
-          wave_rnge: Trusted lambda range of spectra
-          spectra_ids: ids of spectra to supervise
-          spectra: [bsz, num_smpls]
+          gt/recon_spectra: [bsz, num_smpls]
     '''
+    #return loss(gt_spectra, recon_spectra)
+
     # norm spectra each so they sum to 1 (earth movers distance)
-    return loss(gt_spectra, recon_spectra)
+    # print(gt_spectra.shape, recon_spectra.shape)
+    gt_spectra /= (torch.sum(gt_spectra, dim=-1)[...,None])
+    recon_spectra /= (torch.sum(recon_spectra, dim=-1)[...,None])
+
+    emd = calculate_emd(gt_spectra, recon_spectra)
+    # print(emd.shape, emd)
+    emd = torch.mean(torch.abs(emd))
+    return emd
 
 def redshift_supervision_loss(loss, gt_redshift, recon_redshift):
     ''' Loss function for few-shot redshift supervision

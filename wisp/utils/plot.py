@@ -123,7 +123,7 @@ def plot_one_row(fig, r, c, lo, img, num_bands, plot_option, vmins, vmaxs, cal_z
     if cal_z_range:
         return vmins,vmaxs
 
-def plot_horizontally(img, png_fname, plot_option, zscale_ranges=None, save_close=True):
+def plot_horizontally(img, png_fname, plot_option="plot_img", zscale_ranges=None, save_close=True):
     """ Plot multiband image horizontally.
         Currently only supports plot one row.
         @Param

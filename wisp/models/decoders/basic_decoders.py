@@ -38,14 +38,14 @@ class MLP_Relu(nn.Module):
 class BasicDecoder(nn.Module):
     """Super basic but super useful MLP class.
     """
-    def __init__(self, 
-        input_dim, 
-        output_dim, 
+    def __init__(self,
+        input_dim,
+        output_dim,
         activation,
         bias,
         layer = nn.Linear,
-        num_layers = 1, 
-        hidden_dim = 128, 
+        num_layers = 1,
+        hidden_dim = 128,
         skip       = []
     ):
         """Initialize the BasicDecoder.
@@ -64,9 +64,9 @@ class BasicDecoder(nn.Module):
             (void): Initializes the class.
         """
         super().__init__()
-        
+
         self.input_dim = input_dim
-        self.output_dim = output_dim        
+        self.output_dim = output_dim
         self.activation = activation
         self.bias = bias
         self.layer = layer
@@ -75,7 +75,7 @@ class BasicDecoder(nn.Module):
         self.skip = skip
         if self.skip is None:
             self.skip = []
-        
+
         self.make()
 
     def make(self):
@@ -83,7 +83,7 @@ class BasicDecoder(nn.Module):
         """
         layers = []
         for i in range(self.num_layers):
-            if i == 0: 
+            if i == 0:
                 layers.append(self.layer(self.input_dim, self.hidden_dim, bias=self.bias))
             elif i in self.skip:
                 layers.append(self.layer(self.hidden_dim+input_dim, self.hidden_dim, bias=self.bias))
@@ -113,10 +113,9 @@ class BasicDecoder(nn.Module):
                 h = torch.cat([x, h], dim=-1)
             else:
                 h = self.activation(l(h))
-            #print(h)
-        
+
         out = self.lout(h)
-        
+
         if return_h:
             return out, h
         else:
@@ -199,4 +198,3 @@ def average(weight):
         (torch.FloatTensor): Matrix of shape [M, N].
     """
     return weight / weight.sum()
-

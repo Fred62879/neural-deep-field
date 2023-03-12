@@ -216,7 +216,6 @@ class AstroTrainer(BaseTrainer):
                         in self.pipeline.named_parameters() }
 
         for name in params_dict:
-            print(name)
             if "grid" in name: grid_params.append(params_dict[name])
             elif "qtz_codebook" in name: qtz_params.append(params_dict[name])
             else: rest_params.append(params_dict[name])

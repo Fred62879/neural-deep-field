@@ -261,7 +261,7 @@ class AstroInferrer(BaseInferrer):
                 in_fname = join(self.recon_dir, fname)
                 out_fname = join(self.pixel_distrib_dir, fname[:-4] + ".png")
                 pixels = np.load(in_fname)
-                plot_horizontally(pixels, out_fname, "plot_distrib")
+                plot_horizontally(pixels, out_fname, plot_option="plot_distrib")
 
     #############
     # Infer with checkpoint
