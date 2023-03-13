@@ -217,15 +217,22 @@ def define_cmd_line_args():
     ###################
     # Quantization arguments
     ###################
+    qtz_group = parser.add_argument_group("quantization")
+
+    qtz_group.add_argument("--quantization-strategy", type=str)
+    qtz_group.add_argument("--qtz-latent-dim", type=int)
+    qtz_group.add_argument("--qtz-num-embed", type=int)
+    qtz_group.add_argument("--qtz-beta", type=float, help="codebook loss weight")
+    qtz_group.add_argument("--qtz-seed", type=int)
+    qtz_group.add_argument("--qtz-soft-temperature", type=int)
+
+    ###################
+    # Spatial Decoder arguments
+    ###################
     spatial_decod_group = parser.add_argument_group("quantization")
 
     spatial_decod_group.add_argument("--generate-scaler", action="store_true")
     spatial_decod_group.add_argument("--generate-redshift", action="store_true")
-
-    spatial_decod_group.add_argument("--qtz-latent-dim", type=int)
-    spatial_decod_group.add_argument("--qtz-num-embed", type=int)
-    spatial_decod_group.add_argument("--qtz-beta", type=float, help="codebook loss weight")
-    spatial_decod_group.add_argument("--qtz-seed", type=int)
 
     spatial_decod_group.add_argument("--spatial-decod-hidden-dim", type=int)
     spatial_decod_group.add_argument("--spatial-decod-num-hidden-layers", type=int)

@@ -16,9 +16,11 @@ class SpatialDecoder(nn.Module):
         super(SpatialDecoder, self).__init__()
 
         self.kwargs = kwargs
+
         self.quantize_z = kwargs["quantize_latent"]
         self.qtz_calculate_loss = qtz_calculate_loss
-        #self.quantize_strategy = kwargs["quantize_strategy"]
+        self.quantize_strategy = kwargs["quantization_strategy"]
+
         self.output_scaler = kwargs["generate_scaler"]
         self.output_redshift = kwargs["generate_redshift"]
         self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
@@ -58,7 +60,13 @@ class SpatialDecoder(nn.Module):
 
     def init_decoder(self):
         if self.quantize_z:
-            output_dim = self.kwargs["qtz_latent_dim"]
+            if self.quantize_strategy == "soft":
+                # decode into score corresponding to each code
+                output_dim = self.kwargs["qtz_num_embed"]
+            elif self.quantize_strategy == "hard":
+                output_dim = self.kwargs["qtz_latent_dim"]
+            else:
+                raise ValueError("Unsupporteed quantization strategt.")
         elif self.decode_spatial_embedding:
             output_dim = self.kwargs["spatial_decod_output_dim"]
 
@@ -87,6 +95,7 @@ class SpatialDecoder(nn.Module):
             z = self.decoder(z)
 
         if self.quantize_z:
+            assert(self.decode_spatial_embedding)
             z, z_q = self.qtz(z, ret)
 
         ret["latents"] = z

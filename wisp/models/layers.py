@@ -159,9 +159,11 @@ class Quantization(nn.Module):
         super(Quantization, self).__init__()
         self.kwargs = kwargs
 
-        #self.quantize_strategy = kwargs["quantize_strategy"]
-
         self.calculate_loss = calculate_loss
+        self.quantization_strategy = kwargs["quantization_strategy"]
+        self.temperature = kwargs["qtz_soft_temperature"]
+        self.softmax = nn.Softmax()
+
         self.beta = kwargs["qtz_beta"]
         self.num_embed = kwargs["qtz_num_embed"]
         self.latent_dim = kwargs["qtz_latent_dim"]
@@ -176,20 +178,33 @@ class Quantization(nn.Module):
         self.qtz_codebook.weight.data /= 10
 
     def quantize(self, z):
-        # flatten input [...,]
-        # assert(z.shape[-1] == self.latent_dim)
-        z_shape = z.shape
-        z_f = z.view(-1,self.latent_dim)
+        if self.quantization_strategy == "soft":
+            min_embed_ids = None
+            # print(z.shape)
+            # print(z[1:10])
+            weights = nn.functional.softmax(z * self.temperature, dim=-1) # [bsz,1,num_embeds] !!! all values same
+            # print(weights.shape)
+            # print(torch.sum(weights, dim=-1)[1:10])
+            z_q = weights * self.qtz_codebook.weight # [bsz,latent_dim,num_embeds]
+            z_q = torch.sum(z_q, dim=-1)[:,None]     # [bsz,1,latent_dim]
 
-        min_embed_ids = find_closest_tensor(z_f, self.qtz_codebook.weight) # [bsz]
+        elif self.quantization_strategy == "hard":
+            z_shape = z.shape
+            z_f = z.view(-1,self.latent_dim) # flatten
 
-        # replace each z with closest embedding
-        encodings = one_hot(min_embed_ids, self.num_embed) # [n,num_embed]
-        encodings = encodings.type(z.dtype)
-        z_q = torch.matmul(encodings, self.qtz_codebook.weight.T).view(z_shape)
+            min_embed_ids = find_closest_tensor(z_f, self.qtz_codebook.weight) # [bsz]
+
+            # replace each z with closest embedding
+            encodings = one_hot(min_embed_ids, self.num_embed) # [n,num_embed]
+            encodings = encodings.type(z.dtype)
+            z_q = torch.matmul(encodings, self.qtz_codebook.weight.T).view(z_shape)
+
+        print(z.shape, z_q.shape)
         return z_q, min_embed_ids
 
     def partial_loss(self, z, z_q):
+
+
         codebook_loss = torch.mean((z_q.detach() - z)**2) + \
             torch.mean((z_q - z.detach())**2) * self.beta
         return codebook_loss
@@ -197,7 +212,9 @@ class Quantization(nn.Module):
     def forward(self, z, ret):
         z_q, min_embed_ids = self.quantize(z)
 
-        ret["min_embed_ids"] = min_embed_ids
+        if self.quantization_strategy == "hard":
+            ret["min_embed_ids"] = min_embed_ids
+
         if self.calculate_loss:
             ret["codebook_loss"] = self.partial_loss(z, z_q)
 

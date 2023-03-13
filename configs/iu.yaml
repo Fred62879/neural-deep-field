@@ -93,14 +93,17 @@ decoder:
     siren_coords_scaler: 8
     siren_last_linear: True
 
-spatial_decod:
-    generate_scaler: True
-    generate_redshift: True
-
+qtz:
+    quantization_strategy: 'soft'
     qtz_latent_dim: 16
     qtz_num_embed: 4
     qtz_beta: 0.01
     qtz_seed: 8
+    qtz_soft_temperature: 1
+
+spatial_decod:
+    generate_scaler: True
+    generate_redshift: True
 
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1
