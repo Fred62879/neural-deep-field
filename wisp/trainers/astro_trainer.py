@@ -505,6 +505,7 @@ class AstroTrainer(BaseTrainer):
 
         ret = forward(data,
                       self.pipeline,
+                      self.iteration,
                       self.space_dim,
                       self.extra_args["trans_sample_method"],
                       pixel_supervision_train=self.pixel_supervision,
@@ -570,7 +571,7 @@ class AstroTrainer(BaseTrainer):
 
         # iv) latent quantization codebook loss
         codebook_loss = 0
-        if self.quantize_latent:
+        if self.quantize_latent and self.extra_args["quantization_strategy"] == "hard":
             codebook_loss = ret["codebook_loss"]
             self.log_dict["codebook_loss"] += codebook_loss.item()
 
@@ -589,7 +590,7 @@ class AstroTrainer(BaseTrainer):
         log_text = "EPOCH {}/{}".format(self.epoch, self.num_epochs)
         log_text += " | total loss: {:>.3E}".format(self.log_dict["total_loss"] / n)
         log_text += " | recon loss: {:>.3E}".format(self.log_dict["recon_loss"] / n)
-        if self.quantize_latent:
+        if self.quantize_latent and self.extra_args["quantization_strategy"] == "hard":
             log_text += " | codebook loss: {:>.3E}".format(self.log_dict["codebook_loss"] / n)
 
         if self.spectra_supervision and \

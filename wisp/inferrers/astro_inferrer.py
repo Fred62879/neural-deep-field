@@ -462,6 +462,7 @@ class AstroInferrer(BaseInferrer):
                     ret = forward(
                         data,
                         self.full_pipeline,
+                        0,
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
                         pixel_supervision_train=False,
@@ -500,6 +501,7 @@ class AstroInferrer(BaseInferrer):
                     spectra = forward(
                         data,
                         self.spectra_infer_pipeline,
+                        0,
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
                         pixel_supervision_train=False,
@@ -547,6 +549,7 @@ class AstroInferrer(BaseInferrer):
                     spectra = forward(
                         data,
                         self.codebook_pipeline,
+                        0,
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
                         pixel_supervision_train=False,

@@ -18,7 +18,6 @@ def spectra_supervision_loss(loss, gt_spectra, recon_spectra):
     recon_spectra /= (torch.sum(recon_spectra, dim=-1)[...,None])
 
     emd = calculate_emd(gt_spectra, recon_spectra)
-    # print(emd.shape, emd)
     emd = torch.mean(torch.abs(emd))
     return emd
 

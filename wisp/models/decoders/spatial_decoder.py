@@ -19,7 +19,7 @@ class SpatialDecoder(nn.Module):
 
         self.quantize_z = kwargs["quantize_latent"]
         self.qtz_calculate_loss = qtz_calculate_loss
-        self.quantize_strategy = kwargs["quantization_strategy"]
+        self.quantization_strategy = kwargs["quantization_strategy"]
 
         self.output_scaler = kwargs["generate_scaler"]
         self.output_redshift = kwargs["generate_redshift"]
@@ -60,10 +60,10 @@ class SpatialDecoder(nn.Module):
 
     def init_decoder(self):
         if self.quantize_z:
-            if self.quantize_strategy == "soft":
+            if self.quantization_strategy == "soft":
                 # decode into score corresponding to each code
                 output_dim = self.kwargs["qtz_num_embed"]
-            elif self.quantize_strategy == "hard":
+            elif self.quantization_strategy == "hard":
                 output_dim = self.kwargs["qtz_latent_dim"]
             else:
                 raise ValueError("Unsupporteed quantization strategt.")
@@ -77,7 +77,7 @@ class SpatialDecoder(nn.Module):
             num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["spatial_decod_hidden_dim"], skip=[])
 
-    def forward(self, z, ret):
+    def forward(self, z, ret, temperature=1):
         """ Decode latent variables
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
@@ -96,7 +96,7 @@ class SpatialDecoder(nn.Module):
 
         if self.quantize_z:
             assert(self.decode_spatial_embedding)
-            z, z_q = self.qtz(z, ret)
+            z, z_q = self.qtz(z, ret, temperature=temperature)
 
         ret["latents"] = z
         ret["scaler"] = scaler

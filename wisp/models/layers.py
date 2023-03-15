@@ -39,7 +39,7 @@ def normalize_L_1(x):
     abscolsum = torch.min(torch.stack([1.0/abscolsum, torch.ones_like(abscolsum)], dim=0), dim=0)[0]
     return x * abscolsum[None,:]
 
-def normalize_L_inf(x):    
+def normalize_L_inf(x):
     """Normalizes the matrix according to the Linf norm.
 
     Args:
@@ -84,7 +84,7 @@ class L_inf_Linear(nn.Module):
     def forward(self, x):
         weight = normalize_L_inf(self.linear.weight)
         return F.linear(x, weight, self.linear.bias)
-        
+
 def spectral_norm_(*args, **kwargs):
     """Initializes a spectral norm layer.
     """
@@ -177,16 +177,15 @@ class Quantization(nn.Module):
             -1.0 / self.latent_dim, 1.0 / self.latent_dim)
         self.qtz_codebook.weight.data /= 10
 
-    def quantize(self, z):
+    def quantize(self, z, temperature):
         if self.quantization_strategy == "soft":
             min_embed_ids = None
-            # print(z.shape)
-            # print(z[1:10])
-            weights = nn.functional.softmax(z * self.temperature, dim=-1) # [bsz,1,num_embeds] !!! all values same
+            weights = nn.functional.softmax(z * temperature, dim=-1) # [bsz,1,num_embeds] !!! all values same
             # print(weights.shape)
             # print(torch.sum(weights, dim=-1)[1:10])
-            z_q = weights * self.qtz_codebook.weight # [bsz,latent_dim,num_embeds]
-            z_q = torch.sum(z_q, dim=-1)[:,None]     # [bsz,1,latent_dim]
+            # z_q = weights * self.qtz_codebook.weight # [bsz,latent_dim,num_embeds]
+            # z_q = torch.sum(z_q, dim=-1)[:,None]     # [bsz,1,latent_dim]
+            z_q = torch.matmul(weights, self.qtz_codebook.weight.permute((1,0)))
 
         elif self.quantization_strategy == "hard":
             z_shape = z.shape
@@ -199,25 +198,23 @@ class Quantization(nn.Module):
             encodings = encodings.type(z.dtype)
             z_q = torch.matmul(encodings, self.qtz_codebook.weight.T).view(z_shape)
 
-        print(z.shape, z_q.shape)
         return z_q, min_embed_ids
 
     def partial_loss(self, z, z_q):
-
-
         codebook_loss = torch.mean((z_q.detach() - z)**2) + \
             torch.mean((z_q - z.detach())**2) * self.beta
         return codebook_loss
 
-    def forward(self, z, ret):
-        z_q, min_embed_ids = self.quantize(z)
+    def forward(self, z, ret, temperature=1):
+        z_q, min_embed_ids = self.quantize(z, temperature)
 
         if self.quantization_strategy == "hard":
             ret["min_embed_ids"] = min_embed_ids
 
-        if self.calculate_loss:
-            ret["codebook_loss"] = self.partial_loss(z, z_q)
+            if self.calculate_loss:
+                ret["codebook_loss"] = self.partial_loss(z, z_q)
 
-        # straight-through estimator
-        z_q = z + (z_q - z).detach()
+            # straight-through estimator
+            z_q = z + (z_q - z).detach()
+
         return z, z_q

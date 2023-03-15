@@ -126,6 +126,7 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
 
 def forward(data,
             pipeline,
+            step_num,
             space_dim,
             trans_sample_method,
             pixel_supervision_train=True,
@@ -135,6 +136,7 @@ def forward(data,
             recon_spectra=False,
             recon_codebook_spectra=False,
             quantize_latent=False,
+            quantization_strategy="hard",
             calculate_codebook_loss=False,
             save_scaler=False,
             save_spectra=False,
@@ -156,14 +158,16 @@ def forward(data,
 
     elif space_dim == 3:
         requested_channels = ["intensity"]
-        if quantize_latent and calculate_codebook_loss:
-            requested_channels.append("codebook_loss")
         if save_scaler: requested_channels.append("scaler")
         if save_spectra: requested_channels.append("spectra")
         if save_latents: requested_channels.append("latents")
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if spectra_supervision_train: requested_channels.append("spectra")
-        if save_redshift or redshift_supervision_train: requested_channels.append("redshift")
+        if save_redshift or redshift_supervision_train:
+            requested_channels.append("redshift")
+        if train and quantize_latent and quantization_strategy == "hard" \
+           and calculate_codebook_loss:
+            requested_channels.append("codebook_loss")
 
         # transmission wave min and max value (used for linear normalization)
         net_args["full_wave_bound"] = data["full_wave_bound"]
@@ -189,6 +193,9 @@ def forward(data,
             net_args["full_wave"] = data["full_wave"]
             # num of coords for gt, dummy (incl. neighbours) spectra
             net_args["num_spectra_coords"] = data["num_spectra_coords"]
+
+        if train and quantize_latent and quantization_strategy == "soft":
+            net_args["temperature"] = step_num
 
     else: raise ValueError("Unsupported space dimension.")
 

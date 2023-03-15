@@ -56,11 +56,16 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         """ Register forward functions with the channels that they output.
         """
         channels = ["intensity","latents","spectra"]
+
         if self.kwargs["quantize_latent"]:
             channels.extend(["scaler","redshift","codebook_loss","min_embed_ids"])
+
+            if self.kwargs["quantization_strategy"] == "soft":
+                channels.append("temperature")
+
         self._register_forward_function( self.hyperspectral, channels )
 
-    def hyperspectral(self, coords, wave=None, trans=None, nsmpl=None, full_wave=None, full_wave_bound=None, num_spectra_coords=-1, pidx=None, lod_idx=None):
+    def hyperspectral(self, coords, wave=None, trans=None, nsmpl=None, full_wave=None, full_wave_bound=None, num_spectra_coords=-1, pidx=None, lod_idx=None, temperature=1):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
               coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2/3]
@@ -69,6 +74,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
               lod_idx (int): index into active_lods. If None, will use the maximum LOD.
                              Currently interpolation doesn't use this.
               full_wave_bound: min and max of wave to normalize wave TODO make this requried
+              temperature: temperature for soft quantization, if performed
             @Return
               {"indensity": Output intensity tensor of shape [batch, num_samples, 3]
                "spectra":
@@ -80,7 +86,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
 
         timer.check("hyper nef encode coord")
         latents = self.coord_encoder(coords, lod_idx=lod_idx)
-        latents = self.spatial_decoder(latents, ret)
+        latents = self.spatial_decoder(latents, ret, temperature=temperature)
         self.hps_decoder(latents, wave, trans, nsmpl, ret,
                          full_wave, full_wave_bound, num_spectra_coords)
         return ret
