@@ -177,10 +177,13 @@ class Quantization(nn.Module):
             -1.0 / self.latent_dim, 1.0 / self.latent_dim)
         self.qtz_codebook.weight.data /= 10
 
-    def quantize(self, z, temperature):
+    def quantize(self, z, temperature, find_embed_id):
         if self.quantization_strategy == "soft":
-            min_embed_ids = None
-            weights = nn.functional.softmax(z * temperature, dim=-1) # [bsz,1,num_embeds] !!! all values same
+            if find_embed_id:
+                min_embed_ids = torch.argmax(z, dim=-1)
+            else: min_embed_ids = None
+
+            weights = nn.functional.softmax(z * temperature * self.kwargs["qtz_temperature_scale"], dim=-1) # [bsz,1,num_embeds] !!! all values same
             # print(weights.shape)
             # print(torch.sum(weights, dim=-1)[1:10])
             # z_q = weights * self.qtz_codebook.weight # [bsz,latent_dim,num_embeds]
@@ -205,8 +208,16 @@ class Quantization(nn.Module):
             torch.mean((z_q - z.detach())**2) * self.beta
         return codebook_loss
 
-    def forward(self, z, ret, temperature=1):
-        z_q, min_embed_ids = self.quantize(z, temperature)
+    def forward(self, z, ret, temperature=1, find_embed_id=False):
+        """ @Param
+               z: latent variables
+               ret: collection of results to return
+               temperature: used for softmax quantization
+               find_embed_id: whether find embed id, only used for soft quantization
+                              hard qtz always requires find embed id
+                              soft qtz requires only when plotting embed map
+        """
+        z_q, min_embed_ids = self.quantize(z, temperature, find_embed_id)
 
         if self.quantization_strategy == "hard":
             ret["min_embed_ids"] = min_embed_ids
@@ -217,4 +228,9 @@ class Quantization(nn.Module):
             # straight-through estimator
             z_q = z + (z_q - z).detach()
 
+        elif self.quantization_strategy == "soft":
+            if find_embed_id:
+                ret["min_embed_ids"] = min_embed_ids
+
+        else: raise ValueError("Unsupported quantization strategy")
         return z, z_q

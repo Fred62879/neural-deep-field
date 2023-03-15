@@ -225,6 +225,7 @@ def define_cmd_line_args():
     qtz_group.add_argument("--qtz-beta", type=float, help="codebook loss weight")
     qtz_group.add_argument("--qtz-seed", type=int)
     qtz_group.add_argument("--qtz-soft-temperature", type=int)
+    qtz_group.add_argument("--qtz-temperature-scale", type=int)
 
     ###################
     # Spatial Decoder arguments

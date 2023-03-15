@@ -194,8 +194,11 @@ def forward(data,
             # num of coords for gt, dummy (incl. neighbours) spectra
             net_args["num_spectra_coords"] = data["num_spectra_coords"]
 
-        if train and quantize_latent and quantization_strategy == "soft":
-            net_args["temperature"] = step_num
+        if quantize_latent and quantization_strategy == "soft":
+            if train:
+                net_args["temperature"] = step_num
+            elif save_embed_ids:
+                net_args["find_embed_id"] = save_embed_ids
 
     else: raise ValueError("Unsupported space dimension.")
 

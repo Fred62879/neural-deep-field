@@ -24,8 +24,8 @@ global:
 
     tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
 
-    tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler']
-    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map'] #,'plot_redshift']
+    #tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler']
+    tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map'] #,'plot_redshift']
     #tasks: ['infer','plot_embed_map','plot_redshift']
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
 
@@ -100,6 +100,7 @@ qtz:
     qtz_beta: 0.01
     qtz_seed: 8
     qtz_soft_temperature: 1
+    qtz_temperature_scale: 0.01
 
 spatial_decod:
     generate_scaler: True
