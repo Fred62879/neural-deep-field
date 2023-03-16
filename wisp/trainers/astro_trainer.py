@@ -67,6 +67,8 @@ class AstroTrainer(BaseTrainer):
         self.init_dataloader()
         self.configure_dataset()
 
+        self.total_steps = 0
+
     #############
     # Initializations
     #############
@@ -254,6 +256,8 @@ class AstroTrainer(BaseTrainer):
                 self.post_step()
 
                 self.iteration += 1
+                self.total_steps += 1
+
                 iter_end_time = time.time()
                 self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
 
@@ -505,13 +509,14 @@ class AstroTrainer(BaseTrainer):
 
         ret = forward(data,
                       self.pipeline,
-                      self.iteration,
+                      self.total_steps,
                       self.space_dim,
                       self.extra_args["trans_sample_method"],
                       pixel_supervision_train=self.pixel_supervision,
                       spectra_supervision_train=self.spectra_supervision,
                       redshift_supervision_train=self.redshift_supervision,
                       quantize_latent=self.quantize_latent,
+                      quantization_strategy=self.extra_args["quantization_strategy"],
                       calculate_codebook_loss=self.quantize_latent,
                       recon_img=False,
                       recon_spectra=False,

@@ -58,16 +58,14 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         channels = ["intensity","latents","spectra"]
 
         if self.kwargs["quantize_latent"]:
-            channels.extend(["scaler","redshift","codebook_loss","min_embed_ids"])
-
-            if self.kwargs["quantization_strategy"] == "soft":
-                channels.append("temperature")
+            channels.extend(["scaler","redshift","codebook_loss","min_embed_ids","soft_qtz_weights"])
 
         self._register_forward_function( self.hyperspectral, channels )
 
     def hyperspectral(self, coords, wave=None, trans=None, nsmpl=None, full_wave=None,
                       full_wave_bound=None, num_spectra_coords=-1, pidx=None,
-                      lod_idx=None, temperature=1, find_embed_id=False):
+                      lod_idx=None, temperature=1, find_embed_id=False,
+                      save_soft_qtz_weights=False):
 
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
@@ -91,7 +89,8 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         timer.check("hyper nef encode coord")
         latents = self.coord_encoder(coords, lod_idx=lod_idx)
         latents = self.spatial_decoder(
-            latents, ret, temperature=temperature, find_embed_id=find_embed_id)
+            latents, ret, temperature=temperature, find_embed_id=find_embed_id,
+            save_soft_qtz_weights=save_soft_qtz_weights)
 
         self.hps_decoder(latents, wave, trans, nsmpl, ret,
                          full_wave, full_wave_bound, num_spectra_coords)

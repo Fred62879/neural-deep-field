@@ -65,10 +65,10 @@ class AstroInferrer(BaseInferrer):
                 ["model_dir","recon_dir","metric_dir", "spectra_dir",
                  "codebook_spectra_dir", "embed_map_dir","latent_dir",
                  "redshift_dir","latent_embed_dir","zoomed_recon_dir",
-                 "scaler_dir","pixel_distrib_dir"],
+                 "scaler_dir","pixel_distrib_dir","soft_qtz_weights_dir"],
                 ["models","recons","metrics","spectra","codebook_spectra",
                  "embed_map","latents","redshift","latent_embed","zoomed_recon",
-                 "scaler","pixel_distrib"]
+                 "scaler","pixel_distrib","soft_qtz_weights"]
         ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
@@ -104,6 +104,10 @@ class AstroInferrer(BaseInferrer):
         self.plot_scaler =  "plot_save_scaler" in tasks \
             and self.quantize_latent and self.space_dim == 3
 
+        self.save_soft_qtz_weights = "save_soft_qtz_weights" in tasks and \
+            self.quantize_latent and self.space_dim == 3 and \
+            self.extra_args["quantization_strategy"] == "soft"
+
         # infer all coords using modified model
         self.recon_codebook_spectra = "recon_codebook_spectra" in tasks \
             and self.quantize_latent and self.space_dim == 3
@@ -118,7 +122,8 @@ class AstroInferrer(BaseInferrer):
 
         if self.recon_img or self.recon_flat_trans or \
            self.plot_embed_map or self.plot_latent_embed or \
-           self.plot_redshift or self.plot_scaler:
+           self.plot_redshift or self.plot_scaler or \
+           self.save_soft_qtz_weights:
             self.group_tasks.append("infer_all_coords_full_model")
 
         if self.recon_codebook_spectra:
@@ -289,6 +294,9 @@ class AstroInferrer(BaseInferrer):
         if self.plot_scaler:
             self.scalers = []
 
+        if self.save_soft_qtz_weights:
+            self.soft_qtz_weights = []
+
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
         epoch = checkpoint["epoch_trained"]
         model_state = checkpoint["model_state_dict"]
@@ -406,6 +414,21 @@ class AstroInferrer(BaseInferrer):
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.scalers, **re_args)
 
+        if self.save_soft_qtz_weights:
+            re_args = {
+                "fname": f'{model_id}',
+                "dir": self.soft_qtz_weights_dir,
+                "verbose": self.verbose,
+                "num_bands": self.extra_args["qtz_num_embed"],
+                "log_max": False,
+                "to_HDU": False,
+                "save_locally": True,
+                "match_fits": False,
+                "zscale": False,
+                "calculate_metrics": False,
+            }
+            _, _ = self.dataset.restore_evaluate_tiles(self.soft_qtz_weights, **re_args)
+
     def pre_checkpoint_selected_coords_partial_model(self, model_id):
         self.reset_data_iterator()
         self.recon_spectra = []
@@ -469,6 +492,7 @@ class AstroInferrer(BaseInferrer):
                         spectra_supervision_train=False,
                         quantize_latent=self.quantize_latent,
                         quantization_strategy=self.extra_args["quantization_strategy"],
+                        save_soft_qtz_weights=self.save_soft_qtz_weights,
                         calculate_codebook_loss=False,
                         recon_img=True,
                         recon_spectra=False,
@@ -484,6 +508,7 @@ class AstroInferrer(BaseInferrer):
                 if self.plot_latent_embed: self.latents.extend(ret["latents"])
                 if self.plot_embed_map: self.embed_ids.extend(ret["min_embed_ids"])
                 if self.plot_scaler: self.scalers.extend(ret["scaler"])
+                if self.save_soft_qtz_weights: self.soft_qtz_weights.extend(ret["soft_qtz_weights"])
 
             except StopIteration:
                 # log.info("all coords inferrence done")

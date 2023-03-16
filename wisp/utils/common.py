@@ -137,6 +137,7 @@ def forward(data,
             recon_codebook_spectra=False,
             quantize_latent=False,
             quantization_strategy="hard",
+            save_soft_qtz_weights=False, # save qtz codebook weight
             calculate_codebook_loss=False,
             save_scaler=False,
             save_spectra=False,
@@ -168,6 +169,8 @@ def forward(data,
         if train and quantize_latent and quantization_strategy == "hard" \
            and calculate_codebook_loss:
             requested_channels.append("codebook_loss")
+        if quantize_latent and quantization_strategy == "soft" and save_soft_qtz_weights:
+            requested_channels.append("soft_qtz_weights")
 
         # transmission wave min and max value (used for linear normalization)
         net_args["full_wave_bound"] = data["full_wave_bound"]
@@ -199,6 +202,8 @@ def forward(data,
                 net_args["temperature"] = step_num
             elif save_embed_ids:
                 net_args["find_embed_id"] = save_embed_ids
+
+            net_args["save_soft_qtz_weights"] = save_soft_qtz_weights
 
     else: raise ValueError("Unsupported space dimension.")
 

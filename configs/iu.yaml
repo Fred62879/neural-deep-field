@@ -22,10 +22,9 @@ global:
     #tasks: ['train','plot_save_scaler','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
     #tasks: ['infer','recon_img','plot_embed_map','plot_save_scaler']
 
-    tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
-
-    #tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler']
-    tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map'] #,'plot_redshift']
+    #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
+    tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
+    tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map'] #,'plot_redshift','save_soft_qtz_weights']
     #tasks: ['infer','plot_embed_map','plot_redshift']
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
 
@@ -37,6 +36,7 @@ global:
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map']
     #tasks: ['infer','plot_pixel_distrib']
+    tasks: ['infer','save_soft_qtz_weights']
 
 optimizer:
     optimizer_type: 'adam'
@@ -251,7 +251,7 @@ dataset:
     hardcode_num_trans_samples: 12
     trans_sample_interval: 10
 
-    gt_spectra_ids: [0] #[5,9,6,7,8] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
+    gt_spectra_ids: [0] #[0,1,3,5,7,2,4,6,8,9] #[5,9,6,7,8] #[0,1,2,3,4,5,6,7,8,9]
     spectra_smooth_sigma: 50
     spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]
 

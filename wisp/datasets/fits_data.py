@@ -792,6 +792,7 @@ class FITSData:
             log.info(f"recon. pixel max {recon_max}")
 
         if re_args["save_locally"]:
+            print(dir)
             np_fname = join(dir, f"{fits_uid}_{fname}.npy")
             #if restore_args["recon_norm"]: recon_fname += "_norm"
             #if restore_args["recon_flat_trans"]: recon_fname += "_flat"
