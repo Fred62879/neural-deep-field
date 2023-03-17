@@ -186,14 +186,11 @@ class Quantization(nn.Module):
             weights = nn.functional.softmax(z * temperature * self.kwargs["qtz_temperature_scale"], dim=-1) # [bsz,1,num_embeds]
             z_q = torch.matmul(weights, self.qtz_codebook.weight.permute((1,0)))
 
-            # print(temperature, weights)
-            # print(weights.shape, self.qtz_codebook.weight.shape)
-            # print(z_q.shape)
-
         elif self.quantization_strategy == "hard":
+            weights = None
+
             z_shape = z.shape
             z_f = z.view(-1,self.latent_dim) # flatten
-            weights = None
 
             min_embed_ids = find_closest_tensor(z_f, self.qtz_codebook.weight) # [bsz]
 

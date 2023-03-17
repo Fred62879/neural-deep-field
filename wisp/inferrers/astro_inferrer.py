@@ -11,7 +11,7 @@ from os.path import exists, join
 
 from wisp.inferrers import BaseInferrer
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_latent_embed, annotated_heat, plot_simple
-from wisp.utils.common import add_to_device, forward, load_model_weights, load_layer_weights, load_embed
+from wisp.utils.common import add_to_device, forward, load_model_weights, load_layer_weights, load_embed, sort_alphanumeric
 
 
 class AstroInferrer(BaseInferrer):
@@ -76,7 +76,7 @@ class AstroInferrer(BaseInferrer):
 
     def select_models(self):
         self.selected_model_fnames = os.listdir(self.model_dir)
-        self.selected_model_fnames.sort()
+        self.selected_model_fnames = sort_alphanumeric(self.selected_model_fnames)
         if self.infer_last_model_only:
             self.selected_model_fnames = self.selected_model_fnames #[5:6] #[-1:]
         self.num_models = len(self.selected_model_fnames)
@@ -298,12 +298,10 @@ class AstroInferrer(BaseInferrer):
             self.soft_qtz_weights = []
 
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
-        epoch = checkpoint["epoch_trained"]
-        model_state = checkpoint["model_state_dict"]
-        self.infer_all_coords(model_id, model_state)
+        self.infer_all_coords(model_id, checkpoint)
 
         if self.plot_latent_embed:
-            self.embed = load_embed(model_state)
+            self.embed = load_embed(checkpoint["model_state"])
 
     def post_checkpoint_all_coords_full_model(self, model_id):
         if self.recon_img:
@@ -473,7 +471,9 @@ class AstroInferrer(BaseInferrer):
               flat-trans image,
               pixel embedding map
         """
-        load_model_weights(self.full_pipeline, checkpoint)
+        iterations = checkpoint["iterations"]
+        model_state = checkpoint["model_state_dict"]
+        load_model_weights(self.full_pipeline, model_state)
         self.full_pipeline.eval()
 
         while True:
@@ -485,7 +485,7 @@ class AstroInferrer(BaseInferrer):
                     ret = forward(
                         data,
                         self.full_pipeline,
-                        0,
+                        iterations,
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
                         pixel_supervision_train=False,

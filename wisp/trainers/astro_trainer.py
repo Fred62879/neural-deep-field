@@ -24,7 +24,7 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
 from wisp.datasets import default_collate
 from wisp.utils.plot import plot_horizontally, plot_embed_map
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
-from wisp.utils.common import get_gpu_info, add_to_device, sorted_nicely, forward
+from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, forward
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
 
@@ -143,8 +143,11 @@ class AstroTrainer(BaseTrainer):
         if self.verbose: log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
-                ["model_dir","recon_dir","spectra_dir","embed_map_dir","latent_dir","scaler_dir"],
-                ["models","train_recons","train_spectra","train_embed_maps","latents","scaler"]):
+                ["model_dir","recon_dir","spectra_dir","embed_map_dir",
+                 "latent_dir","scaler_dir","soft_qtz_weights_dir"],
+                ["models","train_recons","train_spectra","train_embed_maps",
+                 "latents","scaler","soft_qtz_weights"]):
+
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -167,7 +170,7 @@ class AstroTrainer(BaseTrainer):
             else:
                 fnames = os.listdir(pretrained_model_dir)
                 assert(len(fnames) > 0)
-                fnames = sorted_nicely(fnames)
+                fnames = sort_alphanumeric(fnames)
                 self.pretrained_model_fname = join(pretrained_model_dir, fnames[-1])
 
     def get_loss(self, cho):
@@ -413,6 +416,13 @@ class AstroTrainer(BaseTrainer):
         #with torch.cuda.amp.autocast():
         total_loss, recon_pixels, ret = self.calculate_loss(data)
 
+        # print weights TMP
+        # if self.extra_args["log_cli_every"] > -1 and self.epoch % self.extra_args["log_cli_every"] == 0:
+        #     weights = ret["soft_qtz_weights"][:-1,0].T
+        #     weights = weights.view(4,64,64).detach().cpu().numpy()
+        #     np.save(join(self.soft_qtz_weights_dir, f"train_{self.epoch}"), weights)
+        #     log.info(f"weight is {weights}")
+
         #self.scaler.scale(total_loss).backward()
         #self.scaler.step(self.optimizer)
         #self.scaler.update()
@@ -517,6 +527,7 @@ class AstroTrainer(BaseTrainer):
                       redshift_supervision_train=self.redshift_supervision,
                       quantize_latent=self.quantize_latent,
                       quantization_strategy=self.extra_args["quantization_strategy"],
+                      save_soft_qtz_weights=True,
                       calculate_codebook_loss=self.quantize_latent,
                       recon_img=False,
                       recon_spectra=False,
@@ -615,6 +626,7 @@ class AstroTrainer(BaseTrainer):
         if self.verbose: log.info(f"Saving model checkpoint to: {model_fname}")
 
         checkpoint = {
+            "iterations": self.total_steps,
             "epoch_trained": self.epoch,
             "model_state_dict": self.pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
