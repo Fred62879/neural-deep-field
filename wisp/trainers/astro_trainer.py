@@ -247,7 +247,6 @@ class AstroTrainer(BaseTrainer):
         for epoch in range(self.num_epochs + 1):
             self.begin_epoch()
 
-            # print(self.num_iterations_cur_epoch)
             for batch in range(self.num_iterations_cur_epoch):
                 iter_start_time = time.time()
                 self.scene_state.optimization.iteration = self.iteration
@@ -417,11 +416,11 @@ class AstroTrainer(BaseTrainer):
         total_loss, recon_pixels, ret = self.calculate_loss(data)
 
         # print weights TMP
-        # if self.extra_args["log_cli_every"] > -1 and self.epoch % self.extra_args["log_cli_every"] == 0:
-        #     weights = ret["soft_qtz_weights"][:-1,0].T
-        #     weights = weights.view(4,64,64).detach().cpu().numpy()
-        #     np.save(join(self.soft_qtz_weights_dir, f"train_{self.epoch}"), weights)
-        #     log.info(f"weight is {weights}")
+        if self.extra_args["log_cli_every"] > -1 and self.epoch % self.extra_args["log_cli_every"] == 0:
+            weights = ret["soft_qtz_weights"][:-1,0].T
+            weights = weights.view(4,64,64).detach().cpu().numpy()
+            np.save(join(self.soft_qtz_weights_dir, f"train_{self.epoch}"), weights)
+            log.info(f"weight is {weights}")
 
         #self.scaler.scale(total_loss).backward()
         #self.scaler.step(self.optimizer)

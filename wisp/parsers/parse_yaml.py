@@ -340,7 +340,11 @@ def define_cmd_line_args():
                             help="id of chosen gt spectra for supervision/recon etc.")
     data_group.add_argument("--spectra-markers", type=int, nargs='+',
                             help="marker to plot each spectra.")
-    data_group.add_argument("--spectra_smooth_sigma",type=int, default=5)
+    data_group.add_argument("--spectra-smooth-sigma",type=int, default=5)
+    data_group.add_argument("--spectra-norm-cho",type=str,choices=["max","sum"],
+                            help="0- divide with max, 1-divide with sum")
+    data_group.add_argument("--trusted-range-only", action="store_true",
+                            help="plot gt spectra within trusted range only")
 
     ###################
     # Arguments for optimizer

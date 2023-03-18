@@ -441,8 +441,9 @@ class AstroInferrer(BaseInferrer):
         ).detach().cpu().numpy()
 
         self.dataset.plot_spectrum(
-            self.spectra_dir, model_id, self.recon_spectra, save_spectra=False,
-            clip=self.extra_args["plot_clipped_spectrum"])
+            self.spectra_dir, model_id, self.recon_spectra,
+            spectra_norm_cho=self.extra_args["spectra_norm_cho"],
+            save_spectra=False, clip=self.extra_args["plot_clipped_spectrum"])
 
         if self.log_pixel_value:
             self.dataset.log_spectra_pixel_values(self.recon_spectra)
@@ -458,6 +459,7 @@ class AstroInferrer(BaseInferrer):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
         self.dataset.plot_spectrum(
             self.codebook_spectra_dir, model_id, self.codebook_spectra,
+            spectra_norm_cho=self.extra_args["spectra_norm_cho"],
             save_spectra=False, codebook=True,
             clip=self.extra_args["plot_clipped_spectrum"])
 
@@ -471,7 +473,7 @@ class AstroInferrer(BaseInferrer):
               flat-trans image,
               pixel embedding map
         """
-        iterations = checkpoint["iterations"]
+        iterations = checkpoint["epoch_trained"] #"iterations"]
         model_state = checkpoint["model_state_dict"]
         load_model_weights(self.full_pipeline, model_state)
         self.full_pipeline.eval()

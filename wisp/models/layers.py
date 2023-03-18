@@ -184,6 +184,7 @@ class Quantization(nn.Module):
             else: min_embed_ids = None
 
             weights = nn.functional.softmax(z * temperature * self.kwargs["qtz_temperature_scale"], dim=-1) # [bsz,1,num_embeds]
+            # print('&', z.shape, z)
             z_q = torch.matmul(weights, self.qtz_codebook.weight.permute((1,0)))
 
         elif self.quantization_strategy == "hard":

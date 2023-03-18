@@ -214,9 +214,9 @@ class AstroDataset(Dataset):
         """
         return self.fits_dataset.restore_evaluate_tiles(recon_pixels, **re_args)
 
-    def plot_spectrum(self, spectra_dir, name, recon_spectra, save_spectra=False, clip=True, codebook=False):
+    def plot_spectrum(self, spectra_dir, name, recon_spectra, spectra_norm_cho, save_spectra=False, clip=True, codebook=False):
         self.spectra_dataset.plot_spectrum(
-            spectra_dir, name, recon_spectra, save_spectra=save_spectra, clip=clip, codebook=codebook)
+            spectra_dir, name, recon_spectra, spectra_norm_cho, save_spectra=save_spectra, clip=clip, codebook=codebook)
 
     def log_spectra_pixel_values(self, spectra):
         return self.spectra_dataset.log_spectra_pixel_values(spectra)

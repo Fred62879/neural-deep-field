@@ -189,6 +189,8 @@ class SpectraData:
             footprint = source_spectra_data["footprint"][spectra_id]
             tile_id = source_spectra_data["tile_id"][spectra_id]
             subtile_id = source_spectra_data["subtile_id"][spectra_id]
+            wave_lo = source_spectra_data["spectrum_plot_wave_lo"][spectra_id]
+            wave_hi = source_spectra_data["spectrum_plot_wave_hi"][spectra_id]
             fits_uid = f"{footprint}{tile_id}{subtile_id}"
 
             log.info(f'spectra: {spectra_id}, {ra}/{dec}')
@@ -210,8 +212,9 @@ class SpectraData:
 
             gt_wave, gt_spectra = load_gt_spectra(
                 fname, self.full_wave, smpl_interval,
-                interpolate=self.spectra_supervision_train,
-                sigma=self.kwargs["spectra_smooth_sigma"])
+                interpolate=True, #self.spectra_supervision_train,
+                sigma=self.kwargs["spectra_smooth_sigma"],
+                trusted_range=None if not self.kwargs["trusted_range_only"] else [wave_lo, wave_hi])
 
             # iii) get data for for spectra supervision
             if self.spectra_supervision_train:
@@ -314,7 +317,7 @@ class SpectraData:
     # Utilities
     #############
 
-    def plot_spectrum(self, spectra_dir, name, recon_spectra, save_spectra=False, clip=True, codebook=False):
+    def plot_spectrum(self, spectra_dir, name, recon_spectra, spectra_norm_cho, save_spectra=False, clip=True, codebook=False):
         """ Plot given spectra.
             @Param
               recon_spectra: [num_spectra(,num_neighbours),full_num_smpl]
@@ -356,7 +359,12 @@ class SpectraData:
                 else: cur_spectra = cur_spectra[0]
             else:
                 assert(cur_spectra.ndim == 1)
-            cur_spectra /= np.max(cur_spectra)
+
+            # normalized spectra within trusted range to sum to 1
+            if spectra_norm_cho == "max":
+                cur_spectra /= np.max(cur_spectra)
+            elif spectra_norm_cho == "sum":
+                cur_spectra /= np.sum(cur_spectra)
 
             # get wave values (x-axis)
             if not clip:
@@ -379,7 +387,12 @@ class SpectraData:
 
                 cur_gt_spectra = gt_spectra[i]
                 cur_gt_spectra_wave = gt_spectra_wave[i]
-                cur_gt_spectra /= np.max(cur_gt_spectra)
+
+                if spectra_norm_cho == "max":
+                    cur_gt_spectra /= np.max(cur_gt_spectra)
+                elif spectra_norm_cho == "sum":
+                    cur_gt_spectra /= np.sum(cur_gt_spectra)
+
                 plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
 
             if sub_dir != "":
@@ -497,7 +510,7 @@ def get_bound_id(wave_bound, source_wave, within_bound=True):
 
     return [id_lo, id_hi]
 
-def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1):
+def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1, trusted_range=None):
 
     """ Load gt spectra (intensity values) for spectra supervision and
           spectrum plotting. Also smooth the gt spectra which has significantly
@@ -527,9 +540,12 @@ def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1
 
         # make sure wave range to interpolate stay within gt spectra wave range
         # full_wave is full transmission wave
-        (lo_id, hi_id) = get_bound_id( ( min(gt_wave),max(gt_wave) ), full_wave, within_bound=True)
-        lo = full_wave[lo_id] # lo <= full_wave[lo_id]
-        hi = full_wave[hi_id] # hi >= full_wave[hi_id]
+        if trusted_range is not None:
+            (lo, hi) = trusted_range
+        else:
+            (lo_id, hi_id) = get_bound_id( ( min(gt_wave),max(gt_wave) ), full_wave, within_bound=True)
+            lo = full_wave[lo_id] # lo <= full_wave[lo_id]
+            hi = full_wave[hi_id] # hi >= full_wave[hi_id]
 
         # new gt wave range with same discretization value as transmission wave
         gt_wave = np.arange(lo, hi + 1, smpl_interval)
