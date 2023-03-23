@@ -325,6 +325,14 @@ class SpectraData:
         full_wave = self.get_full_wave()
         gt_spectra = self.get_gt_spectra()
 
+        print(recon_spectra)
+        for i in range(4):
+            plt.plot(full_wave, recon_spectra[i])
+            plt.savefig(join(spectra_dir,f'{i}.png'))
+            plt.close()
+
+        assert 0
+
         if codebook:
             if clip:
                 clip_range = self.kwargs["codebook_spectra_clip_range"]
@@ -339,9 +347,10 @@ class SpectraData:
             recon_spectra_wave = self.get_recon_spectra_wave()
 
         for i, cur_spectra in enumerate(recon_spectra):
-            sub_dir = ""
+            sub_dir = spectra_norm_cho
+            plot_gt_spectra = not codebook and self.kwargs["plot_spectrum_with_gt"] \
+                and i < len(gt_spectra)
 
-            # clip spectra use bound, if given
             if clip:
                 sub_dir += "clipped_"
 
@@ -357,14 +366,7 @@ class SpectraData:
                 if self.kwargs["average_spectra"]:
                     cur_spectra = np.mean(cur_spectra, axis=0)
                 else: cur_spectra = cur_spectra[0]
-            else:
-                assert(cur_spectra.ndim == 1)
-
-            # normalized spectra within trusted range to sum to 1
-            if spectra_norm_cho == "max":
-                cur_spectra /= np.max(cur_spectra)
-            elif spectra_norm_cho == "sum":
-                cur_spectra /= np.sum(cur_spectra)
+            else: assert(cur_spectra.ndim == 1)
 
             # get wave values (x-axis)
             if not clip:
@@ -376,14 +378,17 @@ class SpectraData:
             else:
                 recon_wave = full_wave
 
-            if self.kwargs["plot_spectrum_with_trans"]:
-                sub_dir += "with_trans_"
-                self.trans_obj.plot_trans()
+            # normalized spectra within trusted range to sum to 1
+            if spectra_norm_cho == "max":
+                cur_spectra /= np.max(cur_spectra)
+            elif spectra_norm_cho == "sum":
+                cur_spectra /= np.sum(cur_spectra)
+            elif spectra_norm_cho == "scale_gt":
+                # scale gt spectra s.t. its max is same as recon
+                cur_recon_max = np.max(cur_spectra)
 
-            plt.plot(recon_wave, cur_spectra, color="black", label="spectrum")
-
-            if not codebook and self.kwargs["plot_spectrum_with_gt"] and i < len(gt_spectra):
-                sub_dir += "with_gt"
+            if plot_gt_spectra:
+                sub_dir += "with_gt_"
 
                 cur_gt_spectra = gt_spectra[i]
                 cur_gt_spectra_wave = gt_spectra_wave[i]
@@ -392,7 +397,18 @@ class SpectraData:
                     cur_gt_spectra /= np.max(cur_gt_spectra)
                 elif spectra_norm_cho == "sum":
                     cur_gt_spectra /= np.sum(cur_gt_spectra)
+                elif spectra_norm_cho == "scale_gt":
+                    cur_gt_spectra = cur_gt_spectra / np.max(cur_gt_spectra) * cur_recon_max
+                elif spectra_norm_cho == "scale_recon":
+                    cur_spectra = cur_spectra / np.max(cur_spectra) * np.max(cur_gt_spectra)
 
+            # plot spectra
+            if self.kwargs["plot_spectrum_with_trans"]:
+                sub_dir += "with_trans_"
+                self.trans_obj.plot_trans()
+
+            plt.plot(recon_wave, cur_spectra, color="black", label="spectrum")
+            if plot_gt_spectra:
                 plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
 
             if sub_dir != "":
@@ -408,8 +424,7 @@ class SpectraData:
             plt.savefig(fname)
             plt.close()
 
-            if save_spectra:
-                np.save(fname, cur_spectra)
+            if save_spectra: np.save(fname, cur_spectra)
 
     def mark_spectra_on_img(self):
         markers = self.kwargs["spectra_markers"]

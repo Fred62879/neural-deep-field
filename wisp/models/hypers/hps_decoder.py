@@ -46,6 +46,9 @@ class HyperSpectralDecoder(nn.Module):
         if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
         spectra = self.spectra_decoder(latents)[...,0]
+        # spectra = torch.rand((self.kwargs["qtz_num_embed"],694))
+
+        # print(spectra.shape, spectra)
         if self.scale and scaler is not None:
             # spectra = (torch.exp(scaler) * spectra.T).T
             spectra = (scaler * spectra.T).T

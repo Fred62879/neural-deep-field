@@ -53,6 +53,9 @@ class AstroInferrer(BaseInferrer):
         self.summarize_inferrence_tasks()
         self.generate_inferrence_funcs()
 
+        self.codebook_latents = torch.rand((self.extra_args["qtz_num_embed"], 1,
+                                            self.extra_args["qtz_latent_dim"])).uniform_(-1,1).numpy()
+
     #############
     # Initializations
     #############
@@ -558,13 +561,17 @@ class AstroInferrer(BaseInferrer):
                 print("recon spectrum pixel", recon[args.spectrum_pos])
 
     def infer_codebook_spectra(self, model_id, checkpoint):
-        load_model_weights(self.codebook_pipeline, checkpoint)
-        self.codebook_pipeline.eval()
+        # load_model_weights(self.codebook_pipeline, checkpoint)
+        # self.codebook_pipeline.eval()
 
-        codebook_latents = load_layer_weights(
-            checkpoint, lambda n: "grid" not in n and "codebook" in n)
-        codebook_latents = codebook_latents.T[:,None] # [num_embd, 1, latent_dim]
-        codebook_latents = codebook_latents.detach().cpu().numpy()
+        # codebook_latents = load_layer_weights(
+        #     checkpoint, lambda n: "grid" not in n and "codebook" in n)
+
+        # codebook_latents = codebook_latents.T[:,None] # [num_embd, 1, latent_dim]
+        # codebook_latents = codebook_latents[:,None] # [num_embd, 1, latent_dim]
+        # codebook_latents = codebook_latents.detach().cpu().numpy()
+        codebook_latents = self.codebook_latents
+        # print('infer', codebook_latents[:,0])
 
         self.dataset.set_hardcode_data(self.coords_source, codebook_latents)
 

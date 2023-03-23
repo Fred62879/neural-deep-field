@@ -88,7 +88,7 @@ class SpatialDecoder(nn.Module):
 
         if self.output_redshift:
             redshift = self.redshift_decoder(z[:,0])[...,0]
-            redshift = self.redshift_adjust(redshift) + 0.5
+            redshift = self.redshift_adjust(redshift)
         else: redshift = None
 
         if self.decode_spatial_embedding: # or self.quantize_z:

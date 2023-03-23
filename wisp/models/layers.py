@@ -172,10 +172,12 @@ class Quantization(nn.Module):
 
     def init_codebook(self, seed):
         torch.manual_seed(seed)
-        self.qtz_codebook = nn.Embedding(self.latent_dim, self.num_embed)
+        # self.qtz_codebook = nn.Embedding(self.latent_dim, self.num_embed)
+        self.qtz_codebook = nn.Embedding(self.num_embed, self.latent_dim)
         self.qtz_codebook.weight.data.uniform_(
             -1.0 / self.latent_dim, 1.0 / self.latent_dim)
-        self.qtz_codebook.weight.data /= 10
+        # print("codebook weights", self.qtz_codebook.weight.data)
+        # self.qtz_codebook.weight.data /= 10
 
     def quantize(self, z, temperature, find_embed_id):
         if self.quantization_strategy == "soft":
@@ -184,8 +186,9 @@ class Quantization(nn.Module):
             else: min_embed_ids = None
 
             weights = nn.functional.softmax(z * temperature * self.kwargs["qtz_temperature_scale"], dim=-1) # [bsz,1,num_embeds]
-            # print('&', z.shape, z)
-            z_q = torch.matmul(weights, self.qtz_codebook.weight.permute((1,0)))
+
+            # z_q = torch.matmul(weights, self.qtz_codebook.weight.permute((1,0)))
+            z_q = torch.matmul(weights, self.qtz_codebook.weight)
 
         elif self.quantization_strategy == "hard":
             weights = None
@@ -198,7 +201,8 @@ class Quantization(nn.Module):
             # replace each z with closest embedding
             encodings = one_hot(min_embed_ids, self.num_embed) # [n,num_embed]
             encodings = encodings.type(z.dtype)
-            z_q = torch.matmul(encodings, self.qtz_codebook.weight.T).view(z_shape)
+            z_q = torch.matmul(encodings, self.qtz_codebook.weight).view(z_shape)
+            # z_q = torch.matmul(encodings, self.qtz_codebook.weight.T).view(z_shape)
 
         return z_q, min_embed_ids, weights
 

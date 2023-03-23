@@ -30,9 +30,10 @@ def find_closest_tensor(tensor1, tensor2):
     ''' Calculate L2-normalized distance between the each tensor from tensor1 and
           tensor2. Then find id of closest tensor in tensor2 for each tensor in tensor1
         Input:  tensor1 [n,d]
-                tensor2 [d,m]
+                tensor2 [m,d]
         Output: id_min_dist [n]
     '''
+    tensor2 = tensor2.T
     similarity = torch.matmul(tensor1, tensor2)
     distances = (
         torch.sum(tensor1 ** 2, dim=-1, keepdims=True) +
