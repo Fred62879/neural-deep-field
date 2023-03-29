@@ -325,13 +325,12 @@ class SpectraData:
         full_wave = self.get_full_wave()
         gt_spectra = self.get_gt_spectra()
 
-        print(recon_spectra)
-        for i in range(4):
-            plt.plot(full_wave, recon_spectra[i])
-            plt.savefig(join(spectra_dir,f'{i}.png'))
-            plt.close()
-
-        assert 0
+        # print(recon_spectra)
+        # for i in range(4):
+        #     plt.plot(full_wave, recon_spectra[i])
+        #     plt.savefig(join(spectra_dir,f'{i}.png'))
+        #     plt.close()
+        # assert 0
 
         if codebook:
             if clip:
@@ -347,7 +346,7 @@ class SpectraData:
             recon_spectra_wave = self.get_recon_spectra_wave()
 
         for i, cur_spectra in enumerate(recon_spectra):
-            sub_dir = spectra_norm_cho
+            sub_dir = spectra_norm_cho + "_"
             plot_gt_spectra = not codebook and self.kwargs["plot_spectrum_with_gt"] \
                 and i < len(gt_spectra)
 

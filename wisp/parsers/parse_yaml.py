@@ -121,14 +121,18 @@ def define_cmd_line_args():
 
     net_group.add_argument("--nef-type", type=str,
                            help="The neural field class to be used.")
+    net_group.add_argument("--mlp-output-norm-method", type=str,
+                           choices=["identity","arcsinh","sinh"])
+
+    net_group.add_argument("--encode-coords", action="store_true")
     net_group.add_argument("--coords-encode-method", type=str,
                            choices=["positional","grid"],
                            help="ra/dec coordinate encoding method.")
+
+    net_group.add_argument("--encode-wave", action="store_true")
     net_group.add_argument("--wave-encode-method", type=str,
                            choices=["positional"],
                            help="lambda encoding method.")
-    net_group.add_argument("--mlp-output-norm-method", type=str,
-                           choices=["identity","arcsinh","sinh"])
 
     ###################
     # Embedder arguments
@@ -152,6 +156,14 @@ def define_cmd_line_args():
                                 help="frequency of sinusoidal functaions.")
     embedder_group.add_argument("--wave-embed-sigma", type=int, default=1,
                                 help="variance to intialize pe weights.")
+
+    embedder_group.add_argument("--wave-encoder-num-hidden-layers", type=int, default=1)
+    embedder_group.add_argument("--wave-encoder-hidden-dim", type=int, default=64)
+    embedder_group.add_argument("--wave-encoder-siren-first-w0", type=int, default=30)
+    embedder_group.add_argument("--wave-encoder-siren-hidden-w0", type=int, default=30)
+    embedder_group.add_argument("--wave-encoder-siren-seed", type=int, default=0)
+    embedder_group.add_argument("--wave-encoder-siren-coords-scaler", type=int, default=1)
+    embedder_group.add_argument("--wave-encoder-siren-last-linear", action="store_true")
 
     ###################
     # Grid arguments
@@ -400,6 +412,8 @@ def define_cmd_line_args():
                              help="Log to cli gpu usage at every N epoch.")
     train_group.add_argument("--save-local-every", type=int, default=100,
                              help="Save data to local every N epoch.")
+    train_group.add_argument("--plot-grad-every", type=int, default=20,
+                             help="Plot gradient at every N epoch.")
     train_group.add_argument("--gpu-data", nargs="+", type=str,
                              help="data fields that can be added to gpu.")
 

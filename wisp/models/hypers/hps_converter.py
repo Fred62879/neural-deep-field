@@ -2,21 +2,64 @@
 import torch
 import torch.nn as nn
 
+from wisp.models.decoders import BasicDecoder, Siren
+
 
 class HyperSpectralConverter(nn.Module):
     """ Processing module, no weights to update here.
     """
-    def __init__(self, wave_encoder, **kwargs):
+    def __init__(self, **kwargs):
         """ @Param:
               wave_encoder: encoder network for lambda.
         """
         super(HyperSpectralConverter, self).__init__()
 
         self.kwargs = kwargs
+        self.encode_wave = kwargs["encode_wave"]
         self.combine_method = kwargs["hps_combine_method"]
-        self.wave_encode_method = kwargs["wave_encode_method"]
 
-        self.wave_encoder = wave_encoder
+        self.init_encoder()
+
+    def init_encoder(self):
+        if self.kwargs["wave_encode_method"] == "pe":
+            embedder_args = (
+                1,
+                self.kwargs["wave_embed_dim"],
+                self.kwargs["wave_embed_omega"],
+                self.kwargs["wave_embed_sigma"],
+                self.kwargs["wave_embed_bias"],
+                self.kwargs["wave_embed_seed"]
+            )
+            self.wave_encoder = Encoder(
+                input_dim=1,
+                encode_method=self.kwargs["wave_encode_method"],
+                embedder_args=embedder_args,
+                **self.kwargs
+            )
+
+        elif self.kwargs["wave_encode_method"] == "relumlp":
+            # we abuse basic decoder and use it as an encoder here
+            self.wave_encoder = BasicDecoder(
+                1, self.kwargs["wave_embed_dim"],
+                torch.relu, bias=True, layer=nn.Linear,
+                num_layers=self.kwargs["wave_encoder_num_hidden_layers"] + 1,
+                hidden_dim=self.kwargs["wave_encoder_hidden_dim"], skip=[]
+            )
+
+        elif self.kwargs["wave_encode_method"] == "siren":
+            self.wave_encoder = Siren(
+                1, self.kwargs["wave_embed_dim"],
+                num_layers=self.kwargs["wave_encoder_num_hidden_layers"] + 1,
+                dim_hidden=self.kwargs["wave_encoder_hidden_dim"],
+                first_w0=self.kwargs["wave_encoder_siren_first_w0"],
+                hidden_w0=self.kwargs["wave_encoder_siren_hidden_w0"],
+                seed=self.kwargs["wave_encoder_siren_seed"],
+                coords_scaler=self.kwargs["wave_encoder_siren_coords_scaler"],
+                last_linear=self.kwargs["wave_encoder_siren_last_linear"],
+            )
+
+        else:
+            assert not self.kwargs["encode_wave"]
 
     def linear_norm_wave(self, wave, wave_bound):
         (lo, hi) = wave_bound # 3940, 10870
@@ -83,11 +126,16 @@ class HyperSpectralConverter(nn.Module):
         # normalize lambda values to [0,1]
         wave = self.linear_norm_wave(wave, wave_bound)
 
-        if self.wave_encode_method == "positional":
+        if self.encode_wave:
             assert(coords_encode_dim != 2)
+            # import numpy as np
+            # np.save('/scratch/projects/vision/code/implicit-universe-wisp/wave.npy',
+            #         wave.detach().cpu().numpy())
             wave = self.wave_encoder(wave) # [bsz,num_samples,wave_embed_dim]
-        else:
-            # assert 2D coords are not encoded as well, should use siren in this case
+            # np.save('/scratch/projects/vision/code/implicit-universe-wisp/encoded_wave.npy',
+            #         wave.detach().cpu().numpy())
+
+        else: # assert 2D coords are not encoded as well, should only use siren in this case
             assert(coords_encode_dim == 2)
 
         if self.kwargs["print_shape"]: print('hps_converter, embedded wave', wave.shape)
@@ -96,5 +144,4 @@ class HyperSpectralConverter(nn.Module):
         if self.kwargs["print_shape"]: print('hps_converter, latents',latents.shape)
         latents = self.combine_spatial_spectral(latents, wave)
 
-        #del wave, redshift
         return latents

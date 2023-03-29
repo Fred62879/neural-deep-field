@@ -41,6 +41,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             self.kwargs["coords_embed_sigma"],
             self.kwargs["coords_embed_bias"],
             self.kwargs["coords_embed_seed"]
+
         )
         self.coord_encoder = Encoder(
             input_dim=2,
@@ -61,13 +62,16 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         channels = ["intensity","latents","spectra"]
 
         if self.kwargs["quantize_latent"]:
-            channels.extend(["scaler","redshift","codebook_loss","min_embed_ids","soft_qtz_weights"])
+            channels.extend(["scaler","redshift","codebook_loss",
+                             "min_embed_ids","codebook","soft_qtz_weights"])
 
         self._register_forward_function( self.hyperspectral, channels )
 
     def hyperspectral(self, coords, wave=None, trans=None, nsmpl=None, full_wave=None,
                       full_wave_bound=None, num_spectra_coords=-1, pidx=None,
-                      lod_idx=None, temperature=1, find_embed_id=False,
+                      lod_idx=None, temperature=1,
+                      find_embed_id=False,
+                      save_codebook=False,
                       save_soft_qtz_weights=False):
 
         """ Compute hyperspectral intensity for the provided coordinates.
@@ -80,21 +84,23 @@ class AstroHyperSpectralNerf(BaseNeuralField):
               full_wave_bound: min and max of wave to normalize wave TODO make this requried
               temperature: temperature for soft quantization, if performed
               find_embed_id: whether find embed id or not (used for soft quantization)
+               save_codebook: save codebook weights value to local
+               save_soft_qtz_weights: save weights for each code (when doing soft qtz)
+
             @Return
               {"indensity": Output intensity tensor of shape [batch, num_samples, 3]
                "spectra":
               }
         """
-        # print('coords', coords.shape, coords)
-        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
-
         ret = defaultdict(lambda: None)
+        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
 
         timer.check("hyper nef encode coord")
         latents = self.coord_encoder(coords, lod_idx=lod_idx)
-        # print(latents.shape, latents)
         latents = self.spatial_decoder(
-            latents, ret, temperature=temperature, find_embed_id=find_embed_id,
+            latents, ret, temperature=temperature,
+            find_embed_id=find_embed_id,
+            save_codebook=save_codebook,
             save_soft_qtz_weights=save_soft_qtz_weights)
 
         self.hps_decoder(latents, wave, trans, nsmpl, ret,

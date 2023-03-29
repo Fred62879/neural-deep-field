@@ -142,6 +142,7 @@ def forward(data,
             save_scaler=False,
             save_spectra=False,
             save_latents=False,
+            save_codebook=False,
             save_redshift=False,
             save_embed_ids=False):
 
@@ -162,6 +163,7 @@ def forward(data,
         if save_scaler: requested_channels.append("scaler")
         if save_spectra: requested_channels.append("spectra")
         if save_latents: requested_channels.append("latents")
+        if save_codebook: requested_channels.append("codebook")
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if spectra_supervision_train: requested_channels.append("spectra")
         if save_redshift or redshift_supervision_train:
@@ -197,13 +199,16 @@ def forward(data,
             # num of coords for gt, dummy (incl. neighbours) spectra
             net_args["num_spectra_coords"] = data["num_spectra_coords"]
 
-        if quantize_latent and quantization_strategy == "soft":
-            if train:
-                net_args["temperature"] = step_num
-            elif save_embed_ids:
-                net_args["find_embed_id"] = save_embed_ids
+        if quantize_latent:
+            if quantization_strategy == "soft":
+                net_args["save_soft_qtz_weights"] = save_soft_qtz_weights
+                if train:
+                    net_args["temperature"] = step_num
+                elif save_embed_ids:
+                    net_args["find_embed_id"] = save_embed_ids
 
-            net_args["save_soft_qtz_weights"] = save_soft_qtz_weights
+            if save_codebook:
+                net_args["save_codebook"] = save_codebook
 
     else: raise ValueError("Unsupported space dimension.")
 

@@ -8,6 +8,7 @@ sandbox.ipynb
 logs
 *.so
 _*/
+*npy
 .polyscope.ini
 *.npz
 *.egg-info

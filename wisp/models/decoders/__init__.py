@@ -6,5 +6,6 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
+from .siren import *
 from .decoder import *
 from .spatial_decoder import *

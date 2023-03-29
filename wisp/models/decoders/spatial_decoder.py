@@ -77,7 +77,9 @@ class SpatialDecoder(nn.Module):
             num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["spatial_decod_hidden_dim"], skip=[])
 
-    def forward(self, z, ret, temperature=1, find_embed_id=False, save_soft_qtz_weights=False):
+    def forward(self, z, ret, temperature=1, find_embed_id=False,
+                save_codebook=False, save_soft_qtz_weights=False):
+
         """ Decode latent variables
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
@@ -97,7 +99,9 @@ class SpatialDecoder(nn.Module):
         if self.quantize_z:
             assert(self.decode_spatial_embedding)
             z, z_q = self.qtz(z, ret, temperature=temperature,
-                              find_embed_id=find_embed_id, save_soft_qtz_weights=save_soft_qtz_weights)
+                              find_embed_id=find_embed_id,
+                              save_codebook=save_codebook,
+                              save_soft_qtz_weights=save_soft_qtz_weights)
 
         ret["latents"] = z
         ret["scaler"] = scaler

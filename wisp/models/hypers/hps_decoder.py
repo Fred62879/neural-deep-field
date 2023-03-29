@@ -3,8 +3,8 @@ import torch
 import torch.nn as nn
 
 from wisp.utils import PerfTimer
-from wisp.models.embedders import Encoder
 from wisp.models.decoders import Decoder
+from wisp.models.embedders import Encoder
 from wisp.models.layers import Normalization
 from wisp.models.hypers.hps_converter import HyperSpectralConverter
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
@@ -19,36 +19,24 @@ class HyperSpectralDecoder(nn.Module):
         self.kwargs = kwargs
         self.scale = scale
 
-        self.init_encoder()
-        self.convert = HyperSpectralConverter(self.wave_encoder, **kwargs)
+        self.convert = HyperSpectralConverter(**kwargs)
         self.spectra_decoder = Decoder(**kwargs)
         self.scale = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
 
-    def init_encoder(self):
-        embedder_args = (
-            1,
-            self.kwargs["wave_embed_dim"],
-            self.kwargs["wave_embed_omega"],
-            self.kwargs["wave_embed_sigma"],
-            self.kwargs["wave_embed_bias"],
-            self.kwargs["wave_embed_seed"]
-        )
-        self.wave_encoder = Encoder(
-            input_dim=1,
-            encode_method=self.kwargs["wave_encode_method"],
-            embedder_args=embedder_args,
-            **self.kwargs
-        )
-
     def reconstruct_spectra(self, wave, latents, scaler, redshift, wave_bound, scale=True):
         latents = self.convert(wave, latents, redshift, wave_bound)
-        if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
+
+        # import numpy as np
+        # np.save('/scratch/projects/vision/code/implicit-universe-wisp/latents.npy',
+        #         latents.detach().cpu().numpy())
 
         spectra = self.spectra_decoder(latents)[...,0]
-        # spectra = torch.rand((self.kwargs["qtz_num_embed"],694))
 
-        # print(spectra.shape, spectra)
+        # np.save('/scratch/projects/vision/code/implicit-universe-wisp/spectra.npy',
+        #         spectra.detach().cpu().numpy())
+        # assert 0
+
         if self.scale and scaler is not None:
             # spectra = (torch.exp(scaler) * spectra.T).T
             spectra = (scaler * spectra.T).T
@@ -99,17 +87,13 @@ class HyperSpectralDecoder(nn.Module):
 
         # spectra supervision, train with all lambda values instead of sampled lambda
         if num_spectra_coords > 0:
-            #print('==== spectra supervision ====')
             self.train_with_full_wave(latents, full_wave, full_wave_bound, num_spectra_coords, ret)
-
             latents = latents[:-num_spectra_coords]
             if ret["scaler"] is not None: ret["scaler"] = ret["scaler"][:-num_spectra_coords]
             if ret["redshift"] is not None: ret["redshift"] = ret["redshift"][:-num_spectra_coords]
             if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
 
         if latents.shape[0] > 0:
-            #print('==== normal ====')
-            #timer.check("hps decoder, reconstruct spectra")
             spectra = self.reconstruct_spectra(wave, latents, ret["scaler"], ret["redshift"], full_wave_bound)
             if "spectra" not in ret: ret["spectra"] = spectra
             if self.kwargs["print_shape"]: print('hps_decoder', spectra.shape)

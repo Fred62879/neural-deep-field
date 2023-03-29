@@ -6,10 +6,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.interpolate as interpolate
 
+from pathlib import Path
 from os.path import join
 from astropy.visualization import ZScaleInterval
 from wisp.utils.numerical import calculate_sam_spectrum
 
+
+def plot_grad_flow(named_parameters, gradFileName=None):
+    layers, ave_grads = [], []
+    for n, p in named_parameters:
+        if(p.requires_grad) and ("bias" not in n):
+            if "grid" in n: continue
+            layers.append(n[-22:-7])
+            ave_grads.append(p.grad.detach().cpu().abs().mean())
+
+    plt.plot(ave_grads, alpha=0.3, color="b")
+    plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k")
+    plt.xticks(range(0,len(ave_grads), 1), layers, fontsize=8, rotation=30)
+    plt.xlim(xmin=0, xmax=len(ave_grads))
+    plt.xlabel("Layers");plt.ylabel("average gradient")
+    plt.title("Gradient flow");plt.grid(True)
+    if gradFileName: plt.savefig(gradFileName)
 
 def plot_save(fname, x, y):
     # assert(y.ndim <= 2)
@@ -37,8 +54,11 @@ def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
     ax.scatter(latents[:,0],latents[:,1],latents[:,2],marker='v',color='orange')
-    png_fn = join(out_dir, f"latent_{fname}")
-    plt.savefig(png_fn)
+    latent_dir = join(out_dir, "latents")
+    Path(latent_dir).mkdir(parents=True, exist_ok=True)
+    cur_fname = join(latent_dir, f"{fname}")
+    np.save(cur_fname, latents)
+    plt.savefig(cur_fname)
     plt.close()
 
     if plot_latent_only: return
@@ -46,18 +66,21 @@ def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):
     # plot embeddings only
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
-    ax.scatter(embed[:,0],embed[:,1],embed[:,2],marker='o',color='blue')
-    png_fname = join(out_dir, f"embed_{fname}.png")
-    plt.savefig(png_fname)
+    ax.scatter(embed[0],embed[1],embed[2],marker='o',color='blue')
+    embed_dir = join(out_dir, "embed")
+    Path(embed_dir).mkdir(parents=True, exist_ok=True)
+    cur_fname = join(embed_dir, f"{fname}")
+    np.save(cur_fname, embed)
+    plt.savefig(cur_fname)
     plt.close()
 
     # plot embeddings with latent variables
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
-    ax.scatter(embed[:,0],embed[:,1],embed[:,2],marker='o',color='blue')
+    ax.scatter(embed[0],embed[1],embed[2],marker='o',color='blue')
     ax.scatter(latents[:,0],latents[:,1],latents[:,2],marker='v',color='orange')
-    png_fname = join(out_dir, f"{fname}")
-    plt.savefig(png_fname)
+    cur_fname = join(out_dir, f"{fname}")
+    plt.savefig(cur_fname)
     plt.close()
 
 def plot_embed_map(coords, embed_ids, embed_map_fn, fits_id):
@@ -498,24 +521,6 @@ def plot_sample_histogram(counts, distrib, wave, trans, args):
 
     plt.savefig(args.sample_hist_fn)
     plt.close()
-
-def plot_grad_flow(named_parameters, gradFileName=None):
-    layers, ave_grads = [], []
-    for n, p in named_parameters:
-        if(p.requires_grad) and ("bias" not in n):
-            #if 'decoder' in n: continue
-            layers.append(n[:20])
-            #if 'codebook' in n:
-            #    print('**grad**', p.grad)
-            ave_grads.append(p.grad.detach().cpu().abs().mean())
-
-    plt.plot(ave_grads, alpha=0.3, color="b")
-    plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k")
-    plt.xticks(range(0,len(ave_grads), 1), layers, fontsize=8, rotation=30)
-    plt.xlim(xmin=0, xmax=len(ave_grads))
-    plt.xlabel("Layers");plt.ylabel("average gradient")
-    plt.title("Gradient flow");plt.grid(True)
-    if gradFileName: plt.savefig(gradFileName)
 
 def plot_mask(sz, dim, mask, fn):
     fig = plt.figure(figsize=(2*dim,4))

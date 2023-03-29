@@ -22,7 +22,7 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
     RandomSampler, DataLoader
 
 from wisp.datasets import default_collate
-from wisp.utils.plot import plot_horizontally, plot_embed_map
+from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, forward
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
@@ -118,6 +118,8 @@ class AstroTrainer(BaseTrainer):
             ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
         self.save_scaler =  self.pixel_supervision and self.quantize_latent and \
             "plot_save_scaler" in tasks
+        self.save_codebook =  self.pixel_supervision and self.quantize_latent and \
+            "save_codebook" in tasks
 
         self.save_redshift =  self.quantize_latent and self.extra_args["generate_redshift"] \
             and "save_redshift_during_train" in tasks
@@ -144,13 +146,15 @@ class AstroTrainer(BaseTrainer):
 
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","spectra_dir","embed_map_dir",
-                 "latent_dir","scaler_dir","soft_qtz_weights_dir"],
+                 "latent_dir","scaler_dir","codebook_dir","soft_qtz_weights_dir"],
                 ["models","train_recons","train_spectra","train_embed_maps",
-                 "latents","scaler","soft_qtz_weights"]):
+                 "latents","scaler","codebook","soft_qtz_weights"]):
 
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
+
+        self.grad_fname = join(self.log_dir, "grad.png")
 
         if self.extra_args["resume_train"]:
             if self.extra_args["resume_log_dir"] is not None:
@@ -220,7 +224,7 @@ class AstroTrainer(BaseTrainer):
         params_dict = { name : param for name, param
                         in self.pipeline.named_parameters() }
 
-        for name in params_dict:
+        for name in params_dict.keys():
             if "grid" in name: grid_params.append(params_dict[name])
             elif "qtz_codebook" in name: qtz_params.append(params_dict[name])
             else: rest_params.append(params_dict[name])
@@ -233,6 +237,8 @@ class AstroTrainer(BaseTrainer):
                        "lr": self.extra_args["hps_lr"]})
 
         self.optimizer = self.optim_cls(params, **self.optim_params)
+        log.info(f"init codebook values {qtz_params}")
+        log.info(self.optimizer)
 
     #############
     # Training logic
@@ -330,6 +336,7 @@ class AstroTrainer(BaseTrainer):
             if self.save_scaler: self.pixel_scaler = []
             if self.plot_embed_map: self.embed_ids = []
             if self.plot_spectra: self.smpl_spectra = []
+            if self.save_codebook: self.codebook_to_save = None
             if self.save_recon or self.save_cropped_recon: self.smpl_pixels = []
 
             # re-init dataloader to make sure pixels are in order
@@ -372,12 +379,6 @@ class AstroTrainer(BaseTrainer):
             self.dataset.set_wave_sample_mode(use_full_wave=False)
             self.init_dataloader()
             self.reset_data_iterator()
-
-        '''
-        # save model
-        if self.save_every > -1 and self.epoch % self.save_every == 0:
-            self.save_model()
-        '''
 
         self.timer.check("post_epoch done")
 
@@ -426,13 +427,14 @@ class AstroTrainer(BaseTrainer):
         #self.scaler.step(self.optimizer)
         #self.scaler.update()
         total_loss.backward()
+        if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
+            plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
         self.optimizer.step()
 
         self.timer.check("backward and step")
 
-        #plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
         if self.save_data_to_local:
-            scaler, recon_spectra, embed_ids, latents, redshift = self.get_data_to_save(ret)
+            scaler, recon_spectra, embed_ids, latents, redshift, codebook = self.get_data_to_save(ret)
             if self.save_scaler: self.pixel_scaler.extend(scaler)
             if self.save_latents: self.latents.extend(latents)
             if self.save_redshift: self.redshifts.extend(redshift)
@@ -440,6 +442,8 @@ class AstroTrainer(BaseTrainer):
             if self.plot_spectra: self.smpl_spectra.append(recon_spectra)
             if self.save_recon or self.save_cropped_recon:
                 self.smpl_pixels.extend(recon_pixels)
+            if self.save_codebook and self.codebook_to_save is None:
+                self.codebook_to_save = codebook
 
     def post_step(self):
         pass
@@ -534,6 +538,7 @@ class AstroTrainer(BaseTrainer):
                       save_scaler=self.save_data_to_local and self.save_scaler,
                       save_spectra=self.save_data_to_local and self.plot_spectra,
                       save_latents=self.save_data_to_local and self.save_latents,
+                      save_codebook=self.save_data_to_local and self.save_codebook,
                       save_redshift=self.save_data_to_local and self.save_redshift,
                       save_embed_ids=self.save_data_to_local and self.plot_embed_map)
 
@@ -644,7 +649,8 @@ class AstroTrainer(BaseTrainer):
         redshift = None if not self.save_redshift else ret["redshift"]
         recon_spectra = None if not self.plot_spectra else ret["spectra"]
         embed_ids = None if not self.plot_embed_map else ret["min_embed_ids"]
-        return scaler, recon_spectra, embed_ids, latents, redshift
+        codebook = None if not self.save_codebook else ret["codebook"]
+        return scaler, recon_spectra, embed_ids, latents, redshift, codebook
 
     def save_local(self):
         if self.save_latents:
@@ -663,6 +669,10 @@ class AstroTrainer(BaseTrainer):
 
         if self.plot_spectra:
             self.plot_spectrum()
+
+        if self.save_codebook:
+            log.info(self.codebook_to_save)
+            np.save(self.codebook_dir, f"{self.epoch}", self.codebook_to_save)
 
     def plot_save_scaler(self):
         """ Plot scaler values generated by the decoder before qtz for each pixel.

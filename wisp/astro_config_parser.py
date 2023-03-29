@@ -59,7 +59,7 @@ def get_pipelines_from_config(args, tasks=[]):
     if args.dataset_type == 'astro':
         nef_train = globals()[args.nef_type](**vars(args))
         pipelines["full"] = AstroPipeline(nef_train)
-        # log.info(pipelines["full"])
+        log.info(pipelines["full"])
 
         # pipeline for spectra inferrence
         if "recon_gt_spectra" in tasks or "recon_dummy_spectra" in tasks:
