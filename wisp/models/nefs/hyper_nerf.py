@@ -26,7 +26,8 @@ class AstroHyperSpectralNerf(BaseNeuralField):
 
         self.space_dim = kwargs["space_dim"]
 
-        self.init_encoder()
+        if self.kwargs["encode_coords"]:
+            self.init_encoder()
         self.spatial_decoder = SpatialDecoder(qtz_calculate_loss, **kwargs)
         self.hps_decoder = HyperSpectralDecoder(
             integrate=integrate, scale=scale, **kwargs)
@@ -94,16 +95,16 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         # print(coords)
 
         timer.check("hyper nef encode coord")
-        latents = self.coord_encoder(coords, lod_idx=lod_idx)
-        # print('before spatial encoding', latents)
+
+        if self.kwargs["encode_coords"]:
+            latents = self.coord_encoder(coords, lod_idx=lod_idx)
+        else: latents = coords
 
         # latents = self.spatial_decoder(
         #     latents, ret, temperature=temperature,
         #     find_embed_id=find_embed_id,
         #     save_codebook=save_codebook,
         #     save_soft_qtz_weights=save_soft_qtz_weights)
-
-        # print('after spatial encoding', latents)
 
         self.hps_decoder(latents, wave, trans, nsmpl, ret,
                          full_wave, full_wave_bound, num_spectra_coords)

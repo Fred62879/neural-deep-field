@@ -57,10 +57,10 @@ optimizer:
 net:
     nef_type: 'AstroHyperSpectralNerf'
     #nef_type: 'AstroNerf'
-    encode_wave: True
-    encode_coords: True
-    coords_encode_method: 'positional_encoding'
-    wave_encode_method: 'positional_encoding'
+    encode_wave: False
+    encode_coords: False
+    coords_encode_method: 'none' #'positional_encoding'
+    wave_encode_method: 'none' #'positional_encoding'
     mlp_output_norm_method: 'sinh'
 
 embedder:
@@ -101,7 +101,7 @@ decoder:
     decoder_num_layers: 3
     decoder_hidden_dim: 128
     decoder_layer_type: 'none'
-    decoder_activation_type: "relu"
+    decoder_activation_type: "sin"
 
     siren_seed: 0
     siren_first_w0: 24

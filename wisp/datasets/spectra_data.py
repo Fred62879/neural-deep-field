@@ -190,7 +190,6 @@ class SpectraData:
             [np.arange(self.full_wave[id_lo], self.full_wave[id_hi] + 1,
                        self.kwargs["trans_sample_interval"])] * 9
         )
-        print(self.data["dummy_recon_wave"])
 
     def load_gt_spectra_data(self):
         """ Load gt spectra data.
