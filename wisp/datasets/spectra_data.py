@@ -5,6 +5,8 @@ import numpy as np
 import logging as log
 import matplotlib.pyplot as plt
 
+from wisp.datasets.data_utils import add_dummy_dim
+
 from pathlib import Path
 from astropy.io import fits
 from os.path import join, exists
@@ -55,12 +57,12 @@ class SpectraData:
         """
         self.data = defaultdict(lambda: [])
 
-        if self.recon_dummy_spectra:
-            self.load_dummy_spectra_data()
-
         if self.require_spectra_coords or self.spectra_supervision_train or \
            self.recon_gt_spectra:
             self.load_gt_spectra_data()
+
+        if self.recon_dummy_spectra:
+            self.load_dummy_spectra_data()
 
         self.load_plot_spectra_data()
 
@@ -141,16 +143,11 @@ class SpectraData:
 
     def load_plot_spectra_data(self):
         wave = []
-        if (self.recon_gt_spectra and self.kwargs["plot_spectrum_with_gt"]): # or \
-           #self.spectra_supervision_train:
+        if (self.recon_gt_spectra and self.kwargs["plot_spectrum_with_gt"]):
             wave.extend(self.data["gt_recon_wave"])
 
         if self.recon_dummy_spectra:
             wave.extend(self.data["dummy_recon_wave"])
-
-        #if self.recon_codebook_spectra:
-        # wave.extend(self.data["codebook_recon_wave"])
-        #    wave.extend(self.data["gt_recon_wave"])
 
         self.data["recon_wave"] = wave
 
@@ -173,14 +170,17 @@ class SpectraData:
         """ Load hardcoded spectra positions for pixels without gt spectra.
             Can be used to compare with codebook spectrum.
         """
-        self.data["dummy_spectra_grid_coords"] = [
-            torch.FloatTensor([[0.0159,0.0159,0]]),
-            torch.FloatTensor([[-1,1,0]]),
-            torch.FloatTensor([[-0.9,0.12,0]]),
-            torch.FloatTensor([[0.11,0.5,0]]),
-            torch.FloatTensor([[0.7,-0.2,0]]),
-            torch.FloatTensor([[0.45,-0.9,0]]),
-            torch.FloatTensor([[1,1,0]])]
+        self.data["dummy_spectra_grid_coords"] = torch.stack([
+            torch.FloatTensor([0.0159,0.0159]),
+            torch.FloatTensor([-1,1]),
+            torch.FloatTensor([-0.9,0.12]),
+            torch.FloatTensor([0.11,0.5]),
+            torch.FloatTensor([0.7,-0.2]),
+            torch.FloatTensor([0.45,-0.9]),
+            torch.FloatTensor([1,1])])
+
+        self.data["dummy_spectra_grid_coords"] = add_dummy_dim(
+            self.data["dummy_spectra_grid_coords"], **self.kwargs)
 
         recon_spectra_wave_bound = self.kwargs["dummy_spectra_wave_bound"]
         id_lo, id_hi = get_bound_id(
@@ -213,6 +213,7 @@ class SpectraData:
 
         coord_dim = 3 if self.kwargs["coords_encode_method"] == "grid" and \
             self.kwargs["grid_dim"] == 3 else 2
+
         self.data["gt_spectra_grid_coords"] = torch.stack(
             self.data["gt_spectra_grid_coords"]).type(
             torch.FloatTensor)[:,:,None].view(-1,1,coord_dim) # [num_coords,num_neighbours,.]

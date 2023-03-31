@@ -12,6 +12,7 @@ from wisp.utils.common import worldToPix
 from astropy.coordinates import SkyCoord
 
 from wisp.utils.common import generate_hdu
+from wisp.datasets.data_utils import add_dummy_dim
 from wisp.utils.plot import plot_horizontally, mark_on_img
 from wisp.utils.numerical import normalize_coords, normalize, \
     calculate_metrics, calculate_zscale_ranges_multiple_FITS
@@ -431,7 +432,7 @@ class FITSData:
             np.save(self.coords_fname, coords)
             np.save(self.coords_range_fname, np.array(coords_range))
 
-        self.data["coords"] = self.add_dummy_dim(coords)
+        self.data["coords"] = add_dummy_dim(coords, **self.kwargs)
 
     def get_pixel_coords_all_fits(self):
         # assert(not self.use_full_fits)
@@ -455,7 +456,7 @@ class FITSData:
         mgrid = np.stack(np.meshgrid(x, y, indexing=indexing), axis=-1)
 
         if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
-        self.data["coords"] = self.add_dummy_dim(mgrid)
+        self.data["coords"] = add_dummy_dim(mgrid, **self.kwargs)
 
     def get_mgrid_tensor(self, sidelen, lo=-1, hi=1, dim=2, flat=True):
         """ Generates a flattened grid of (x,y,...) coords in [-1,1] (Tensor version).
@@ -463,18 +464,7 @@ class FITSData:
         tensors = tuple(dim * [torch.linspace(lo, hi, steps=sidelen)])
         mgrid = torch.stack(torch.meshgrid(*tensors), dim=-1)
         if flat: mgrid = mgrid.reshape(-1, dim)
-        self.data["coords"] = self.add_dummy_dim(mgrid)
-
-    def add_dummy_dim(self, coords):
-        if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
-            num_coords = coords.shape[0]
-            if type(coords).__module__ == "torch":
-                coords_3d = torch.zeros((num_coords, 3))
-            else:
-                coords_3d = np.zeros((num_coords, 3))
-                coords_3d[...,:2] = coords
-            coords = coords_3d
-        return torch.FloatTensor(coords)[:,None]
+        self.data["coords"] = add_dummy_dim(mgrid, **self.kwargs)
 
     #############
     # Mask creation
@@ -697,6 +687,7 @@ class FITSData:
         pixel_ids = self.get_pixel_ids(fits_uid, r, c, neighbour_size)
         grid_coords = self.get_coord(pixel_ids)
         # print(r, c, pixel_ids, coords_accurate, self.kwargs["fits_cutout_start_pos"])
+        print(grid_coords)
         return img_coords, grid_coords, pixel_ids
 
     def calculate_local_id(self, r, c, index, fits_uid):

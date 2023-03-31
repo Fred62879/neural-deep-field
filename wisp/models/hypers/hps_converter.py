@@ -136,11 +136,14 @@ class HyperSpectralConverter(nn.Module):
             # np.save('/scratch/projects/vision/code/implicit-universe-wisp/encoded_wave.npy',
             #         wave.detach().cpu().numpy())
 
-        else: # assert 2D coords are not encoded as well, should only use siren in this case
-            assert(coords_encode_dim == self.kwargs["space_dim"])
+        else: # assert coords are not encoded as well, should only use siren in this case
+            if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
+                assert(coords_encode_dim == self.kwargs["space_dim"])
 
-            # remove dummy 3rd dim
-            latents = latents[...,:2]
+            else:
+                assert(coords_encode_dim == 2)
+                # remove dummy 3rd dim
+                latents = latents[...,:2]
 
         if self.kwargs["print_shape"]: print('hps_converter, embedded wave', wave.shape)
 

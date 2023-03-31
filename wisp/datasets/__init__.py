@@ -10,4 +10,4 @@ from .sdf_dataset import SDFDataset
 from .astro_dataset import AstroDataset
 from .multiview_dataset import MultiviewDataset
 from .random_view_dataset import RandomViewDataset
-from .utils import default_collate
+from .data_utils import default_collate

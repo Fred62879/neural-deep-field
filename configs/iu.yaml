@@ -25,8 +25,8 @@ global:
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
     tasks: ['train','save_codebook','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed']
 
-    tasks: ['train','infer','recon_img','recon_dummy_spectra']
-    #tasks: ['infer','recon_img','recon_dummy_spectra']
+    tasks: ['train','infer','recon_img','recon_gt_spectra','recon_dummy_spectra']
+    tasks: ['infer','recon_img','recon_gt_spectra','recon_dummy_spectra']
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed']
     #tasks: ['infer','plot_embed_map','plot_redshift']
@@ -36,8 +36,8 @@ global:
     #tasks: ['infer','recon_img','plot_embed_map']
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','plot_save_scaler','plot_redshift']
-    #tasks: ['infer','recon_gt_spectra'] #,'log_pixel_value']
-    tasks: ['infer','recon_dummy_spectra']
+    tasks: ['infer','recon_gt_spectra'] #,'log_pixel_value']
+    #tasks: ['infer','recon_dummy_spectra','recon_gt_spectra']
     #tasks: ['infer','recon_codebook_spectra']
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map']
@@ -149,7 +149,7 @@ trainer:
     pixel_loss_cho: l1
     spectra_loss_cho: l2
     redshift_loss_cho: l2
-    num_epochs: 2000
+    num_epochs: 4000
     batch_size: 262144 #209715 #104857 #262144 #147456 #131072
     save_every: 400
     render_tb_every: -1
@@ -164,7 +164,7 @@ trainer:
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift']
 
     pixel_supervision: True
-    spectra_supervision: False
+    spectra_supervision: True
     redshift_supervision: False
     spectra_beta: 1
     redshift_beta: 1
@@ -204,12 +204,12 @@ infer:
     recon_cutout_start_pos: [ [[256,256]] ] #, [[86,188]] ] #[86,188]
 
     # recon spectra
-    spectra_norm_cho: "none"
+    spectra_norm_cho: "sum"
     average_spectra: True
-    trusted_range_only: False     # for gt spectra
+    trusted_range_only: True     # for gt spectra
     plot_clipped_spectrum: True  # for recon spectra
     plot_spectrum_with_gt: True
-    plot_spectrum_with_trans: True
+    plot_spectrum_with_trans: False
     infer_spectra_individually: False
     codebook_spectra_clip_range: [5000,8000]
 
