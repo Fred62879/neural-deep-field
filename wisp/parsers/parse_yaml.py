@@ -348,6 +348,7 @@ def define_cmd_line_args():
     data_group.add_argument("--plot-trans", action="store_true")
 
     # spectra data
+    data_group.add_argument("--dummy-spectra-wave-bound", type=int, nargs='+')
     data_group.add_argument("--gt-spectra-ids", type=int, nargs='+',
                             help="id of chosen gt spectra for supervision/recon etc.")
     data_group.add_argument("--spectra-markers", type=int, nargs='+',

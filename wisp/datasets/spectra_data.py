@@ -163,7 +163,6 @@ class SpectraData:
             img_coords.extend(self.data["gt_spectra_img_coords"])
 
         if self.recon_dummy_spectra:
-            # ids.extend(self.data["dummy_spectra_coord_ids"])
             grid_coords.extend(self.data["dummy_spectra_grid_coords"])
 
         if len(ids) != 0:         self.data["spectra_coord_ids"] = np.array(ids)
@@ -174,15 +173,24 @@ class SpectraData:
         """ Load hardcoded spectra positions for pixels without gt spectra.
             Can be used to compare with codebook spectrum.
         """
-        coords = [ torch.FloatTensor([[32,32,0]]),
-                   torch.FloatTensor([[12,14,0]]),
-                   torch.FloatTensor([[0,0,0]]),
-                   torch.FloatTensor([[40,60,0]]),
-                   torch.FloatTensor([[23,64,0]]),
-                   torch.FloatTensor([[39,7,0]]),
-                   torch.FloatTensor([[10,32,0]])]
+        self.data["dummy_spectra_grid_coords"] = [
+            torch.FloatTensor([[0.0159,0.0159,0]]),
+            torch.FloatTensor([[-1,1,0]]),
+            torch.FloatTensor([[-0.9,0.12,0]]),
+            torch.FloatTensor([[0.11,0.5,0]]),
+            torch.FloatTensor([[0.7,-0.2,0]]),
+            torch.FloatTensor([[0.45,-0.9,0]]),
+            torch.FloatTensor([[1,1,0]])]
 
-        self.data["dummy_spectra_grid_coords"] = coords
+        recon_spectra_wave_bound = self.kwargs["dummy_spectra_wave_bound"]
+        id_lo, id_hi = get_bound_id(
+            recon_spectra_wave_bound, self.full_wave, within_bound=False)
+        self.data["spectra_recon_wave_bound_ids"].extend([[id_lo, id_hi + 1]]*9)
+        self.data["dummy_recon_wave"].extend(
+            [np.arange(self.full_wave[id_lo], self.full_wave[id_hi] + 1,
+                       self.kwargs["trans_sample_interval"])] * 9
+        )
+        print(self.data["dummy_recon_wave"])
 
     def load_gt_spectra_data(self):
         """ Load gt spectra data.
@@ -251,18 +259,18 @@ class SpectraData:
 
         gt_wave, gt_spectra = load_gt_spectra(
             fname, self.full_wave, smpl_interval,
-            interpolate=True, #self.spectra_supervision_train,
-            sigma=self.kwargs["spectra_smooth_sigma"],
+            interpolate=True, sigma=self.kwargs["spectra_smooth_sigma"],
             trusted_range=None if not self.kwargs["trusted_range_only"] else [wave_lo, wave_hi])
 
         # iii) get data for for spectra supervision
         if self.spectra_supervision_train:
-            # the specified range may not coincide exactly with the trans lambda
-            # here we replace with closest trans lambda
             supervision_spectra_wave_bound = [
                 source_spectra_data["spectra_supervision_wave_lo"][spectra_id],
                 source_spectra_data["spectra_supervision_wave_hi"][spectra_id]]
 
+            # find id of min and max lambda in terms of the transmission wave (full_wave)
+            # the min and max lambda for the spectra may not coincide exactly with the
+            # trans lambda, here we replace with closest trans lambda
             (id_lo, id_hi) = get_bound_id(
                 supervision_spectra_wave_bound, self.full_wave, within_bound=False)
             self.data["spectra_supervision_wave_bound_ids"].append([id_lo, id_hi + 1])
@@ -338,7 +346,7 @@ class SpectraData:
 
                 if codebook:
                     (lo, hi) = bound_ids
-                elif codebook or (bound_ids is not None and i < len(bound_ids)):
+                elif bound_ids is not None and i < len(bound_ids):
                     (lo, hi) = bound_ids[i]
                 else: lo, hi = 0, cur_spectra.shape[-1]
                 cur_spectra = cur_spectra[...,lo:hi]
@@ -529,7 +537,8 @@ def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1
     """
     gt = np.load(fname)
     gt_wave, gt_spectra = gt[:,0], gt[:,1]
-    if sigma != -1:
+
+    if sigma > 0:
         gt_spectra = convolve_spectra(gt_spectra, std=sigma)
 
     if interpolate:
@@ -540,14 +549,15 @@ def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1
         if trusted_range is not None:
             (lo, hi) = trusted_range
         else:
-            (lo_id, hi_id) = get_bound_id( ( min(gt_wave),max(gt_wave) ), full_wave, within_bound=True)
+            (lo_id, hi_id) = get_bound_id(
+                ( min(gt_wave),max(gt_wave) ), full_wave, within_bound=True)
             lo = full_wave[lo_id] # lo <= full_wave[lo_id]
             hi = full_wave[hi_id] # hi >= full_wave[hi_id]
 
         # new gt wave range with same discretization value as transmission wave
         gt_wave = np.arange(lo, hi + 1, smpl_interval)
 
-        # interpolate new gt wave to get interpolated spectra
+        # use new gt wave to get interpolated spectra
         gt_spectra = f_gt(gt_wave)
 
     return gt_wave, gt_spectra

@@ -82,7 +82,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames = sort_alphanumeric(self.selected_model_fnames)
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames[-1:] #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames #[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 

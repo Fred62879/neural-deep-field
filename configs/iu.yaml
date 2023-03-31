@@ -26,7 +26,7 @@ global:
     tasks: ['train','save_codebook','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed']
 
     tasks: ['train','infer','recon_img','recon_dummy_spectra']
-    tasks: ['infer','recon_img','recon_dummy_spectra']
+    #tasks: ['infer','recon_img','recon_dummy_spectra']
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed']
     #tasks: ['infer','plot_embed_map','plot_redshift']
@@ -37,7 +37,7 @@ global:
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','plot_save_scaler','plot_redshift']
     #tasks: ['infer','recon_gt_spectra'] #,'log_pixel_value']
-    #tasks: ['infer','recon_dummy_spectra']
+    tasks: ['infer','recon_dummy_spectra']
     #tasks: ['infer','recon_codebook_spectra']
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map']
@@ -65,13 +65,13 @@ net:
 
 embedder:
     coords_embed_bias: True
-    coords_embed_dim: 3000
+    coords_embed_dim: 1000
     coords_embed_omega: 8
     coords_embed_sigma: 1.0
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 3000
+    wave_embed_dim: 1000
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -207,9 +207,9 @@ infer:
     spectra_norm_cho: "none"
     average_spectra: True
     trusted_range_only: False     # for gt spectra
-    plot_clipped_spectrum: False  # for recon spectra
+    plot_clipped_spectrum: True  # for recon spectra
     plot_spectrum_with_gt: True
-    plot_spectrum_with_trans: False
+    plot_spectrum_with_trans: True
     infer_spectra_individually: False
     codebook_spectra_clip_range: [5000,8000]
 
@@ -269,6 +269,7 @@ dataset:
     hardcode_num_trans_samples: 12
     trans_sample_interval: 10
 
+    dummy_spectra_wave_bound: [4000,9000]
     gt_spectra_ids: [0] #[5,9,6,7,8] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
     spectra_smooth_sigma: 50
     spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]
