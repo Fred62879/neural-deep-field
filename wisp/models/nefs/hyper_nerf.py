@@ -50,9 +50,6 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             **self.kwargs
         )
 
-        #for n, p in self.coord_encoder.named_parameters():
-        # print(n, p.shape)
-
     def get_nef_type(self):
         return 'hyperspectral'
 
@@ -94,14 +91,19 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         """
         ret = defaultdict(lambda: None)
         timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
+        # print(coords)
 
         timer.check("hyper nef encode coord")
         latents = self.coord_encoder(coords, lod_idx=lod_idx)
-        latents = self.spatial_decoder(
-            latents, ret, temperature=temperature,
-            find_embed_id=find_embed_id,
-            save_codebook=save_codebook,
-            save_soft_qtz_weights=save_soft_qtz_weights)
+        # print('before spatial encoding', latents)
+
+        # latents = self.spatial_decoder(
+        #     latents, ret, temperature=temperature,
+        #     find_embed_id=find_embed_id,
+        #     save_codebook=save_codebook,
+        #     save_soft_qtz_weights=save_soft_qtz_weights)
+
+        # print('after spatial encoding', latents)
 
         self.hps_decoder(latents, wave, trans, nsmpl, ret,
                          full_wave, full_wave_bound, num_spectra_coords)

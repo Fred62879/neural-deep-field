@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 
+from wisp.models.embedders import Encoder
 from wisp.models.decoders import BasicDecoder, Siren
 
 
@@ -21,7 +22,7 @@ class HyperSpectralConverter(nn.Module):
         self.init_encoder()
 
     def init_encoder(self):
-        if self.kwargs["wave_encode_method"] == "pe":
+        if self.kwargs["wave_encode_method"] == "positional_encoding":
             embedder_args = (
                 1,
                 self.kwargs["wave_embed_dim"],
@@ -125,6 +126,7 @@ class HyperSpectralConverter(nn.Module):
 
         # normalize lambda values to [0,1]
         wave = self.linear_norm_wave(wave, wave_bound)
+        # print(wave[0].T)
 
         if self.encode_wave:
             assert(coords_encode_dim != 2)
@@ -143,5 +145,5 @@ class HyperSpectralConverter(nn.Module):
         latents = latents.tile(1,num_samples,1) # [bsz,nsamples,encode_dim or 2]
         if self.kwargs["print_shape"]: print('hps_converter, latents',latents.shape)
         latents = self.combine_spatial_spectral(latents, wave)
-
+        # print(latents.shape, latents)
         return latents

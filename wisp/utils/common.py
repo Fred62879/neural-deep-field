@@ -15,7 +15,7 @@ from astropy.coordinates import SkyCoord
 def get_input_latents_dim(**kwargs):
     """ Infer the dimension of the input RA/DEC coordinate for MLP.
     """
-    if kwargs["coords_encode_method"] == "positional":
+    if kwargs["coords_encode_method"] == "positional_encoding":
         latents_dim = kwargs["coords_embed_dim"]
     elif kwargs["coords_encode_method"] == "grid":
         latents_dim = kwargs["grid_feature_dim"]

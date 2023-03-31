@@ -4,7 +4,6 @@ import torch.nn as nn
 
 from wisp.utils import PerfTimer
 from wisp.models.decoders import Decoder
-from wisp.models.embedders import Encoder
 from wisp.models.layers import Normalization
 from wisp.models.hypers.hps_converter import HyperSpectralConverter
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
@@ -25,6 +24,8 @@ class HyperSpectralDecoder(nn.Module):
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
 
     def reconstruct_spectra(self, wave, latents, scaler, redshift, wave_bound, scale=True):
+        # print('****')
+        # print('latents',latents)
         latents = self.convert(wave, latents, redshift, wave_bound)
 
         # import numpy as np
@@ -32,6 +33,7 @@ class HyperSpectralDecoder(nn.Module):
         #         latents.detach().cpu().numpy())
 
         spectra = self.spectra_decoder(latents)[...,0]
+        # print('spectra',spectra)
 
         # np.save('/scratch/projects/vision/code/implicit-universe-wisp/spectra.npy',
         #         spectra.detach().cpu().numpy())
@@ -60,7 +62,9 @@ class HyperSpectralDecoder(nn.Module):
 
         ret["spectra"] = self.reconstruct_spectra(full_wave, latents, scaler, redshift, full_wave_bound)
 
-    def forward(self, latents, wave, trans, nsmpl, ret, full_wave=None, full_wave_bound=None, num_spectra_coords=-1):
+    def forward(self, latents, wave, trans, nsmpl, ret, full_wave=None,
+                full_wave_bound=None, num_spectra_coords=-1):
+
         """ @Param
               latents:   (encoded or original) coords. [bsz,num_samples,coords_encode_dim or 2 or 3]
               wave:      lambda values, used to convert ra/dec to hyperspectral latents. [bsz,num_samples]

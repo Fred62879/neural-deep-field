@@ -59,7 +59,7 @@ class FITSData:
             "train","recon_img","log_pixel_value"})) != 0
         self.require_masks = "train" in tasks and self.spectral_inpaint
         self.require_scaler = self.kwargs["space_dim"] == 3 and self.kwargs["quantize_latent"] and self.kwargs["generate_scaler"]
-        self.require_redshifts = self.kwargs["space_dim"] == 3 and self.kwargs["quantize_latent"] and self.kwargs["generate_redshift"] and self.kwargs["redshift_supervision"]
+        self.require_redshift = self.kwargs["space_dim"] == 3 and self.kwargs["quantize_latent"] and self.kwargs["generate_redshift"] and self.kwargs["redshift_supervision"]
 
         self.require_coords = self.kwargs["spectra_supervision"] or len(tasks.intersection({
             "train","recon_img","recon_flat","recon_gt_spectra"})) != 0 or \
@@ -67,7 +67,7 @@ class FITSData:
 
         return self.require_coords or self.require_pixels or \
             self.require_weights or self.require_masks or \
-            self.require_redshifts or self.require_scaler or \
+            self.require_redshift or self.require_scaler or \
             "recon_codebook_spectra" in tasks
 
     def init(self):
@@ -81,7 +81,7 @@ class FITSData:
         if self.require_pixels:
             self.load_all_fits()
 
-        if self.require_redshifts:
+        if self.require_redshift:
             self.get_redshift_all_fits()
 
         if self.require_masks:

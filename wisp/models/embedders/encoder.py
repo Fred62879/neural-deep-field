@@ -22,10 +22,11 @@ class Encoder(nn.Module):
         self.input_dim = input_dim
         self.encode_method = encode_method
 
-        if encode_method == "positional":
+        if encode_method == "positional_encoding":
             self.embedder = RandGaus(embedder_args)
         elif encode_method == "grid":
             self.init_grid()
+        else: assert 0
 
     def init_grid(self):
         grid_type = self.kwargs["grid_type"]
@@ -62,7 +63,7 @@ class Encoder(nn.Module):
 
         batch, num_samples, _ = coords.shape
 
-        if self.encode_method == "positional":
+        if self.encode_method == "positional_encoding":
             latents = self.embedder(coords) # [bsz,num_samples,coords_embed_dim]
             #timer.check("rf_hyperspectral_pe")
 

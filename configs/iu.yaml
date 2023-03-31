@@ -24,6 +24,10 @@ global:
 
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
     tasks: ['train','save_codebook','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed']
+
+    tasks: ['train','infer','recon_img','recon_dummy_spectra']
+    tasks: ['infer','recon_img','recon_dummy_spectra']
+
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed']
     #tasks: ['infer','plot_embed_map','plot_redshift']
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
@@ -33,6 +37,7 @@ global:
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','plot_save_scaler','plot_redshift']
     #tasks: ['infer','recon_gt_spectra'] #,'log_pixel_value']
+    #tasks: ['infer','recon_dummy_spectra']
     #tasks: ['infer','recon_codebook_spectra']
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map']
@@ -54,19 +59,19 @@ net:
     #nef_type: 'AstroNerf'
     encode_wave: True
     encode_coords: True
-    coords_encode_method: 'grid'
-    wave_encode_method: 'relumlp' #'positional'
+    coords_encode_method: 'positional_encoding'
+    wave_encode_method: 'positional_encoding'
     mlp_output_norm_method: 'sinh'
 
 embedder:
     coords_embed_bias: True
-    coords_embed_dim: 1000
+    coords_embed_dim: 3000
     coords_embed_omega: 8
     coords_embed_sigma: 1.0
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 16
+    wave_embed_dim: 3000
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -93,8 +98,8 @@ grid:
     codebook_bitwidth: 20
 
 decoder:
-    decoder_num_layers: 1
-    decoder_hidden_dim: 64
+    decoder_num_layers: 3
+    decoder_hidden_dim: 128
     decoder_layer_type: 'none'
     decoder_activation_type: "relu"
 
@@ -106,14 +111,14 @@ decoder:
 
 qtz:
     quantization_strategy: 'hard'
-    qtz_latent_dim: 3
+    qtz_latent_dim: 16
     qtz_num_embed: 6
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
 
 spatial_decod:
-    generate_scaler: True
+    generate_scaler: False
     generate_redshift: False
 
     spatial_decod_hidden_dim: 64
@@ -159,14 +164,14 @@ trainer:
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift']
 
     pixel_supervision: True
-    spectra_supervision: True
+    spectra_supervision: False
     redshift_supervision: False
     spectra_beta: 1
     redshift_beta: 1
     spectra_supervision_start_epoch: 0
 
-    decode_spatial_embedding: True
-    quantize_latent: True
+    decode_spatial_embedding: False
+    quantize_latent: False
     weight_train: False
     train_use_all_wave: False
     resume_train: False
@@ -183,7 +188,7 @@ trainer:
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_batch_size: 20000 #36864
+    infer_batch_size: 100 #4096 #20000 #36864
     infer_use_all_wave: True # enforced
     infer_last_model_only: True
 
@@ -201,11 +206,11 @@ infer:
     # recon spectra
     spectra_norm_cho: "none"
     average_spectra: True
-    trusted_range_only: False    # for gt spectra
+    trusted_range_only: False     # for gt spectra
     plot_clipped_spectrum: False  # for recon spectra
     plot_spectrum_with_gt: True
     plot_spectrum_with_trans: False
-    infer_spectra_individually: True
+    infer_spectra_individually: False
     codebook_spectra_clip_range: [5000,8000]
 
     mark_spectra: True

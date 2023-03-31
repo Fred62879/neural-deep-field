@@ -107,6 +107,9 @@ class AstroDataset(Dataset):
     def get_spectra_img_coords(self):
         return self.spectra_dataset.get_spectra_img_coords()
 
+    def get_num_spectra_to_plot(self):
+        return self.spectra_dataset.get_num_spectra_to_plot()
+
     def get_num_gt_spectra(self):
         return self.spectra_dataset.get_num_gt_spectra()
 

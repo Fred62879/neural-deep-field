@@ -82,7 +82,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames = sort_alphanumeric(self.selected_model_fnames)
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames #[5:6] #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames[-1:] #[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -106,6 +106,7 @@ class AstroInferrer(BaseInferrer):
             and self.extra_args["generate_redshift"] \
             and self.quantize_latent and self.space_dim == 3
         self.plot_scaler =  "plot_save_scaler" in tasks \
+            and self.extra_args["generate_scaler"] \
             and self.quantize_latent and self.space_dim == 3
 
         self.save_soft_qtz_weights = "save_soft_qtz_weights" in tasks and \
@@ -230,6 +231,8 @@ class AstroInferrer(BaseInferrer):
             log.info(f"zscale metrics: {np.round(self.metrics_zscale[:,-1,0], 3)}")
 
     def pre_inferrence_selected_coords_partial_model(self):
+        """ Spectra reconstruction.
+        """
         self.model_output = "spectra"
         self.coords_source = "spectra"
         self.batched_fields = ["coords"]
@@ -238,7 +241,9 @@ class AstroInferrer(BaseInferrer):
         #self.num_spectra = self.dataset.get_num_spectra_coords()
         if not self.extra_args["infer_spectra_individually"]:
             # self.num_batches = int(np.ceil(num_coords / self.batch_size))
-            self.batch_size = self.extra_args["infer_batch_size"]
+            self.batch_size = min(
+                self.dataset_length * self.extra_args["spectra_neighbour_size"]**2,
+                self.extra_args["infer_batch_size"])
         else:
             # self.num_batches = num_coords
             self.batch_size = self.extra_args["spectra_neighbour_size"]**2
@@ -249,6 +254,8 @@ class AstroInferrer(BaseInferrer):
         pass
 
     def pre_inferrence_hardcode_coords_modified_model(self):
+        """ Codebook spectra reconstruction.
+        """
         self.model_output = "spectra"
         self.batched_fields = ["coords"]
         self.coords_source = "codebook_latents"
@@ -440,7 +447,7 @@ class AstroInferrer(BaseInferrer):
 
     def post_checkpoint_selected_coords_partial_model(self, model_id):
         self.recon_spectra = torch.stack(self.recon_spectra).view(
-            self.dataset.get_num_gt_spectra(),
+            self.dataset.get_num_spectra_to_plot(),
             self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()
 
@@ -552,7 +559,6 @@ class AstroInferrer(BaseInferrer):
                 self.recon_spectra.extend(spectra)
 
             except StopIteration:
-                # log.info("spectra inferrence done")
                 break
 
     def calculate_recon_spectra_pixel_values(self):
