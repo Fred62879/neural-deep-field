@@ -46,7 +46,9 @@ class Encoder(nn.Module):
             base_lod=self.kwargs["grid_base_lod"],
             num_lods=self.kwargs["grid_num_lods"],
             interpolation_type=self.kwargs["grid_interpolation_type"],
-            multiscale_type=self.kwargs["grid_multiscale_type"], **self.kwargs)
+            multiscale_type=self.kwargs["grid_multiscale_type"],
+            feature_std=self.kwargs["grid_feature_std"],
+            **self.kwargs)
 
         self.grid.init_from_geometric(
             self.kwargs["min_grid_res"], self.kwargs["max_grid_res"], self.kwargs["grid_num_lods"])

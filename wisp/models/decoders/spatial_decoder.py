@@ -21,8 +21,8 @@ class SpatialDecoder(nn.Module):
         self.qtz_calculate_loss = qtz_calculate_loss
         self.quantization_strategy = kwargs["quantization_strategy"]
 
-        self.output_scaler = kwargs["generate_scaler"]
-        self.output_redshift = kwargs["generate_redshift"]
+        self.output_scaler = self.quantize_z and kwargs["generate_scaler"]
+        self.output_redshift = self.quantize_z and kwargs["generate_redshift"]
         self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
 
         self.input_dim = get_input_latents_dim(**kwargs)

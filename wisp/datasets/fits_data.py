@@ -687,7 +687,6 @@ class FITSData:
         pixel_ids = self.get_pixel_ids(fits_uid, r, c, neighbour_size)
         grid_coords = self.get_coord(pixel_ids)
         # print(r, c, pixel_ids, coords_accurate, self.kwargs["fits_cutout_start_pos"])
-        print(grid_coords)
         return img_coords, grid_coords, pixel_ids
 
     def calculate_local_id(self, r, c, index, fits_uid):

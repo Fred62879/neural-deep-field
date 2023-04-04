@@ -9,6 +9,7 @@
 import re
 import torch
 import collections
+import numpy as np
 
 from wisp.core import Rays
 from torch._six import string_classes
@@ -21,17 +22,17 @@ def add_dummy_dim(coords, **kwargs):
     if kwargs["coords_encode_method"] == "grid" and kwargs["grid_dim"] == 3:
         num_coords = coords.shape[0]
         class_name = coords.__class__.__name__
-        print(class_name)
-        assert 0
+        # print(coords.shape, class_name)
         # if type(coords).__module__ == "torch":
+        coords_2d = coords
 
         if class_name == "Tensor":
-            coords_3d = torch.zeros((num_coords, 3))
+            coords = torch.zeros((num_coords, 3))
         elif class_name == "ndarray":
-            coords_3d = np.zeros((num_coords, 3))
+            coords = np.zeros((num_coords, 3))
         else:
             raise ValueError("Unknown collection class")
-        coords_3d[...,:2] = coords
+        coords[...,:2] = coords_2d
 
     coords = torch.FloatTensor(coords)[:,None]
     return coords
