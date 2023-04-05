@@ -233,8 +233,8 @@ class AstroTrainer(BaseTrainer):
 
         params.append({"params" : grid_params,
                        "lr": self.lr * self.grid_lr_weight})
-        #params.append({"params" : qtz_params,
-        #               "lr": self.extra_args["qtz_lr"]})
+        params.append({"params" : qtz_params,
+                       "lr": self.extra_args["qtz_lr"]})
         params.append({"params" : rest_params,
                        "lr": self.extra_args["hps_lr"]})
 
@@ -414,8 +414,6 @@ class AstroTrainer(BaseTrainer):
         self.optimizer.zero_grad(set_to_none=True)
         self.timer.check("zero grad")
 
-        #torch.autograd.set_detect_anomaly(True)
-        #with torch.cuda.amp.autocast():
         total_loss, recon_pixels, ret = self.calculate_loss(data)
 
         # print weights TMP
@@ -425,11 +423,8 @@ class AstroTrainer(BaseTrainer):
         #     np.save(join(self.soft_qtz_weights_dir, f"train_{self.epoch}"), weights)
         #     log.info(f"weight is {weights}")
 
-        #self.scaler.scale(total_loss).backward()
-        #self.scaler.step(self.optimizer)
-        #self.scaler.update()
         total_loss.backward()
-        #if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
+        # if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
         #    plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
         self.optimizer.step()
 

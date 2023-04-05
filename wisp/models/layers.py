@@ -188,17 +188,24 @@ class Quantization(nn.Module):
         elif self.quantization_strategy == "hard":
             weights, z_shape = None, z.shape
             z_f = z.view(-1,self.latent_dim) # flatten
+            assert(z_f.shape[-1] == z.shape[-1])
+            # print(z.shape, z_f.shape, self.qtz_codebook.weight.shape)
+
             min_embed_ids = find_closest_tensor(z_f, self.qtz_codebook.weight) # [bsz]
 
             # replace each z with closest embedding
             encodings = one_hot(min_embed_ids, self.num_embed) # [n,num_embed]
             encodings = encodings.type(z.dtype)
+
             z_q = torch.matmul(encodings, self.qtz_codebook.weight).view(z_shape)
+            # z_q = torch.index_select(self.qtz_codebook.weight, dim=0, index=min_embed_ids).view(z_shape)
 
         else: raise ValueError("Unsupported quantization strategy")
         return z_q, min_embed_ids, weights
+        # return z, min_embed_ids, weights
 
     def partial_loss(self, z, z_q):
+        # codebook_loss = torch.mean((z_q.detach() - z)**2)
         codebook_loss = torch.mean((z_q.detach() - z)**2) + \
             torch.mean((z_q - z.detach())**2) * self.beta
         return codebook_loss

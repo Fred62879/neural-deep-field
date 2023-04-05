@@ -576,6 +576,7 @@ class AstroInferrer(BaseInferrer):
 
         codebook_latents = codebook_latents[:,None] # [num_embd, 1, latent_dim]
         codebook_latents = codebook_latents.detach().cpu().numpy()
+        print(codebook_latents)
         # codebook_latents = self.codebook_latents
 
         self.dataset.set_hardcode_data(self.coords_source, codebook_latents)

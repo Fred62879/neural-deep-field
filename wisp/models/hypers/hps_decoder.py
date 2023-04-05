@@ -24,9 +24,10 @@ class HyperSpectralDecoder(nn.Module):
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
 
     def reconstruct_spectra(self, wave, latents, scaler, redshift, wave_bound, scale=True):
-        # print('****')
-        # print('latents',latents)
+        #print('****')
+        #print(latents.shape, wave.shape, latents)
         latents = self.convert(wave, latents, redshift, wave_bound)
+        #print(latents.shape, latents)
 
         # import numpy as np
         # np.save('/scratch/projects/vision/code/implicit-universe-wisp/latents.npy',
@@ -38,6 +39,8 @@ class HyperSpectralDecoder(nn.Module):
         # np.save('/scratch/projects/vision/code/implicit-universe-wisp/spectra.npy',
         #         spectra.detach().cpu().numpy())
         # assert 0
+        #print(spectra.shape, spectra)
+        #assert 0
 
         if self.scale and scaler is not None:
             # spectra = (torch.exp(scaler) * spectra.T).T

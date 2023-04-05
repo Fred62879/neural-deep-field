@@ -143,7 +143,7 @@ class SpectraData:
 
     def load_plot_spectra_data(self):
         wave = []
-        if (self.recon_gt_spectra and self.kwargs["plot_spectrum_with_gt"]):
+        if self.recon_gt_spectra: # and self.kwargs["plot_spectrum_with_gt"]):
             wave.extend(self.data["gt_recon_wave"])
 
         if self.recon_dummy_spectra:
@@ -179,16 +179,18 @@ class SpectraData:
             torch.FloatTensor([0.45,-0.9]),
             torch.FloatTensor([1,1])])
 
+        n = len( self.data["dummy_spectra_grid_coords"])
+
         self.data["dummy_spectra_grid_coords"] = add_dummy_dim(
             self.data["dummy_spectra_grid_coords"], **self.kwargs)
 
-        recon_spectra_wave_bound = self.kwargs["dummy_spectra_wave_bound"]
+        recon_spectra_wave_bound = self.kwargs["dummy_spectra_clip_range"]
         id_lo, id_hi = get_bound_id(
             recon_spectra_wave_bound, self.full_wave, within_bound=False)
-        self.data["spectra_recon_wave_bound_ids"].extend([[id_lo, id_hi + 1]]*9)
+        self.data["spectra_recon_wave_bound_ids"].extend([[id_lo, id_hi + 1]] * n)
         self.data["dummy_recon_wave"].extend(
             [np.arange(self.full_wave[id_lo], self.full_wave[id_hi] + 1,
-                       self.kwargs["trans_sample_interval"])] * 9
+                       self.kwargs["trans_sample_interval"])] * n
         )
 
     def load_gt_spectra_data(self):
@@ -308,20 +310,12 @@ class SpectraData:
 
     def plot_spectrum(self, spectra_dir, name, recon_spectra, spectra_norm_cho,
                       save_spectra=False, clip=True, codebook=False):
-
         """ Plot given spectra.
             @Param
               recon_spectra: [num_spectra(,num_neighbours),full_num_smpl]
         """
         full_wave = self.get_full_wave()
         gt_spectra = self.get_gt_spectra()
-
-        # print(recon_spectra)
-        # for i in range(4):
-        #     plt.plot(full_wave, recon_spectra[i])
-        #     plt.savefig(join(spectra_dir,f'{i}.png'))
-        #     plt.close()
-        # assert 0
 
         if codebook:
             if clip:
@@ -335,6 +329,11 @@ class SpectraData:
                 bound_ids = self.get_spectra_recon_wave_bound_ids()
             gt_spectra_wave = self.get_gt_spectra_wave()
             recon_spectra_wave = self.get_recon_spectra_wave()
+
+        if self.kwargs["plot_spectrum_together"]:
+            ncols = self.kwargs["num_spectra_plot_per_row"]
+            nrows = int(np.ceil(len(recon_spectra) / ncols))
+            fig, axs = plt.subplots(nrows, ncols)
 
         for i, cur_spectra in enumerate(recon_spectra):
             sub_dir = spectra_norm_cho + "_"
@@ -368,7 +367,7 @@ class SpectraData:
             else:
                 recon_wave = full_wave
 
-            # normalized spectra within trusted range to sum to 1
+            # normalize spectra within trusted range
             if spectra_norm_cho == "max":
                 cur_spectra /= np.max(cur_spectra)
             elif spectra_norm_cho == "sum":
@@ -393,13 +392,23 @@ class SpectraData:
                     cur_spectra = cur_spectra / np.max(cur_spectra) * np.max(cur_gt_spectra)
 
             # plot spectra
+            if self.kwargs["plot_spectrum_together"]:
+                if nrows == 1:
+                    axis = axs[i%ncols]
+                else: axis = axs[i//ncols,i%ncols]
+            else:
+                fig, axs = plt.subplots(1)
+                axis = axs[0]
+
             if self.kwargs["plot_spectrum_with_trans"]:
                 sub_dir += "with_trans_"
-                self.trans_obj.plot_trans()
+                self.trans_obj.plot_trans(axis=axis)
 
-            plt.plot(recon_wave, cur_spectra, color="black", label="spectrum")
+            axis.set_title(i)
+            axis.plot(recon_wave, cur_spectra, color="black", label="spectrum")
+            # axis.set_ylim([0.003,0.007])
             if plot_gt_spectra:
-                plt.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
+                axis.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
 
             if sub_dir != "":
                 if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]
@@ -410,11 +419,15 @@ class SpectraData:
             if not exists(cur_spectra_dir):
                 Path(cur_spectra_dir).mkdir(parents=True, exist_ok=True)
 
-            fname = join(cur_spectra_dir, f"spectra_{i}_{name}")
-            plt.savefig(fname)
-            plt.close()
+            if not self.kwargs["plot_spectrum_together"]:
+                fname = join(cur_spectra_dir, f"spectra_{i}_{name}")
+                fig.tight_layout();plt.savefig(fname);plt.close()
 
             if save_spectra: np.save(fname, cur_spectra)
+
+        if self.kwargs["plot_spectrum_together"]:
+            fname = join(spectra_dir, sub_dir, f"all_spectra_{name}")
+            fig.tight_layout();plt.savefig(fname);plt.close()
 
     def mark_spectra_on_img(self):
         markers = self.kwargs["spectra_markers"]
@@ -542,6 +555,7 @@ def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1
         gt_spectra = convolve_spectra(gt_spectra, std=sigma)
 
     if interpolate:
+        # print(min(gt_wave), max(gt_wave))
         f_gt = interp1d(gt_wave, gt_spectra)
 
         # make sure wave range to interpolate stay within gt spectra wave range

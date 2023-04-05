@@ -400,13 +400,18 @@ class TransData:
     # Utilities
     #############
 
-    def plot_trans(self):
+    def plot_trans(self, axis=None):
         trans = self.get_source_trans()
         wave = self.get_source_wave()
         for j, (cur_wave, cur_trans) in enumerate(zip(wave, trans)):
-            plt.plot(cur_wave, cur_trans, color=self.kwargs["plot_colors"][j],
-                     label=self.kwargs["plot_labels"][j],
-                     linestyle=self.kwargs["plot_styles"][j])
+            if axis is not None:
+                axis.plot(cur_wave, cur_trans, color=self.kwargs["plot_colors"][j],
+                         label=self.kwargs["plot_labels"][j],
+                         linestyle=self.kwargs["plot_styles"][j])
+            else:
+                plt.plot(cur_wave, cur_trans, color=self.kwargs["plot_colors"][j],
+                         label=self.kwargs["plot_labels"][j],
+                         linestyle=self.kwargs["plot_styles"][j])
 
     def integrate(self, spectra, all_wave=True):
         """ Integrate spectra over transmission.

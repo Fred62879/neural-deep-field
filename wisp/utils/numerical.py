@@ -40,7 +40,7 @@ def find_closest_tensor(tensor1, tensor2):
         torch.sum(tensor2 ** 2, dim=0) - 2 * similarity) # [n,m]
 
     # Derive the indices for minimum distances
-    ids = torch.argmin(distances, dim=1)
+    ids = torch.argmin(distances, dim=-1)
     return ids
 
 def get_coords_range(coords):

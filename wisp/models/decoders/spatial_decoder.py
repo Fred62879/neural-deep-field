@@ -84,6 +84,7 @@ class SpatialDecoder(nn.Module):
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
         """
+        # print(z.shape)
         if self.output_scaler:
             scaler = self.scaler_decoder(z[:,0])[...,0]
         else: scaler = None
@@ -97,11 +98,13 @@ class SpatialDecoder(nn.Module):
             z = self.decoder(z)
 
         if self.quantize_z:
-            assert(self.decode_spatial_embedding)
+            #assert(self.decode_spatial_embedding)
+            #print('*', z.shape)
             z, z_q = self.qtz(z, ret, temperature=temperature,
                               find_embed_id=find_embed_id,
                               save_codebook=save_codebook,
                               save_soft_qtz_weights=save_soft_qtz_weights)
+            #print('**',z.shape, z_q.shape)
 
         ret["latents"] = z
         ret["scaler"] = scaler

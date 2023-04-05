@@ -348,7 +348,7 @@ def define_cmd_line_args():
     data_group.add_argument("--plot-trans", action="store_true")
 
     # spectra data
-    data_group.add_argument("--dummy-spectra-wave-bound", type=int, nargs='+')
+    data_group.add_argument("--dummy-spectra-clip-range", type=int, nargs='+')
     data_group.add_argument("--gt-spectra-ids", type=int, nargs='+',
                             help="id of chosen gt spectra for supervision/recon etc.")
     data_group.add_argument("--spectra-markers", type=int, nargs='+',
@@ -530,8 +530,10 @@ def define_cmd_line_args():
     infer_group.add_argument("--plot-clipped-spectrum", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-gt", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-trans", action="store_true")
+    infer_group.add_argument("--plot-spectrum-together", action="store_true")
     infer_group.add_argument("--infer-spectra-individually", action="store_true")
     infer_group.add_argument("--codebook-spectra-clip-range", nargs="+")
+    infer_group.add_argument("--num-spectra-plot-per-row", type=int)
 
     infer_group.add_argument("--plot-labels", nargs="+", type=str)
     infer_group.add_argument("--plot-colors", nargs="+", type=str)
