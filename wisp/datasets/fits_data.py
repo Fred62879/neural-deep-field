@@ -103,6 +103,8 @@ class FITSData:
             for fits_uid in self.fits_uids:
                 suffix += f"_{fits_uid}"
                 self.gt_img_fnames[fits_uid] = join(img_data_path, f"gt_img_{norm}_{fits_uid}")
+                self.gt_img_distrib_fnames[fits_uid] = join(
+                    img_data_path, f"gt_img_distrib_{norm}_{fits_uid}")
         else:
             # for (fits_uid, size, (r,c)) in zip(
             #         self.fits_uids, self.fits_cutout_sizes, self.fits_cutout_start_pos):
