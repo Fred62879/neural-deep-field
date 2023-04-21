@@ -17,6 +17,7 @@ class HyperSpectralConverter(nn.Module):
 
         self.kwargs = kwargs
         self.encode_wave = kwargs["encode_wave"]
+        self.quantize_spectra = kwargs["quantize_spectra"]
         self.combine_method = kwargs["hps_combine_method"]
 
         self.init_encoder()
@@ -107,7 +108,7 @@ class HyperSpectralConverter(nn.Module):
         return latents
 
     def forward(self, wave, latents, redshift, wave_bound):
-        """ Process wave (refshift, encode, if required) and
+        """ Process wave (shift, encode, if required) and
               combine with RA/DEC (original state or encoded) to hyperspectral latents.
             @Param
               wave:     lambda values used for casting.   [bsz,num_samples,1]
@@ -116,8 +117,6 @@ class HyperSpectralConverter(nn.Module):
             @Return
               latents:  hyperspectral latents (i.e. ra/dec/wave)
         """
-        if self.kwargs["print_shape"]: print('hps_converter',latents.shape)
-
         num_samples = wave.shape[-2]
         coords_encode_dim = latents.shape[-1]
 
@@ -129,26 +128,15 @@ class HyperSpectralConverter(nn.Module):
 
         if self.encode_wave:
             assert(coords_encode_dim != self.kwargs["space_dim"])
-            # import numpy as np
-            # np.save('/scratch/projects/vision/code/implicit-universe-wisp/wave.npy',
-            #         wave.detach().cpu().numpy())
             wave = self.wave_encoder(wave) # [bsz,num_samples,wave_embed_dim]
-            # np.save('/scratch/projects/vision/code/implicit-universe-wisp/encoded_wave.npy',
-            #         wave.detach().cpu().numpy())
 
         else: # assert coords are not encoded as well, should only use siren in this case
             if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
                 assert(coords_encode_dim == self.kwargs["space_dim"])
-
             else:
                 assert(coords_encode_dim == 2)
-                # remove dummy 3rd dim
-                latents = latents[...,:2]
-
-        if self.kwargs["print_shape"]: print('hps_converter, embedded wave', wave.shape)
+                latents = latents[...,:2] # remove dummy 3rd dim
 
         latents = latents.tile(1,num_samples,1) # [bsz,nsamples,encode_dim or 2]
-        if self.kwargs["print_shape"]: print('hps_converter, latents',latents.shape)
         latents = self.combine_spatial_spectral(latents, wave)
-        # print(latents.shape, latents)
         return latents

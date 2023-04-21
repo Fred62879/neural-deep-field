@@ -9,6 +9,7 @@ from os.path import join
 from astropy.io import fits
 from astropy.wcs import WCS
 from functools import reduce
+from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
@@ -136,6 +137,7 @@ def forward(data,
             recon_spectra=False,
             recon_codebook_spectra=False,
             quantize_latent=False,
+            quantize_spectra=False,
             quantization_strategy="hard",
             save_soft_qtz_weights=False, # save qtz codebook weight
             calculate_codebook_loss=False,
@@ -192,23 +194,30 @@ def forward(data,
 
         if recon_spectra or recon_codebook_spectra:
             net_args["wave"] = data["wave"]
-            # print('**', data["wave"].shape)
 
         if spectra_supervision_train:
-            net_args["full_wave"] = data["full_wave"]
             # num of coords for gt, dummy (incl. neighbours) spectra
             net_args["num_spectra_coords"] = data["num_spectra_coords"]
+            net_args["full_wave"] = data["full_wave"]
 
-        if quantize_latent:
+        if quantize_latent or quantize_spectra:
+            qtz_args = defaultdict(lambda: False)
+
+            if quantize_spectra:
+                net_args["full_wave"] = data["full_wave"]
+                net_args["wave_smpl_ids"] = data["wave_smpl_ids"]
+
             if quantization_strategy == "soft":
-                net_args["save_soft_qtz_weights"] = save_soft_qtz_weights
+                qtz_args["save_soft_qtz_weights"] = save_soft_qtz_weights
                 if train:
-                    net_args["temperature"] = step_num
+                    qtz_args["temperature"] = step_num
                 elif save_embed_ids:
-                    net_args["find_embed_id"] = save_embed_ids
+                    qtz_args["find_embed_id"] = save_embed_ids
 
             if save_codebook:
-                net_args["save_codebook"] = save_codebook
+                qtz_args["save_codebook"] = save_codebook
+
+            net_args["qtz_args"] = qtz_args
 
     else: raise ValueError("Unsupported space dimension.")
 

@@ -36,7 +36,9 @@ class AstroDataset(Dataset):
         self.nsmpls = kwargs["num_trans_samples"]
 
         if self.space_dim == 3:
-            self.unbatched_fields = {"trans_data","spectra_supervision_data"}
+            self.unbatched_fields = {
+                "trans_data","spectra_supervision_data","qtz_spectra_data"
+            }
         else:
             self.unbatched_fields = set()
 
@@ -151,7 +153,7 @@ class AstroDataset(Dataset):
                 out["trans"] = self.trans_dataset.get_hdcd_trans()
                 out["nsmpl"] = self.trans_dataset.get_hdcd_nsmpl()
             else:
-                out["wave"], out["trans"], out["nsmpl"] = \
+                out["wave"], out["trans"], out["wave_smpl_ids"], out["nsmpl"] = \
                     self.trans_dataset.sample_wave_trans(
                         batch_size, self.nsmpls, use_full_wave=self.use_full_wave)
 
@@ -179,6 +181,10 @@ class AstroDataset(Dataset):
         out["full_wave_bound"] = self.trans_dataset.get_full_wave_bound()
         out["spectra_supervision_wave_bound_ids"] = self.spectra_dataset.get_spectra_supervision_wave_bound_ids()
 
+    def get_qtz_spectra_data(self, out):
+        out["full_wave"] = self.trans_dataset.get_full_wave()
+        assert("wave_smpl_ids" in out)
+
     def __len__(self):
         """ Length of the dataset in number of coords.
         """
@@ -195,11 +201,14 @@ class AstroDataset(Dataset):
         for field in batched_fields:
             out[field] = self.get_batched_data(field, idx)
 
-        if "spectra_supervision_data" in self.requested_fields:
-            self.get_spectra_data(out)
-
         if "trans_data" in self.requested_fields:
             self.get_trans_data(len(idx), out)
+
+        if "qtz_spectra_data" in self.requested_fields:
+            self.get_qtz_spectra_data(out)
+
+        if "spectra_supervision_data" in self.requested_fields:
+            self.get_spectra_data(out)
 
         if self.transform is not None:
             out = self.transform(out)

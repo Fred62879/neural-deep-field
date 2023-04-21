@@ -4,9 +4,9 @@ import torch.nn as nn
 
 from wisp.utils import PerfTimer
 from wisp.models.decoders import Decoder
-from wisp.models.layers import Normalization
 from wisp.models.hypers.hps_converter import HyperSpectralConverter
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
+from wisp.models.layers import init_codebook, Normalization, Quantization
 
 
 class HyperSpectralDecoder(nn.Module):
@@ -17,39 +17,48 @@ class HyperSpectralDecoder(nn.Module):
 
         self.kwargs = kwargs
         self.scale = scale
+        self.quantize_spectra = kwargs["quantize_spectra"]
 
         self.convert = HyperSpectralConverter(**kwargs)
         self.spectra_decoder = Decoder(**kwargs)
-        self.scale = Normalization(kwargs["mlp_output_norm_method"])
+        self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
 
-    def reconstruct_spectra(self, wave, latents, scaler, redshift, wave_bound, scale=True):
-        #print('****')
-        #print(latents.shape, wave.shape, latents)
+        if self.quantize_spectra:
+            self.qtz = Quantization(False, **kwargs)
+            self.codebook = init_codebook(
+                kwargs["qtz_seed"], kwargs["qtz_num_embed"], kwargs["qtz_latent_dim"])
+
+    def reconstruct_spectra(self, wave, latents, scaler, redshift, wave_bound,
+                            ret, codebook_spectra=None, qtz_args=None):
+
         latents = self.convert(wave, latents, redshift, wave_bound)
-        #print(latents.shape, latents)
-
-        # import numpy as np
-        # np.save('/scratch/projects/vision/code/implicit-universe-wisp/latents.npy',
-        #         latents.detach().cpu().numpy())
-
         spectra = self.spectra_decoder(latents)[...,0]
-        # print('spectra',spectra)
 
-        # np.save('/scratch/projects/vision/code/implicit-universe-wisp/spectra.npy',
-        #         spectra.detach().cpu().numpy())
-        # assert 0
-        #print(spectra.shape, spectra)
-        #assert 0
+        if self.quantize_spectra and codebook_spectra is not None:
+            spectra = self.qtz(spectra, codebook_spectra, ret, qtz_args)
 
         if self.scale and scaler is not None:
-            # spectra = (torch.exp(scaler) * spectra.T).T
             spectra = (scaler * spectra.T).T
 
-        spectra = self.scale(spectra)
+        spectra = self.norm(spectra)
         return spectra
 
-    def train_with_full_wave(self, latents, full_wave, full_wave_bound, num_spectra_coords, ret):
+    def forward_codebook(self, full_wave, full_wave_bound, codebook, ret):
+        """ Forward latents in codebook.
+            @Param
+              full_wave: [num_full_samples]
+        """
+        full_wave = full_wave[None,:,None].tile(
+            self.kwargs["qtz_num_embed"],1,1) # [n,nsmpl,1]
+        spectra = self.reconstruct_spectra(
+            full_wave, codebook.weight[:,None], None, None,
+            full_wave_bound, ret)
+        return spectra
+
+    def forward_with_full_wave(self, latents, full_wave, full_wave_bound,
+                               num_spectra_coords, codebook_spectra, ret, qtz_args):
+
         """ During training, some latents will be decoded, combining with full wave.
             Currently only supports spectra coords (incl. gt, dummy that requires
               spectrum plotting during training time).
@@ -63,10 +72,12 @@ class HyperSpectralDecoder(nn.Module):
         if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
         if self.kwargs["print_shape"]: print('hps_decoder, full wave', full_wave.shape)
 
-        ret["spectra"] = self.reconstruct_spectra(full_wave, latents, scaler, redshift, full_wave_bound)
+        ret["spectra"] = self.reconstruct_spectra(
+            full_wave, latents, scaler, redshift, full_wave_bound,
+            ret, codebook_spectra, qtz_args)
 
-    def forward(self, latents, wave, trans, nsmpl, ret, full_wave=None,
-                full_wave_bound=None, num_spectra_coords=-1):
+    def forward(self, latents, wave, wave_smpl_ids, trans, nsmpl, ret, full_wave=None,
+                full_wave_bound=None, num_spectra_coords=-1, qtz_args=None):
 
         """ @Param
               latents:   (encoded or original) coords. [bsz,num_samples,coords_encode_dim or 2 or 3]
@@ -90,23 +101,28 @@ class HyperSpectralDecoder(nn.Module):
         """
         timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
 
-        if self.kwargs["print_shape"]: print('hps_decoder',latents.shape)
+        if self.quantize_spectra:
+            codebook_spectra = self.forward_codebook(
+                full_wave, full_wave_bound, self.codebook, ret) # [n,nsmpl]
+        else: codebook_spectra = None
 
         # spectra supervision, train with all lambda values instead of sampled lambda
         if num_spectra_coords > 0:
-            self.train_with_full_wave(latents, full_wave, full_wave_bound, num_spectra_coords, ret)
+            self.forward_with_full_wave(
+                latents, full_wave, full_wave_bound, num_spectra_coords,
+                codebook_spectra, ret, qtz_args)
             latents = latents[:-num_spectra_coords]
-            if ret["scaler"] is not None: ret["scaler"] = ret["scaler"][:-num_spectra_coords]
-            if ret["redshift"] is not None: ret["redshift"] = ret["redshift"][:-num_spectra_coords]
-            if self.kwargs["print_shape"]: print('hps_decoder', latents.shape)
+
+            if ret["scaler"] is not None:
+                ret["scaler"] = ret["scaler"][:-num_spectra_coords]
+            if ret["redshift"] is not None:
+                ret["redshift"] = ret["redshift"][:-num_spectra_coords]
 
         if latents.shape[0] > 0:
-            spectra = self.reconstruct_spectra(wave, latents, ret["scaler"], ret["redshift"], full_wave_bound)
+            spectra = self.reconstruct_spectra(
+                wave, latents, ret["scaler"], ret["redshift"], full_wave_bound, ret,
+                codebook_spectra.T[wave_smpl_ids])
+
             if "spectra" not in ret: ret["spectra"] = spectra
-            if self.kwargs["print_shape"]: print('hps_decoder', spectra.shape)
-
-            #timer.check("hps decoder, integration")
             intensity = self.inte(spectra, trans, nsmpl)
-            if self.kwargs["print_shape"]: print('hps_decoder', intensity.shape)
-
             ret["intensity"] = intensity

@@ -130,6 +130,7 @@ class TransData:
               trans: [bsz,nbands,nsmpl]
               nsmpl: [bsz,nbands]/None
         """
+        smpl_ids = None
         nsmpl_within_each_band = None
 
         if use_full_wave:
@@ -150,11 +151,12 @@ class TransData:
                 batch_size, num_samples, self.trans_data, waves=self.wave, sort=False)
 
         elif self.sample_method == "mixture":
-            smpl_wave, smpl_trans, _, nsmpl_within_each_band = batch_sample_trans(
+            smpl_wave, smpl_trans, smpl_ids, nsmpl_within_each_band = batch_sample_trans(
                 batch_size, num_samples, self.trans_data, **self.kwargs)
         else:
             raise Exception("Unsupported monte carlo choice")
-        return smpl_wave, smpl_trans, nsmpl_within_each_band
+
+        return smpl_wave, smpl_trans, smpl_ids, nsmpl_within_each_band
 
     def get_flat_trans(self):
         if exists(self.flat_trans_fname):
@@ -445,7 +447,7 @@ def batch_sample_trans(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, 
         @Return smpl_wave   [bsz,nsmpl,1]
                 smpl_trans  [bsz,nbands,nsmpl]
                 avg_nsmpl   [nbands]
-                ids         [nsmpls]
+                ids         [bsz,nsmpls]
     """
     (wave, trans, distrib, encd_ids) = trans_data
     (nbands, nsmpl_full) = trans.shape

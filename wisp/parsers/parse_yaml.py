@@ -441,6 +441,7 @@ def define_cmd_line_args():
     train_group.add_argument("--redshift-beta", type=float, help="redshift loss weight scaler.")
 
     train_group.add_argument("--quantize-latent", action="store_true")
+    train_group.add_argument("--quantize-spectra", action="store_true")
     train_group.add_argument("--decode-spatial-embedding", action="store_true")
 
     train_group.add_argument("--resume-train", action="store_true")

@@ -111,7 +111,7 @@ decoder:
     siren_last_linear: True
 
 qtz:
-    quantization_strategy: 'hard'
+    quantization_strategy: 'soft'
     qtz_latent_dim: 16
     qtz_num_embed: 4
     qtz_beta: 1
@@ -165,14 +165,15 @@ trainer:
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift']
 
     pixel_supervision: True
-    spectra_supervision: False
+    spectra_supervision: True
     redshift_supervision: False
     spectra_beta: 1
     redshift_beta: 1
     spectra_supervision_start_epoch: 0
 
     decode_spatial_embedding: True
-    quantize_latent: True
+    quantize_latent: False
+    quantize_spectra: True
     weight_train: False
     train_use_all_wave: False
     resume_train: False
@@ -233,12 +234,12 @@ dataset:
 
     # if don't use full fits, we can select cutout from tiles
     # the order of the following 5 fields corresponds to each other
-    fits_footprints: ['9813'] #['9812']
-    fits_tile_ids: ['5'] #['1']
-    fits_subtile_ids: ['8'] #['5']
-    fits_cutout_num_rows: [4000]
-    fits_cutout_num_cols: [4000]
-    fits_cutout_start_pos: [[0,0]] #[[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    fits_footprints: ['9812']
+    fits_tile_ids: ['1']
+    fits_subtile_ids: ['5']
+    fits_cutout_num_rows: [64]
+    fits_cutout_num_cols: [64]
+    fits_cutout_start_pos: [[86,188]] #[[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
     #num_bands: 1
     #sensor_collection_name: '1_i'

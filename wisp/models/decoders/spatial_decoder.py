@@ -17,7 +17,11 @@ class SpatialDecoder(nn.Module):
 
         self.kwargs = kwargs
 
+        # we either quantize latents or spectra or none
         self.quantize_z = kwargs["quantize_latent"]
+        self.quantize_spectra = kwargs["quantize_spectra"]
+        assert not (self.quantize_z and self.quantize_spectra)
+
         self.qtz_calculate_loss = qtz_calculate_loss
         self.quantization_strategy = kwargs["quantization_strategy"]
 
@@ -77,14 +81,13 @@ class SpatialDecoder(nn.Module):
             num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["spatial_decod_hidden_dim"], skip=[])
 
-    def forward(self, z, ret, temperature=1, find_embed_id=False,
-                save_codebook=False, save_soft_qtz_weights=False):
-
+    def forward(self, z, ret, qtz_args):
+                # temperature=1, find_embed_id=False,
+                # save_codebook=False, save_soft_qtz_weights=False):
         """ Decode latent variables
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
         """
-        # print(z.shape)
         if self.output_scaler:
             scaler = self.scaler_decoder(z[:,0])[...,0]
         else: scaler = None
@@ -98,18 +101,17 @@ class SpatialDecoder(nn.Module):
             z = self.decoder(z)
 
         if self.quantize_z:
-            #assert(self.decode_spatial_embedding)
-            #print('*', z.shape)
-            z, z_q = self.qtz(z, ret, temperature=temperature,
-                              find_embed_id=find_embed_id,
-                              save_codebook=save_codebook,
-                              save_soft_qtz_weights=save_soft_qtz_weights)
-            #print('**',z.shape, z_q.shape)
+            # z, z_q = self.qtz(z, ret, temperature=temperature,
+            #                   find_embed_id=find_embed_id,
+            #                   save_codebook=save_codebook,
+            #                   save_soft_qtz_weights=save_soft_qtz_weights)
+            z, z_q = self.qtz(z, ret, **qtz_args)
+
+        elif self.quantize_spectra: pass
 
         ret["latents"] = z
         ret["scaler"] = scaler
         ret["redshift"] = redshift
 
-        if self.quantize_z:
-            return z_q
+        if self.quantize_z: return z_q
         return z

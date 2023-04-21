@@ -87,6 +87,9 @@ class AstroTrainer(BaseTrainer):
             if self.spectral_inpaint:
                 pass
 
+        if self.quantize_spectra:
+            fields.append("qtz_spectra_data")
+
         if self.spectra_supervision:
             fields.append("spectra_supervision_data")
 
@@ -104,6 +107,8 @@ class AstroTrainer(BaseTrainer):
         tasks = set(self.extra_args["tasks"])
 
         self.quantize_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
+        self.quantize_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
+        assert not (self.quantize_latent and self.quantize_spectra)
 
         self.pixel_supervision = self.extra_args["pixel_supervision"]
         self.save_recon = self.pixel_supervision and \
@@ -526,6 +531,7 @@ class AstroTrainer(BaseTrainer):
                       spectra_supervision_train=self.spectra_supervision,
                       redshift_supervision_train=self.redshift_supervision,
                       quantize_latent=self.quantize_latent,
+                      quantize_spectra=self.quantize_spectra,
                       quantization_strategy=self.extra_args["quantization_strategy"],
                       save_soft_qtz_weights=True,
                       calculate_codebook_loss=self.quantize_latent,

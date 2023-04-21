@@ -44,7 +44,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             self.kwargs["coords_embed_seed"]
 
         )
-        self.coord_encoder = Encoder(
+        self.spatial_encoder = Encoder(
             input_dim=2,
             encode_method=self.kwargs["coords_encode_method"],
             embedder_args=embedder_args,
@@ -59,18 +59,17 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         """
         channels = ["intensity","latents","spectra"]
 
-        if self.kwargs["quantize_latent"]:
-            channels.extend(["scaler","redshift","codebook_loss",
-                             "min_embed_ids","codebook","soft_qtz_weights"])
+        if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
+            # channels.extend(["scaler","redshift","codebook_loss",
+            #                  "min_embed_ids","codebook","soft_qtz_weights"])
+            channels.extend(["wave_smpl_ids","qtz_args"])
 
         self._register_forward_function( self.hyperspectral, channels )
 
-    def hyperspectral(self, coords, wave=None, trans=None, nsmpl=None, full_wave=None,
-                      full_wave_bound=None, num_spectra_coords=-1, pidx=None,
-                      lod_idx=None, temperature=1,
-                      find_embed_id=False,
-                      save_codebook=False,
-                      save_soft_qtz_weights=False):
+    def hyperspectral(self, coords, wave=None, wave_smpl_ids=None, trans=None,
+                      nsmpl=None, full_wave=None, full_wave_bound=None,
+                      num_spectra_coords=-1, qtz_args=None, pidx=None, lod_idx=None):
+                      #temperature=1, find_embed_id=False, save_codebook=False, save_soft_qtz_weights=False):
 
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
@@ -80,10 +79,11 @@ class AstroHyperSpectralNerf(BaseNeuralField):
               lod_idx (int): index into active_lods. If None, will use the maximum LOD.
                              Currently interpolation doesn't use this.
               full_wave_bound: min and max of wave to normalize wave TODO make this requried
-              temperature: temperature for soft quantization, if performed
-              find_embed_id: whether find embed id or not (used for soft quantization)
-               save_codebook: save codebook weights value to local
-               save_soft_qtz_weights: save weights for each code (when doing soft qtz)
+              qtz_args:
+                temperature: temperature for soft quantization, if performed
+                find_embed_id: whether find embed id or not (used for soft quantization)
+                save_codebook: save codebook weights value to local
+                save_soft_qtz_weights: save weights for each code (when doing soft qtz)
 
             @Return
               {"indensity": Output intensity tensor of shape [batch, num_samples, 3]
@@ -92,22 +92,19 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         """
         ret = defaultdict(lambda: None)
         timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
-        #print(coords.shape, coords)
 
         timer.check("hyper nef encode coord")
 
         if self.kwargs["encode_coords"]:
-            latents = self.coord_encoder(coords, lod_idx=lod_idx)
+            latents = self.spatial_encoder(coords, lod_idx=lod_idx)
         else: latents = coords
 
-        #print(latents.shape, latents)
+        latents = self.spatial_decoder(latents, ret, qtz_args)
+        # temperature=temperature,
+        # find_embed_id=find_embed_id,
+        # save_codebook=save_codebook,
+        # save_soft_qtz_weights=save_soft_qtz_weights)
 
-        latents = self.spatial_decoder(
-            latents, ret, temperature=temperature,
-            find_embed_id=find_embed_id,
-            save_codebook=save_codebook,
-            save_soft_qtz_weights=save_soft_qtz_weights)
-
-        self.hps_decoder(latents, wave, trans, nsmpl, ret,
-                         full_wave, full_wave_bound, num_spectra_coords)
+        self.hps_decoder(latents, wave, wave_smpl_ids, trans, nsmpl, ret,
+                         full_wave, full_wave_bound, num_spectra_coords, qtz_args)
         return ret
