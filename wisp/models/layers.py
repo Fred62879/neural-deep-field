@@ -273,9 +273,15 @@ class Quantization(nn.Module):
                 min_embed_ids = torch.argmax(z, dim=-1)
             else: min_embed_ids = None
 
+            # print((z * temperature * self.kwargs["qtz_temperature_scale"])[:5])
             weights = nn.functional.softmax( # [bsz,1,num_embeds]
                 z * temperature * self.kwargs["qtz_temperature_scale"], dim=-1)
-            # z_q = torch.matmul(weights, codebook.weight)
+            # print(weights[:5])
+
+            if self.kwargs["quantize_spectra"]:
+                codebook = codebook.permute(1,0,2) # [bsz,num_embeds,nsmpl]
+            else:
+                pass # codebook [num_embeds,embed_dim]
             z_q = torch.matmul(weights, codebook)
 
         elif self.quantization_strategy == "hard":
@@ -283,13 +289,13 @@ class Quantization(nn.Module):
             z_f = z.view(-1,self.latent_dim) # flatten
             assert(z_f.shape[-1] == z.shape[-1])
 
-            min_embed_ids = find_closest_tensor(z_f, codebook.weight) # [bsz]
+            min_embed_ids = find_closest_tensor(z_f, codebook) # [bsz]
 
             # replace each z with closest embedding
             encodings = one_hot(min_embed_ids, self.num_embed) # [n,num_embed]
             encodings = encodings.type(z.dtype)
 
-            z_q = torch.matmul(encodings, codebook.weight).view(z_shape)
+            z_q = torch.matmul(encodings, codebook).view(z_shape)
 
         else: raise ValueError("Unsupported quantization strategy")
         return z_q, min_embed_ids, weights
@@ -300,12 +306,11 @@ class Quantization(nn.Module):
         return codebook_loss
 
     def forward(self, z, codebook, ret, qtz_args):
-        # find_embed_id=False, save_codebook=False, save_soft_qtz_weights=False):
         """ @Param
-               z: latent variables
+               z: latent variables [bsz,1,num_embeds]
                ret: collection of results to return
                temperature: used for softmax quantization
-               qtz_args:
+               qtz_args (deafultdict: False):
                  find_embed_id: whether find embed id, only used for soft quantization
                                 hard qtz always requires find embed id
                                 soft qtz requires only when plotting embed map
@@ -334,6 +339,6 @@ class Quantization(nn.Module):
         else: raise ValueError("Unsupported quantization strategy")
 
         if qtz_args["save_codebook"]:
-            ret["codebook"] = codebook.weight.detach().cpu().numpy()
+            ret["codebook"] = codebook.detach().cpu().numpy()
 
         return z, z_q

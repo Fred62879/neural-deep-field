@@ -70,20 +70,21 @@ class SpatialDecoder(nn.Module):
             elif self.quantization_strategy == "hard":
                 output_dim = self.kwargs["qtz_latent_dim"]
             else:
-                raise ValueError("Unsupporteed quantization strategt.")
+                raise ValueError("Unsupporteed quantization strategy.")
+        elif self.quantize_spectra:
+            output_dim = self.kwargs["qtz_num_embed"]
         elif self.decode_spatial_embedding:
             output_dim = self.kwargs["spatial_decod_output_dim"]
+        else: return
 
-        self.decoder = BasicDecoder(
+        self.decode = BasicDecoder(
             self.input_dim, output_dim,
             get_activation_class(self.kwargs["spatial_decod_activation_type"]),
             bias=True, layer=get_layer_class(self.kwargs["spatial_decod_layer_type"]),
             num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["spatial_decod_hidden_dim"], skip=[])
 
-    def forward(self, z, ret, qtz_args):
-                # temperature=1, find_embed_id=False,
-                # save_codebook=False, save_soft_qtz_weights=False):
+    def forward(self, z, codebook, ret, qtz_args):
         """ Decode latent variables
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
@@ -97,21 +98,18 @@ class SpatialDecoder(nn.Module):
             redshift = self.redshift_adjust(redshift)
         else: redshift = None
 
-        if self.decode_spatial_embedding: # or self.quantize_z:
-            z = self.decoder(z)
-
-        if self.quantize_z:
-            # z, z_q = self.qtz(z, ret, temperature=temperature,
-            #                   find_embed_id=find_embed_id,
-            #                   save_codebook=save_codebook,
-            #                   save_soft_qtz_weights=save_soft_qtz_weights)
-            z, z_q = self.qtz(z, ret, **qtz_args)
-
-        elif self.quantize_spectra: pass
+        if self.quantize_spectra:
+            logits = self.decode(z)
+        else:
+            if self.decode_spatial_embedding:
+                z = self.decode(z)
+            if self.quantize_z:
+                z, z_q = self.qtz(z, codebook.weight, ret, qtz_args)
 
         ret["latents"] = z
         ret["scaler"] = scaler
         ret["redshift"] = redshift
 
-        if self.quantize_z: return z_q
+        if self.quantize_spectra: return logits
+        if self.quantize_z:       return z_q
         return z

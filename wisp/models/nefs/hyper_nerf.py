@@ -4,12 +4,13 @@ import torch
 from collections import defaultdict
 
 from wisp.utils import PerfTimer
+from wisp.utils.common import load_layer_weights
+
 from wisp.models.embedders import Encoder
+from wisp.models.layers import init_codebook
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.decoders import SpatialDecoder
 from wisp.models.hypers import HyperSpectralDecoder
-
-from wisp.utils.common import load_layer_weights
 
 
 class AstroHyperSpectralNerf(BaseNeuralField):
@@ -29,8 +30,12 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         if self.kwargs["encode_coords"]:
             self.init_encoder()
         self.spatial_decoder = SpatialDecoder(qtz_calculate_loss, **kwargs)
-        self.hps_decoder = HyperSpectralDecoder(
-            integrate=integrate, scale=scale, **kwargs)
+        self.hps_decoder = HyperSpectralDecoder(integrate=integrate, scale=scale, **kwargs)
+
+        if kwargs["quantize_latent"] or kwargs["quantize_spectra"]:
+            self.codebook = init_codebook(
+                kwargs["qtz_seed"], kwargs["qtz_num_embed"], kwargs["qtz_latent_dim"])
+        else: self.codebook = None
 
         torch.cuda.empty_cache()
 
@@ -60,17 +65,16 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         channels = ["intensity","latents","spectra"]
 
         if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
-            # channels.extend(["scaler","redshift","codebook_loss",
-            #                  "min_embed_ids","codebook","soft_qtz_weights"])
-            channels.extend(["wave_smpl_ids","qtz_args"])
+            channels.extend(["scaler","redshift","codebook_loss",
+                             "min_embed_ids","codebook","soft_qtz_weights"])
+            # channels.extend(["wave_smpl_ids","qtz_args"])
+            # channels.extend(["qtz_args"])
 
-        self._register_forward_function( self.hyperspectral, channels )
+        self._register_forward_function(self.hyperspectral, channels)
 
     def hyperspectral(self, coords, wave=None, wave_smpl_ids=None, trans=None,
                       nsmpl=None, full_wave=None, full_wave_bound=None,
                       num_spectra_coords=-1, qtz_args=None, pidx=None, lod_idx=None):
-                      #temperature=1, find_embed_id=False, save_codebook=False, save_soft_qtz_weights=False):
-
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
               coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2/3]
@@ -99,12 +103,9 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             latents = self.spatial_encoder(coords, lod_idx=lod_idx)
         else: latents = coords
 
-        latents = self.spatial_decoder(latents, ret, qtz_args)
-        # temperature=temperature,
-        # find_embed_id=find_embed_id,
-        # save_codebook=save_codebook,
-        # save_soft_qtz_weights=save_soft_qtz_weights)
+        latents = self.spatial_decoder(latents, self.codebook, ret, qtz_args)
 
         self.hps_decoder(latents, wave, wave_smpl_ids, trans, nsmpl, ret,
-                         full_wave, full_wave_bound, num_spectra_coords, qtz_args)
+                         full_wave, full_wave_bound, num_spectra_coords,
+                         self.codebook, qtz_args)
         return ret
