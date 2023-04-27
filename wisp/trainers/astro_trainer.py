@@ -264,10 +264,15 @@ class AstroTrainer(BaseTrainer):
                 iter_start_time = time.time()
                 self.scene_state.optimization.iteration = self.iteration
 
+                a = time.time()
                 data = self.next_batch()
+                b = time.time()
+                print(f'data takes {b-a}s')
 
                 self.pre_step()
                 self.step(data)
+                c = time.time()
+                print(f'forward takes {c-b}s')
                 self.post_step()
 
                 self.iteration += 1

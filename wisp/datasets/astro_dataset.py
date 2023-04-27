@@ -126,7 +126,6 @@ class AstroDataset(Dataset):
                 data = self.spectra_dataset.get_spectra_grid_coords()
             else:
                 data = self.data[self.coords_source]
-
         elif field == "pixels":
             data = self.fits_dataset.get_pixels()
         elif field == "weights":
@@ -204,8 +203,8 @@ class AstroDataset(Dataset):
         if "trans_data" in self.requested_fields:
             self.get_trans_data(len(idx), out)
 
-        if "qtz_spectra_data" in self.requested_fields:
-            self.get_qtz_spectra_data(out)
+        # if "qtz_spectra_data" in self.requested_fields:
+        #     self.get_qtz_spectra_data(out)
 
         if "spectra_supervision_data" in self.requested_fields:
             self.get_spectra_data(out)
