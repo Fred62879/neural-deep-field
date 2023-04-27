@@ -20,13 +20,14 @@ class SpatialDecoder(nn.Module):
         # we either quantize latents or spectra or none
         self.quantize_z = kwargs["quantize_latent"]
         self.quantize_spectra = kwargs["quantize_spectra"]
+        self.qtz = self.quantize_z or self.quantize_spectra
         assert not (self.quantize_z and self.quantize_spectra)
 
         self.qtz_calculate_loss = qtz_calculate_loss
         self.quantization_strategy = kwargs["quantization_strategy"]
 
-        self.output_scaler = self.quantize_z and kwargs["generate_scaler"]
-        self.output_redshift = self.quantize_z and kwargs["generate_redshift"]
+        self.output_scaler = self.qtz and kwargs["generate_scaler"]
+        self.output_redshift = self.qtz and kwargs["generate_redshift"]
         self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
 
         self.input_dim = get_input_latents_dim(**kwargs)

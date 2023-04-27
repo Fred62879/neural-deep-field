@@ -91,6 +91,8 @@ class AstroInferrer(BaseInferrer):
         """
         tasks = set(self.extra_args["tasks"])
         self.quantize_latent = self.extra_args["quantize_latent"]
+        self.quantize_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
+        assert not (self.quantize_latent and self.quantize_spectra)
 
         # infer all coords using original model
         self.recon_img = "recon_img" in tasks
@@ -115,7 +117,8 @@ class AstroInferrer(BaseInferrer):
 
         # infer all coords using modified model
         self.recon_codebook_spectra = "recon_codebook_spectra" in tasks \
-            and self.quantize_latent and self.space_dim == 3
+            and (self.quantize_latent or self.quantize_spectra) \
+            and self.space_dim == 3
 
         # infer selected coords using partial model
         self.log_pixel_value = "log_pixel_value" in tasks # log spectra pixel value
@@ -504,6 +507,7 @@ class AstroInferrer(BaseInferrer):
                         pixel_supervision_train=False,
                         spectra_supervision_train=False,
                         quantize_latent=self.quantize_latent,
+                        quantize_spectra=self.quantize_spectra,
                         quantization_strategy=self.extra_args["quantization_strategy"],
                         save_soft_qtz_weights=self.save_soft_qtz_weights,
                         calculate_codebook_loss=False,
@@ -546,6 +550,8 @@ class AstroInferrer(BaseInferrer):
                         pixel_supervision_train=False,
                         spectra_supervision_train=False,
                         quantize_latent=self.quantize_latent,
+                        quantize_spectra=self.quantize_spectra,
+                        quantization_strategy=self.extra_args["quantization_strategy"],
                         calculate_codebook_loss=False,
                         recon_img=False,
                         recon_spectra=True,
@@ -568,6 +574,7 @@ class AstroInferrer(BaseInferrer):
                 print("recon spectrum pixel", recon[args.spectrum_pos])
 
     def infer_codebook_spectra(self, model_id, checkpoint):
+        print('****')
         load_model_weights(self.codebook_pipeline, checkpoint)
         self.codebook_pipeline.eval()
 
@@ -596,6 +603,7 @@ class AstroInferrer(BaseInferrer):
                         pixel_supervision_train=False,
                         spectra_supervision_train=False,
                         quantize_latent=False,
+                        quantize_spectra=False,
                         calculate_codebook_loss=False,
                         recon_img=False,
                         recon_spectra=False,

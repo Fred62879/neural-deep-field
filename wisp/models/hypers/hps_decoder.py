@@ -17,19 +17,19 @@ class HyperSpectralDecoder(nn.Module):
 
         self.kwargs = kwargs
         self.scale = scale
-        self.quantize_spectra = kwargs["quantize_spectra"]
 
         self.convert = HyperSpectralConverter(**kwargs)
         self.spectra_decoder = Decoder(**kwargs)
         self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
-
-        if self.quantize_spectra:
+        if kwargs["quantize_spectra"]:
             self.softmax = nn.Softmax()
             self.qtz = Quantization(False, **kwargs)
 
-    def reconstruct_spectra(self, input, wave, scaler, redshift, wave_bound, ret, codebook, qtz_args):
-        if self.quantize_spectra:
+    def reconstruct_spectra(self, input, wave, scaler, redshift, wave_bound, ret,
+                            codebook, qtz_args, quantize_spectra):
+
+        if quantize_spectra:
             bsz = wave.shape[0]
             # each input coord has #num_code spectra generated
             latents = torch.stack([
@@ -41,7 +41,7 @@ class HyperSpectralDecoder(nn.Module):
 
         spectra = self.spectra_decoder(latents)[...,0]
 
-        if self.quantize_spectra: # and codebook is not None:
+        if quantize_spectra: # and codebook is not None:
             _, spectra = self.qtz(input, spectra, ret, qtz_args)
             spectra = spectra[:,0] # [bsz,nsmpl]
 
@@ -52,7 +52,7 @@ class HyperSpectralDecoder(nn.Module):
         return spectra
 
     def forward_with_full_wave(self, latents, full_wave, full_wave_bound,
-                               num_spectra_coords, ret, codebook, qtz_args):
+                               num_spectra_coords, ret, codebook, qtz_args, quantize_spectra):
         """ During training, some latents will be decoded, combining with full wave.
             Currently only supports spectra coords (incl. gt, dummy that requires
               spectrum plotting during training time).
@@ -64,7 +64,8 @@ class HyperSpectralDecoder(nn.Module):
         full_wave = full_wave[None,:,None].tile(num_spectra_coords,1,1)
 
         ret["spectra"] = self.reconstruct_spectra(
-            full_wave, latents, scaler, redshift, full_wave_bound, ret, codebook, qtz_args)
+            latents, full_wave, scaler, redshift, full_wave_bound, ret,
+            codebook, qtz_args, quantize_spectra)
 
         if ret["scaler"] is not None:
             ret["scaler"] = ret["scaler"][:-num_spectra_coords]
@@ -73,13 +74,15 @@ class HyperSpectralDecoder(nn.Module):
 
     def forward(self, latents, wave, wave_smpl_ids, trans, nsmpl, ret,
                 full_wave=None, full_wave_bound=None, num_spectra_coords=-1,
-                codebook=None, qtz_args=None):
+                codebook=None, qtz_args=None, quantize_spectra=False):
 
         """ @Param
               latents:   (encoded or original) coords or logits for quantization.
                            [bsz,num_samples,coords_encode_dim or 2 or 3]
               wave:      lambda values, used to convert ra/dec to hyperspectral latents.
                            [bsz,num_samples]
+              full_wave_bound: min and max value of lambda
+              wave_smpl_ids: TO REMOVE
               trans:     corresponding transmission values of lambda. [bsz,num_samples]
               nsmpl:     average number of lambda samples falling within each band. [num_bands]
               ret (output from nerf and/or quantization): {
@@ -92,7 +95,6 @@ class HyperSpectralDecoder(nn.Module):
             - spectra supervision
               full_wave: not None if do spectra supervision.
                            [num_spectra_coords,full_num_samples]
-              full_wave_bound: min and max value of lambda
               num_spectra_coords: > 0 if spectra supervision.
 
             - spectra qtz
@@ -105,22 +107,21 @@ class HyperSpectralDecoder(nn.Module):
         """
         timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
 
-        # if self.quantize_spectra:
-        #     codebook_spectra = self.forward_codebook(
-        #         full_wave, full_wave_bound, codebook, ret) # [n,nsmpl]
-        # else: codebook_spectra = None
-
-        # spectra supervision, train with all lambda values instead of sampled lambda
         if num_spectra_coords > 0:
+            # forward the last #num_spectra_coords latents with all lambda
             self.forward_with_full_wave(
-                latents, full_wave, full_wave_bound, num_spectra_coords, ret, codebook, qtz_args)
+                latents, full_wave, full_wave_bound, num_spectra_coords,
+                ret, codebook, qtz_args, quantize_spectra)
+
             latents = latents[:-num_spectra_coords]
+            if latents.shape[0] == 0: return
 
-        if latents.shape[0] > 0:
-            spectra = self.reconstruct_spectra(
-                latents, wave, ret["scaler"], ret["redshift"], full_wave_bound, ret,
-                codebook, qtz_args) # codebook_spectra.T[wave_smpl_ids])
+        spectra = self.reconstruct_spectra(
+            latents, wave, ret["scaler"], ret["redshift"], full_wave_bound, ret,
+            codebook, qtz_args, quantize_spectra)
 
-            if "spectra" not in ret: ret["spectra"] = spectra
-            intensity = self.inte(spectra, trans, nsmpl)
-            ret["intensity"] = intensity
+        if "spectra" not in ret:
+            ret["spectra"] = spectra
+
+        intensity = self.inte(spectra, trans, nsmpl)
+        ret["intensity"] = intensity

@@ -203,9 +203,9 @@ def forward(data,
         if quantize_latent or quantize_spectra:
             qtz_args = defaultdict(lambda: False)
 
-            if quantize_spectra:
-                net_args["full_wave"] = data["full_wave"]
-                net_args["wave_smpl_ids"] = data["wave_smpl_ids"]
+            # if quantize_spectra:
+            #     net_args["full_wave"] = data["full_wave"]
+            #     net_args["wave_smpl_ids"] = data["wave_smpl_ids"]
 
             if quantization_strategy == "soft":
                 qtz_args["save_soft_qtz_weights"] = save_soft_qtz_weights

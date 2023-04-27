@@ -264,15 +264,10 @@ class AstroTrainer(BaseTrainer):
                 iter_start_time = time.time()
                 self.scene_state.optimization.iteration = self.iteration
 
-                a = time.time()
                 data = self.next_batch()
-                b = time.time()
-                print(f'data takes {b-a}s')
 
                 self.pre_step()
                 self.step(data)
-                c = time.time()
-                print(f'forward takes {c-b}s')
                 self.post_step()
 
                 self.iteration += 1
@@ -426,16 +421,9 @@ class AstroTrainer(BaseTrainer):
 
         total_loss, recon_pixels, ret = self.calculate_loss(data)
 
-        # print weights TMP
-        # if self.extra_args["log_cli_every"] > -1 and self.epoch % self.extra_args["log_cli_every"] == 0:
-        #     weights = ret["soft_qtz_weights"][:-1,0].T
-        #     weights = weights.view(4,64,64).detach().cpu().numpy()
-        #     np.save(join(self.soft_qtz_weights_dir, f"train_{self.epoch}"), weights)
-        #     log.info(f"weight is {weights}")
-
         total_loss.backward()
         # if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
-        #    plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
+        #     plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
         self.optimizer.step()
 
         self.timer.check("backward and step")

@@ -101,21 +101,13 @@ class AstroHyperSpectralNerf(BaseNeuralField):
 
         timer.check("hyper nef encode coord")
 
-        a = time.time()
         if self.kwargs["encode_coords"]:
             latents = self.spatial_encoder(coords, lod_idx=lod_idx)
         else: latents = coords
-        b = time.time()
-        #print(b-a)
 
         latents = self.spatial_decoder(latents, self.codebook, ret, qtz_args)
-        c = time.time()
-        #print(c-b)
 
         self.hps_decoder(latents, wave, wave_smpl_ids, trans, nsmpl, ret,
                          full_wave, full_wave_bound, num_spectra_coords,
-                         self.codebook, qtz_args)
-        d = time.time()
-        #print(d-c)
-
+                         self.codebook, qtz_args, self.kwargs["quantize_spectra"])
         return ret

@@ -274,15 +274,19 @@ class Quantization(nn.Module):
             else: min_embed_ids = None
 
             # print((z * temperature * self.kwargs["qtz_temperature_scale"])[:5])
-            weights = nn.functional.softmax( # [bsz,1,num_embeds]
-                z * temperature * self.kwargs["qtz_temperature_scale"], dim=-1)
+            weights = nn.functional.softmax(
+                z * temperature * self.kwargs["qtz_temperature_scale"], dim=-1
+            ) # [bsz,1,num_embeds]
             # print(weights[:5])
 
             if self.kwargs["quantize_spectra"]:
                 codebook = codebook.permute(1,0,2) # [bsz,num_embeds,nsmpl]
             else:
                 pass # codebook [num_embeds,embed_dim]
+
+            # print(weights.shape, codebook.shape)
             z_q = torch.matmul(weights, codebook)
+            # print(z_q.shape)
 
         elif self.quantization_strategy == "hard":
             weights, z_shape = None, z.shape
@@ -297,7 +301,9 @@ class Quantization(nn.Module):
 
             z_q = torch.matmul(encodings, codebook).view(z_shape)
 
-        else: raise ValueError("Unsupported quantization strategy")
+        else:
+            raise ValueError("Unsupported quantization strategy")
+
         return z_q, min_embed_ids, weights
 
     def partial_loss(self, z, z_q):
