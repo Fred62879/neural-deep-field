@@ -23,9 +23,9 @@ global:
     #tasks: ['infer','recon_img','plot_embed_map','plot_save_scaler']
 
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
-    #tasks: ['train','save_codebook','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed','recon_dummy_spectra']
+    tasks: ['train','save_codebook','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed','recon_dummy_spectra']
 
-    # tasks: ['train','infer','recon_img','recon_gt_spectra','recon_dummy_spectra','recon_codebook_spectra']
+    #tasks: ['train','infer','recon_img','recon_gt_spectra','recon_dummy_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_dummy_spectra']
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed']
@@ -38,7 +38,7 @@ global:
     #tasks: ['infer','plot_save_scaler','plot_redshift']
     #tasks: ['infer','recon_gt_spectra'] #,'log_pixel_value']
     #tasks: ['infer','recon_dummy_spectra','recon_gt_spectra']
-    tasks: ['infer','recon_codebook_spectra']
+    #tasks: ['infer','recon_codebook_spectra']
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map']
     #tasks: ['infer','plot_pixel_distrib']
@@ -98,7 +98,7 @@ grid:
     codebook_bitwidth: 20
 
 decoder:
-    decoder_num_layers: 1
+    decoder_num_layers: 2
     decoder_hidden_dim: 64
     decoder_layer_type: 'none'
     decoder_activation_type: "relu"
@@ -119,7 +119,7 @@ qtz:
 
 spatial_decod:
     generate_scaler: True
-    generate_redshift: False
+    generate_redshift: True
 
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1
@@ -150,7 +150,7 @@ trainer:
     spectra_loss_cho: l2
     redshift_loss_cho: l2
     num_epochs: 2000
-    batch_size: 262144
+    batch_size: 65536 #262144
     save_every: 400
     render_tb_every: -1
     log_tb_every: -1
@@ -171,8 +171,8 @@ trainer:
     spectra_supervision_start_epoch: 0
 
     decode_spatial_embedding: True
-    quantize_latent: False
-    quantize_spectra: True
+    quantize_latent: True
+    quantize_spectra: False
     weight_train: False
     train_use_all_wave: False
     resume_train: False
@@ -184,7 +184,7 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 1
+    num_supervision_spectra: 5
     spectra_neighbour_size: 1
 
 infer:
@@ -213,7 +213,7 @@ infer:
     plot_spectrum_with_trans: False
     plot_spectrum_together: True
     infer_spectra_individually: False
-    num_spectra_plot_per_row: 4
+    num_spectra_plot_per_row: 5
     codebook_spectra_clip_range: [6000,8000]
     dummy_spectra_clip_range: [6000,8000]
 
@@ -236,9 +236,9 @@ dataset:
     fits_footprints: ['9812']
     fits_tile_ids: ['1']
     fits_subtile_ids: ['5']
-    fits_cutout_num_rows: [64]
-    fits_cutout_num_cols: [64]
-    fits_cutout_start_pos: [[86,188]] #[[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    fits_cutout_num_rows: [512]
+    fits_cutout_num_cols: [512]
+    fits_cutout_start_pos: [[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
     #num_bands: 1
     #sensor_collection_name: '1_i'
@@ -273,7 +273,7 @@ dataset:
     hardcode_num_trans_samples: 12
     trans_sample_interval: 10
 
-    gt_spectra_ids: [0] #[5,9,6,7,8] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
+    gt_spectra_ids: [5,9,6,7,8] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
     spectra_smooth_sigma: 50
     spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]
 

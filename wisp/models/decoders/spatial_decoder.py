@@ -96,7 +96,9 @@ class SpatialDecoder(nn.Module):
 
         if self.output_redshift:
             redshift = self.redshift_decoder(z[:,0])[...,0]
+            # print(redshift, redshift.shape)
             redshift = self.redshift_adjust(redshift)
+            # print(redshift)
         else: redshift = None
 
         if self.quantize_spectra:

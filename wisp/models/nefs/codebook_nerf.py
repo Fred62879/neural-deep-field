@@ -33,6 +33,5 @@ class CodebookNef(BaseNeuralField):
                 - Output intensity tensor of shape [batch, num_samples, 3]
         """
         ret = defaultdict(lambda: None)
-        print(coords.shape)
         self.hps_decoder(coords, wave, None, None, None, ret, full_wave_bound=full_wave_bound)
         return ret

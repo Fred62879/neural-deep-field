@@ -28,7 +28,6 @@ class HyperSpectralDecoder(nn.Module):
 
     def reconstruct_spectra(self, input, wave, scaler, redshift, wave_bound, ret,
                             codebook, qtz_args, quantize_spectra):
-
         if quantize_spectra:
             bsz = wave.shape[0]
             # each input coord has #num_code spectra generated
@@ -39,7 +38,9 @@ class HyperSpectralDecoder(nn.Module):
         else:
             latents = self.convert(wave, input, redshift, wave_bound)
 
+        # print(latents.shape, latents)
         spectra = self.spectra_decoder(latents)[...,0]
+        # print(spectra)
 
         if quantize_spectra: # and codebook is not None:
             _, spectra = self.qtz(input, spectra, ret, qtz_args)

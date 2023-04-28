@@ -108,6 +108,7 @@ class AstroTrainer(BaseTrainer):
 
         self.quantize_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
         self.quantize_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
+        self.quantize = self.quantize_latent or self.quantize_spectra
         assert not (self.quantize_latent and self.quantize_spectra)
 
         self.pixel_supervision = self.extra_args["pixel_supervision"]
@@ -117,23 +118,23 @@ class AstroTrainer(BaseTrainer):
             "save_cropped_recon_during_train" in tasks
         self.spectral_inpaint = self.pixel_supervision and self.space_dim == 3 and \
             "spectral_inpaint" in tasks
-        self.plot_embed_map = self.pixel_supervision and self.quantize_latent and \
+        self.plot_embed_map = self.pixel_supervision and self.quantize and \
             "plot_embed_map_during_train" in tasks
-        self.plot_codebook_spectra = self.pixel_supervision and self.quantize_latent and \
+        self.plot_codebook_spectra = self.pixel_supervision and self.quantize and \
             "recon_codebook_spectra_during_train" in tasks
-        self.save_latents =  self.pixel_supervision and self.quantize_latent and \
+        self.save_latents =  self.pixel_supervision and self.quantize and \
             ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
-        self.save_scaler =  self.pixel_supervision and self.quantize_latent and \
+        self.save_scaler =  self.pixel_supervision and self.quantize and \
             self.extra_args["generate_scaler"] and "plot_save_scaler" in tasks
-        self.save_codebook =  self.pixel_supervision and self.quantize_latent and \
+        self.save_codebook =  self.pixel_supervision and self.quantize and \
             "save_codebook" in tasks
 
-        self.save_redshift =  self.quantize_latent and self.extra_args["generate_redshift"] \
+        self.save_redshift =  self.quantize and self.extra_args["generate_redshift"] \
             and "save_redshift_during_train" in tasks
 
         self.plot_spectra = self.space_dim == 3 and "plot_spectra_during_train" in tasks
         self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
-        self.redshift_supervision = self.space_dim == 3 and self.extra_args["quantize_latent"] and self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"]
+        self.redshift_supervision = self.space_dim == 3 and self.quantize and self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"]
 
         if self.save_cropped_recon:
             # save selected-cropped train image reconstruction
@@ -422,8 +423,8 @@ class AstroTrainer(BaseTrainer):
         total_loss, recon_pixels, ret = self.calculate_loss(data)
 
         total_loss.backward()
-        # if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
-        #     plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
+        if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
+            plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
         self.optimizer.step()
 
         self.timer.check("backward and step")

@@ -173,7 +173,8 @@ def forward(data,
         if train and quantize_latent and quantization_strategy == "hard" \
            and calculate_codebook_loss:
             requested_channels.append("codebook_loss")
-        if quantize_latent and quantization_strategy == "soft" and save_soft_qtz_weights:
+        if save_soft_qtz_weights and \
+           (quantize_spectra or (quantize_latent and quantization_strategy == "soft")):
             requested_channels.append("soft_qtz_weights")
 
         # transmission wave min and max value (used for linear normalization)
@@ -209,9 +210,9 @@ def forward(data,
 
             if quantization_strategy == "soft":
                 qtz_args["save_soft_qtz_weights"] = save_soft_qtz_weights
-                if train:
-                    qtz_args["temperature"] = step_num
-                elif save_embed_ids:
+                qtz_args["temperature"] = step_num
+
+                if save_embed_ids:
                     qtz_args["find_embed_id"] = save_embed_ids
 
             if save_codebook:

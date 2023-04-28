@@ -331,9 +331,9 @@ class SpectraData:
             recon_spectra_wave = self.get_recon_spectra_wave()
 
         if self.kwargs["plot_spectrum_together"]:
-            ncols = self.kwargs["num_spectra_plot_per_row"]
+            ncols = min(len(recon_spectra), self.kwargs["num_spectra_plot_per_row"])
             nrows = int(np.ceil(len(recon_spectra) / ncols))
-            fig, axs = plt.subplots(nrows, ncols)
+            fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
 
         for i, cur_spectra in enumerate(recon_spectra):
             sub_dir = spectra_norm_cho + "_"
@@ -555,7 +555,6 @@ def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1
         gt_spectra = convolve_spectra(gt_spectra, std=sigma)
 
     if interpolate:
-        # print(min(gt_wave), max(gt_wave))
         f_gt = interp1d(gt_wave, gt_spectra)
 
         # make sure wave range to interpolate stay within gt spectra wave range

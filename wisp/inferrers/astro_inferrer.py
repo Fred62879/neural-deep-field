@@ -101,19 +101,24 @@ class AstroInferrer(BaseInferrer):
         self.plot_pixel_distrib = "plot_pixel_distrib" in tasks
 
         self.plot_embed_map = "plot_embed_map" in tasks \
-            and self.quantize_latent and self.space_dim == 3
+            and (self.quantize_latent or self.quantize_spectra) \
+            and self.space_dim == 3
         self.plot_latent_embed = "plot_latent_embed" in tasks \
-            and self.quantize_latent and self.space_dim == 3
+            and (self.quantize_latent or self.quantize_spectra) \
+            and self.space_dim == 3
         self.plot_redshift = "plot_redshift" in tasks \
             and self.extra_args["generate_redshift"] \
-            and self.quantize_latent and self.space_dim == 3
+            and (self.quantize_latent or self.quantize_spectra) \
+            and self.space_dim == 3
         self.plot_scaler =  "plot_save_scaler" in tasks \
             and self.extra_args["generate_scaler"] \
-            and self.quantize_latent and self.space_dim == 3
+            and (self.quantize_latent or self.quantize_spectra) \
+            and self.space_dim == 3
 
-        self.save_soft_qtz_weights = "save_soft_qtz_weights" in tasks and \
-            self.quantize_latent and self.space_dim == 3 and \
-            self.extra_args["quantization_strategy"] == "soft"
+        self.save_soft_qtz_weights = "save_soft_qtz_weights" in tasks \
+            and ((self.quantize_latent and self.extra_args["quantization_strategy"] == "soft") \
+                 or self.quantize_spectra) \
+            and self.space_dim == 3
 
         # infer all coords using modified model
         self.recon_codebook_spectra = "recon_codebook_spectra" in tasks \
@@ -544,7 +549,7 @@ class AstroInferrer(BaseInferrer):
                     spectra = forward(
                         data,
                         self.spectra_infer_pipeline,
-                        0,
+                        self.extra_args["num_epochs"],
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
                         pixel_supervision_train=False,
@@ -574,7 +579,6 @@ class AstroInferrer(BaseInferrer):
                 print("recon spectrum pixel", recon[args.spectrum_pos])
 
     def infer_codebook_spectra(self, model_id, checkpoint):
-        print('****')
         load_model_weights(self.codebook_pipeline, checkpoint)
         self.codebook_pipeline.eval()
 
@@ -583,9 +587,6 @@ class AstroInferrer(BaseInferrer):
 
         codebook_latents = codebook_latents[:,None] # [num_embd, 1, latent_dim]
         codebook_latents = codebook_latents.detach().cpu().numpy()
-        print(codebook_latents)
-        # codebook_latents = self.codebook_latents
-
         self.dataset.set_hardcode_data(self.coords_source, codebook_latents)
 
         while True:
