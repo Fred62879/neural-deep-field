@@ -5,6 +5,7 @@ import numpy as np
 from typing import Callable
 from torch.utils.data import Dataset
 from wisp.datasets.fits_data import FITSData
+from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
 
@@ -51,8 +52,10 @@ class AstroDataset(Dataset):
         self.trans_dataset = TransData(self.root, self.device, **self.kwargs)
         self.spectra_dataset = SpectraData(self.fits_dataset, self.trans_dataset,
                                            self.root, self.device, **self.kwargs)
+        self.mask_dataset = MaskData(self.fits_dataset, self.root, self.device, **self.kwargs)
+
         # randomly initialize
-        #self.mode = "train"
+        # self.mode = "train"
         self.coords_source = "fits"
         self.model_output = "pixel_intensity"
         self.use_full_wave = False

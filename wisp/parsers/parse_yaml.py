@@ -555,23 +555,21 @@ def define_cmd_line_args():
     inpaint_group = parser.add_argument_group("inpaint")
 
     # inpainting args
-    inpaint_group.add_argument("--mask_bandset_cho", type=str,default="None")
-    inpaint_group.add_argument("--mask_config", type=str, default="rand_diff")
-    inpaint_group.add_argument("--inpaint_cho", type=str, default="no_inpaint",
+    inpaint_group.add_argument("--mask-bandset-cho", type=str,default="None")
+    inpaint_group.add_argument("--mask-mode", type=str, default="rand_diff")
+    inpaint_group.add_argument("--inpaint-cho", type=str, default="no_inpaint",
                                choices=["no_inpaint","spatial_inpaint","spectral_inpaint"])
 
     inpaint_group.add_argument("--mask_sz", type=int, default=1)
     inpaint_group.add_argument("--mask_seed", type=int, default=0)
     inpaint_group.add_argument("--m_start_r", type=int, default=1)
     inpaint_group.add_argument("--m_start_c", type=int, default=1)
-    inpaint_group.add_argument("--train_bands", nargs="+", type=int)
-    inpaint_group.add_argument("--inpaint_bands", nargs="+", type=int)
-    inpaint_group.add_argument("--sample_ratio", type=float, default=1.0,
-                        help="percent of pixels not masked")
-    #inpaint_group.add_argument("--inpaint_ratio", type=float, default=1,
-    #                    help="ratio of inpaint band pixels used for training per epoch")
-    inpaint_group.add_argument("--relative_train_bands", nargs="+", type=int)
-    inpaint_group.add_argument("--relative_inpaint_bands", nargs="+", type=int)
+    inpaint_group.add_argument("--train-bands", nargs="+", type=int)
+    inpaint_group.add_argument("--inpaint-bands", nargs="+", type=int)
+    inpaint_group.add_argument("--inpaint-sample-ratio", type=float, default=1.0,
+                               help="percent of pixels not masked")
+    inpaint_group.add_argument("--relative-train-bands", nargs="+", type=int)
+    inpaint_group.add_argument("--relative-inpaint-bands", nargs="+", type=int)
 
     ###############
     # Argument for experiment

@@ -32,7 +32,7 @@ def redshift_supervision_loss(loss, gt_redshift, recon_redshift):
     return loss(gt_redshift, recon_redshift)
 
 def spectral_masking_loss(loss, relative_train_bands, relative_inpaint_bands,
-                          gt_pixls, recon_pixls, mask):
+                          gt_pixels, recon_pixels, mask):
     ''' Loss function for spectral inpainting
         @Param
           loss: l1/l2 as specified in config
@@ -42,14 +42,14 @@ def spectral_masking_loss(loss, relative_train_bands, relative_inpaint_bands,
               continuous seq starting from 0 while maintaing the relative order.
               e.g. before: [1,4]/[2,9]
                    after:  [0,2]/[1,3]
-          pixls: [bsz,num_bands]
+          pixels: [bsz,num_bands]
           mask: sliced with only inpaint dim left
     '''
     masked_gt = gt_pixls[:,relative_train_bands].flatten()
     masked_recon = recon_pixls[:,relative_train_bands].flatten()
 
-    a = torch.masked_select(gt_pixls[:,relative_inpaint_bands],mask)
-    b = torch.masked_select(recon_pixls[:,relative_inpaint_bands],mask)
+    a = torch.masked_select(gt_pixels[:,relative_inpaint_bands], mask)
+    b = torch.masked_select(recon_pixels[:,relative_inpaint_bands], mask)
 
     masked_gt = torch.cat((masked_gt, a))
     masked_recon = torch.cat((masked_recon, b))

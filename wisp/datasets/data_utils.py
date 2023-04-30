@@ -18,6 +18,22 @@ from torch.utils.data._utils.collate import default_convert
 np_str_obj_array_pattern = re.compile(r'[SaUO]')
 
 
+def create_uid(fits_obj, **kwargs):
+    """ Form suffix that uniquely identifies the currently selected group of
+        patches with the corresponding cropping parameters, if any.
+    """
+    suffix = ""
+    if kwargs["use_full_fits"]:
+        for fits_uid in fits_obj.fits_uids:
+            suffix += f"_{fits_uid}"
+    else:
+        for (fits_uid, num_rows, num_cols, (r,c)) in zip(
+                fits_obj.fits_uids, fits_obj.fits_cutout_num_rows,
+                fits_obj.fits_cutout_num_cols, fits_obj.fits_cutout_start_pos):
+            suffix += f"_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}"
+
+    return suffix
+
 def add_dummy_dim(coords, **kwargs):
     if kwargs["coords_encode_method"] == "grid" and kwargs["grid_dim"] == 3:
         num_coords = coords.shape[0]

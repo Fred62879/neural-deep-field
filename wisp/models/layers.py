@@ -284,11 +284,11 @@ class Quantization(nn.Module):
             else:
                 pass # codebook [num_embeds,embed_dim]
 
-            # print(weights.shape, codebook.shape)
             z_q = torch.matmul(weights, codebook)
-            # print(z_q.shape)
 
         elif self.quantization_strategy == "hard":
+            assert(self.kwargs["quantize_latent"])
+
             weights, z_shape = None, z.shape
             z_f = z.view(-1,self.latent_dim) # flatten
             assert(z_f.shape[-1] == z.shape[-1])
@@ -313,10 +313,12 @@ class Quantization(nn.Module):
 
     def forward(self, z, codebook, ret, qtz_args):
         """ @Param
-               z: latent variables [bsz,1,num_embeds]
-               ret: collection of results to return
-               temperature: used for softmax quantization
+               z:        logits  or latent variables
+                         [bsz,1,embed_dim/num_embeds] (hard/soft qtz)
+               codebook: codebook for qtz [num_embeds,embed_dim]
+               ret:      collection of results to return
                qtz_args (deafultdict: False):
+                 temperature:   soft qtz temp (current num of steps)
                  find_embed_id: whether find embed id, only used for soft quantization
                                 hard qtz always requires find embed id
                                 soft qtz requires only when plotting embed map

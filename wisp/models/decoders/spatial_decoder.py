@@ -62,6 +62,7 @@ class SpatialDecoder(nn.Module):
             num_layers=self.kwargs["redshift_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["redshift_decod_hidden_dim"], skip=[])
         self.redshift_adjust = nn.ReLU(inplace=True)
+        # self.redshift_adjust = torch.exp
 
     def init_decoder(self):
         if self.quantize_z:
@@ -97,7 +98,7 @@ class SpatialDecoder(nn.Module):
         if self.output_redshift:
             redshift = self.redshift_decoder(z[:,0])[...,0]
             # print(redshift, redshift.shape)
-            redshift = self.redshift_adjust(redshift)
+            redshift = self.redshift_adjust(redshift + 0.5)
             # print(redshift)
         else: redshift = None
 

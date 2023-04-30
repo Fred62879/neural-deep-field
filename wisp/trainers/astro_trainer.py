@@ -245,8 +245,8 @@ class AstroTrainer(BaseTrainer):
                        "lr": self.extra_args["hps_lr"]})
 
         self.optimizer = self.optim_cls(params, **self.optim_params)
-        log.info(f"init codebook values {qtz_params}")
-        log.info(self.optimizer)
+        # log.info(f"init codebook values {qtz_params}")
+        # log.info(self.optimizer)
 
     #############
     # Training logic
@@ -423,8 +423,8 @@ class AstroTrainer(BaseTrainer):
         total_loss, recon_pixels, ret = self.calculate_loss(data)
 
         total_loss.backward()
-        if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
-            plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
+        # if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
+        #     plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
         self.optimizer.step()
 
         self.timer.check("backward and step")

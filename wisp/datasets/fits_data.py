@@ -12,8 +12,8 @@ from wisp.utils.common import worldToPix
 from astropy.coordinates import SkyCoord
 
 from wisp.utils.common import generate_hdu
-from wisp.datasets.data_utils import add_dummy_dim
 from wisp.utils.plot import plot_horizontally, mark_on_img
+from wisp.datasets.data_utils import add_dummy_dim, create_uid
 from wisp.utils.numerical import normalize_coords, normalize, \
     calculate_metrics, calculate_zscale_ranges_multiple_FITS
 
@@ -24,7 +24,7 @@ class FITSData:
     def __init__(self, dataset_path, device, **kwargs):
         self.kwargs = kwargs
         self.load_weights = kwargs["weight_train"]
-        self.spectral_inpaint = self.kwargs["inpaint_cho"] == "spectral_inpaint"
+        self.qtz = kwargs["quantize_latent"] or kwargs["quantize_spectra"]
 
         if not self.require_any_data(kwargs["tasks"]): return
 
@@ -58,18 +58,20 @@ class FITSData:
         self.require_weights = "train" in tasks and self.load_weights
         self.require_pixels = len(tasks.intersection({
             "train","recon_img","log_pixel_value"})) != 0
-        self.require_masks = "train" in tasks and self.spectral_inpaint
-        self.require_scaler = self.kwargs["space_dim"] == 3 and self.kwargs["quantize_latent"] and self.kwargs["generate_scaler"]
-        self.require_redshift = self.kwargs["space_dim"] == 3 and self.kwargs["quantize_latent"] and self.kwargs["generate_redshift"] and self.kwargs["redshift_supervision"]
 
-        self.require_coords = self.kwargs["spectra_supervision"] or len(tasks.intersection({
-            "train","recon_img","recon_flat","recon_gt_spectra"})) != 0 or \
-            self.require_scaler or self.require_redshift
+        self.require_scaler = self.kwargs["space_dim"] == 3 and self.qtz \
+            and self.kwargs["generate_scaler"]
+        self.require_redshift = self.kwargs["space_dim"] == 3 and self.qtz \
+            and self.kwargs["generate_redshift"] and self.kwargs["redshift_supervision"]
+
+        self.require_coords = self.kwargs["spectra_supervision"] or \
+            self.require_scaler or self.require_redshift or \
+            len(tasks.intersection({
+                "train","recon_img","recon_flat","recon_gt_spectra"})) != 0
 
         return self.require_coords or self.require_pixels or \
-            self.require_weights or self.require_masks or \
-            self.require_redshift or self.require_scaler or \
-            "recon_codebook_spectra" in tasks
+            self.require_weights or self.require_redshift or \
+            self.require_scaler or "recon_codebook_spectra" in tasks
 
     def init(self):
         """ Load all needed data. """
@@ -85,68 +87,40 @@ class FITSData:
         if self.require_redshift:
             self.get_redshift_all_fits()
 
-        if self.require_masks:
-            self.get_masks()
-
     def set_path(self, dataset_path):
         input_path = join(dataset_path, "input")
+        self.input_fits_path = join(input_path, "input_fits")
         img_data_path = join(input_path, self.kwargs["sensor_collection_name"], "img_data")
 
-        self.input_fits_path = join(input_path, "input_fits")
-
-        # suffix that uniquely identifies the currently selected group of
-        # tiles with the corresponding cropping parameters, if any
-        suffix, self.gt_img_fnames, self.gt_img_distrib_fnames = "", {}, {}
         norm = self.kwargs["gt_img_norm_cho"]
+        norm_str = self.kwargs["train_pixels_norm"]
 
+        self.gt_img_fnames, self.gt_img_distrib_fnames = {}, {}
         if self.use_full_fits:
             for fits_uid in self.fits_uids:
-                suffix += f"_{fits_uid}"
                 self.gt_img_fnames[fits_uid] = join(img_data_path, f"gt_img_{norm}_{fits_uid}")
                 self.gt_img_distrib_fnames[fits_uid] = join(
                     img_data_path, f"gt_img_distrib_{norm}_{fits_uid}")
         else:
-            # for (fits_uid, size, (r,c)) in zip(
-            #         self.fits_uids, self.fits_cutout_sizes, self.fits_cutout_start_pos):
-            #     suffix += f"_{fits_uid}_{size}_{r}_{c}"
-            #     self.gt_img_fnames[fits_uid] = join(
-            #         img_data_path, f"gt_img_{norm}_{fits_uid}_{size}_{r}_{c}")
-
             for (fits_uid, num_rows, num_cols, (r,c)) in zip(
                     self.fits_uids, self.fits_cutout_num_rows,
                     self.fits_cutout_num_cols, self.fits_cutout_start_pos):
 
-                suffix += f"_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}"
                 self.gt_img_fnames[fits_uid] = join(
                     img_data_path, f"gt_img_{norm}_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}")
                 self.gt_img_distrib_fnames[fits_uid] = join(
                     img_data_path, f"gt_img_distrib_{norm}_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}")
 
-        norm_str = self.kwargs["train_pixels_norm"]
-
         # image data path creation
+        suffix = create_uid(self, **self.kwargs)
         self.coords_fname = join(img_data_path, f"coords{suffix}.npy")
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.pixels_fname = join(img_data_path, f"pixels_{norm_str}{suffix}.npy")
         self.coords_range_fname = join(img_data_path, f"coords_range{suffix}.npy")
         self.zscale_ranges_fname = join(img_data_path, f"zscale_ranges{suffix}.npy")
 
-        # mask path creation
-        mask_path = join(input_path, "mask")
-        if self.kwargs["mask_config"] == "region":
-            mask_str = "_" + str(self.kwargs["m_start_r"]) + "_" \
-                + str(self.kwargs["m_start_c"]) + "_" \
-                + str(self.kwargs["mask_size"])
-        else: mask_str = "_" + str(float(100 * self.kwargs["sample_ratio"]))
-
-        if self.kwargs["inpaint_cho"] == "spectral_inpaint":
-            self.mask_fn = join(self.mask_path, str(self.kwargs["fits_cutout_size"]) + mask_str + ".npy")
-            self.masked_pixl_id_fn = join(mask_path, str(self.kwargs["fits_cutout_size"]) + mask_str + "_masked_id.npy")
-        else:
-            self.mask_fn, self.masked_pixl_id_fn = None, None
-
         # create path
-        for path in [input_path, img_data_path, self.input_fits_path, mask_path]:
+        for path in [input_path, img_data_path, self.input_fits_path]:
             Path(path).mkdir(parents=True, exist_ok=True)
 
     def compile_fits_fnames(self):
@@ -216,12 +190,8 @@ class FITSData:
             num_rows = self.fits_cutout_num_rows[index]
             num_cols = self.fits_cutout_num_cols[index]
             pos = (c + num_cols//2, r + num_rows//2)
-            # size = self.fits_cutout_sizes[index]
-            # pos = (c + size//2, r + size//2)      # center position (x/y)
-            # num_rows, num_cols = self.fits_cutout_size, self.fits_cutout_size
 
             wcs = WCS(header)
-            # cutout = Cutout2D(hdu.data, position=pos, size=self.fits_cutout_size, wcs=wcs)
             cutout = Cutout2D(hdu.data, position=pos, size=(num_rows,num_cols), wcs=wcs)
             header = cutout.wcs.to_header()
 
@@ -254,8 +224,6 @@ class FITSData:
 
                 if not self.use_full_fits:
                     (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
-                    # size = self.fits_cutout_sizes[index]
-                    # pixels = pixels[r:r+size, c:c+size]
                     num_rows = self.num_rows[fits_uid]
                     num_cols = self.num_cols[fits_uid]
                     pixels = pixels[r:r+num_rows, c:c+num_cols]
@@ -277,8 +245,6 @@ class FITSData:
                     cur_data.append(weight.flatten())
                 else:
                     (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
-                    # size = self.fits_cutout_sizes[index]
-                    # var = var[r:r+size, c:c+size].flatten()
                     num_rows = self.fits_cutout_num_rows[index]
                     num_cols = self.fits_cutout_num_cols[index]
                     var = var[r:r+num_rows, c:c+num_cols].flatten()
@@ -371,12 +337,9 @@ class FITSData:
             num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
             redshifts = -1 * np.ones((num_rows, num_cols))
         else:
-            # (r, c) = self.fits_cutout_start_pos[id] # start position (r/c)
             num_rows = self.fits_cutout_num_rows[index]
             num_cols = self.fits_cutout_num_cols[index]
             redshifts = -1 * np.ones((num_rows, num_cols))
-            # size = self.fits_cutout_sizes[id]
-            # redshifts = -1 * np.ones((size, size))
 
         return redshifts
 
@@ -392,52 +355,52 @@ class FITSData:
     # Load coords
     ##############
 
-    def get_world_coords_one_fits(self, id, fits_uid):
-        """ Get ra/dec coords from one fits file and normalize.
-            pix2world calculate coords in x-y order
-              coords can be indexed using r-c
-            @Return
-              coords: 2D coordinates [npixels,2]
-        """
-        num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
-        xids = np.tile(np.arange(0, num_cols), num_rows)
-        yids = np.repeat(np.arange(0, num_rows), num_cols)
+    # def get_world_coords_one_fits(self, id, fits_uid):
+    #     """ Get ra/dec coords from one fits file and normalize.
+    #         pix2world calculate coords in x-y order
+    #           coords can be indexed using r-c
+    #         @Return
+    #           coords: 2D coordinates [npixels,2]
+    #     """
+    #     num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
+    #     xids = np.tile(np.arange(0, num_cols), num_rows)
+    #     yids = np.repeat(np.arange(0, num_rows), num_cols)
 
-        wcs = WCS(self.headers[fits_uid])
-        ras, decs = wcs.all_pix2world(xids, yids, 0) # x-y pixel coord
-        if self.use_full_fits:
-            coords = np.array([ras, decs]).T
-        else:
-            coords = np.concatenate(( ras.reshape((num_rows, num_cols, 1)),
-                                      decs.reshape((num_rows, num_cols, 1)) ), axis=2)
-            # size = self.fits_cutout_sizes[id]
-            num_rows = self.num_rows[fits_uid]
-            num_cols = self.num_cols[fits_uid]
+    #     wcs = WCS(self.headers[fits_uid])
+    #     ras, decs = wcs.all_pix2world(xids, yids, 0) # x-y pixel coord
+    #     if self.use_full_fits:
+    #         coords = np.array([ras, decs]).T
+    #     else:
+    #         coords = np.concatenate(( ras.reshape((num_rows, num_cols, 1)),
+    #                                   decs.reshape((num_rows, num_cols, 1)) ), axis=2)
+    #         # size = self.fits_cutout_sizes[id]
+    #         num_rows = self.num_rows[fits_uid]
+    #         num_cols = self.num_cols[fits_uid]
 
-            (r, c) = self.fits_cutout_start_pos[id] # start position (r/c)
-            coords = coords[r:r+num_rows,c:c+num_cols].reshape(-1,2)
-        return coords
+    #         (r, c) = self.fits_cutout_start_pos[id] # start position (r/c)
+    #         coords = coords[r:r+num_rows,c:c+num_cols].reshape(-1,2)
+    #     return coords
 
-    def get_world_coords_all_fits(self):
-        """ Get ra/dec coord from all fits files and normalize.
-            @Return
-              coords [num_pixels,1,2]
-        """
-        if exists(self.coords_fname):
-            log.info("Loading coords from cache.")
-            coords = np.load(self.coords_fname)
-        else:
-            log.info("Generating coords.")
-            coords = np.concatenate([ self.get_world_coords_one_fits(id, fits_uid)
-                                      for id, fits_uid in enumerate(self.fits_uids) ])
-            coords, coords_range = normalize_coords(coords)
-            np.save(self.coords_fname, coords)
-            np.save(self.coords_range_fname, np.array(coords_range))
+    # def get_world_coords_all_fits(self):
+    #     """ Get ra/dec coord from all fits files and normalize.
+    #         @Return
+    #           coords [num_pixels,1,2]
+    #     """
+    #     if exists(self.coords_fname):
+    #         log.info("Loading coords from cache.")
+    #         coords = np.load(self.coords_fname)
+    #     else:
+    #         log.info("Generating coords.")
+    #         coords = np.concatenate([ self.get_world_coords_one_fits(id, fits_uid)
+    #                                   for id, fits_uid in enumerate(self.fits_uids) ])
+    #         coords, coords_range = normalize_coords(coords)
+    #         np.save(self.coords_fname, coords)
+    #         np.save(self.coords_range_fname, np.array(coords_range))
 
-        self.data["coords"] = add_dummy_dim(coords, **self.kwargs)
+    #     self.data["coords"] = add_dummy_dim(coords, **self.kwargs)
 
     def get_pixel_coords_all_fits(self):
-        # assert(not self.use_full_fits)
+        assert(not self.use_full_fits)
         assert(len(self.fits_uids) == 1)
         for id, fits_uid in enumerate(self.fits_uids):
             num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
@@ -467,97 +430,6 @@ class FITSData:
         mgrid = torch.stack(torch.meshgrid(*tensors), dim=-1)
         if flat: mgrid = mgrid.reshape(-1, dim)
         self.data["coords"] = add_dummy_dim(mgrid, **self.kwargs)
-
-    #############
-    # Mask creation
-    #############
-
-    def create_mask_one_band(n, ratio, seed):
-        # generate mask, first 100*ratio% pixls has mask value 1 (unmasked)
-        ids = np.arange(n)
-        random.seed(seed)
-        random.shuffle(ids)
-        offset = int(ratio*n)
-        mask = np.zeros(n)
-        mask[ids[:offset]] = 1
-        return mask, ids[-offset:]
-
-    def create_mask(mask_seed, npixls, num_bands, inpaint_bands, mask_config, mask_args, verbose):
-        if mask_config == "rand_diff":
-            if verbose: print("= mask diff pixels in diff bands")
-            ratio = mask_args[0]
-            mask, masked_ids = np.ones((npixls, num_bands)), []
-            for i in inpaint_bands:
-                mask[:,i], cur_band_masked_ids = create_mask_one_band(npixls, ratio, i + mask_seed)
-                masked_ids.append(cur_band_masked_ids)
-            # [npixls,nbands], [nbands,num_masked_pixls]
-            masked_ids = np.array(masked_ids)
-
-        elif mask_config == "rand_same":
-            if verbose: print("= mask same pixels in diff bands")
-            ratio = mask_args[0]
-            mask, masked_ids = create_mask_one_band(npixls, ratio, mask_seed)
-            mask = np.tile(mask[:,None], (1,num_bands))
-            # [npixls, nbands], [num_masked_pixls]
-
-        elif mask_config == "region": # NOT TESTED
-            assert(False)
-            if verbose: print("= mask region")
-            (m_start_r, m_start_c, msize) = mask_args
-            rs = np.arange(m_start_r, m_start_r+msize)
-            cs = np.arange(m_start_c, m_start_c+msize)
-            grid = np.stack(np.meshgrid(*tuple([rs,cs]),indexing="ij"), \
-                            axis=-1).reshape((-1,2))
-            m_ids = np.array(list(map(lambda p: p[0]*nr+p[1], grid)))
-            nm_ids = np.array(list(set(ids)-set(m_ids))) # id of pixels used for training
-        else:
-            raise Exception("Unsupported mask config")
-        return mask, masked_ids
-
-    def load_mask(args, flat=True, to_bool=True, to_tensor=True):
-        """ Load (or generate) mask dependeing on config for spectral inpainting.
-            If train bands and inpaint bands form a smaller set of
-              the band of the current mask file, then we load only and
-              slice the corresponding dimension from the larger mask.
-        """
-        npixls = args.img_size**2
-        mask_fname = args.mask_fname
-        masked_id_fname = args.masked_pixl_id_fname
-
-        if exists(mask_fname) and exists(masked_id_fname):
-            if args.verbose: print(f"= loading spectral mask from {mask_fname}")
-            mask = np.load(mask_fname)
-            masked_ids = np.load(masked_id_fname)
-        else:
-            assert(len(args.filters) == len(args.train_bands) + len(args.inpaint_bands))
-            if args.mask_config == "region":
-                maks_args = [args.m_start_r, args.m_start_c, args.msize]
-            else: mask_args = [args.sample_ratio]
-            mask, masked_ids = create_mask(args.mask_seed, npixls, args.num_bands, args.inpaint_bands,
-                                           args.mask_config, mask_args, args.verbose)
-            np.save(mask_fname, mask)
-            np.save(masked_id_fname, masked_ids)
-
-        num_smpl_pixls = [np.count_nonzero(mask[:,i]) for i in range(mask.shape[1])]
-        if args.verbose: print("= sampled pixls for each band of spectral mask", num_smpl_pixls)
-
-        # slice mask, leave inpaint bands only
-        mask = mask[:,args.inpaint_bands] # [npixls,num_inpaint_bands]
-        if to_bool:   mask = (mask == 1) # conver to boolean array
-        if not flat:  mask = mask.reshape((args.img_size, args.img_size, -1))
-        if to_tensor: mask = torch.tensor(mask, device=args.device)
-        return mask, masked_ids
-
-    def spatial_masking(pixls, coords, args, weights=None):
-        # mask data spatially
-        mask = load_mask(args)[...,0]
-        pixls, coords = pixls[mask], coords[mask]
-        if self.load_weights:
-            assert(weights is not None)
-            weights = weights[mask]
-        print("    spatial mask: total num train pixls: {}, with {} per epoch".
-              format(len(mask), int(len(mask)*args.train_ratio)))
-        return pixls, coords, weights
 
     #############
     # Getters
@@ -610,24 +482,6 @@ class FITSData:
     def get_coords(self):
         """ Get all coords [n,1,2] """
         return self.data["coords"]
-
-    def get_mask(self):
-        if self.kwargs["inpaint_cho"] == "spatial_inpaint":
-            self.pixls, self.coords, self.weights = utils.spatial_masking\
-                (self.pixls, self.coords, self.kwargs, weights=self.weights)
-
-        elif self.kwargs["inpaint_cho"] == "spectral_inpaint":
-            self.relative_train_bands = self.kwargs["relative_train_bands"]
-            self.relative_inpaint_bands = self.kwargs["relative_inpaint_bands"]
-            self.mask, self.masked_pixl_ids = utils.load_mask(self.args)
-            self.num_masked_pixls = self.masked_pixl_ids.shape[0]
-
-        # iv) get ids of cutout pixels
-        if self.save_cutout:
-            self.cutout_pixl_ids = utils.generate_cutout_pixl_ids\
-                (self.cutout_pos, self.fits_cutout_size, self.img_size)
-        else: self.cutout_pixl_ids = None
-        return
 
     ############
     # Utilities

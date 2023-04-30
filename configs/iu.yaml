@@ -23,14 +23,14 @@ global:
     #tasks: ['infer','recon_img','plot_embed_map','plot_save_scaler']
 
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
-    tasks: ['train','save_codebook','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed','recon_dummy_spectra']
+    tasks: ['train','save_codebook','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed'] #,'recon_dummy_spectra']
 
     #tasks: ['train','infer','recon_img','recon_gt_spectra','recon_dummy_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_dummy_spectra']
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed']
     #tasks: ['infer','plot_embed_map','plot_redshift']
-    #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra','recon_dummy_spectra']
+    #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra'] #,'recon_dummy_spectra']
     #tasks: ['infer','plot_latent_embed']
 
     #tasks: ['infer','recon_img','plot_embed_map']
@@ -98,7 +98,7 @@ grid:
     codebook_bitwidth: 20
 
 decoder:
-    decoder_num_layers: 2
+    decoder_num_layers: 1
     decoder_hidden_dim: 64
     decoder_layer_type: 'none'
     decoder_activation_type: "relu"
@@ -156,7 +156,7 @@ trainer:
     log_tb_every: -1
     log_cli_every: 200
     log_gpu_every: -1
-    plot_grad_every: 20
+    plot_grad_every: 50
     save_local_every: -1
     save_as_new: True
     train_pixel_ratio: .1 # change dataloader sampler
@@ -171,8 +171,8 @@ trainer:
     spectra_supervision_start_epoch: 0
 
     decode_spatial_embedding: True
-    quantize_latent: True
-    quantize_spectra: False
+    quantize_latent: False
+    quantize_spectra: True
     weight_train: False
     train_use_all_wave: False
     resume_train: False
@@ -184,7 +184,7 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 5
+    num_supervision_spectra: 2
     spectra_neighbour_size: 1
 
 infer:
@@ -195,7 +195,7 @@ infer:
 
     # recon img
     to_HDU: False
-    #infer_log_fname: '20230316-134823_emd_temp_2048'
+    infer_log_fname: '20230429-135210'
     metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
@@ -278,8 +278,8 @@ dataset:
     spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]
 
 inpaint:
-    inpaint_cho: 'no_inpaint' # 'spectral_inpaint'
-    sample_ratio: .01 # 0-1
+    inpaint_cho: 'spectral_inpaint' #'no_inpaint'
+    inpaint_sample_ratio: .01 # 0-1
 
     # assume max set is 10 bands in this order [GRIZY,nb387,nb816,nb921,u,us]
     # always makes sure mask creation is called for a continuous set of bands
@@ -289,7 +289,7 @@ inpaint:
     # When do masking, pick only 1 and 8 channel from the full mask
 
     # define mask directory
-    mask_config: 'rand_same'
+    mask_mode: 'rand_same'
     mask_bandset_cho: '5grizy' # *change everytime
     mask_seed: 0              # seed to do random masking
 
