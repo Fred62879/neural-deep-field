@@ -7,6 +7,7 @@ import logging as log
 from pathlib import Path
 from os.path import exists, join
 from collections import defaultdict
+from wisp.utils.plot import plot_horizontally
 from wisp.datasets.data_utils import create_uid
 
 
@@ -34,6 +35,9 @@ class MaskData:
         self.inpaint_cho = kwargs["inpaint_cho"]
         self.inpaint_bands = kwargs["inpaint_bands"]
         self.inpaint_sample_ratio = kwargs["inpaint_sample_ratio"]
+        self.masked_ratio = (1 - self.inpaint_sample_ratio) * 100
+        self.inpaint_bands_str = "".join(np.array(kwargs["filters"])[self.inpaint_bands])
+        print(self.inpaint_bands_str)
 
         self.set_path(dataset_path)
         self.data = defaultdict(lambda: [])
@@ -48,9 +52,9 @@ class MaskData:
             mask_str = "region_" + str(self.kwargs["m_start_r"]) + "_" \
                 + str(self.kwargs["m_start_c"]) + "_" \
                 + str(self.kwargs["mask_size"])
-        else: mask_str = "_" + str(float(100 * self.inpaint_sample_ratio))
+        else: mask_str = str(float(100 * self.inpaint_sample_ratio))
 
-        suffix = create_uid(self.fits_obj, **self.kwargs)
+        suffix = create_uid(self.fits_obj, **self.kwargs)[1:] + "_"
         if self.inpaint_cho == "spectral_inpaint":
             self.mask_fname = join(mask_path, suffix + mask_str + ".npy")
             self.masked_pixel_ids_fname = join(mask_path, suffix + mask_str + "_masked_ids.npy")
@@ -67,7 +71,6 @@ class MaskData:
               the band of the current mask file, then we load only and
               slice the corresponding dimension from the larger mask.
         """
-        print(self.mask_fname, self.masked_pixel_ids_fname)
         if exists(self.mask_fname) and exists(self.masked_pixel_ids_fname):
             if self.verbose:
                 log.info(f"loading spectral mask from {self.mask_fname}")
@@ -174,7 +177,9 @@ class MaskData:
         fits_uids = self.fits_obj.get_fits_uids()
 
         if self.plot_masked_gt:
+            gt_paths = self.fits_obj.get_gt_paths()
             gt_img_fnames = self.fits_obj.get_gt_img_fnames()
+            zscale_ranges = self.fits_obj.get_zscale_ranges()
 
         for id, fits_uid in enumerate(fits_uids):
             num_rows, num_cols = num_rows[fits_uid], num_cols[fits_uid]
@@ -182,7 +187,8 @@ class MaskData:
             _mask, _masked_pixel_ids = self.create_mask_one_patch(npixels, acc_npixels)
 
             if self.plot_masked_gt:
-                self.plot_masked_gt_img(_mask, gt_img_fnames[fits_uid])
+                self.plot_masked_gt_img(
+                    _mask, gt_paths[id], gt_img_fnames[fits_uid], zscale_ranges[id])
 
             mask.append(_mask)
             masked_pixel_ids.append(_masked_pixel_ids)
@@ -226,10 +232,12 @@ class MaskData:
     # Utilities
     ############
 
-    def plot_masked_gt_img(self, mask, in_fname):
-        out_fname = in_fname + "masked"
+    def plot_masked_gt_img(self, mask, path, in_fname, zscale_ranges):
+        out_fname = join(path, f"{self.inpaint_bands_str}_{self.masked_ratio}%_masked")
         gt_img = np.load(in_fname + ".npy")
         img_shape = gt_img.shape
-        print(gt_img.shape, mask.shape)
         masked_gt = gt_img * (mask.T.reshape(img_shape))
+
         np.save(out_fname, masked_gt)
+        plot_horizontally(
+            masked_gt, out_fname + ".png", "plot_img", zscale_ranges=zscale_ranges)

@@ -84,7 +84,7 @@ class HyperSpectralDecoder(nn.Module):
                            [bsz,num_samples]
               full_wave_bound: min and max value of lambda
               wave_smpl_ids: TO REMOVE
-              trans:     corresponding transmission values of lambda. [bsz,num_samples]
+              trans:     corresponding transmission values of lambda. [(bsz,)nbands,num_samples]
               nsmpl:     average number of lambda samples falling within each band. [num_bands]
               ret (output from nerf and/or quantization): {
                 "scaler":        unique scaler value for each coord. [bsz,1]

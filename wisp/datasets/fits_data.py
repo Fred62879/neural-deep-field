@@ -67,7 +67,7 @@ class FITSData:
         self.require_coords = self.kwargs["spectra_supervision"] or \
             self.require_scaler or self.require_redshift or \
             len(tasks.intersection({
-                "train","recon_img","recon_flat","recon_gt_spectra"})) != 0
+                "train","recon_img","recon_synthetic_band","recon_gt_spectra"})) != 0
 
         return self.require_coords or self.require_pixels or \
             self.require_weights or self.require_redshift or \
@@ -91,25 +91,32 @@ class FITSData:
         input_path = join(dataset_path, "input")
         self.input_fits_path = join(input_path, "input_fits")
         img_data_path = join(input_path, self.kwargs["sensor_collection_name"], "img_data")
+        paths = [input_path, img_data_path, self.input_fits_path]
 
         norm = self.kwargs["gt_img_norm_cho"]
         norm_str = self.kwargs["train_pixels_norm"]
 
-        self.gt_img_fnames, self.gt_img_distrib_fnames = {}, {}
+        self.gt_paths, self.gt_img_fnames, self.gt_img_distrib_fnames = [], {}, {}
+
         if self.use_full_fits:
             for fits_uid in self.fits_uids:
-                self.gt_img_fnames[fits_uid] = join(img_data_path, f"gt_img_{norm}_{fits_uid}")
-                self.gt_img_distrib_fnames[fits_uid] = join(
-                    img_data_path, f"gt_img_distrib_{norm}_{fits_uid}")
+                gt_path = join(img_data_path, f"{norm}_{fits_uid}")
+
+                self.gt_paths.append(gt_path)
+                self.gt_img_fnames[fits_uid] = join(gt_path, "gt_img")
+                self.gt_img_distrib_fnames[fits_uid] = join(gt_path, "gt_img_distrib")
         else:
             for (fits_uid, num_rows, num_cols, (r,c)) in zip(
                     self.fits_uids, self.fits_cutout_num_rows,
                     self.fits_cutout_num_cols, self.fits_cutout_start_pos):
+                gt_path = join(img_data_path, f"{norm}_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}")
 
-                self.gt_img_fnames[fits_uid] = join(
-                    img_data_path, f"gt_img_{norm}_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}")
-                self.gt_img_distrib_fnames[fits_uid] = join(
-                    img_data_path, f"gt_img_distrib_{norm}_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}")
+                self.gt_paths.append(gt_path)
+                self.gt_img_fnames[fits_uid] = join(gt_path, "gt_img")
+                self.gt_img_distrib_fnames[fits_uid] = join(gt_path, "gt_img_distrid")
+
+        # generate folder for each gt image
+        paths.extend(self.gt_paths)
 
         # image data path creation
         suffix = create_uid(self, **self.kwargs)
@@ -120,7 +127,7 @@ class FITSData:
         self.zscale_ranges_fname = join(img_data_path, f"zscale_ranges{suffix}.npy")
 
         # create path
-        for path in [input_path, img_data_path, self.input_fits_path]:
+        for path in paths:
             Path(path).mkdir(parents=True, exist_ok=True)
 
     def compile_fits_fnames(self):
@@ -278,7 +285,7 @@ class FITSData:
         #    raise Exception("Cutout based train only works on one fits file.")
 
         cached = self.load_fits_data_cache and exists(self.pixels_fname) and \
-            ([exists(fname) for fname in self.gt_img_fnames]) and \
+            all([exists(fname) for fname in self.gt_img_fnames]) and \
             (not self.load_weights or exists(self.weights_fname)) and \
             exists(self.zscale_ranges_fname)
 
@@ -492,6 +499,9 @@ class FITSData:
     def get_gt_img_fnames(self):
         return self.gt_img_fnames
 
+    def get_gt_paths(self):
+        return self.gt_paths
+
     ############
     # Utilities
     ############
@@ -642,14 +652,14 @@ class FITSData:
             #recon_min = np.round(np.min(recon_tile, axis=(1,2)), 1)
             #recon_mean = np.round(np.mean(recon_tile, axis=(1,2)), 1)
             recon_max = np.round(np.max(recon_tile, axis=(1,2)), 1)
-            #log.info(f"recon. pixel min {recon_min}")
-            #log.info(f"recon. pixel mean {recon_mean}")
+            # log.info(f"recon. pixel min {recon_min}")
+            # log.info(f"recon. pixel mean {recon_mean}")
             log.info(f"recon. pixel max {recon_max}")
 
         if re_args["save_locally"]:
             np_fname = join(dir, f"{fits_uid}_{fname}.npy")
-            #if restore_args["recon_norm"]: recon_fname += "_norm"
-            #if restore_args["recon_flat_trans"]: recon_fname += "_flat"
+            #if restore_args["recon_norm"]: np_fname += "_norm"
+            if re_args["recon_synthetic_band"]: np_fname += "_synthetic"
             np.save(np_fname, recon_tile)
 
         if re_args["to_HDU"]:

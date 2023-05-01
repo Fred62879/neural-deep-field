@@ -55,7 +55,7 @@ class AstroDataset(Dataset):
         self.mask_dataset = MaskData(self.fits_dataset, self.root, self.device, **self.kwargs)
 
         # randomly initialize
-        # self.mode = "train"
+        self.mode = "train"
         self.coords_source = "fits"
         self.model_output = "pixel_intensity"
         self.use_full_wave = False
@@ -64,6 +64,9 @@ class AstroDataset(Dataset):
     ############
     # Setters
     ############
+
+    def set_mode(self, mode):
+        self.mode = mode
 
     def set_wave_sample_mode(self, use_full_wave: bool):
         self.use_full_wave = use_full_wave
@@ -143,9 +146,8 @@ class AstroDataset(Dataset):
 
     def get_trans_data(self, batch_size, out):
         """ Get transmission data (wave, trans, nsmpl etc.).
-            These are not batched, we do monte carlo sampling at every step.
+            These are not batched, we do sampling at every step.
         """
-
         # trans wave min and max value (used for linear normalization)
         out["full_wave_bound"] = self.trans_dataset.get_full_wave_bound()
 
@@ -158,6 +160,12 @@ class AstroDataset(Dataset):
                 out["wave"], out["trans"], out["wave_smpl_ids"], out["nsmpl"] = \
                     self.trans_dataset.sample_wave_trans(
                         batch_size, self.nsmpls, use_full_wave=self.use_full_wave)
+
+            if self.mode == "infer" and self.kwargs["infer_synthetic_band"]:
+                assert(self.use_full_wave)
+                nsmpl = out["trans"].shape[1]
+                out["trans"] = torch.cat((out["trans"], torch.ones(1,nsmpl)), dim=0)
+                out["nsmpl"] = torch.cat((out["nsmpl"], torch.tensor([nsmpl])), dim=0)
 
         elif self.model_output == "spectra":
             out["wave"] = torch.FloatTensor(self.trans_dataset.get_full_wave())

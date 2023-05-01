@@ -53,10 +53,6 @@ class AstroInferrer(BaseInferrer):
         self.summarize_inferrence_tasks()
         self.generate_inferrence_funcs()
 
-        # self.codebook_latents = torch.rand((
-        #     self.extra_args["qtz_num_embed"], 1,
-        #     self.extra_args["qtz_latent_dim"])).uniform_(-1,1).numpy()
-
     #############
     # Initializations
     #############
@@ -66,11 +62,11 @@ class AstroInferrer(BaseInferrer):
         if self.verbose: log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
-                ["model_dir","recon_dir","metric_dir", "spectra_dir",
+                ["model_dir","recon_dir","recon_synthetic_dir","metric_dir", "spectra_dir",
                  "codebook_spectra_dir", "embed_map_dir","latent_dir",
                  "redshift_dir","latent_embed_dir","zoomed_recon_dir",
                  "scaler_dir","pixel_distrib_dir","soft_qtz_weights_dir"],
-                ["models","recons","metrics","spectra","codebook_spectra",
+                ["models","recons","recon_synthetic","metrics","spectra","codebook_spectra",
                  "embed_map","latents","redshift","latent_embed","zoomed_recon",
                  "scaler","pixel_distrib","soft_qtz_weights"]
         ):
@@ -97,8 +93,8 @@ class AstroInferrer(BaseInferrer):
         # infer all coords using original model
         self.recon_img = "recon_img" in tasks
         self.recon_HSI = "recon_HSI" in tasks
-        self.recon_flat_trans = "recon_flat_trans" in tasks
         self.plot_pixel_distrib = "plot_pixel_distrib" in tasks
+        self.recon_synthetic_band = "recon_synthetic_band" in tasks
 
         self.plot_embed_map = "plot_embed_map" in tasks \
             and (self.quantize_latent or self.quantize_spectra) \
@@ -133,7 +129,7 @@ class AstroInferrer(BaseInferrer):
         # keep only tasks required to perform
         self.group_tasks = []
 
-        if self.recon_img or self.recon_flat_trans or \
+        if self.recon_img or self.recon_synthetic_band or \
            self.plot_embed_map or self.plot_latent_embed or \
            self.plot_redshift or self.plot_scaler or \
            self.save_soft_qtz_weights:
@@ -154,7 +150,8 @@ class AstroInferrer(BaseInferrer):
         self.infer_selected_coords_partial_model = False
         self.infer_without_model_run = False
 
-        # log.info(f"inferrence group tasks: {self.group_tasks}.")
+        if self.verbose:
+            log.info(f"inferrence group tasks: {self.group_tasks}.")
 
     def generate_inferrence_funcs(self):
         self.infer_funcs = {}
@@ -199,6 +196,7 @@ class AstroInferrer(BaseInferrer):
 
     def pre_inferrence_all_coords_full_model(self):
         self.fits_uids = self.dataset.get_fits_uids()
+        self.use_full_wave = True
         self.model_output = "pixel_intensity"
         self.coords_source = "fits"
         self.batched_fields = ["coords"]
@@ -216,8 +214,7 @@ class AstroInferrer(BaseInferrer):
         if self.recon_img:
             self.metric_options = self.extra_args["metric_options"]
             self.num_metrics = len(self.metric_options)
-            self.calculate_metrics = self.recon_img and \
-                not self.recon_flat_trans and self.metric_options is not None
+            self.calculate_metrics = self.recon_img and self.metric_options is not None
 
             if self.calculate_metrics:
                 self.metrics = np.zeros((self.num_metrics, 0, num_fits, self.num_bands))
@@ -241,6 +238,7 @@ class AstroInferrer(BaseInferrer):
     def pre_inferrence_selected_coords_partial_model(self):
         """ Spectra reconstruction.
         """
+        self.use_full_wave = True
         self.model_output = "spectra"
         self.coords_source = "spectra"
         self.batched_fields = ["coords"]
@@ -264,6 +262,7 @@ class AstroInferrer(BaseInferrer):
     def pre_inferrence_hardcode_coords_modified_model(self):
         """ Codebook spectra reconstruction.
         """
+        self.use_full_wave = True
         self.model_output = "spectra"
         self.batched_fields = ["coords"]
         self.coords_source = "codebook_latents"
@@ -297,9 +296,11 @@ class AstroInferrer(BaseInferrer):
         if self.recon_img:
             self.to_HDU_now = self.extra_args["to_HDU"] and model_id == self.num_models
             self.recon_HSI_now = self.recon_HSI and model_id == self.num_models
-            self.recon_flat_trans_now = self.recon_flat_trans and model_id == self.num_models
-            #if self.recon_flat_trans_now: self.num_bands = 1
+            # self.recon_flat_trans_now = self.recon_flat_trans and model_id == self.num_models
             self.recon_pixels = []
+
+        if self.recon_synthetic_band:
+            self.recon_synthetic_pixels = []
 
         if self.plot_embed_map:
             self.embed_ids = []
@@ -336,7 +337,7 @@ class AstroInferrer(BaseInferrer):
                 "save_locally": True,
                 "to_HDU": self.to_HDU_now,
                 "calculate_metrics": self.calculate_metrics,
-                "recon_flat_trans": self.recon_flat_trans_now,
+                "recon_synthetic_band": False,
                 "zoom": self.extra_args["recon_zoomed"],
                 "cutout_fits_uids": self.extra_args["recon_cutout_fits_uids"],
                 "cutout_sizes": self.extra_args["recon_cutout_sizes"],
@@ -352,6 +353,29 @@ class AstroInferrer(BaseInferrer):
                 self.metrics = np.concatenate((self.metrics, cur_metrics[:,None]), axis=1)
                 self.metrics_zscale = np.concatenate((
                     self.metrics_zscale, cur_metrics_zscale[:,None]), axis=1)
+
+        if self.recon_synthetic_band:
+            re_args = {
+                "fname": model_id,
+                "dir": self.recon_synthetic_dir,
+                "metric_options": None,
+                "verbose": self.verbose,
+                "num_bands": 1,
+                "plot_func": plot_horizontally,
+                "zscale": True,
+                "log_max": True,
+                "save_locally": True,
+                "to_HDU": False,
+                "calculate_metrics": False,
+                "recon_synthetic_band": True,
+                "zoom": self.extra_args["recon_zoomed"],
+                "cutout_fits_uids": self.extra_args["recon_cutout_fits_uids"],
+                "cutout_sizes": self.extra_args["recon_cutout_sizes"],
+                "cutout_start_pos": self.extra_args["recon_cutout_start_pos"],
+                "zoomed_recon_dir": self.zoomed_recon_dir,
+                "zoomed_recon_fname": model_id,
+            }
+            _, _ = self.dataset.restore_evaluate_tiles(self.recon_synthetic_pixels, **re_args)
 
         if self.plot_latent_embed:
             plot_latent_embed(self.latents, self.embed, model_id, self.latent_embed_dir)
@@ -525,7 +549,13 @@ class AstroInferrer(BaseInferrer):
                         save_redshift=self.plot_redshift,
                         save_embed_ids=self.plot_embed_map)
 
-                if self.recon_img: self.recon_pixels.extend(ret["intensity"])
+                if self.recon_img:
+                    # artifically generated transmission function (last channel)
+                    if self.recon_synthetic_band:
+                        self.recon_synthetic_pixels.extend(ret["intensity"][...,-1:])
+                        ret["intensity"] = ret["intensity"][...,:-1]
+                    self.recon_pixels.extend(ret["intensity"])
+
                 if self.plot_redshift: self.redshifts.extend(ret["redshift"])
                 if self.plot_latent_embed: self.latents.extend(ret["latents"])
                 if self.plot_embed_map: self.embed_ids.extend(ret["min_embed_ids"])
@@ -533,7 +563,7 @@ class AstroInferrer(BaseInferrer):
                 if self.save_soft_qtz_weights: self.soft_qtz_weights.extend(ret["soft_qtz_weights"])
 
             except StopIteration:
-                # log.info("all coords inferrence done")
+                if self.verbose: log.info("all coords inferrence done")
                 break
 
     def infer_spectra(self, model_id, checkpoint):
@@ -616,7 +646,7 @@ class AstroInferrer(BaseInferrer):
                 self.codebook_spectra.extend(spectra)
 
             except StopIteration:
-                # log.info("codebook spectra inferrence done")
+                if self.verbose: log.info("codebook spectra inferrence done")
                 break
 
     def _configure_dataset(self):
@@ -624,8 +654,9 @@ class AstroInferrer(BaseInferrer):
         """
         if self.space_dim == 3: self.batched_fields.extend(["trans_data"])
 
+        self.dataset.set_mode("infer")
         self.dataset.set_model_output(self.model_output)
-        self.dataset.set_wave_sample_mode(use_full_wave=True)
+        self.dataset.set_wave_sample_mode(self.use_full_wave)
         self.dataset.set_dataset_length(self.dataset_length)
         self.dataset.set_dataset_fields(self.batched_fields)
         self.dataset.set_dataset_coords_source(self.coords_source)
