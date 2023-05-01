@@ -560,6 +560,8 @@ def define_cmd_line_args():
     inpaint_group.add_argument("--inpaint-cho", type=str, default="no_inpaint",
                                choices=["no_inpaint","spatial_inpaint","spectral_inpaint"])
 
+    inpaint_group.add_argument("--plot-masked-gt", action="store_true", default=False)
+
     inpaint_group.add_argument("--mask_sz", type=int, default=1)
     inpaint_group.add_argument("--mask_seed", type=int, default=0)
     inpaint_group.add_argument("--m_start_r", type=int, default=1)

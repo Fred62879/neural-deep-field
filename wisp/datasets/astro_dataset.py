@@ -124,22 +124,22 @@ class AstroDataset(Dataset):
     def get_batched_data(self, field, idx):
         if field == "coords":
             if self.coords_source == "fits":
-                data = self.fits_dataset.get_coords()
+                data = self.fits_dataset.get_coords(idx)
             elif self.coords_source == "spectra":
                 data = self.spectra_dataset.get_spectra_grid_coords()
             else:
-                data = self.data[self.coords_source]
+                data = self.data[self.coords_source][idx]
         elif field == "pixels":
-            data = self.fits_dataset.get_pixels()
+            data = self.fits_dataset.get_pixels(idx)
         elif field == "weights":
-            data = self.fits_dataset.get_weights()
+            data = self.fits_dataset.get_weights(idx)
         elif field == "redshift":
-            data = self.fits_dataset.get_redshifts()
+            data = self.fits_dataset.get_redshifts(idx)
         elif field == "masks":
-            data = self.fits_dataset.get_mask()
+            data = self.mask_dataset.get_mask(idx)
         else:
             raise ValueError("Unrecognized data field.")
-        return data[idx]
+        return data
 
     def get_trans_data(self, batch_size, out):
         """ Get transmission data (wave, trans, nsmpl etc.).

@@ -27,6 +27,8 @@ class MaskData:
         self.kwargs = kwargs
         self.fits_obj = fits_obj
         self.verbose = kwargs["verbose"]
+        self.plot_masked_gt = kwargs["plot_masked_gt"]
+
         self.num_bands = kwargs["num_bands"]
         self.mask_mode = kwargs["mask_mode"]
         self.inpaint_cho = kwargs["inpaint_cho"]
@@ -83,7 +85,7 @@ class MaskData:
             np.save(self.masked_pixel_ids_fname, masked_pixel_ids)
 
         num_smpl_pixls = [np.count_nonzero(mask[:,i]) for i in range(mask.shape[1])]
-        log.info("Sampled pixels for each band of spectral mask", num_smpl_pixls)
+        log.info(f"Sampled pixels for each band of spectral mask: {num_smpl_pixls}")
 
         # slice mask, leave inpaint bands only
         mask = mask[:,self.inpaint_bands] # [npixels,num_inpaint_bands]
@@ -91,11 +93,13 @@ class MaskData:
         if not flat:  mask = mask.reshape((args.img_size, args.img_size, -1))
         if to_tensor: mask = torch.tensor(mask)
 
-        if kwargs["spatial_inpaint"]:
+        if self.spatial_inpaint:
+            # dont support spatial inpainting currently
+            assert 0
             self.spatial_masking()
 
-        self.data["mask"] = np.concatenate(mask) # [npixels,nbands]
-        self.data["masked_pixel_ids"] = masked_pixel_ids     # [n_masked_pixels]
+        self.data["mask"] = mask # [npixels,nbands]
+        self.data["masked_pixel_ids"] = masked_pixel_ids # [n_masked_pixels]
 
     #############
     # Mask creation
@@ -123,29 +127,23 @@ class MaskData:
         """ Generate mask for one multi-band patch.
             Mask only pixels in inpaint_bands.
         """
-        if self.mask_mode == "rand_diff":
+        if self.mask_mode == "rand_diff" or self.mask_mode == "rand_same":
             # mask different pixels in different bands
             if self.verbose: log.info("mask diff pixels in diff bands")
 
             ratio = self.inpaint_sample_ratio
-            mask, masked_pixel_ids = np.ones((npixls, self.num_bands)), []
+            mask, masked_pixel_ids = np.ones((npixels, self.num_bands)), []
+
             for i in self.inpaint_bands:
+                seed = self.kwargs["mask_seed"]
+                if self.mask_mode == "rand_diff": seed += i
+
                 mask[:,i], cur_band_masked_pixel_ids = self.create_mask_one_band(
-                    npixels, ratio, i + self.kwargs["mask_seed"])
+                    npixels, ratio, seed)
                 masked_pixel_ids.append(cur_band_masked_pixel_ids)
 
-            # [npixls,nbands], [nbands,num_masked_pixls]
+            # [npixels,nbands], [nbands,num_masked_pixels]
             masked_pixel_ids = np.array(masked_pixel_ids)
-
-        elif self.mask_mode == "rand_same":
-            # mask same pixels in different bands
-            if self.verbose: log.info("mask same pixels in diff bands")
-
-            mask, masked_pixel_ids = self.create_mask_one_band(
-                npixels, self.inpaint_sample_ratio, self.kwargs["mask_seed"])
-
-            # [npixls, nbands], [num_masked_pixls]
-            mask = np.tile(mask[:,None], (1, self.num_bands))
 
         elif self.mask_mode == "region":
             # mask a rectangular area
@@ -175,10 +173,16 @@ class MaskData:
         num_cols = self.fits_obj.get_num_cols()
         fits_uids = self.fits_obj.get_fits_uids()
 
+        if self.plot_masked_gt:
+            gt_img_fnames = self.fits_obj.get_gt_img_fnames()
+
         for id, fits_uid in enumerate(fits_uids):
             num_rows, num_cols = num_rows[fits_uid], num_cols[fits_uid]
             npixels = num_rows * num_cols
             _mask, _masked_pixel_ids = self.create_mask_one_patch(npixels, acc_npixels)
+
+            if self.plot_masked_gt:
+                self.plot_masked_gt_img(_mask, gt_img_fnames[fits_uid])
 
             mask.append(_mask)
             masked_pixel_ids.append(_masked_pixel_ids)
@@ -200,20 +204,32 @@ class MaskData:
     # Getters
     #############
 
-    def get_mask(self):
-        if self.kwargs["inpaint_cho"] == "spatial_inpaint":
-            self.pixls, self.coords, self.weights = utils.spatial_masking\
-                (self.pixls, self.coords, self.kwargs, weights=self.weights)
+    def get_mask(self, idx=None):
+        assert self.kwargs["inpaint_cho"] == "spectral_inpaint"
+        if idx is None:
+            return self.data["mask"][idx]
+        return self.data["mask"]
 
-        elif self.kwargs["inpaint_cho"] == "spectral_inpaint":
-            self.relative_train_bands = self.kwargs["relative_train_bands"]
-            self.relative_inpaint_bands = self.kwargs["relative_inpaint_bands"]
-            self.mask, self.masked_pixl_ids = utils.load_mask(self.args)
-            self.num_masked_pixls = self.masked_pixl_ids.shape[0]
+        # self.relative_train_bands = self.kwargs["relative_train_bands"]
+        # self.relative_inpaint_bands = self.kwargs["relative_inpaint_bands"]
 
-        # iv) get ids of cutout pixels
-        if self.save_cutout:
-            self.cutout_pixl_ids = utils.generate_cutout_pixl_ids\
-                (self.cutout_pos, self.fits_cutout_size, self.img_size)
-        else: self.cutout_pixl_ids = None
-        return
+        # self.num_masked_pixls = self.masked_pixl_ids.shape[0]
+
+        # # iv) get ids of cutout pixels
+        # if self.save_cutout:
+        #     self.cutout_pixl_ids = utils.generate_cutout_pixl_ids\
+        #         (self.cutout_pos, self.fits_cutout_size, self.img_size)
+        # else: self.cutout_pixl_ids = None
+        # return
+
+    ############
+    # Utilities
+    ############
+
+    def plot_masked_gt_img(self, mask, in_fname):
+        out_fname = in_fname + "masked"
+        gt_img = np.load(in_fname + ".npy")
+        img_shape = gt_img.shape
+        print(gt_img.shape, mask.shape)
+        masked_gt = gt_img * (mask.T.reshape(img_shape))
+        np.save(out_fname, masked_gt)

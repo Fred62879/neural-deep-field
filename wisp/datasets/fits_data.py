@@ -460,15 +460,19 @@ class FITSData:
     def get_fits_cutout_start_pos(self):
         return self.fits_cutout_start_pos
 
-    def get_pixels(self, ids=None):
-        if ids is not None:
-            return self.data["pixels"][ids]
+    def get_pixels(self, idx=None):
+        if idx is not None:
+            return self.data["pixels"][idx]
         return self.data["pixels"]
 
-    def get_weights(self):
+    def get_weights(self, idx=None):
+        if idx is not None:
+            return self.data["weights"][idx]
         return self.data["weights"]
 
-    def get_redshifts(self):
+    def get_redshifts(self, idx=None):
+        if idx is not None:
+            return self.data["redshift"][idx]
         return self.data["redshift"]
 
     def get_coord(self, idx):
@@ -479,9 +483,14 @@ class FITSData:
             assert(id >= 0 and id < len(self.data["coords"]))
         return self.data["coords"][idx]
 
-    def get_coords(self):
+    def get_coords(self, idx=None):
         """ Get all coords [n,1,2] """
+        if idx is not None:
+            return self.data["coords"][idx]
         return self.data["coords"]
+
+    def get_gt_img_fnames(self):
+        return self.gt_img_fnames
 
     ############
     # Utilities

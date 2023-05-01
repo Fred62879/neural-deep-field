@@ -119,7 +119,7 @@ qtz:
 
 spatial_decod:
     generate_scaler: True
-    generate_redshift: True
+    generate_redshift: False
 
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1
@@ -195,7 +195,7 @@ infer:
 
     # recon img
     to_HDU: False
-    infer_log_fname: '20230429-135210'
+    # infer_log_fname: '20230429-135210'
     metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
@@ -279,7 +279,8 @@ dataset:
 
 inpaint:
     inpaint_cho: 'spectral_inpaint' #'no_inpaint'
-    inpaint_sample_ratio: .01 # 0-1
+    inpaint_sample_ratio: 0.01 # 0-1
+    plot_masked_gt: True
 
     # assume max set is 10 bands in this order [GRIZY,nb387,nb816,nb921,u,us]
     # always makes sure mask creation is called for a continuous set of bands

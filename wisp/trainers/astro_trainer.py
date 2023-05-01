@@ -558,7 +558,7 @@ class AstroTrainer(BaseTrainer):
 
             self.log_dict["recon_loss"] += recon_loss.item()
 
-        # ii) spectra loss
+        # ii) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
         if self.spectra_supervision and \
            self.epoch >= self.extra_args["spectra_supervision_start_epoch"]:
