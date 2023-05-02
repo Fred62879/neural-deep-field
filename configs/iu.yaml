@@ -7,7 +7,6 @@ global:
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    #tasks: ['train']
 
     #tasks: ['train','save_recon_during_train','infer','recon_img'] #,'plot_save_scaler']
     #tasks: ['infer','recon_img','plot_save_scaler']
@@ -25,22 +24,19 @@ global:
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
     tasks: ['train','save_codebook','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed'] #,'recon_dummy_spectra']
 
-    #tasks: ['train','infer','recon_img','recon_gt_spectra','recon_dummy_spectra','recon_codebook_spectra']
-    #tasks: ['infer','recon_img','recon_gt_spectra','recon_dummy_spectra']
-
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed']
+    #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
     #tasks: ['infer','plot_embed_map','plot_redshift']
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra'] #,'recon_dummy_spectra']
     #tasks: ['infer','plot_latent_embed']
 
-    tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
+    #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','plot_save_scaler','plot_redshift']
     #tasks: ['infer','recon_gt_spectra'] #,'log_pixel_value']
     #tasks: ['infer','recon_dummy_spectra','recon_gt_spectra']
     #tasks: ['infer','recon_codebook_spectra']
 
-    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map']
     #tasks: ['infer','plot_pixel_distrib']
     #tasks: ['infer','save_soft_qtz_weights']
 
@@ -191,12 +187,11 @@ infer:
     inferrer_type: 'AstroInferrer'
     infer_batch_size: 100 #4096 #20000 #36864
     infer_use_all_wave: True # enforced
-    infer_synthetic_band: True
     infer_last_model_only: True
 
     # recon img
     to_HDU: False
-    # infer_log_fname: '20230429-135210'
+    #infer_log_fname: '20230427-111337_qtz_spectra_2048'
     metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
@@ -237,9 +232,9 @@ dataset:
     fits_footprints: ['9812']
     fits_tile_ids: ['1']
     fits_subtile_ids: ['5']
-    fits_cutout_num_rows: [512]
-    fits_cutout_num_cols: [512]
-    fits_cutout_start_pos: [[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    fits_cutout_num_rows: [2048]
+    fits_cutout_num_cols: [2048]
+    fits_cutout_start_pos: [[0,0]] #[[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
     #num_bands: 1
     #sensor_collection_name: '1_i'
@@ -274,9 +269,11 @@ dataset:
     hardcode_num_trans_samples: 12
     trans_sample_interval: 10
 
-    gt_spectra_ids: [5,6,7,8,9] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
+    gt_spectra_ids: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9] [5,6,7,8,9]
+
     spectra_smooth_sigma: 50
-    spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]
+    # spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]
+    spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]
 
 inpaint:
     inpaint_cho: 'no_inpaint' #'spectral_inpaint'

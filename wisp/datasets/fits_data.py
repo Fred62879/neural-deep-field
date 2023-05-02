@@ -407,8 +407,8 @@ class FITSData:
     #     self.data["coords"] = add_dummy_dim(coords, **self.kwargs)
 
     def get_pixel_coords_all_fits(self):
-        assert(not self.use_full_fits)
-        assert(len(self.fits_uids) == 1)
+        # assert(not self.use_full_fits)
+        # assert(len(self.fits_uids) == 1)
         for id, fits_uid in enumerate(self.fits_uids):
             num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
             self.get_mgrid_np(num_rows, num_cols)
@@ -648,7 +648,7 @@ class FITSData:
         #     if fn is not None:
         #         np.save(fn + "_restored.npy", recon)
 
-        if verbose and re_args["log_max"]:
+        if re_args["log_max"]:
             #recon_min = np.round(np.min(recon_tile, axis=(1,2)), 1)
             #recon_mean = np.round(np.mean(recon_tile, axis=(1,2)), 1)
             recon_max = np.round(np.max(recon_tile, axis=(1,2)), 1)
@@ -659,7 +659,8 @@ class FITSData:
         if re_args["save_locally"]:
             np_fname = join(dir, f"{fits_uid}_{fname}.npy")
             #if restore_args["recon_norm"]: np_fname += "_norm"
-            if re_args["recon_synthetic_band"]: np_fname += "_synthetic"
+            if "recon_synthetic_band" in re_args and re_args["recon_synthetic_band"]:
+                np_fname += "_synthetic"
             np.save(np_fname, recon_tile)
 
         if re_args["to_HDU"]:
@@ -680,7 +681,7 @@ class FITSData:
             gt_fname = self.gt_img_fnames[fits_uid] + ".npy"
             gt_tile = np.load(gt_fname)
             gt_max = np.round(np.max(gt_tile, axis=(1,2)), 1)
-            if verbose: log.info(f"GT. pixel max {gt_max}")
+            log.info(f"GT. pixel max {gt_max}")
 
             metrics = calculate_metrics(
                 recon_tile, gt_tile, re_args["metric_options"])[:,None]

@@ -161,8 +161,8 @@ class AstroDataset(Dataset):
                     self.trans_dataset.sample_wave_trans(
                         batch_size, self.nsmpls, use_full_wave=self.use_full_wave)
 
-            if self.mode == "infer" and self.kwargs["infer_synthetic_band"]:
-                assert(self.use_full_wave)
+            if self.mode == "infer" and "recon_synthetic_band" in self.kwargs["tasks"]:
+                assert(self.use_full_wave) # only in inferrence
                 nsmpl = out["trans"].shape[1]
                 out["trans"] = torch.cat((out["trans"], torch.ones(1,nsmpl)), dim=0)
                 out["nsmpl"] = torch.cat((out["nsmpl"], torch.tensor([nsmpl])), dim=0)

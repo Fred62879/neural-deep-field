@@ -1,6 +1,7 @@
 
 import csv
 import torch
+import pandas
 import numpy as np
 import logging as log
 import matplotlib.pyplot as plt
@@ -242,7 +243,8 @@ class SpectraData:
         wave_hi = source_spectra_data["spectrum_plot_wave_hi"][spectra_id]
         fits_uid = f"{footprint}{tile_id}{subtile_id}"
 
-        log.info(f'spectra: {spectra_id}, {ra}/{dec}')
+        if self.kwargs["verbose"]:
+            log.info(f'spectra: {spectra_id}, {ra}/{dec}')
 
         # i) get img coord, grid coord, and pixel ids of selected gt spectra
         img_coords, grid_coords, ids = self.fits_obj.convert_from_world_coords(
@@ -257,7 +259,7 @@ class SpectraData:
 
         # ii) load actual spectra data
         fname = join(self.spectra_path, fits_uid,
-                     source_spectra_data["spectra_fname"][spectra_id] + ".npy")
+                     source_spectra_data["spectra_fname"][spectra_id])
 
         gt_wave, gt_spectra = load_gt_spectra(
             fname, self.full_wave, smpl_interval,
@@ -528,7 +530,7 @@ def get_bound_id(wave_bound, source_wave, within_bound=True):
 
     return [id_lo, id_hi]
 
-def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1, trusted_range=None):
+def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1, trusted_range=None, save_np=True, plot=True):
 
     """ Load gt spectra (intensity values) for spectra supervision and
           spectrum plotting. Also smooth the gt spectra which has significantly
@@ -548,7 +550,9 @@ def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1
                  the range of it is identical to that of recon spectra and thus
                  can be directly compare with.
     """
-    gt = np.load(fname)
+    gt = np.array(
+        pandas.read_table(fname + ".tbl", comment="#", delim_whitespace=True)
+    )
     gt_wave, gt_spectra = gt[:,0], gt[:,1]
 
     if sigma > 0:
@@ -572,6 +576,12 @@ def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1
 
         # use new gt wave to get interpolated spectra
         gt_spectra = f_gt(gt_wave)
+
+    if save_np: np.save(fname + ".npy", gt)
+    if plot:
+        plt.plot(gt_wave, gt_spectra)
+        plt.savefig(fname + ".png")
+        plt.close()
 
     return gt_wave, gt_spectra
 

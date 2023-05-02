@@ -258,6 +258,7 @@ class AstroTrainer(BaseTrainer):
             self.resume_train()
 
         self.scene_state.optimization.running = True
+        log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
 
         for epoch in range(self.num_epochs + 1):
             self.begin_epoch()
@@ -335,8 +336,8 @@ class AstroTrainer(BaseTrainer):
             self.resample_dataset()
 
         # save model
-        if self.save_every > -1 and self.epoch % self.save_every == 0:
-            self.save_model()
+        # if self.save_every > -1 and self.epoch % self.save_every == 0:
+        #     self.save_model()
 
         if self.extra_args["save_local_every"] > -1 and self.epoch % self.extra_args["save_local_every"] == 0:
             self.save_data_to_local = True
@@ -377,6 +378,9 @@ class AstroTrainer(BaseTrainer):
         # render visualizations to tensorboard
         if self.render_tb_every > -1 and self.epoch % self.render_tb_every == 0:
             self.render_tb()
+
+        if self.save_every > -1 and self.epoch % self.save_every == 0:
+            self.save_model()
 
         # save data locally and restore trainer state
         if self.save_data_to_local:
