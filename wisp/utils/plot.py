@@ -105,7 +105,8 @@ def plot_embed_map(coords, embed_ids, embed_map_fn, fits_id):
         log.info(f"embed id of {fits_id}_{r}_{c} is: {cur_embed_id}")
 
     plt.imshow(embed_ids, cmap='gray',origin='lower')
-    plt.savefig(embed_map_fn)
+    plt.axis("off")
+    plt.savefig(embed_map_fn, bbox_inches="tight")
     plt.close()
 
 def plot_zscale(ax, data, vmin, vmax):
