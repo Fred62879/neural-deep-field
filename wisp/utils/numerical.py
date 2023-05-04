@@ -13,9 +13,6 @@ def calculate_emd(distrib1, distrib2, norm="l2"):
            distrib: [...,num_bins] (assume they sum to 1)
     """
     # assert(distrib1.shape == distrib2.shape)
-    #print(distrib1.shape, distrib2.shape)
-    #print(torch.sum(distrib1, dim=-1))
-    #print(torch.sum(distrib2, dim=-1))
     n = distrib1.shape[-1]
     sub = distrib1 - distrib2
     if norm == "l1":

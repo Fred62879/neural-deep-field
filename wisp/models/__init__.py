@@ -8,3 +8,4 @@
 
 from .pipeline import Pipeline
 from .astro_pipeline import AstroPipeline
+from .codebook_pipeline import CodebookPipeline

@@ -2,9 +2,8 @@
 import yaml
 import torch
 import pprint
+import logging
 import argparse
-
-from app_utils import add_log_level_flag
 
 str2optim = {m.lower(): getattr(torch.optim, m) for m in dir(torch.optim) if m[0].isupper()}
 
@@ -238,6 +237,7 @@ def define_cmd_line_args():
     qtz_group.add_argument("--qtz-seed", type=int)
     qtz_group.add_argument("--qtz-soft-temperature", type=int)
     qtz_group.add_argument("--qtz-temperature-scale", type=int)
+    qtz_group.add_argument("--codebook-pretrain-latent-dim", type=int)
 
     ###################
     # Spatial Decoder arguments
@@ -426,6 +426,7 @@ def define_cmd_line_args():
     # train_group.add_argument("--masked_pixl_ratio_per_epoch", type=float, default=1,
     #                          help="ratio of masked pixels used for spectral inpaint training per epoch")
 
+    train_group.add_argument("--pretrain-codebook", action="store_true")
     train_group.add_argument("--weight-train", action="store_true")
     train_group.add_argument("--train-use-all-wave", action="store_true")
     train_group.add_argument("--infer-during-train", action="store_true")
@@ -590,5 +591,10 @@ def define_cmd_line_args():
     exp_group.add_argument("--ipe_rand_schedule_cho", type=int)
     exp_group.add_argument("--ipe_global_schedule_cho", type=int)
 
-    add_log_level_flag(parser)
+    # add_log_level_flag(parser)
+    parser.add_argument(
+        '--log_level', action='store', type=int, default=logging.INFO,
+        help='Logging level to use globally, DEBUG: 10, INFO: 20, WARN: 30, ERROR: 40.'
+    )
+
     return parser

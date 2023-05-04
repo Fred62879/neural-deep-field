@@ -91,7 +91,6 @@ class BaseTrainer(ABC):
             render_tb_every (int): The number of epochs between renders for tensorboard logging. -1 = no rendering.
             save_every (int): The number of epochs between model saves. -1 = no saving.
         """
-        #log.info(f'Info: \n{info}')
         log.info(f'Training on {extra_args["dataset_path"]}')
 
         self.extra_args = extra_args
@@ -117,7 +116,6 @@ class BaseTrainer(ABC):
         self.weight_decay = weight_decay
         self.grid_lr_weight = grid_lr_weight
         self.optim_params = optim_params
-        self.init_optimizer()
 
         # Training params
         self.num_epochs = num_epochs
@@ -149,7 +147,6 @@ class BaseTrainer(ABC):
         self.val_data_loader = None
         self.dataset_size = None
         self.log_dict = {}
-        self.init_dataloader()
 
         self.log_fname = f'{datetime.now().strftime("%Y%m%d-%H%M%S")}'
         self.log_dir = os.path.join(
@@ -157,7 +154,7 @@ class BaseTrainer(ABC):
             self.exp_name,
             self.log_fname
         )
-        
+
         # Default TensorBoard Logging
         self.writer = SummaryWriter(self.log_dir, purge_step=0)
         self.writer.add_text('Info', self.info)
@@ -165,7 +162,7 @@ class BaseTrainer(ABC):
         self.save_every = save_every
         self.using_wandb = using_wandb
         self.timer.check('set_logger')
-        
+
         if self.using_wandb:
             for d in range(self.extra_args["num_lods"]):
                 wandb.define_metric(f"LOD-{d}-360-Degree-Scene")

@@ -278,9 +278,9 @@ class Quantization(nn.Module):
                 z * temperature * self.kwargs["qtz_temperature_scale"], dim=-1
             ) # [bsz,1,num_embeds]
 
-            import numpy as np
-            np.set_printoptions(suppress=True, formatter={'float_kind':'{:0.3f}'.format})
-            print(weights[:,0].detach().cpu().numpy())
+            # import numpy as np
+            # np.set_printoptions(suppress=True, formatter={'float_kind':'{:0.3f}'.format})
+            # print(weights[:,0].detach().cpu().numpy())
 
             if self.kwargs["quantize_spectra"]:
                 codebook = codebook.permute(1,0,2) # [bsz,num_embeds,nsmpl]

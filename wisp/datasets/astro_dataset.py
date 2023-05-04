@@ -35,10 +35,11 @@ class AstroDataset(Dataset):
 
         self.space_dim = kwargs["space_dim"]
         self.nsmpls = kwargs["num_trans_samples"]
+        self.get_spectra_coords = True
 
         if self.space_dim == 3:
             self.unbatched_fields = {
-                "trans_data","spectra_supervision_data","qtz_spectra_data"
+                "trans_data","spectra_supervision_data"
             }
         else:
             self.unbatched_fields = set()
@@ -59,7 +60,7 @@ class AstroDataset(Dataset):
         self.coords_source = "fits"
         self.model_output = "pixel_intensity"
         self.use_full_wave = False
-        self.set_dataset_length(1000)
+        self.set_dataset_length(0)
 
     ############
     # Setters
@@ -92,6 +93,9 @@ class AstroDataset(Dataset):
 
     def set_hardcode_data(self, field, data):
         self.data[field] = data
+
+    def toggle_spectra_coords(self, get):
+        self.get_spectra_coords = get
 
     ############
     # Getters
@@ -177,30 +181,28 @@ class AstroDataset(Dataset):
         # get only supervision spectra (not all gt spectra) for loss calculation
         out["gt_spectra"] = self.spectra_dataset.get_supervision_spectra()
 
-        # get all coords to plot all spectra (gt, dummy, incl. neighbours)
-        # the first #num_supervision_spectra are gt coords for supervision
-        # the others are forwarded only for spectrum plotting
-        spectra_coords = self.spectra_dataset.get_spectra_grid_coords()
-        if "coords" in out:
-            out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
-        else:
-            out["coords"] = spectra_coords
+        if self.get_spectra_coords:
+            # get all coords to plot all spectra (gt, dummy, incl. neighbours)
+            # the first #num_supervision_spectra are gt coords for supervision
+            # the others are forwarded only for spectrum plotting
+            spectra_coords = self.spectra_dataset.get_spectra_grid_coords()
+            if "coords" in out:
+                out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
+            else:
+                out["coords"] = spectra_coords
 
-        out["num_spectra_coords"] = len(spectra_coords)
+            out["num_spectra_coords"] = len(spectra_coords)
+
         out["full_wave"] = self.trans_dataset.get_full_wave()
         out["full_wave_bound"] = self.trans_dataset.get_full_wave_bound()
         out["spectra_supervision_wave_bound_ids"] = self.spectra_dataset.get_spectra_supervision_wave_bound_ids()
-
-    def get_qtz_spectra_data(self, out):
-        out["full_wave"] = self.trans_dataset.get_full_wave()
-        assert("wave_smpl_ids" in out)
 
     def __len__(self):
         """ Length of the dataset in number of coords.
         """
         return self.dataset_length
 
-    def __getitem__(self, idx : list):
+    def __getitem__(self, idx: list):
         """ Sample data from requried fields using given index.
             Also get unbatched data (trans, spectra etc.).
         """
@@ -213,9 +215,6 @@ class AstroDataset(Dataset):
 
         if "trans_data" in self.requested_fields:
             self.get_trans_data(len(idx), out)
-
-        # if "qtz_spectra_data" in self.requested_fields:
-        #     self.get_qtz_spectra_data(out)
 
         if "spectra_supervision_data" in self.requested_fields:
             self.get_spectra_data(out)

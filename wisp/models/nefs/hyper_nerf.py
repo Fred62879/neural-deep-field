@@ -31,7 +31,13 @@ class AstroHyperSpectralNerf(BaseNeuralField):
 
         if self.kwargs["encode_coords"]:
             self.init_encoder()
-        self.spatial_decoder = SpatialDecoder(qtz_calculate_loss, **kwargs)
+
+        self.spatial_decoder = SpatialDecoder(
+            output_scaler=kwargs["generate_scaler"],
+            output_redshift=kwargs["generate_redshift"],
+            qtz_calculate_loss=qtz_calculate_loss,
+            **kwargs)
+
         self.hps_decoder = HyperSpectralDecoder(integrate=integrate, scale=scale, **kwargs)
 
         if kwargs["quantize_latent"] or kwargs["quantize_spectra"]:
@@ -69,31 +75,32 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
             channels.extend(["scaler","redshift","codebook_loss",
                              "min_embed_ids","codebook","soft_qtz_weights"])
-            # channels.extend(["wave_smpl_ids","qtz_args"])
-            # channels.extend(["qtz_args"])
 
         self._register_forward_function(self.hyperspectral, channels)
 
-    def hyperspectral(self, coords, wave=None, wave_smpl_ids=None, trans=None,
-                      nsmpl=None, full_wave=None, full_wave_bound=None,
-                      num_spectra_coords=-1, qtz_args=None, pidx=None, lod_idx=None):
+    def hyperspectral(self, coords,
+                      wave, trans, nsmpl, full_wave_bound,
+                      full_wave=None, num_spectra_coords=-1,
+                      qtz_args=None, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
               coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2/3]
-              pidx (torch.LongTensor): SPC point_hierarchy indices of shape [batch].
-                                       Unused in the current implementation.
-              lod_idx (int): index into active_lods. If None, will use the maximum LOD.
-                             Currently interpolation doesn't use this.
-              full_wave_bound: min and max of wave to normalize wave TODO make this requried
-              qtz_args:
+
+              - qtz_args:
                 temperature: temperature for soft quantization, if performed
                 find_embed_id: whether find embed id or not (used for soft quantization)
                 save_codebook: save codebook weights value to local
                 save_soft_qtz_weights: save weights for each code (when doing soft qtz)
 
+              - grid_args:
+                pidx (torch.LongTensor): SPC point_hierarchy indices of shape [batch].
+                                         Unused in the current implementation.
+                lod_idx (int): index into active_lods. If None, will use the maximum LOD.
+                               Currently interpolation doesn't use this.
             @Return
-              {"indensity": Output intensity tensor of shape [batch, num_samples, 3]
-               "spectra":
+              {
+                "indensity": Output intensity tensor of shape [batch, num_samples, 3]
+                "spectra":
               }
         """
         ret = defaultdict(lambda: None)
@@ -105,9 +112,9 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             latents = self.spatial_encoder(coords, lod_idx=lod_idx)
         else: latents = coords
 
-        latents = self.spatial_decoder(latents, self.codebook, ret, qtz_args)
+        latents = self.spatial_decoder(latents, self.codebook, qtz_args, ret)
 
-        self.hps_decoder(latents, wave, wave_smpl_ids, trans, nsmpl, ret,
-                         full_wave, full_wave_bound, num_spectra_coords,
-                         self.codebook, qtz_args, self.kwargs["quantize_spectra"])
+        self.hps_decoder(latents, wave, trans, nsmpl, full_wave_bound,
+                         full_wave, num_spectra_coords,
+                         self.codebook, qtz_args, self.kwargs["quantize_spectra"], ret)
         return ret

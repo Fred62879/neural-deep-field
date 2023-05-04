@@ -10,10 +10,7 @@ def spectra_supervision_loss(loss, gt_spectra, recon_spectra):
           loss: l1/l2 as specified in config
           gt/recon_spectra: [bsz, num_smpls]
     '''
-    #return loss(gt_spectra, recon_spectra)
-
     # norm spectra each so they sum to 1 (earth movers distance)
-    # print(gt_spectra.shape, recon_spectra.shape)
     gt_spectra /= (torch.sum(gt_spectra, dim=-1)[...,None])
     recon_spectra /= (torch.sum(recon_spectra, dim=-1)[...,None])
 

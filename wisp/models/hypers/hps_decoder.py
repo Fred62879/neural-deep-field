@@ -23,7 +23,6 @@ class HyperSpectralDecoder(nn.Module):
         self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
         if kwargs["quantize_spectra"]:
-            self.softmax = nn.Softmax()
             self.qtz = Quantization(False, **kwargs)
 
     def reconstruct_spectra(self, input, wave, scaler, redshift, wave_bound, ret,
@@ -38,11 +37,9 @@ class HyperSpectralDecoder(nn.Module):
         else:
             latents = self.convert(wave, input, redshift, wave_bound)
 
-        # print(latents.shape, latents)
         spectra = self.spectra_decoder(latents)[...,0]
-        # print(spectra)
 
-        if quantize_spectra: # and codebook is not None:
+        if quantize_spectra:
             _, spectra = self.qtz(input, spectra, ret, qtz_args)
             spectra = spectra[:,0] # [bsz,nsmpl]
 
@@ -73,25 +70,20 @@ class HyperSpectralDecoder(nn.Module):
         if ret["redshift"] is not None:
             ret["redshift"] = ret["redshift"][:-num_spectra_coords]
 
-    def forward(self, latents, wave, wave_smpl_ids, trans, nsmpl, ret,
-                full_wave=None, full_wave_bound=None, num_spectra_coords=-1,
-                codebook=None, qtz_args=None, quantize_spectra=False):
-
+    def forward(self, latents,
+                wave, trans, nsmpl, full_wave_bound,
+                full_wave=None, num_spectra_coords=-1,
+                codebook=None, qtz_args=None, quantize_spectra=False, ret=None):
         """ @Param
               latents:   (encoded or original) coords or logits for quantization.
                            [bsz,num_samples,coords_encode_dim or 2 or 3]
+
+            - hyperspectral
               wave:      lambda values, used to convert ra/dec to hyperspectral latents.
                            [bsz,num_samples]
-              full_wave_bound: min and max value of lambda
-              wave_smpl_ids: TO REMOVE
               trans:     corresponding transmission values of lambda. [(bsz,)nbands,num_samples]
               nsmpl:     average number of lambda samples falling within each band. [num_bands]
-              ret (output from nerf and/or quantization): {
-                "scaler":        unique scaler value for each coord. [bsz,1]
-                "redshift":      unique redshift value for each coord. [bsz,1]
-                "embed_ids":     ids of embedding each pixel's latent is quantized to.
-                "codebook_loss": loss for codebook optimization.
-              }
+              full_wave_bound: min and max value of lambda
 
             - spectra supervision
               full_wave: not None if do spectra supervision.
@@ -101,6 +93,13 @@ class HyperSpectralDecoder(nn.Module):
             - spectra qtz
               codebook
               qtz_args
+
+            ret (output from nerf and/or quantization): {
+                "scaler":        unique scaler value for each coord. [bsz,1]
+                "redshift":      unique redshift value for each coord. [bsz,1]
+                "embed_ids":     ids of embedding each pixel's latent is quantized to.
+                "codebook_loss": loss for codebook optimization.
+              }
 
             @Return (add new fields to input data)
               intensity: reconstructed pixel values

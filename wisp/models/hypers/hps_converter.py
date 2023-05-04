@@ -111,7 +111,7 @@ class HyperSpectralConverter(nn.Module):
         """ Process wave (shift, encode, if required) and
               combine with RA/DEC (original state or encoded) to hyperspectral latents.
             @Param
-              wave:     lambda values used for casting.   [bsz,num_samples,1]
+              wave:     lambda values used for casting.   [bsz,nsmpl,1]
               latents:  (original or encoded) 2D coords.  [bsz,1,2 or coords_embed_dim]
               redshift: redshift value, unique for each pixel. [bsz]
             @Return

@@ -37,6 +37,7 @@ class SpectraData:
         self.recon_codebook_spectra = "recon_codebook_spectra" in tasks
 
         self.spectra_supervision_train = "train" in tasks and self.kwargs["spectra_supervision"]
+        self.codebook_pretrain = "codebook_pretrain" in tasks and self.kwargs["pretrain_codebook"]
         self.recon_spectra = self.recon_gt_spectra or self.recon_dummy_spectra or self.recon_codebook_spectra
         self.require_spectra_coords = self.kwargs["mark_spectra"] and ("plot_redshift" in tasks or "plot_embed_map" in tasks)
 
@@ -221,7 +222,7 @@ class SpectraData:
             self.data["gt_spectra_grid_coords"]).type(
             torch.FloatTensor)[:,:,None].view(-1,1,coord_dim) # [num_coords,num_neighbours,.]
 
-        if self.spectra_supervision_train:
+        if self.spectra_supervision_train or self.codebook_pretrain:
             n = self.kwargs["num_supervision_spectra"]
             self.data["supervision_spectra"] = torch.FloatTensor(
                 np.array(self.data["supervision_spectra"]))[:n]
@@ -267,7 +268,7 @@ class SpectraData:
             trusted_range=None if not self.kwargs["trusted_range_only"] else [wave_lo, wave_hi])
 
         # iii) get data for for spectra supervision
-        if self.spectra_supervision_train:
+        if self.spectra_supervision_train or self.codebook_pretrain:
             supervision_spectra_wave_bound = [
                 source_spectra_data["spectra_supervision_wave_lo"][spectra_id],
                 source_spectra_data["spectra_supervision_wave_hi"][spectra_id]]

@@ -7,9 +7,12 @@ import pprint
 import argparse
 
 from wisp.datasets import *
+from wisp.trainers import *
+from wisp.inferrers import *
 from wisp.models.nefs import *
-from wisp.models import AstroPipeline
 from wisp.datasets.transforms import *
+from wisp.models import AstroPipeline
+from wisp.models.layers import init_codebook
 
 
 str2optim = {m.lower(): getattr(torch.optim, m) for m in dir(torch.optim) if m[0].isupper()}
@@ -47,19 +50,25 @@ def get_dataset_from_config(args):
         raise ValueError(f'"{args.dataset_type}" unrecognized dataset_type')
     return dataset
 
-def get_pipelines_from_config(args, tasks=[]):
+def get_pipelines_from_config(args, tasks={}):
     """ Utility function to get the pipelines from the parsed config.
     """
     pipelines = {}
-    tasks = set(tasks)
     if args.use_gpu:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else: device = "cpu"
 
     if args.dataset_type == 'astro':
+
+        # pipeline for codebook pretraining
+        if "codebook_pretrain" in tasks and args.pretrain_codebook:
+            assert(args.quantize_latent or args.quantize_spectra)
+            nef_pretrain = CodebookPretrainNerf(**vars(args))
+            pipelines["codebook_net"] = AstroPipeline(nef_pretrain)
+
+        # full pipline for training and/or inferrence
         nef_train = globals()[args.nef_type](**vars(args))
         pipelines["full"] = AstroPipeline(nef_train)
-        # log.info(pipelines["full"])
 
         # pipeline for spectra inferrence
         if "recon_gt_spectra" in tasks or "recon_dummy_spectra" in tasks:
@@ -77,3 +86,17 @@ def get_pipelines_from_config(args, tasks=[]):
     for _, pipeline in pipelines.items():
         pipeline.to(device)
     return device, pipelines
+
+def get_trainer_from_config(trainer_cls, pipeline, dataset, optim_cls, optim_params, device, args, args_str):
+    trainer = trainer_cls(
+        pipeline, dataset, args.num_epochs, args.batch_size,
+        optim_cls, args.lr, args.weight_decay,
+        args.grid_lr_weight, optim_params, args.log_dir, device,
+        exp_name=args.exp_name, info=args_str, extra_args=vars(args),
+        render_tb_every=args.render_tb_every, save_every=args.save_every)
+    return trainer
+
+def get_inferrer_from_config(pipelines, dataset, args, args_str):
+    inferrer = globals()[args.inferrer_type](
+        pipelines, dataset, device, vars(args), info=args_str)
+    return inferrer

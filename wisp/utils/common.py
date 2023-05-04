@@ -130,7 +130,8 @@ def forward(data,
             step_num,
             space_dim,
             trans_sample_method,
-            pixel_supervision_train=True,
+            codebook_pretrain=False,
+            pixel_supervision_train=False,
             spectra_supervision_train=False,
             redshift_supervision_train=False,
             recon_img=False, # reconstruct img, embed map, redshift heatmap, etc.
@@ -148,10 +149,12 @@ def forward(data,
             save_redshift=False,
             save_embed_ids=False):
 
-    # forward can only be done for one of the four states
+    # forward should only be called under one and only one of the following states
     train = pixel_supervision_train or spectra_supervision_train or redshift_supervision_train
-    is_valid = reduce(lambda x, y: x ^ y,
-                      [train, recon_img, recon_spectra, recon_codebook_spectra])
+    is_valid = reduce(
+        lambda x, y: x ^ y,
+        [codebook_pretrain, train, recon_img, recon_spectra, recon_codebook_spectra]
+    )
     assert(is_valid)
 
     requested_channels = []
@@ -166,6 +169,7 @@ def forward(data,
         if save_spectra: requested_channels.append("spectra")
         if save_latents: requested_channels.append("latents")
         if save_codebook: requested_channels.append("codebook")
+        if codebook_pretrain: requested_channels.append("spectra")
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if spectra_supervision_train: requested_channels.append("spectra")
         if save_redshift or redshift_supervision_train:
@@ -196,6 +200,11 @@ def forward(data,
         if recon_spectra or recon_codebook_spectra:
             net_args["wave"] = data["wave"]
 
+        if codebook_pretrain:
+            net_args["full_wave"] = data["full_wave"]
+            net_args["full_wave_bound"] = data["full_wave_bound"]
+            net_args["spectra_supervision_wave_bound_ids"] = data["spectra_supervision_wave_bound_ids"]
+
         if spectra_supervision_train:
             # num of coords for gt, dummy (incl. neighbours) spectra
             net_args["num_spectra_coords"] = data["num_spectra_coords"]
@@ -203,10 +212,6 @@ def forward(data,
 
         if quantize_latent or quantize_spectra:
             qtz_args = defaultdict(lambda: False)
-
-            # if quantize_spectra:
-            #     net_args["full_wave"] = data["full_wave"]
-            #     net_args["wave_smpl_ids"] = data["wave_smpl_ids"]
 
             if quantization_strategy == "soft":
                 qtz_args["save_soft_qtz_weights"] = save_soft_qtz_weights

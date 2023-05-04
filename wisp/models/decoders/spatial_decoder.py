@@ -12,7 +12,7 @@ class SpatialDecoder(nn.Module):
     """ Accept as input latent variables and quantize based on
           a codebook which is optimizaed simultaneously during training
     """
-    def __init__(self, qtz_calculate_loss, **kwargs):
+    def __init__(self, output_scaler, output_redshift, qtz_calculate_loss, **kwargs):
         super(SpatialDecoder, self).__init__()
 
         self.kwargs = kwargs
@@ -26,8 +26,8 @@ class SpatialDecoder(nn.Module):
         self.qtz_calculate_loss = qtz_calculate_loss
         self.quantization_strategy = kwargs["quantization_strategy"]
 
-        self.output_scaler = self.qtz and kwargs["generate_scaler"]
-        self.output_redshift = self.qtz and kwargs["generate_redshift"]
+        self.output_scaler = self.qtz and output_scaler
+        self.output_redshift = self.qtz and output_redshift
         self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
 
         self.input_dim = get_input_latents_dim(**kwargs)
@@ -86,7 +86,7 @@ class SpatialDecoder(nn.Module):
             num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["spatial_decod_hidden_dim"], skip=[])
 
-    def forward(self, z, codebook, ret, qtz_args):
+    def forward(self, z, codebook, qtz_args, ret):
         """ Decode latent variables
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
@@ -97,9 +97,7 @@ class SpatialDecoder(nn.Module):
 
         if self.output_redshift:
             redshift = self.redshift_decoder(z[:,0])[...,0]
-            # print(redshift, redshift.shape)
             redshift = self.redshift_adjust(redshift + 0.5)
-            # print(redshift)
         else: redshift = None
 
         if self.quantize_spectra:
