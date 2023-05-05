@@ -35,7 +35,6 @@ class AstroDataset(Dataset):
 
         self.space_dim = kwargs["space_dim"]
         self.nsmpls = kwargs["num_trans_samples"]
-        self.get_spectra_coords = True
 
         if self.space_dim == 3:
             self.unbatched_fields = {
@@ -94,9 +93,6 @@ class AstroDataset(Dataset):
     def set_hardcode_data(self, field, data):
         self.data[field] = data
 
-    def toggle_spectra_coords(self, get):
-        self.get_spectra_coords = get
-
     ############
     # Getters
     ############
@@ -132,10 +128,10 @@ class AstroDataset(Dataset):
         if field == "coords":
             if self.coords_source == "fits":
                 data = self.fits_dataset.get_coords(idx)
-            elif self.coords_source == "spectra":
-                data = self.spectra_dataset.get_spectra_grid_coords()
-            else:
-                data = self.data[self.coords_source][idx]
+            #elif self.coords_source == "spectra":
+            #    data = self.spectra_dataset.get_spectra_grid_coords()
+            #else:
+            #    data = self.data[self.coords_source][idx]
         elif field == "pixels":
             data = self.fits_dataset.get_pixels(idx)
         elif field == "weights":
@@ -181,18 +177,21 @@ class AstroDataset(Dataset):
         # get only supervision spectra (not all gt spectra) for loss calculation
         out["gt_spectra"] = self.spectra_dataset.get_supervision_spectra()
 
-        if self.get_spectra_coords:
-            # get all coords to plot all spectra (gt, dummy, incl. neighbours)
-            # the first #num_supervision_spectra are gt coords for supervision
-            # the others are forwarded only for spectrum plotting
-            spectra_coords = self.spectra_dataset.get_spectra_grid_coords()
-            if "coords" in out:
-                out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
-            else:
-                out["coords"] = spectra_coords
+        # get all coords to plot all spectra (gt, dummy, incl. neighbours)
+        # the first #num_supervision_spectra are gt coords for supervision
+        # the others are forwarded only for spectrum plotting
+        spectra_coords = self.spectra_dataset.get_spectra_grid_coords()
 
-            out["num_spectra_coords"] = len(spectra_coords)
+        if self.mode == "codebook_pretrain":
+            spectra_coords = spectra_coords[:self.kwargs["num_supervision_spectra"]]
+            out["spectra_latents"] = self.data["spectra_latents"]
 
+        if "coords" in out:
+            out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
+        else:
+            out["coords"] = spectra_coords
+
+        out["num_spectra_coords"] = len(spectra_coords)
         out["full_wave"] = self.trans_dataset.get_full_wave()
         out["full_wave_bound"] = self.trans_dataset.get_full_wave_bound()
         out["spectra_supervision_wave_bound_ids"] = self.spectra_dataset.get_spectra_supervision_wave_bound_ids()

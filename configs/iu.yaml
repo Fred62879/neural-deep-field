@@ -158,7 +158,7 @@ trainer:
     save_as_new: True
     train_pixel_ratio: .1 # change dataloader sampler
     #masked_pixl_ratio_per_epoch: 1
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift']
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift','spectra_latents']
 
     pretrain_codebook: True
     pixel_supervision: True

@@ -76,16 +76,13 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_mode("codebook_pretrain")
 
         # set required fields from dataset
-        fields = ["coords","spectra_supervision_data"]
+        fields = ["spectra_supervision_data"]
         if self.redshift_supervision:
             fields.append("redshift")
         self.dataset.set_dataset_fields(fields)
 
         # set input latents for codebook net
-        self.dataset.set_dataset_coords_source("spectra_latents")
         self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
-
-        self.dataset.toggle_spectra_coords(False)
 
         self.dataset.set_dataset_length(
             self.extra_args["num_supervision_spectra"])
@@ -175,13 +172,19 @@ class CodebookTrainer(BaseTrainer):
 
     def init_optimizer(self):
         params, net_params, latents = [], [], []
-        params_dict = { name : param for name, param in self.pipeline.named_parameters()}
 
-        for param in self.latents.parameters():
-            latents.append(param)
+        # self.params_dict = { "latents": self.latents.parameters() }
+        self.params_dict = { name: param for name, param in self.latents.named_parameters() }
+        for name, param in self.pipeline.named_parameters():
+            self.params_dict[name] = param
 
-        for name in params_dict:
-            net_params.append(params_dict[name])
+        # for param in self.latents.parameters(): latents.append(param)
+
+        for name in self.params_dict:
+            if "latents" in name:
+                latents.append(self.params_dict[name])
+            else:
+                net_params.append(self.params_dict[name])
 
         params.append({"params": latents,
                        "lr": self.extra_args["hps_lr"]})
@@ -351,6 +354,8 @@ class CodebookTrainer(BaseTrainer):
 
         total_loss, ret = self.calculate_loss(data)
         total_loss.backward()
+        if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
+            plot_grad_flow(self.params_dict, self.grad_fname)
         self.optimizer.step()
 
         self.timer.check("backward and step")
@@ -435,6 +440,7 @@ class CodebookTrainer(BaseTrainer):
         # todo: efficiently slice spectra with different bound
         (lo, hi) = data["spectra_supervision_wave_bound_ids"][0]
         recon_spectra = ret["spectra"][:,lo:hi]
+        # print(recon_spectra.shape)
 
         if len(recon_spectra) == 0:
             spectra_loss = 0

@@ -83,7 +83,6 @@ class AstroTrainer(BaseTrainer):
                 pass
 
         if self.spectra_supervision:
-            self.dataset.toggle_spectra_coords(True)
             fields.append("spectra_supervision_data")
 
         if self.redshift_supervision:

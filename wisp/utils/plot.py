@@ -15,7 +15,7 @@ from wisp.utils.numerical import calculate_sam_spectrum
 def plot_grad_flow(named_parameters, gradFileName=None):
     layers, ave_grads = [], []
     for n, p in named_parameters:
-        # print(n)
+        print(n)
         if "grid" not in n and (p.requires_grad) and ("bias" not in n):
             # print('*', n)
             layers.append(n[-22:-7])

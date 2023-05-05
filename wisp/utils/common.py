@@ -24,6 +24,10 @@ def get_input_latents_dim(**kwargs):
             latents_dim *= kwargs["grid_num_lods"]
     else:
         latents_dim = 2
+
+    # if kwargs["pretrain_codebook"] and "codebook_pretrain" in kwargs["tasks"]:
+    #     latents_dim += 3
+
     return latents_dim
 
 def add_to_device(data, valid_fields, device):
@@ -201,6 +205,7 @@ def forward(data,
             net_args["wave"] = data["wave"]
 
         if codebook_pretrain:
+            net_args["spectra_latents"] = data["spectra_latents"]
             net_args["full_wave"] = data["full_wave"]
             net_args["full_wave_bound"] = data["full_wave_bound"]
             net_args["spectra_supervision_wave_bound_ids"] = data["spectra_supervision_wave_bound_ids"]
