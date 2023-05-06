@@ -91,11 +91,10 @@ class CodebookTrainer(BaseTrainer):
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
 
+        self.save_qtz_weights = "save_soft_qtz_weights_during_train" in tasks
         self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
-        self.save_redshift =  self.extra_args["generate_redshift"] and \
-            "save_redshift_during_train" in tasks
-        self.redshift_supervision = self.extra_args["generate_redshift"] and \
-            self.extra_args["redshift_supervision"]
+        self.save_redshift =  "save_redshift_during_train" in tasks and self.extra_args["generate_redshift"]
+        self.redshift_supervision = self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"]
 
         if self.plot_spectra:
             self.selected_spectra_ids = self.dataset.get_spectra_coord_ids()
@@ -275,6 +274,7 @@ class CodebookTrainer(BaseTrainer):
 
             if self.save_redshift: self.redshifts = []
             if self.plot_spectra: self.smpl_spectra = []
+            if self.save_qtz_weights: self.qtz_weights = []
 
             # re-init dataloader to make sure pixels are in order
             self.shuffle_dataloader = False
@@ -358,9 +358,9 @@ class CodebookTrainer(BaseTrainer):
         self.timer.check("backward and step")
 
         if self.save_data_to_local:
-            recon_spectra, redshift = self.get_data_to_save(ret)
-            if self.save_redshift: self.redshifts.extend(redshift)
-            if self.plot_spectra: self.smpl_spectra.append(recon_spectra)
+            if self.save_redshift: self.redshifts.extend(ret["redshift"])
+            if self.plot_spectra: self.smpl_spectra.append(ret["spectra"])
+            if self.save_qtz_weights: self.qtz_weights.extend(ret["soft_qtz_weights"])
 
     def post_step(self):
         pass
@@ -421,9 +421,9 @@ class CodebookTrainer(BaseTrainer):
                       redshift_supervision_train=self.redshift_supervision,
                       quantize_spectra=True,
                       quantization_strategy="soft",
-                      save_soft_qtz_weights=True,
-                      save_spectra=self.save_data_to_local and self.plot_spectra,
-                      save_redshift=self.save_data_to_local and self.save_redshift)
+                      save_spectra=self.plot_spectra,
+                      save_redshift=self.save_redshift,
+                      save_soft_qtz_weights=self.save_qtz_weights)
 
         # i) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
@@ -487,22 +487,31 @@ class CodebookTrainer(BaseTrainer):
         torch.save(checkpoint, model_fname)
         return checkpoint
 
-    def get_data_to_save(self, ret):
-        redshift = None if not self.save_redshift else ret["redshift"]
-        recon_spectra = None if not self.plot_spectra else ret["spectra"]
-        return recon_spectra, redshift
+    # def get_data_to_save(self, ret):
+    #     redshift = None if not self.save_redshift else ret["redshift"]
+    #     recon_spectra = None if not self.plot_spectra else ret["spectra"]
+    #     return recon_spectra, redshift
 
     def save_local(self):
+        if self.plot_spectra:
+            self.plot_spectrum()
+
         if self.save_redshift:
             self.log_redshift()
 
-        if self.plot_spectra:
-            self.plot_spectrum()
+        if self.save_qtz_weights:
+            self.log_qtz_weights()
 
     def log_redshift(self):
         redshifts = torch.stack(self.redshifts).detach().cpu().numpy()
         np.set_printoptions(precision=3)
         log.info(f"Est. redshift {redshifts}")
+
+    def log_qtz_weights(self):
+        weights = torch.stack(self.qtz_weights).detach().cpu().numpy()
+        np.set_printoptions(suppress=True)
+        np.set_printoptions(precision=3)
+        log.info(f"Qtz weights {weights[:,0]}")
 
     def plot_spectrum(self):
         self.smpl_spectra = torch.stack(self.smpl_spectra).view(
