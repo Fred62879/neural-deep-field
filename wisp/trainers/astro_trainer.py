@@ -125,7 +125,7 @@ class AstroTrainer(BaseTrainer):
         self.save_redshift =  self.quantize and self.extra_args["generate_redshift"] \
             and "save_redshift_during_train" in tasks
 
-        self.plot_spectra = self.space_dim == 3 and "plot_spectra_during_train" in tasks
+        self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
         self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
         self.redshift_supervision = self.space_dim == 3 and self.quantize and self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"]
 

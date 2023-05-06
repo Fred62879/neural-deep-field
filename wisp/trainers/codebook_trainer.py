@@ -47,7 +47,7 @@ class CodebookTrainer(BaseTrainer):
         self.cuda = "cuda" in str(self.device)
         self.verbose = self.extra_args["verbose"]
         self.space_dim = self.extra_args["space_dim"]
-        self.gpu_fields = self.extra_args["gpu_data"]
+        self.gpu_fields = ["spectra_latents","gt_spectra","full_wave"]
 
         self.total_steps = 0
         self.save_data_to_local = False
@@ -91,9 +91,11 @@ class CodebookTrainer(BaseTrainer):
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
 
-        self.plot_spectra = self.space_dim == 3 and "plot_spectra_during_train" in tasks
-        self.save_redshift =  self.extra_args["generate_redshift"] and "save_redshift_during_train" in tasks
-        self.redshift_supervision = self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"]
+        self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
+        self.save_redshift =  self.extra_args["generate_redshift"] and \
+            "save_redshift_during_train" in tasks
+        self.redshift_supervision = self.extra_args["generate_redshift"] and \
+            self.extra_args["redshift_supervision"]
 
         if self.plot_spectra:
             self.selected_spectra_ids = self.dataset.get_spectra_coord_ids()
@@ -171,17 +173,15 @@ class CodebookTrainer(BaseTrainer):
         )
 
     def init_optimizer(self):
-        params, net_params, latents = [], [], []
-
-        # self.params_dict = { "latents": self.latents.parameters() }
-        self.params_dict = { name: param for name, param in self.latents.named_parameters() }
+        # collect all parameters from network and trainable latents
+        self.params_dict = {
+            "spectra_latents": param for _, param in self.latents.named_parameters() }
         for name, param in self.pipeline.named_parameters():
             self.params_dict[name] = param
 
-        # for param in self.latents.parameters(): latents.append(param)
-
+        params, net_params, latents = [], [], []
         for name in self.params_dict:
-            if "latents" in name:
+            if "spectra_latents" in name:
                 latents.append(self.params_dict[name])
             else:
                 net_params.append(self.params_dict[name])
@@ -270,17 +270,14 @@ class CodebookTrainer(BaseTrainer):
         if self.extra_args["only_last"]:
             self.loss_lods = self.loss_lods[-1:]
 
-        if self.extra_args["resample"] and self.epoch % self.extra_args["resample_every"] == 0:
-            self.resample_dataset()
-
-        if self.extra_args["save_local_every"] > -1 and self.epoch % self.extra_args["save_local_every"] == 0:
+        if self.save_local_every > -1 and self.epoch % self.save_local_every == 0:
             self.save_data_to_local = True
             if self.save_redshift: self.redshifts = []
             if self.plot_spectra: self.smpl_spectra = []
 
             # re-init dataloader to make sure pixels are in order
             self.shuffle_dataloader = False
-            self.dataset.set_wave_sample_mode(use_full_wave=False)
+            # self.dataset.set_wave_sample_mode(use_full_wave=False)
             self.use_all_pixels = True
             self.set_num_batches()
             self.init_dataloader()
@@ -298,18 +295,17 @@ class CodebookTrainer(BaseTrainer):
         total_loss = self.log_dict["total_loss"] / len(self.train_data_loader)
         self.scene_state.optimization.losses["total_loss"].append(total_loss)
 
-        if self.extra_args["log_tb_every"] > -1 and self.epoch % self.extra_args["log_tb_every"] == 0:
-            self.log_tb()
-
-        if self.extra_args["log_cli_every"] > -1 and self.epoch % self.extra_args["log_cli_every"] == 0:
-            self.log_cli()
-
-        # render visualizations to tensorboard
-        if self.render_tb_every > -1 and self.epoch % self.render_tb_every == 0:
-            self.render_tb()
-
         if self.save_every > -1 and self.epoch % self.save_every == 0:
             self.save_model()
+
+        if self.log_tb_every > -1 and self.epoch % self.log_tb_every == 0:
+            self.log_tb()
+
+        if self.log_cli_every > -1 and self.epoch % self.log_cli_every == 0:
+            self.log_cli()
+
+        if self.render_tb_every > -1 and self.epoch % self.render_tb_every == 0:
+            self.render_tb()
 
         # save data locally and restore trainer state
         if self.save_data_to_local:
@@ -354,8 +350,8 @@ class CodebookTrainer(BaseTrainer):
 
         total_loss, ret = self.calculate_loss(data)
         total_loss.backward()
-        if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
-            plot_grad_flow(self.params_dict, self.grad_fname)
+        if self.epoch == 0 or (self.plot_grad_every != -1 and self.plot_grad_every % self.epoch == 0):
+            plot_grad_flow(self.params_dict.items(), self.grad_fname)
         self.optimizer.step()
 
         self.timer.check("backward and step")
@@ -411,14 +407,9 @@ class CodebookTrainer(BaseTrainer):
                 log.info(e)
                 log.info("start training from begining")
 
-    def add_to_device(self, data):
-        for field in self.gpu_fields:
-            if field in data:
-                data[field] = data[field].to(self.device)
-
     def calculate_loss(self, data):
         total_loss = 0
-        add_to_device(data, self.extra_args["gpu_data"], self.device)
+        add_to_device(data, self.gpu_fields, self.device)
 
         ret = forward(data,
                       self.pipeline,
@@ -440,7 +431,6 @@ class CodebookTrainer(BaseTrainer):
         # todo: efficiently slice spectra with different bound
         (lo, hi) = data["spectra_supervision_wave_bound_ids"][0]
         recon_spectra = ret["spectra"][:,lo:hi]
-        # print(recon_spectra.shape)
 
         if len(recon_spectra) == 0:
             spectra_loss = 0
@@ -502,36 +492,16 @@ class CodebookTrainer(BaseTrainer):
         return recon_spectra, redshift
 
     def save_local(self):
-        if self.save_latents:
-            fname = join(self.latent_dir, str(self.epoch))
-            self.latents = torch.stack(self.latents).detach().cpu().numpy()
-            np.save(fname, self.latents)
-
         if self.plot_spectra:
             self.plot_spectrum()
 
     def plot_spectrum(self):
-        self.smpl_spectra = torch.stack(self.smpl_spectra)
+        self.smpl_spectra = torch.stack(self.smpl_spectra).view(
+            self.extra_args["num_supervision_spectra"], -1
+        ).detach().cpu().numpy() # [num_supervision_spectra,num_samples]
 
-        if not self.spectra_supervision:
-            # smpl_spectra [bsz,num_samples]
-            # all spectra are collected (no duplications) and we need
-            #   only selected ones (incl. neighbours)
-            self.smpl_spectra = self.smpl_spectra.view(
-                -1, self.smpl_spectra.shape[-1])
-            self.smpl_spectra = self.smpl_spectra[self.selected_spectra_ids]
-            clip_spectra = False
-        else:
-            # smpl_spectra [bsz,num_spectra_coords,num_sampeles]
-            # we get all spectra at each batch (duplications), thus average over batches
-            self.smpl_spectra = torch.mean(self.smpl_spectra, dim=0)
-            clip_spectra = True
-
-        self.smpl_spectra = self.smpl_spectra.detach().cpu().numpy().reshape((
-            self.dataset.get_num_gt_spectra(),
-            self.extra_args["spectra_neighbour_size"]**2, -1))
-
-        self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra, clip=clip_spectra)
+        self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra,
+                                   self.extra_args["spectra_norm_cho"], clip=True)
 
     def validate(self):
         pass

@@ -158,8 +158,12 @@ class BaseTrainer(ABC):
         # Default TensorBoard Logging
         self.writer = SummaryWriter(self.log_dir, purge_step=0)
         self.writer.add_text('Info', self.info)
-        self.render_tb_every = render_tb_every
         self.save_every = save_every
+        self.render_tb_every = render_tb_every
+        self.log_tb_every = extra_args["log_tb_every"]
+        self.log_cli_every = extra_args["log_cli_every"]
+        self.plot_grad_every = extra_args["plot_grad_every"]
+        self.save_local_every = extra_args["save_local_every"]
         self.using_wandb = using_wandb
         self.timer.check('set_logger')
 

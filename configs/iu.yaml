@@ -8,21 +8,10 @@ global:
     use_gpu: True
 
 
-    #tasks: ['train','save_recon_during_train','infer','recon_img'] #,'plot_save_scaler']
-    #tasks: ['infer','recon_img','plot_save_scaler']
-    #tasks: ['infer','plot_save_scaler']
-
-    #tasks: ['train','plot_spectra_during_train','infer','recon_gt_spectra']
-    #tasks: ['infer','recon_gt_spectra']
-
-    #tasks: ['train','save_recon_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra']
-    #tasks: ['infer','recon_gt_spectra','recon_img']
-
-    #tasks: ['train','plot_save_scaler','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','infer','recon_img','plot_embed_map','plot_latent_embed']
-    #tasks: ['infer','recon_img','plot_embed_map','plot_save_scaler']
-
     #tasks: ['train','save_latent_during_train','save_recon_during_train','plot_embed_map_during_train','plot_spectra_during_train','infer','recon_img','recon_gt_spectra','plot_embed_map','plot_laten_embed','recon_codebook_spectra','plot_redshift','plot_save_scaler']
-    tasks: ['codebook_pretrain','train','save_codebook','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed'] #,'recon_dummy_spectra']
+    #tasks: ['train','save_codebook','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed'] #,'recon_dummy_spectra']
+
+    tasks: ['codebook_pretrain','recon_gt_spectra_during_train']
 
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
@@ -154,7 +143,7 @@ trainer:
     log_cli_every: 200
     log_gpu_every: -1
     plot_grad_every: 50
-    save_local_every: -1
+    save_local_every: 200
     save_as_new: True
     train_pixel_ratio: .1 # change dataloader sampler
     #masked_pixl_ratio_per_epoch: 1

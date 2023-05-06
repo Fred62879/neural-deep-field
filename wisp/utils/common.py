@@ -188,27 +188,20 @@ def forward(data,
         # transmission wave min and max value (used for linear normalization)
         net_args["full_wave_bound"] = data["full_wave_bound"]
 
-        if pixel_supervision_train or recon_img:
-            if trans_sample_method == "hardcode":
-                net_args["wave"] = data["wave"]
-                net_args["trans"] = data["trans"]
-                net_args["nsmpl"] = data["nsmpl"]
-            elif trans_sample_method == "bandwise":
-                pass
-            elif trans_sample_method == "mixture":
-                net_args["wave"] = data["wave"]
-                net_args["trans"] = data["trans"]
-                net_args["nsmpl"] = data["nsmpl"]
-            else: raise ValueError("Unrecognized transmission sampling method.")
-
-        if recon_spectra or recon_codebook_spectra:
-            net_args["wave"] = data["wave"]
-
         if codebook_pretrain:
             net_args["spectra_latents"] = data["spectra_latents"]
             net_args["full_wave"] = data["full_wave"]
             net_args["full_wave_bound"] = data["full_wave_bound"]
             net_args["spectra_supervision_wave_bound_ids"] = data["spectra_supervision_wave_bound_ids"]
+
+        if pixel_supervision_train or recon_img:
+            # if trans_sample_method == "bandwise": assert 0
+            net_args["wave"] = data["wave"]
+            net_args["trans"] = data["trans"]
+            net_args["nsmpl"] = data["nsmpl"]
+
+        if recon_spectra or recon_codebook_spectra:
+            net_args["wave"] = data["wave"]
 
         if spectra_supervision_train:
             # num of coords for gt, dummy (incl. neighbours) spectra

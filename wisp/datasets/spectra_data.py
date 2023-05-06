@@ -32,16 +32,23 @@ class SpectraData:
     def require_any_data(self, tasks):
         tasks = set(tasks)
 
-        self.recon_gt_spectra = "recon_gt_spectra" in tasks
-        self.recon_dummy_spectra = "recon_dummy_spectra" in tasks
-        self.recon_codebook_spectra = "recon_codebook_spectra" in tasks
+        self.recon_gt_spectra = "recon_gt_spectra" in tasks or \
+            "recon_gt_spectra_during_train" in tasks
+        self.recon_dummy_spectra = "recon_dummy_spectra" in tasks or \
+            "recon_dummy_spectra_during_train" in tasks
+        self.recon_codebook_spectra = "recon_codebook_spectra" in tasks or \
+            "recon_codebook_spectra_during_train" in tasks
 
-        self.spectra_supervision_train = "train" in tasks and self.kwargs["spectra_supervision"]
-        self.codebook_pretrain = "codebook_pretrain" in tasks and self.kwargs["pretrain_codebook"]
-        self.recon_spectra = self.recon_gt_spectra or self.recon_dummy_spectra or self.recon_codebook_spectra
-        self.require_spectra_coords = self.kwargs["mark_spectra"] and ("plot_redshift" in tasks or "plot_embed_map" in tasks)
+        self.codebook_pretrain = self.kwargs["pretrain_codebook"] and \
+            "codebook_pretrain" in tasks
+        self.require_spectra_coords = self.kwargs["mark_spectra"] and \
+            ("plot_redshift" in tasks or "plot_embed_map" in tasks)
+        self.recon_spectra = self.recon_gt_spectra or self.recon_dummy_spectra or \
+            self.recon_codebook_spectra
+        self.spectra_supervision_train = self.kwargs["spectra_supervision"] and "train" in tasks
 
         return self.kwargs["space_dim"] == 3 and (
+            self.codebook_pretrain or \
             self.spectra_supervision_train or \
             self.recon_spectra or self.require_spectra_coords)
 
@@ -59,8 +66,10 @@ class SpectraData:
         """
         self.data = defaultdict(lambda: [])
 
-        if self.require_spectra_coords or self.spectra_supervision_train or \
-           self.recon_gt_spectra:
+        if self.recon_gt_spectra or \
+           self.codebook_pretrain or \
+           self.require_spectra_coords or \
+           self.spectra_supervision_train:
             self.load_gt_spectra_data()
 
         if self.recon_dummy_spectra:
@@ -256,7 +265,7 @@ class SpectraData:
         self.data["gt_spectra_img_coords"].append(img_coords)   # [num_neighbours,2/3]
         self.data["gt_spectra_grid_coords"].append(grid_coords) # [num_neighbours,2/3] [0~1]
 
-        if not self.spectra_supervision_train and not self.recon_spectra: return
+        if not self.codebook_pretrain and not self.spectra_supervision_train and not self.recon_spectra: return
 
         # ii) load actual spectra data
         fname = join(self.spectra_path, fits_uid,
