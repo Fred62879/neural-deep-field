@@ -272,6 +272,7 @@ class CodebookTrainer(BaseTrainer):
 
         if self.save_local_every > -1 and self.epoch % self.save_local_every == 0:
             self.save_data_to_local = True
+
             if self.save_redshift: self.redshifts = []
             if self.plot_spectra: self.smpl_spectra = []
 
@@ -492,8 +493,16 @@ class CodebookTrainer(BaseTrainer):
         return recon_spectra, redshift
 
     def save_local(self):
+        if self.save_redshift:
+            self.log_redshift()
+
         if self.plot_spectra:
             self.plot_spectrum()
+
+    def log_redshift(self):
+        redshifts = torch.stack(self.redshifts).detach().cpu().numpy()
+        np.set_printoptions(precision=3)
+        log.info(f"Est. redshift {redshifts}")
 
     def plot_spectrum(self):
         self.smpl_spectra = torch.stack(self.smpl_spectra).view(

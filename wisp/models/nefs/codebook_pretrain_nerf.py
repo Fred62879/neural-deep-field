@@ -45,12 +45,13 @@ class CodebookPretrainNerf(BaseNeuralField):
               spectra_latents: [num_supervision_spectra,latent_dim]
         """
         ret = defaultdict(lambda: None)
+        bsz = coords.shape[0]
 
         # coords = torch.cat((coords, spectra_latents[:,None]), dim=-1)
         coords = spectra_latents[:,None]
 
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret)
-        self.hps_decoder(latents, full_wave[None,:,None], None, None, full_wave_bound,
-                         codebook=self.codebook, qtz_args=qtz_args,
+        self.hps_decoder(latents, full_wave[None,:,None].tile(bsz,1,1), None, None,
+                         full_wave_bound, codebook=self.codebook, qtz_args=qtz_args,
                          quantize_spectra=True, ret=ret)
         return ret

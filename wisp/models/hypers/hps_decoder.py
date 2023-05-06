@@ -80,7 +80,7 @@ class HyperSpectralDecoder(nn.Module):
 
             - hyperspectral
               wave:      lambda values, used to convert ra/dec to hyperspectral latents.
-                           [bsz,num_samples]
+                           [bsz,num_samples,1]
               trans:     corresponding transmission values of lambda. [(bsz,)nbands,num_samples]
               nsmpl:     average number of lambda samples falling within each band. [num_bands]
               full_wave_bound: min and max value of lambda
