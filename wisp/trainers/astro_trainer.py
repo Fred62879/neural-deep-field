@@ -25,15 +25,8 @@ from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_
 class AstroTrainer(BaseTrainer):
     """ Trainer class for astro dataset.
     """
-    def __init__(self, pipeline, dataset, num_epochs, batch_size,
-                 optim_cls, lr, weight_decay, grid_lr_weight, optim_params, log_dir, device,
-                 exp_name=None, info=None, scene_state=None, extra_args=None,
-                 render_tb_every=-1, save_every=-1, using_wandb=False):
-
-        super().__init__(pipeline, dataset, num_epochs, batch_size, optim_cls,
-                         lr, weight_decay, grid_lr_weight, optim_params, log_dir,
-                         device, exp_name, info, scene_state, extra_args,
-                         render_tb_every, save_every, using_wandb)
+    def __init__(self, pipeline, dataset, optim_cls, optim_params, device, **extra_args):
+        super().__init__(pipeline, dataset, optim_cls, optim_params, device, **extra_args)
 
         # save config file to log directory
         dst = join(self.log_dir, "config.yaml")
@@ -55,6 +48,7 @@ class AstroTrainer(BaseTrainer):
         self.set_log_path()
         self.summarize_training_tasks()
 
+        self.init_net()
         self.init_loss()
         self.init_optimizer()
 
@@ -67,6 +61,11 @@ class AstroTrainer(BaseTrainer):
     #############
     # Initializations
     #############
+
+    def init_net(self):
+        log.info("Total number of parameters: {}".format(
+            sum(p.numel() for p in self.pipeline.parameters()))
+        )
 
     def configure_dataset(self):
         """ Configure dataset with selected fields and set length accordingly.

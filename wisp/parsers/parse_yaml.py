@@ -102,9 +102,11 @@ def define_cmd_line_args():
     global_group.add_argument("--print-shape", action="store_true")
     global_group.add_argument("--activate_timer", action="store_true")
     global_group.add_argument("--dataloader-drop-last", action="store_true")
-    global_group.add_argument("--exp-name", type=str, help="Experiment name.")
-    global_group.add_argument("--perf", action="store_true", help="Use high-level profiling for the trainer.")
+    global_group.add_argument("--perf", action="store_true",
+                              help="Use high-level profiling for the trainer.")
 
+    global_group.add_argument("--exp-name", type=str, default="unnamed_experiment",
+                              help="Experiment name.")
     global_group.add_argument("--tasks", nargs="+", type=str,
                               choices=["train","plot_embed_map_during_train",
                                        "save_latent_during_train","save_recon_during_train",
@@ -415,6 +417,7 @@ def define_cmd_line_args():
                              help="Save data to local every N epoch.")
     train_group.add_argument("--plot-grad-every", type=int, default=20,
                              help="Plot gradient at every N epoch.")
+    train_group.add_argument("--using-wandb", action="store_true")
     train_group.add_argument("--gpu-data", nargs="+", type=str,
                              help="data fields that can be added to gpu.")
 

@@ -124,6 +124,12 @@ class AstroDataset(Dataset):
     def get_num_spectra_coords(self):
         return self.spectra_dataset.get_num_spectra_coords()
 
+    def get_full_wave(self):
+        return self.trans_dataset.get_full_wave()
+
+    def get_full_wave_bound(self):
+        return self.trans_dataset.get_full_wave_bound()
+
     def get_batched_data(self, field, idx):
         if field == "coords":
             if self.coords_source == "fits":
@@ -149,7 +155,7 @@ class AstroDataset(Dataset):
             These are not batched, we do sampling at every step.
         """
         # trans wave min and max value (used for linear normalization)
-        out["full_wave_bound"] = self.trans_dataset.get_full_wave_bound()
+        out["full_wave_bound"] = self.get_full_wave_bound()
 
         if self.model_output == "pixel_intensity":
             if self.kwargs["trans_sample_method"] == "hardcode":
@@ -168,7 +174,7 @@ class AstroDataset(Dataset):
                 out["nsmpl"] = torch.cat((out["nsmpl"], torch.tensor([nsmpl])), dim=0)
 
         elif self.model_output == "spectra":
-            out["wave"] = torch.FloatTensor(self.trans_dataset.get_full_wave())
+            out["wave"] = torch.FloatTensor(self.get_full_wave())
             out["wave"] = out["wave"][None,:,None].tile(batch_size,1,1)
 
     def get_spectra_data(self, out):
@@ -192,8 +198,8 @@ class AstroDataset(Dataset):
             out["coords"] = spectra_coords
 
         out["num_spectra_coords"] = len(spectra_coords)
-        out["full_wave"] = self.trans_dataset.get_full_wave()
-        out["full_wave_bound"] = self.trans_dataset.get_full_wave_bound()
+        out["full_wave"] = self.get_full_wave()
+        out["full_wave_bound"] = self.get_full_wave_bound()
         out["spectra_supervision_wave_bound_ids"] = self.spectra_dataset.get_spectra_supervision_wave_bound_ids()
 
     def __len__(self):

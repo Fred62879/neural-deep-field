@@ -18,13 +18,16 @@ if __name__ == "__main__":
     if "codebook_pretrain" in tasks and args.pretrain_codebook:
         optim_cls, optim_params = get_optimizer_from_config(args)
         trainer = get_trainer_from_config(
-            CodebookTrainer, pipelines["codebook_net"], dataset, optim_cls, optim_params, device, args, args_str)
+            CodebookTrainer,
+            [ pipelines["codebook_net"], pipelines["codebook"] ],
+            dataset, optim_cls, optim_params, device, args
+        )
         trainer.train()
 
     if "train" in tasks:
         optim_cls, optim_params = get_optimizer_from_config(args)
         trainer = get_trainer_from_config(
-            AstroTrainer, pipelines["full"], dataset, optim_cls, optim_params, device, args, args_str)
+            AstroTrainer, pipelines["full"], dataset, optim_cls, optim_params, device, args)
         trainer.train()
 
     if "infer" in tasks:

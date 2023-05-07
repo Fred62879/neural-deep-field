@@ -60,11 +60,13 @@ def get_pipelines_from_config(args, tasks={}):
 
     if args.dataset_type == 'astro':
 
-        # pipeline for codebook pretraining
+        # pipeline for codebook pretraining and inferrence
         if "codebook_pretrain" in tasks and args.pretrain_codebook:
             assert(args.quantize_latent or args.quantize_spectra)
             nef_pretrain = CodebookPretrainNerf(**vars(args))
+            codebook_nef = CodebookNef(integrate=False, **vars(args))
             pipelines["codebook_net"] = AstroPipeline(nef_pretrain)
+            pipelines["codebook"] = AstroPipeline(codebook_nef)
 
         # full pipline for training and/or inferrence
         nef_train = globals()[args.nef_type](**vars(args))
@@ -77,7 +79,7 @@ def get_pipelines_from_config(args, tasks={}):
             pipelines["spectra_infer"] = AstroPipeline(nef_infer_spectra)
 
         # pipeline for codebook spectra inferrence
-        if "recon_codebook_spectra" in tasks:
+        if "recon_codebook_spectra" in tasks and "codebook" not in pipelines:
             codebook_nef = CodebookNef(integrate=False, **vars(args))
             pipelines["codebook"] = AstroPipeline(codebook_nef)
     else:
@@ -87,13 +89,10 @@ def get_pipelines_from_config(args, tasks={}):
         pipeline.to(device)
     return device, pipelines
 
-def get_trainer_from_config(trainer_cls, pipeline, dataset, optim_cls, optim_params, device, args, args_str):
+def get_trainer_from_config(trainer_cls, pipeline, dataset, optim_cls, optim_params, device, args):
     trainer = trainer_cls(
-        pipeline, dataset, args.num_epochs, args.batch_size,
-        optim_cls, args.lr, args.weight_decay,
-        args.grid_lr_weight, optim_params, args.log_dir, device,
-        exp_name=args.exp_name, info=args_str, extra_args=vars(args),
-        render_tb_every=args.render_tb_every, save_every=args.save_every)
+        pipeline, dataset, optim_cls, optim_params, device, **vars(args)
+    )
     return trainer
 
 def get_inferrer_from_config(pipelines, dataset, args, args_str):

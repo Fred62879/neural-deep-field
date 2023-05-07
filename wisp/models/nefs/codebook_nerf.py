@@ -7,7 +7,8 @@ from wisp.models.hypers import HyperSpectralDecoder
 
 
 class CodebookNef(BaseNeuralField):
-    """ Model for returning hardcoded value.
+    """ Model for codebook inferrence. Generate spectra only
+          w.o. redshift, scaler, or integration.
     """
     def __init__(self, integrate, **kwargs):
         super(CodebookNef, self).__init__()
@@ -27,11 +28,13 @@ class CodebookNef(BaseNeuralField):
     def get_codebook_spectra(self, coords, wave, full_wave_bound=None):
         """ Output given latents without any modifications.
             @Params:
-              coords (torch.FloatTensor): tensor of shape [1, batch, num_samples, 2/3]
+              coords: [(1,)bsz,num_samples,latents_dim]
+              wave:   full wave [bsz,num_samples,1]
             @Return
-              {"indensity": torch.FloatTensor }:
-                - Output intensity tensor of shape [batch, num_samples, 3]
+              ret: {
+                "intensity": [bsz,num_samples,3]
+              }
         """
         ret = defaultdict(lambda: None)
-        self.hps_decoder(coords, wave, None, None, None, ret, full_wave_bound=full_wave_bound)
+        self.hps_decoder(coords, wave, None, None, full_wave_bound, ret=ret)
         return ret

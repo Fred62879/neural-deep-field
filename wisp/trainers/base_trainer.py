@@ -1,106 +1,69 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.  #
-# NVIDIA CORPORATION & AFFILIATES and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
 import os
 import time
-import logging as log
-from datetime import datetime
-from abc import ABC, abstractmethod
 import torch
-from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import DataLoader
-from wisp.offline_renderer import OfflineRenderer
-from wisp.framework import WispState, BottomLevelRendererState
-from wisp.utils import PerfTimer
-from wisp.datasets import default_collate
-
 import wandb
 import numpy as np
+import logging as log
+
+from datetime import datetime
+from abc import ABC, abstractmethod
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+
+from wisp.utils import PerfTimer
+from wisp.datasets import default_collate
+from wisp.offline_renderer import OfflineRenderer
+from wisp.framework import WispState, BottomLevelRendererState
 
 
 def log_metric_to_wandb(key, _object, step):
     wandb.log({key: _object}, step=step, commit=False)
 
-
 def log_images_to_wandb(key, image, step):
     wandb.log({key: wandb.Image(np.moveaxis(image, 0, -1))}, step=step, commit=False)
 
-
 class BaseTrainer(ABC):
+    """ Base class for the trainer.
+        The default overall flow of things:
+
+        init()
+        |- set_renderer()
+        |- set_logger()
+
+        train():
+            for every epoch:
+                pre_epoch()
+
+                iterate()
+                    pre_step()
+                    step()
+                    post_step()
+
+                post_epoch()
+                |- log_tb()
+                |- save_model()
+                |- render_tb()
+                |- resample_dataset()
+
+                validate()
     """
-    Base class for the trainer.
-
-    The default overall flow of things:
-
-    init()
-    |- set_renderer()
-    |- set_logger()
-
-    train():
-        for every epoch:
-            pre_epoch()
-
-            iterate()
-                pre_step()
-                step()
-                post_step()
-
-            post_epoch()
-            |- log_tb()
-            |- save_model()
-            |- render_tb()
-            |- resample_dataset()
-
-            validate()
-
-    Each of these submodules can be overriden, or extended with super().
-
-    """
-
-    #######################
-    # __init__
-    #######################
-
-    # TODO (operel): Rename scene_state -> wisp_state (not doing that now to avoid big merge with Clement)
-    def __init__(self, pipeline, dataset, num_epochs, batch_size,
-                 optim_cls, lr, weight_decay, grid_lr_weight, optim_params, log_dir, device,
-                 exp_name=None, info=None, scene_state=None, extra_args=None,
-                 render_tb_every=-1, save_every=-1, using_wandb=False):
-        """Constructor.
-
-        Args:
+    def __init__(self, pipeline, dataset, optim_cls, optim_params, device, scene_state=None, **extra_args):
+        """ @Params
             pipeline (wisp.core.Pipeline): The pipeline with tracer and neural field to train.
             dataset (torch.Dataset): The dataset to use for training.
-            num_epochs (int): The number of epochs to run the training for.
-            batch_size (int): The batch size used in training.
             optim_cls (torch.optim): The Optimizer object to use
-            lr (float): The learning rate to use
-            weight_decay (float): The weight decay to use
-            optim_params (dict): Optional params for the optimizer.
             device (device): The device to run the training on.
-            log_dir (str): The directory to save the training logs in.
-            exp_name (str): The experiment name to use for logging purposes.
-            info (str): The args to save to the logger.
-            scene_state (wisp.core.State): Use this to inject a scene state from the outside to be synced
-                                           elsewhere.
+            scene_state (wisp.core.State): Use this to inject a scene state from the
+                                           outside to be synced elsewhere.
             extra_args (dict): Optional dict of extra_args for easy prototyping.
-            render_tb_every (int): The number of epochs between renders for tensorboard logging. -1 = no rendering.
-            save_every (int): The number of epochs between model saves. -1 = no saving.
         """
         log.info(f'Training on {extra_args["dataset_path"]}')
 
         self.extra_args = extra_args
-        self.info = info
 
         self.pipeline = pipeline
-        log.info("Total number of parameters: {}".format(
-            sum(p.numel() for p in self.pipeline.parameters()))
-        )
-        # Set device to use
+
         self.device = device
         if device == "gpu":
             device_name = torch.cuda.get_device_name(device=self.device)
@@ -112,15 +75,15 @@ class BaseTrainer(ABC):
 
         # Optimizer params
         self.optim_cls = optim_cls
-        self.lr = lr
-        self.weight_decay = weight_decay
-        self.grid_lr_weight = grid_lr_weight
+        self.lr = extra_args["lr"]
+        self.weight_decay = extra_args["weight_decay"]
+        self.grid_lr_weight = extra_args["grid_lr_weight"]
         self.optim_params = optim_params
 
         # Training params
-        self.num_epochs = num_epochs
-        self.batch_size = batch_size
-        self.exp_name = exp_name if exp_name else "unnamed_experiment"
+        self.exp_name = extra_args["exp_name"]
+        self.num_epochs = extra_args["num_epochs"]
+        self.batch_size = extra_args["batch_size"]
 
         # initialize scene_state
         if scene_state is None:
@@ -128,13 +91,8 @@ class BaseTrainer(ABC):
         self.scene_state = scene_state
         self.scene_state.graph.neural_pipelines[self.exp_name] = self.pipeline
         self.scene_state.optimization.train_data.append(dataset)
-
         if hasattr(self.dataset, "data"):
             self.scene_state.graph.cameras = self.dataset.data.get("cameras", dict())
-
-        # TODO(ttakikawa): Rename to num_epochs?
-        # Max is a bit ambiguous since it could be the upper bound value or the num iterations.
-        # If it's the upper bound value it can be confusing based on the indexing system.
         self.scene_state.optimization.max_epochs = self.num_epochs
 
         self.timer = PerfTimer(activate=extra_args["perf"])
@@ -149,22 +107,20 @@ class BaseTrainer(ABC):
         self.log_dict = {}
 
         self.log_fname = f'{datetime.now().strftime("%Y%m%d-%H%M%S")}'
-        self.log_dir = os.path.join(
-            log_dir,
-            self.exp_name,
-            self.log_fname
-        )
+        self.log_dir = os.path.join(extra_args["log_dir"], self.exp_name, self.log_fname)
 
         # Default TensorBoard Logging
         self.writer = SummaryWriter(self.log_dir, purge_step=0)
-        self.writer.add_text('Info', self.info)
-        self.save_every = save_every
-        self.render_tb_every = render_tb_every
+        # self.writer.add_text('Info', self.info)
+        self.using_wandb = extra_args["using_wandb"]
+
+        self.save_every = extra_args["save_every"]
+        self.valid_every = extra_args["valid_every"]
         self.log_tb_every = extra_args["log_tb_every"]
         self.log_cli_every = extra_args["log_cli_every"]
         self.plot_grad_every = extra_args["plot_grad_every"]
+        self.render_tb_every = extra_args["render_tb_every"]
         self.save_local_every = extra_args["save_local_every"]
-        self.using_wandb = using_wandb
         self.timer.check('set_logger')
 
         if self.using_wandb:
@@ -184,11 +140,10 @@ class BaseTrainer(ABC):
                                             shuffle=True, pin_memory=True, num_workers=0)
 
     def init_optimizer(self):
-        """Default initialization for the optimizer.
+        """ Default initialization for the optimizer.
         """
-
-        params_dict = { name : param for name, param in self.pipeline.nef.named_parameters() }
-
+        params_dict = { name : param
+                        for name, param in self.pipeline.nef.named_parameters() }
         params = []
         decoder_params = []
         grid_params = []
@@ -259,7 +214,7 @@ class BaseTrainer(ABC):
         self.loss_lods = list(range(0, self.extra_args["num_lods"]))
         if self.extra_args["grow_every"] > 0:
             self.grow()
-        
+
         if self.extra_args["only_last"]:
             self.loss_lods = self.loss_lods[-1:]
 
@@ -269,19 +224,13 @@ class BaseTrainer(ABC):
         self.pipeline.train()
 
         self.timer.check('pre_epoch done')
-    
+
     def post_epoch(self):
-        """
-        Override this function to change the post-epoch post processing.
-
-        By default, this function logs to Tensorboard, renders images to Tensorboard, saves the model,
-        and resamples the dataset.
-
-        To keep default behaviour but also augment with other features, do 
-          
-          super().post_epoch()
-
-        in the derived method.
+        """ Override this function to change the post-epoch post processing.
+            By default, this function logs to Tensorboard, renders images to Tensorboard,
+              saves the model, and resamples the dataset.
+            To keep default behaviour but also augment with other features, do
+            super().post_epoch() in the derived method.
         """
         self.pipeline.eval()
 
@@ -290,27 +239,25 @@ class BaseTrainer(ABC):
 
         self.log_cli()
         self.log_tb()
-        
+
         # Render visualizations to tensorboard
         if self.render_tb_every > -1 and self.epoch % self.render_tb_every == 0:
             self.render_tb()
-       
+
        # Save model
         if self.save_every > -1 and self.epoch % self.save_every == 0 and self.epoch != 0:
             self.save_model()
         return
-        
+
         self.timer.check('post_epoch done')
 
     def pre_step(self):
-        """
-        Override this function to change the pre-step preprocessing (runs per iteration).
+        """ Override this function to change the pre-step preprocessing (runs per iteration).
         """
         return
-    
+
     def post_step(self):
-        """
-        Override this function to change the pre-step preprocessing (runs per iteration).
+        """ Override this function to change the pre-step preprocessing (runs per iteration).
         """
         return
 
@@ -397,7 +344,7 @@ class BaseTrainer(ABC):
         data (dict): Dictionary of the input batch from the DataLoader.
         """
         pass
-    
+
     def log_cli(self):
         """
         Override this function to change CLI logging.
@@ -417,7 +364,7 @@ class BaseTrainer(ABC):
                 self.writer.add_scalar(f'Loss/{key}', self.log_dict[key] / len(self.train_data_loader), self.epoch)
                 if self.using_wandb:
                     log_metric_to_wandb(f'Loss/{key}', self.log_dict[key] / len(self.train_data_loader), self.epoch)
-    
+
     def render_tb(self):
         """
         Override this function to change render logging to TensorBoard / Wandb.

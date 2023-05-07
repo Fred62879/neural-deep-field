@@ -129,30 +129,31 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
     #coords = reshape_coords(coords, args, infer=infer, spectrum=spectrum, coord_wave=coord_wave)
     return coords
 
-def forward(data,
-            pipeline,
-            step_num,
-            space_dim,
-            trans_sample_method,
-            codebook_pretrain=False,
-            pixel_supervision_train=False,
-            spectra_supervision_train=False,
-            redshift_supervision_train=False,
-            recon_img=False, # reconstruct img, embed map, redshift heatmap, etc.
-            recon_spectra=False,
-            recon_codebook_spectra=False,
-            quantize_latent=False,
-            quantize_spectra=False,
-            quantization_strategy="hard",
-            save_soft_qtz_weights=False, # save qtz codebook weight
-            calculate_codebook_loss=False,
-            save_scaler=False,
-            save_spectra=False,
-            save_latents=False,
-            save_codebook=False,
-            save_redshift=False,
-            save_embed_ids=False):
-
+def forward(
+        data,
+        pipeline,
+        step_num,
+        space_dim,
+        trans_sample_method,
+        codebook_pretrain=False,
+        pixel_supervision_train=False,
+        spectra_supervision_train=False,
+        redshift_supervision_train=False,
+        recon_img=False, # reconstruct img, embed map, redshift heatmap, etc.
+        recon_spectra=False,
+        recon_codebook_spectra=False,
+        quantize_latent=False,
+        quantize_spectra=False,
+        quantization_strategy="hard",
+        calculate_codebook_loss=False,
+        save_scaler=False,
+        save_spectra=False,
+        save_latents=False,
+        save_codebook=False,
+        save_redshift=False,
+        save_embed_ids=False,
+        save_soft_qtz_weights=False
+):
     # forward should only be called under one and only one of the following states
     train = pixel_supervision_train or spectra_supervision_train or redshift_supervision_train
     is_valid = reduce(
@@ -228,12 +229,15 @@ def forward(data,
     requested_channels = set(requested_channels)
     return pipeline(channels=requested_channels, **net_args)
 
-def load_embed(pretrained_state):
+def load_embed(pretrained_state, transpose=True, tensor=False):
     for n,p in pretrained_state.items():
         if "grid" not in n and "codebook" in n:
-            embed = p.T
+            if transpose:
+                p = p.T
             break
-    return np.array(embed.cpu())
+    if tensor:
+        return p
+    return np.array(p.cpu())
 
 def load_partial_latent(model, pretrained_state, lo, hi):
     cur_state = model.state_dict()

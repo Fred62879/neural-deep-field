@@ -68,8 +68,6 @@ class HyperSpectralConverter(nn.Module):
         return (wave - lo) / (hi - lo)
 
     def shift_wave(self, wave, redshift):
-        if self.kwargs["print_shape"]: print('hps_converter, shift wave', wave.shape)
-        if self.kwargs["print_shape"]: print('hps_converter, shift wave', redshift.shape)
         wave = wave.permute(1,2,0)
 
         if wave.ndim == 3:

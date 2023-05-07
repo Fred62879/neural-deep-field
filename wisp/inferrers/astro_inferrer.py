@@ -533,18 +533,12 @@ class AstroInferrer(BaseInferrer):
                         iterations,
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
-                        pixel_supervision_train=False,
-                        spectra_supervision_train=False,
                         quantize_latent=self.quantize_latent,
                         quantize_spectra=self.quantize_spectra,
                         quantization_strategy=self.extra_args["quantization_strategy"],
                         save_soft_qtz_weights=self.save_soft_qtz_weights,
-                        calculate_codebook_loss=False,
                         recon_img=True,
-                        recon_spectra=False,
-                        recon_codebook_spectra=False,
                         save_scaler=self.plot_scaler,
-                        save_spectra=False,
                         save_latents=self.plot_latent_embed,
                         save_redshift=self.plot_redshift,
                         save_embed_ids=self.plot_embed_map)
@@ -582,18 +576,10 @@ class AstroInferrer(BaseInferrer):
                         self.extra_args["num_epochs"],
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
-                        pixel_supervision_train=False,
-                        spectra_supervision_train=False,
                         quantize_latent=self.quantize_latent,
                         quantize_spectra=self.quantize_spectra,
                         quantization_strategy=self.extra_args["quantization_strategy"],
-                        calculate_codebook_loss=False,
-                        recon_img=False,
-                        recon_spectra=True,
-                        recon_codebook_spectra=False,
-                        save_spectra=False,
-                        save_latents=False,
-                        save_embed_ids=False)["intensity"]
+                        recon_spectra=True)["intensity"]
 
                 if spectra.ndim == 3: # bandwise
                     spectra = spectra.flatten(1,2) # [bsz,nsmpl]
@@ -631,17 +617,7 @@ class AstroInferrer(BaseInferrer):
                         0,
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
-                        pixel_supervision_train=False,
-                        spectra_supervision_train=False,
-                        quantize_latent=False,
-                        quantize_spectra=False,
-                        calculate_codebook_loss=False,
-                        recon_img=False,
-                        recon_spectra=False,
-                        recon_codebook_spectra=True,
-                        save_spectra=False,
-                        save_latents=False,
-                        save_embed_ids=False)["intensity"]
+                        recon_codebook_spectra=True)["intensity"]
 
                 self.codebook_spectra.extend(spectra)
 

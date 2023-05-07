@@ -7,7 +7,6 @@ import nvidia_smi
 import numpy as np
 import torch.nn as nn
 import logging as log
-import matplotlib.pyplot as plt
 
 from pathlib import Path
 from functools import partial
@@ -15,25 +14,19 @@ from os.path import exists, join
 from torch.utils.data import BatchSampler, SequentialSampler, \
     RandomSampler, DataLoader
 
-from wisp.datasets import default_collate
-from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
-from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
-from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, forward
-from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
+from wisp.trainers import BaseTrainer
+from wisp.utils.plot import plot_grad_flow
+from wisp.loss import spectra_supervision_loss, redshift_supervision_loss
+from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
+    load_embed, load_model_weights, forward
 
 
 class CodebookTrainer(BaseTrainer):
     """ Trainer class for codebook pretraining.
     """
-    def __init__(self, pipeline, dataset, num_epochs, batch_size,
-                 optim_cls, lr, weight_decay, grid_lr_weight, optim_params, log_dir, device,
-                 exp_name=None, info=None, scene_state=None, extra_args=None,
-                 render_tb_every=-1, save_every=-1, using_wandb=False):
+    def __init__(self, pipeline, dataset, optim_cls, optim_params, device, **extra_args):
+        super().__init__(pipeline, dataset, optim_cls, optim_params, device, **extra_args)
 
-        super().__init__(pipeline, dataset, num_epochs, batch_size, optim_cls,
-                         lr, weight_decay, grid_lr_weight, optim_params, log_dir,
-                         device, exp_name, info, scene_state, extra_args,
-                         render_tb_every, save_every, using_wandb)
         assert(
             extra_args["space_dim"] == 3 and \
             extra_args["pretrain_codebook"] and \
@@ -53,12 +46,11 @@ class CodebookTrainer(BaseTrainer):
         self.save_data_to_local = False
         self.shuffle_dataloader = False
         self.dataloader_drop_last = False
-        self.latents = nn.Embedding(extra_args["num_supervision_spectra"],
-                                    extra_args["codebook_pretrain_latent_dim"])
 
         self.set_log_path()
         self.summarize_training_tasks()
 
+        self.init_net()
         self.init_loss()
         self.init_optimizer()
 
@@ -69,6 +61,18 @@ class CodebookTrainer(BaseTrainer):
     #############
     # Initializations
     #############
+
+    def init_net(self):
+        self.train_pipeline = self.pipeline[0]
+        self.infer_pipeline = self.pipeline[1]
+        self.latents = nn.Embedding(
+            self.extra_args["num_supervision_spectra"],
+            self.extra_args["codebook_pretrain_latent_dim"]
+        )
+        log.info("Total number of parameters: {}".format(
+            sum(p.numel() for p in self.train_pipeline.parameters()))
+        )
+        print(self.latents.weight.shape)
 
     def configure_dataset(self):
         """ Configure dataset with selected fields and set length accordingly.
@@ -104,8 +108,8 @@ class CodebookTrainer(BaseTrainer):
         if self.verbose: log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
-                ["model_dir","spectra_dir"], ["models","train_spectra"]
-        ):
+                ["model_dir","spectra_dir","codebook_spectra_dir"],
+                ["models","train_spectra","codebook_spectra"]):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -175,7 +179,7 @@ class CodebookTrainer(BaseTrainer):
         # collect all parameters from network and trainable latents
         self.params_dict = {
             "spectra_latents": param for _, param in self.latents.named_parameters() }
-        for name, param in self.pipeline.named_parameters():
+        for name, param in self.train_pipeline.named_parameters():
             self.params_dict[name] = param
 
         params, net_params, latents = [], [], []
@@ -236,12 +240,6 @@ class CodebookTrainer(BaseTrainer):
     def end_epoch(self):
         self.post_epoch()
 
-        if self.extra_args["valid_every"] > -1 and \
-                self.epoch % self.extra_args["valid_every"] == 0 and \
-                self.epoch != 0:
-            self.validate()
-            self.timer.check('validate')
-
         if self.epoch < self.num_epochs:
             self.iteration = 0
             self.epoch += 1
@@ -284,20 +282,23 @@ class CodebookTrainer(BaseTrainer):
             self.init_dataloader()
             self.reset_data_iterator()
 
-        self.pipeline.train()
+        self.train_pipeline.train()
         self.timer.check("pre_epoch done")
 
     def post_epoch(self):
         """ By default, this function logs to Tensorboard, renders images to Tensorboard,
             saves the model, and resamples the dataset.
         """
-        self.pipeline.eval()
+        self.train_pipeline.eval()
 
         total_loss = self.log_dict["total_loss"] / len(self.train_data_loader)
         self.scene_state.optimization.losses["total_loss"].append(total_loss)
 
         if self.save_every > -1 and self.epoch % self.save_every == 0:
             self.save_model()
+
+        if self.valid_every > -1 and self.epoch % self.valid_every == 0:
+            self.validate()
 
         if self.log_tb_every > -1 and self.epoch % self.log_tb_every == 0:
             self.log_tb()
@@ -389,8 +390,8 @@ class CodebookTrainer(BaseTrainer):
                 log.info(f"saved model found, loading {self.pretrained_model_fname}")
             checkpoint = torch.load(self.pretrained_model_fname)
 
-            self.pipeline.load_state_dict(checkpoint["model_state_dict"])
-            self.pipeline.eval()
+            self.train_pipeline.load_state_dict(checkpoint["model_state_dict"])
+            self.train_pipeline.eval()
 
             if "cuda" in str(self.device):
                 self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
@@ -413,7 +414,7 @@ class CodebookTrainer(BaseTrainer):
         add_to_device(data, self.gpu_fields, self.device)
 
         ret = forward(data,
-                      self.pipeline,
+                      self.train_pipeline,
                       self.total_steps,
                       self.space_dim,
                       self.extra_args["trans_sample_method"],
@@ -470,27 +471,19 @@ class CodebookTrainer(BaseTrainer):
         log.info(log_text)
 
     def save_model(self):
-        if self.extra_args["save_as_new"]:
-            fname = f"model-ep{self.epoch}-it{self.iteration}.pth"
-            model_fname = os.path.join(self.model_dir, fname)
-        else: model_fname = os.path.join(self.model_dir, f"model.pth")
-
+        fname = f"model-ep{self.epoch}-it{self.iteration}.pth"
+        model_fname = os.path.join(self.model_dir, fname)
         if self.verbose: log.info(f"Saving model checkpoint to: {model_fname}")
 
         checkpoint = {
             "iterations": self.total_steps,
             "epoch_trained": self.epoch,
-            "model_state_dict": self.pipeline.state_dict(),
+            "model_state_dict": self.train_pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
         }
 
         torch.save(checkpoint, model_fname)
         return checkpoint
-
-    # def get_data_to_save(self, ret):
-    #     redshift = None if not self.save_redshift else ret["redshift"]
-    #     recon_spectra = None if not self.plot_spectra else ret["spectra"]
-    #     return recon_spectra, redshift
 
     def save_local(self):
         if self.plot_spectra:
@@ -522,4 +515,36 @@ class CodebookTrainer(BaseTrainer):
                                    self.extra_args["spectra_norm_cho"], clip=True)
 
     def validate(self):
-        pass
+        """ Reconstruct codebook spectra using current model.
+        """
+        load_model_weights(self.infer_pipeline, self.train_pipeline.state_dict())
+        self.infer_pipeline.eval()
+
+        data = self.get_valid_data()
+        ret = forward(data,
+                      self.infer_pipeline,
+                      self.total_steps,
+                      self.space_dim,
+                      self.extra_args["trans_sample_method"],
+                      recon_codebook_spectra=True)
+
+        codebook_spectra = ret["intensity"].detach().cpu().numpy()
+
+        fname = f"ep{self.epoch}-it{self.iteration}"
+        self.dataset.plot_spectrum(
+            self.codebook_spectra_dir, fname, codebook_spectra,
+            spectra_norm_cho=self.extra_args["spectra_norm_cho"],
+            save_spectra=False, codebook=True,
+            clip=self.extra_args["plot_clipped_spectrum"])
+
+    def get_valid_data(self):
+        bsz = self.extra_args["qtz_num_embed"]
+        latents = load_embed(self.train_pipeline.state_dict(),
+                             transpose=False, tensor=True)[:,None]
+        wave = torch.FloatTensor(self.dataset.get_full_wave())[None,:,None].tile(bsz,1,1)
+        data = {
+            "coords": latents.to(self.device), # [bsz,nsmpl,latent_dim]
+            "wave": wave.to(self.device),      # [bsz,nsmpl,1]
+            "full_wave_bound": self.dataset.get_full_wave_bound()
+        }
+        return data

@@ -76,11 +76,11 @@ class HyperSpectralDecoder(nn.Module):
                 codebook=None, qtz_args=None, quantize_spectra=False, ret=None):
         """ @Param
               latents:   (encoded or original) coords or logits for quantization.
-                           [bsz,num_samples,coords_encode_dim or 2 or 3]
+                         [bsz,1,space_dim or coords_encode_dim]
 
             - hyperspectral
               wave:      lambda values, used to convert ra/dec to hyperspectral latents.
-                           [bsz,num_samples,1]
+                         [bsz,num_samples,1]
               trans:     corresponding transmission values of lambda. [(bsz,)nbands,num_samples]
               nsmpl:     average number of lambda samples falling within each band. [num_bands]
               full_wave_bound: min and max value of lambda
