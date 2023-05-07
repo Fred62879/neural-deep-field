@@ -108,13 +108,16 @@ def define_cmd_line_args():
     global_group.add_argument("--exp-name", type=str, default="unnamed_experiment",
                               help="Experiment name.")
     global_group.add_argument("--tasks", nargs="+", type=str,
-                              choices=["train","plot_embed_map_during_train",
+                              choices=["train",
+                                       "plot_embed_map_during_train","save_codebook",
                                        "save_latent_during_train","save_recon_during_train",
-                                       "plot_spectra_during_train","infer_during_train",
-                                       "infer","recon_img","recon_flat","recon_gt_spectra",
+                                       "recon_gt_spectra_during_train","infer_during_train",
+                                       "infer",
+                                       "recon_img","recon_synthetic","recon_gt_spectra",
                                        "recon_dummy_spectra","recon_codebook_spectra",
-                                       "plot_embed_map","plot_latent_embed","spectral_inpaint",
-                                       "spatial_inpaint",])
+                                       "plot_embed_map","plot_latent_embed",
+                                       "plot_redshift","plot_save_scaler"])
+
     ###################
     # General global network things
     ###################
@@ -450,6 +453,7 @@ def define_cmd_line_args():
 
     train_group.add_argument("--resume-train", action="store_true")
     train_group.add_argument("--resume-log-dir", type=str)
+    train_group.add_argument("--pretrain-log-dir", type=str)
     train_group.add_argument("--pretrained-model-name", type=str)
 
     train_group.add_argument("--num-trans-samples", type=int, default=40,

@@ -330,7 +330,6 @@ class BaseTrainer(ABC):
                 self.begin_epoch()
                 data = self.next_batch()
 
-            #print("Iterate", data["coords"].shape)
             self.pre_step()
             self.step(data)
             self.post_step()

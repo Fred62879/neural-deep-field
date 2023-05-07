@@ -95,7 +95,7 @@ def get_trainer_from_config(trainer_cls, pipeline, dataset, optim_cls, optim_par
     )
     return trainer
 
-def get_inferrer_from_config(pipelines, dataset, args, args_str):
+def get_inferrer_from_config(pipelines, dataset, device, args):
     inferrer = globals()[args.inferrer_type](
-        pipelines, dataset, device, vars(args), info=args_str)
+        pipelines, dataset, device, **vars(args))
     return inferrer

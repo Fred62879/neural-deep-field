@@ -463,7 +463,7 @@ class SpectraData:
 
     def log_spectra_pixel_values(self, spectra):
         gt_pixel_ids = self.get_spectra_coord_ids().flatten()
-        gt_pixels = self.fits_obj.get_pixels(ids=gt_pixel_ids).numpy()
+        gt_pixels = self.fits_obj.get_pixels(idx=gt_pixel_ids).numpy()
         gt_pixels = np.round(gt_pixels, 2)
         np.set_printoptions(suppress = True)
         log.info(f"GT spectra pixel values: {gt_pixels}")

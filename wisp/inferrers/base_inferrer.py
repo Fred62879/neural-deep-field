@@ -14,7 +14,7 @@ class BaseInferrer(ABC):
     """ Base class for inferrence.
     """
 
-    def __init__(self, pipelines, dataset, device, extra_args, info=None):
+    def __init__(self, pipelines, dataset, device, **extra_args):
         self.device = device
         self.dataset = dataset
         self.pipelines = pipelines
@@ -26,7 +26,6 @@ class BaseInferrer(ABC):
         self.batch_size = extra_args["infer_batch_size"]
         self.infer_last_model_only = extra_args["infer_last_model_only"]
 
-        self.info = info
         self.extra_args = extra_args
 
         self.timer = PerfTimer(activate=extra_args["perf"])
@@ -48,7 +47,6 @@ class BaseInferrer(ABC):
 
         # Default TensorBoard Logging
         self.writer = SummaryWriter(self.log_dir, purge_step=0)
-        self.writer.add_text('Info', self.info)
         self.timer.check('set_logger')
 
         # initialization

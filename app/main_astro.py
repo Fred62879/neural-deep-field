@@ -31,5 +31,5 @@ if __name__ == "__main__":
         trainer.train()
 
     if "infer" in tasks:
-        inferrer = get_inferrer_from_config(pipelines, dataset, args, args_str)
+        inferrer = get_inferrer_from_config(pipelines, dataset, device, args)
         inferrer.infer()

@@ -36,10 +36,8 @@ class AstroInferrer(BaseInferrer):
         If infer with hyperspectral net, assume using all
           available lambda values without sampling.
     """
-
-    def __init__(self, pipelines, dataset, device, extra_args, info=None):
-
-        super().__init__(pipelines, dataset, device, extra_args, info=info)
+    def __init__(self, pipelines, dataset, device, **extra_args):
+        super().__init__(pipelines, dataset, device, **extra_args)
 
         if "full" in pipelines:
             self.full_pipeline = pipelines["full"]

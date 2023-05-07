@@ -72,7 +72,6 @@ class CodebookTrainer(BaseTrainer):
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.train_pipeline.parameters()))
         )
-        print(self.latents.weight.shape)
 
     def configure_dataset(self):
         """ Configure dataset with selected fields and set length accordingly.

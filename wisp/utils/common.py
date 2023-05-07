@@ -196,7 +196,7 @@ def forward(
             net_args["spectra_supervision_wave_bound_ids"] = data["spectra_supervision_wave_bound_ids"]
 
         if pixel_supervision_train or recon_img:
-            # if trans_sample_method == "bandwise": assert 0
+            assert(trans_sample_method != "bandwise")
             net_args["wave"] = data["wave"]
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
@@ -225,9 +225,15 @@ def forward(
             net_args["qtz_args"] = qtz_args
 
     else: raise ValueError("Unsupported space dimension.")
-
     requested_channels = set(requested_channels)
     return pipeline(channels=requested_channels, **net_args)
+
+def load_pretrained_codebook(model, pretrained_state):
+    for n,p in pretrained_state.items():
+        if "codebook" in n:
+            codebook = p
+            break
+    model.nef.codebook.weight = torch.nn.Parameter(codebook)
 
 def load_embed(pretrained_state, transpose=True, tensor=False):
     for n,p in pretrained_state.items():

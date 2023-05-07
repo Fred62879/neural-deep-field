@@ -134,10 +134,10 @@ class AstroDataset(Dataset):
         if field == "coords":
             if self.coords_source == "fits":
                 data = self.fits_dataset.get_coords(idx)
-            #elif self.coords_source == "spectra":
-            #    data = self.spectra_dataset.get_spectra_grid_coords()
-            #else:
-            #    data = self.data[self.coords_source][idx]
+            elif self.coords_source == "spectra":
+                data = self.spectra_dataset.get_spectra_grid_coords()
+            else:
+                data = self.data[self.coords_source][idx]
         elif field == "pixels":
             data = self.fits_dataset.get_pixels(idx)
         elif field == "weights":

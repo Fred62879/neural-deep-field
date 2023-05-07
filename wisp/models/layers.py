@@ -348,8 +348,6 @@ class Quantization(nn.Module):
                 ret["soft_qtz_weights"] = codebook_weights
 
         else: raise ValueError("Unsupported quantization strategy")
-
         if qtz_args["save_codebook"]:
-            ret["codebook"] = codebook.detach().cpu().numpy()
-
+            ret["codebook"] = codebook.weight.detach().cpu().numpy()
         return z, z_q

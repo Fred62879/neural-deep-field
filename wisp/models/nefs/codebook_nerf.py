@@ -25,7 +25,7 @@ class CodebookNef(BaseNeuralField):
         channels = ["intensity"]
         self._register_forward_function( self.get_codebook_spectra, channels )
 
-    def get_codebook_spectra(self, coords, wave, full_wave_bound=None):
+    def get_codebook_spectra(self, coords, wave, full_wave_bound, qtz_args=None):
         """ Output given latents without any modifications.
             @Params:
               coords: [(1,)bsz,num_samples,latents_dim]
@@ -36,5 +36,6 @@ class CodebookNef(BaseNeuralField):
               }
         """
         ret = defaultdict(lambda: None)
-        self.hps_decoder(coords, wave, None, None, full_wave_bound, ret=ret)
+        self.hps_decoder(coords, wave, None, None, full_wave_bound,
+                         qtz_args=qtz_args, ret=ret)
         return ret

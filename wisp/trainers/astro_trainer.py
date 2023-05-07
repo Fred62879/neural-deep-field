@@ -18,7 +18,7 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
 from wisp.datasets import default_collate
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
-from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, forward
+from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, load_pretrained_codebook, forward
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
 
@@ -156,26 +156,13 @@ class AstroTrainer(BaseTrainer):
 
         self.grad_fname = join(self.log_dir, "grad.png")
 
+        if self.extra_args["pretrain_codebook"]:
+            self.codebook_checkpoint_fname = self.get_checkpoint_fname(
+            self.extra_args["pretrain_log_dir"])
+
         if self.extra_args["resume_train"]:
-            if self.extra_args["resume_log_dir"] is not None:
-                pretrained_model_dir = join(self.log_dir, "..", self.extra_args["resume_log_dir"])
-            else:
-                # if log dir not specified, use last directory (exclude newly created one)
-                dnames = os.listdir(join(self.log_dir, ".."))
-                assert(len(dnames) > 1)
-                dnames.sort()
-                pretrained_model_dir = join(self.log_dir, "..", dnames[-2])
-
-            pretrained_model_dir = join(pretrained_model_dir, "models")
-
-            if self.extra_args["pretrained_model_name"] is not None:
-                self.pretrained_model_fname = join(
-                    pretrained_model_dir, self.extra_args["pretrained_model_name"])
-            else:
-                fnames = os.listdir(pretrained_model_dir)
-                assert(len(fnames) > 0)
-                fnames = sort_alphanumeric(fnames)
-                self.pretrained_model_fname = join(pretrained_model_dir, fnames[-1])
+            self.pretrained_model_fname = self.get_checkpoint_fname(
+                self.extra_args["resume_log_dir"])
 
     def get_loss(self, cho):
         if cho == "l1":
@@ -220,19 +207,19 @@ class AstroTrainer(BaseTrainer):
         )
 
     def init_optimizer(self):
-        params, grid_params, qtz_params, rest_params = [], [], [], []
+        params, grid_params, codebook_params, rest_params = [], [], [], []
         params_dict = { name : param for name, param
                         in self.pipeline.named_parameters() }
 
         for name in params_dict.keys():
             if "grid" in name: grid_params.append(params_dict[name])
-            elif "qtz_codebook" in name: qtz_params.append(params_dict[name])
+            elif "codebook" in name: codebook_params.append(params_dict[name])
             else: rest_params.append(params_dict[name])
 
         params.append({"params" : grid_params,
                        "lr": self.lr * self.grid_lr_weight})
-        params.append({"params" : qtz_params,
-                       "lr": self.extra_args["qtz_lr"]})
+        # params.append({"params" : codebook_params,
+        #                "lr": self.extra_args["qtz_lr"]})
         params.append({"params" : rest_params,
                        "lr": self.extra_args["hps_lr"]})
 
@@ -245,6 +232,8 @@ class AstroTrainer(BaseTrainer):
     #############
 
     def train(self):
+        if self.extra_args["pretrain_codebook"]:
+            self.load_codebook()
         if self.extra_args["resume_train"]:
             self.resume_train()
 
@@ -503,6 +492,27 @@ class AstroTrainer(BaseTrainer):
                 log.info(e)
                 log.info("start training from begining")
 
+    def load_codebook(self):
+        try:
+            if self.verbose:
+                log.info(f"saved model found, loading {self.codebook_checkpoint_fname}")
+
+            checkpoint = torch.load(self.codebook_checkpoint_fname)
+
+            #for n,p in self.pipeline.named_parameters():
+            #    if "grid" not in n and "codebook" in n: print(p)
+            load_pretrained_codebook(self.pipeline, checkpoint["model_state_dict"])
+            #for n,p in self.pipeline.named_parameters():
+            #    if "grid" not in n and "codebook" in n: print(p)
+
+            self.pipeline.eval()
+            if self.verbose: log.info("loaded codebook")
+
+        except Exception as e:
+            if self.verbose:
+                log.info(e)
+                log.info("codebook loading failed")
+
     def add_to_device(self, data):
         for field in self.gpu_fields:
             if field in data:
@@ -512,6 +522,8 @@ class AstroTrainer(BaseTrainer):
         total_loss = 0
         add_to_device(data, self.extra_args["gpu_data"], self.device)
 
+        #for n,p in self.pipeline.named_parameters():
+        #    if "grid" not in n and "codebook" in n: print(p)
         ret = forward(data,
                       self.pipeline,
                       self.total_steps,
@@ -660,7 +672,7 @@ class AstroTrainer(BaseTrainer):
             self.plot_spectrum()
 
         if self.save_codebook:
-            log.info(self.codebook_to_save)
+            # print(self.codebook_to_save, self.codebook_to_save.shape)
             np.save(join(self.codebook_dir, f"{self.epoch}"), self.codebook_to_save)
 
     def plot_save_scaler(self):
@@ -766,3 +778,26 @@ class AstroTrainer(BaseTrainer):
 
     def validate(self):
         pass
+
+    def get_checkpoint_fname(self, exp_dir):
+        """ Format checkpoint fname from given experiemnt directory.
+        """
+        if exp_dir is not None:
+            pretrained_model_dir = join(self.log_dir, "..", exp_dir)
+        else:
+            # if log dir not specified, use last directory (exclude newly created one)
+            dnames = os.listdir(join(self.log_dir, ".."))
+            assert(len(dnames) > 1)
+            dnames.sort()
+            pretrained_model_dir = join(self.log_dir, "..", dnames[-2])
+
+        pretrained_model_dir = join(pretrained_model_dir, "models")
+
+        if self.extra_args["pretrained_model_name"] is not None:
+            fname = join(pretrained_model_dir, self.extra_args["pretrained_model_name"])
+        else:
+            fnames = os.listdir(pretrained_model_dir)
+            assert(len(fnames) > 0)
+            fnames = sort_alphanumeric(fnames)
+            fname = join(pretrained_model_dir, fnames[-1])
+        return fname

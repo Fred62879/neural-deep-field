@@ -27,27 +27,23 @@ class AstroHyperSpectralNerf(BaseNeuralField):
 
         super(AstroHyperSpectralNerf, self).__init__()
 
-        self.space_dim = kwargs["space_dim"]
-
-        if self.kwargs["encode_coords"]:
-            self.init_encoder()
-
-        self.spatial_decoder = SpatialDecoder(
-            output_scaler=kwargs["generate_scaler"],
-            output_redshift=kwargs["generate_redshift"],
-            qtz_calculate_loss=qtz_calculate_loss,
-            **kwargs)
-
-        self.hps_decoder = HyperSpectralDecoder(integrate=integrate, scale=scale, **kwargs)
-
-        if kwargs["quantize_latent"] or kwargs["quantize_spectra"]:
-            self.codebook = init_codebook(
-                kwargs["qtz_seed"], kwargs["qtz_num_embed"], kwargs["qtz_latent_dim"])
-        else: self.codebook = None
-
+        self.init_codebook()
+        self.init_encoder()
+        self.init_decoder(integrate, scale, qtz_calculate_loss)
         torch.cuda.empty_cache()
 
+    def init_codebook(self):
+        if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
+            self.codebook = init_codebook(
+                self.kwargs["qtz_seed"],
+                self.kwargs["qtz_num_embed"],
+                self.kwargs["qtz_latent_dim"]
+            )
+        else: self.codebook = None
+
     def init_encoder(self):
+        if not self.kwargs["encode_coords"]: return
+
         embedder_args = (
             2,
             self.kwargs["coords_embed_dim"],
@@ -64,6 +60,15 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             **self.kwargs
         )
 
+    def init_decoder(self, integrate, scale, calculate_loss):
+        self.spatial_decoder = SpatialDecoder(
+            output_scaler=self.kwargs["generate_scaler"],
+            output_redshift=self.kwargs["generate_redshift"],
+            qtz_calculate_loss=calculate_loss, **self.kwargs)
+
+        self.hps_decoder = HyperSpectralDecoder(
+            integrate=integrate, scale=scale, **self.kwargs)
+
     def get_nef_type(self):
         return 'hyperspectral'
 
@@ -71,15 +76,14 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         """ Register forward functions with the channels that they output.
         """
         channels = ["intensity","latents","spectra"]
-
         if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
             channels.extend(["scaler","redshift","codebook_loss",
                              "min_embed_ids","codebook","soft_qtz_weights"])
 
         self._register_forward_function(self.hyperspectral, channels)
 
-    def hyperspectral(self, coords,
-                      wave, trans, nsmpl, full_wave_bound,
+    def hyperspectral(self, coords, wave, full_wave_bound,
+                      trans=None, nsmpl=None,
                       full_wave=None, num_spectra_coords=-1,
                       qtz_args=None, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
