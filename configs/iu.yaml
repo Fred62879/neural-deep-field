@@ -21,17 +21,17 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
-    tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
-
+    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
     #tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights','plot_latent_embed']
 
 optimizer:
     optimizer_type: 'adam'
     b1: 0.5
     b2: 0.999
-    lr: 1e-3
+    grid_lr: 1e-3
     hps_lr: 1e-4
-    qtz_lr: 1e-6
+    codebook_lr: 1e-6
+    codebook_pretrain_lr: 1e-4
     weight_decay: 1e-5
     grid_lr_weight: 100
 
@@ -148,7 +148,7 @@ trainer:
 
     pretrain_codebook: True
     pixel_supervision: True
-    spectra_supervision: False
+    spectra_supervision: True
     redshift_supervision: False
     spectra_beta: 1
     redshift_beta: 1
@@ -161,7 +161,7 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230404-123911_no_spatial_decode'
-    pretrain_log_dir: '20230507-144700'
+    pretrain_log_dir: '20230507-132756'
     pretrained_model_name: 'model-ep2000-it1.pth'
 
     num_trans_samples: 40

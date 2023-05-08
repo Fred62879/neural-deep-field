@@ -177,7 +177,8 @@ class CodebookTrainer(BaseTrainer):
     def init_optimizer(self):
         # collect all parameters from network and trainable latents
         self.params_dict = {
-            "spectra_latents": param for _, param in self.latents.named_parameters() }
+            "spectra_latents": param for _, param in self.latents.named_parameters()
+        }
         for name, param in self.train_pipeline.named_parameters():
             self.params_dict[name] = param
 
@@ -189,9 +190,9 @@ class CodebookTrainer(BaseTrainer):
                 net_params.append(self.params_dict[name])
 
         params.append({"params": latents,
-                       "lr": self.extra_args["hps_lr"]})
+                       "lr": self.extra_args["codebook_pretrain_lr"]})
         params.append({"params": net_params,
-                       "lr": self.extra_args["hps_lr"]})
+                       "lr": self.extra_args["codebook_pretrain_lr"]})
         self.optimizer = self.optim_cls(params, **self.optim_params)
         log.info(self.optimizer)
 

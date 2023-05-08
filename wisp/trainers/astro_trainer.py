@@ -63,6 +63,11 @@ class AstroTrainer(BaseTrainer):
     #############
 
     def init_net(self):
+        # self.log_codebook()
+        if self.extra_args["pretrain_codebook"]:
+            self.load_codebook()
+        # self.log_codebook()
+
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.pipeline.parameters()))
         )
@@ -217,23 +222,23 @@ class AstroTrainer(BaseTrainer):
             else: rest_params.append(params_dict[name])
 
         params.append({"params" : grid_params,
-                       "lr": self.lr * self.grid_lr_weight})
-        # params.append({"params" : codebook_params,
-        #                "lr": self.extra_args["qtz_lr"]})
+                       "lr": self.extra_args["grid_lr"] * self.grid_lr_weight})
+        params.append({"params" : codebook_params,
+                       "lr": self.extra_args["codebook_lr"]})
         params.append({"params" : rest_params,
                        "lr": self.extra_args["hps_lr"]})
 
         self.optimizer = self.optim_cls(params, **self.optim_params)
-        # log.info(f"init codebook values {qtz_params}")
-        # log.info(self.optimizer)
+
+        if self.verbose:
+            log.info(f"init codebook values {qtz_params}")
+            log.info(self.optimizer)
 
     #############
     # Training logic
     #############
 
     def train(self):
-        if self.extra_args["pretrain_codebook"]:
-            self.load_codebook()
         if self.extra_args["resume_train"]:
             self.resume_train()
 
@@ -241,6 +246,7 @@ class AstroTrainer(BaseTrainer):
         log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
 
         for epoch in range(self.num_epochs + 1):
+            self.epoch = epoch
             self.begin_epoch()
 
             for batch in range(self.num_iterations_cur_epoch):
@@ -284,12 +290,6 @@ class AstroTrainer(BaseTrainer):
                 self.epoch != 0:
             self.validate()
             self.timer.check('validate')
-
-        if self.epoch < self.num_epochs:
-            self.iteration = 0
-            self.epoch += 1
-        else:
-            self.scene_state.optimization.running = False
 
     def reset_data_iterator(self):
         """ Rewind the iterator for the new epoch.
@@ -408,14 +408,15 @@ class AstroTrainer(BaseTrainer):
         total_loss, recon_pixels, ret = self.calculate_loss(data)
 
         total_loss.backward()
-        # if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
-        #     plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
+        if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
+            plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
         self.optimizer.step()
 
         self.timer.check("backward and step")
 
         if self.save_data_to_local:
-            scaler, recon_spectra, embed_ids, latents, redshift, codebook = self.get_data_to_save(ret)
+            scaler, recon_spectra, embed_ids, latents, redshift, codebook = \
+                self.get_data_to_save(ret)
             if self.save_scaler: self.pixel_scaler.extend(scaler)
             if self.save_latents: self.latents.extend(latents)
             if self.save_redshift: self.redshifts.extend(redshift)
@@ -499,13 +500,9 @@ class AstroTrainer(BaseTrainer):
 
             checkpoint = torch.load(self.codebook_checkpoint_fname)
 
-            #for n,p in self.pipeline.named_parameters():
-            #    if "grid" not in n and "codebook" in n: print(p)
             load_pretrained_codebook(self.pipeline, checkpoint["model_state_dict"])
-            #for n,p in self.pipeline.named_parameters():
-            #    if "grid" not in n and "codebook" in n: print(p)
 
-            self.pipeline.eval()
+            self.pipeline.train()
             if self.verbose: log.info("loaded codebook")
 
         except Exception as e:
@@ -522,8 +519,6 @@ class AstroTrainer(BaseTrainer):
         total_loss = 0
         add_to_device(data, self.extra_args["gpu_data"], self.device)
 
-        #for n,p in self.pipeline.named_parameters():
-        #    if "grid" not in n and "codebook" in n: print(p)
         ret = forward(data,
                       self.pipeline,
                       self.total_steps,
@@ -801,3 +796,8 @@ class AstroTrainer(BaseTrainer):
             fnames = sort_alphanumeric(fnames)
             fname = join(pretrained_model_dir, fnames[-1])
         return fname
+
+    def log_codebook(self):
+        if not self.verbose: return
+        for n,p in self.pipeline.named_parameters():
+            if "grid" not in n and "codebook" in n: print(p);break

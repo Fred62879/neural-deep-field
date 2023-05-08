@@ -121,4 +121,5 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         self.hps_decoder(latents, wave, trans, nsmpl, full_wave_bound,
                          full_wave, num_spectra_coords,
                          self.codebook, qtz_args, self.kwargs["quantize_spectra"], ret)
+        # print(self.codebook.weight)
         return ret

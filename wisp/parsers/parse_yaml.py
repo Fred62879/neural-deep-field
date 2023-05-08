@@ -371,10 +371,11 @@ def define_cmd_line_args():
 
     optim_group.add_argument("--optimizer-type", type=str, default="adam", choices=list(str2optim.keys()),
                              help="Optimizer to be used.")
-    optim_group.add_argument("--lr", type=float, default=0.001,
+    optim_group.add_argument("--grid_lr", type=float, default=0.001,
                              help="Learning rate.")
     optim_group.add_argument("--hps-lr", type=float, default=0.0001)
-    optim_group.add_argument("--qtz-lr", type=float, default=0.0001)
+    optim_group.add_argument("--codebook-lr", type=float, default=0.0001)
+    optim_group.add_argument("--codebook-pretrain-lr", type=float, default=0.0001)
     optim_group.add_argument("--weight-decay", type=float, default=0,
                              help="Weight decay.")
     optim_group.add_argument("--grid-lr-weight", type=float, default=100.0,
