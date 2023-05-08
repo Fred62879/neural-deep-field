@@ -183,6 +183,8 @@ class Quantization(nn.Module):
             weights = nn.functional.softmax(
                 z * temperature * self.kwargs["qtz_temperature_scale"], dim=-1
             ) # [bsz,1,num_embeds]
+            # weights = z * temperature * self.kwargs["qtz_temperature_scale"]
+            # weights = weights / (torch.sum(weights, dim=-1, keepdim=True) + 1e-6)
 
             if self.kwargs["quantize_spectra"]:
                 codebook = codebook.permute(1,0,2) # [bsz,num_embeds,nsmpl]

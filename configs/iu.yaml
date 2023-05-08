@@ -148,7 +148,7 @@ trainer:
 
     pretrain_codebook: True
     pixel_supervision: True
-    spectra_supervision: True
+    spectra_supervision: False
     redshift_supervision: False
     spectra_beta: 1
     redshift_beta: 1
