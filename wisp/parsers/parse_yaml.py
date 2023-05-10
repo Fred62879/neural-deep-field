@@ -369,19 +369,17 @@ def define_cmd_line_args():
     ###################
     optim_group = parser.add_argument_group("optimizer")
 
-    optim_group.add_argument("--optimizer-type", type=str, default="adam", choices=list(str2optim.keys()),
-                             help="Optimizer to be used.")
-    optim_group.add_argument("--grid_lr", type=float, default=0.001,
-                             help="Learning rate.")
-    optim_group.add_argument("--hps-lr", type=float, default=0.0001)
+    optim_group.add_argument("--optimizer-type", type=str, default="adam",
+                             choices=list(str2optim.keys()), help="Optimizer to be used.")
+
+    optim_group.add_argument("--lr", type=float, default=0.0001)
+    optim_group.add_argument("--grid_lr", type=float, default=0.001)
     optim_group.add_argument("--codebook-lr", type=float, default=0.0001)
     optim_group.add_argument("--codebook-pretrain-lr", type=float, default=0.0001)
-    optim_group.add_argument("--weight-decay", type=float, default=0,
-                             help="Weight decay.")
+
+    optim_group.add_argument("--weight-decay", type=float, default=0, help="Weight decay.")
     optim_group.add_argument("--grid-lr-weight", type=float, default=100.0,
                              help="Relative LR weighting for the grid")
-    optim_group.add_argument("--rgb-loss", type=float, default=1.0,
-                            help="Weight of rgb loss")
     optim_group.add_argument("--b1",type=float, default=0.5)
     optim_group.add_argument("--b2",type=float, default=0.999)
 

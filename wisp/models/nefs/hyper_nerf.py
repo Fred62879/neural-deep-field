@@ -6,8 +6,6 @@ import numpy as np
 from collections import defaultdict
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import load_layer_weights
-
 from wisp.models.embedders import Encoder
 from wisp.models.layers import init_codebook
 from wisp.models.nefs import BaseNeuralField
@@ -121,5 +119,5 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         self.hps_decoder(latents, wave, trans, nsmpl, full_wave_bound,
                          full_wave, num_spectra_coords,
                          self.codebook, qtz_args, self.kwargs["quantize_spectra"], ret)
-        # print(self.codebook.weight)
+        ret["codebook"] = self.codebook.weight
         return ret

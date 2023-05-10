@@ -228,12 +228,29 @@ def forward(
     requested_channels = set(requested_channels)
     return pipeline(channels=requested_channels, **net_args)
 
-def load_pretrained_codebook(model, pretrained_state):
-    for n,p in pretrained_state.items():
-        if "codebook" in n:
-            codebook = p
-            break
-    model.nef.codebook.weight = torch.nn.Parameter(codebook)
+def load_layer_weights(checkpoint, layer_identifier):
+    for n, p in checkpoint.items():
+        if layer_identifier(n):
+            return p
+    assert(False)
+
+def load_pretrained_model_weights(model, pretrained_state):
+    """ Load weights from pretrained model.
+        Loading is performed for only layers in both the given model and
+          the pretrained state.
+    """
+    pretrained_dict = {}
+    cur_state = model.state_dict()
+    for n in cur_state.keys():
+        if n in pretrained_state:
+            pretrained_dict[n] = pretrained_state[n]
+        else: pretrained_dict[n] = cur_state[n]
+    model.load_state_dict(pretrained_dict)
+
+def load_model_weights(model, pretrained_state):
+    cur_state = model.state_dict()
+    pretrained_dict = {k: v for k, v in pretrained_state.items() if k in cur_state}
+    model.load_state_dict(pretrained_dict)
 
 def load_embed(pretrained_state, transpose=True, tensor=False):
     for n,p in pretrained_state.items():
@@ -245,64 +262,50 @@ def load_embed(pretrained_state, transpose=True, tensor=False):
         return p
     return np.array(p.cpu())
 
-def load_partial_latent(model, pretrained_state, lo, hi):
-    cur_state = model.state_dict()
-    pretrained_dict = {}
-    for k, v in pretrained_state.items():
-        if 'latents' in k: v = v[lo:hi]
-        pretrained_dict[k] = v
-    model.load_state_dict(pretrained_dict)
+# def load_partial_latent(model, pretrained_state, lo, hi):
+#     cur_state = model.state_dict()
+#     pretrained_dict = {}
+#     for k, v in pretrained_state.items():
+#         if 'latents' in k: v = v[lo:hi]
+#         pretrained_dict[k] = v
+#     model.load_state_dict(pretrained_dict)
 
-def load_model_weights_exact(model, pretrained_state, train_chnls):
-    cur_state = model.state_dict()
-    pretrained_dict = {}
-    for k, v in pretrained_state.items():
-        if k in cur_state and 'scale_layer' in k:
-            v = v[train_chnls]
-        pretrained_dict[k] = v
-    model.load_state_dict(pretrained_dict)
+# def load_model_weights_exact(model, pretrained_state, train_chnls):
+#     cur_state = model.state_dict()
+#     pretrained_dict = {}
+#     for k, v in pretrained_state.items():
+#         if k in cur_state and 'scale_layer' in k:
+#             v = v[train_chnls]
+#         pretrained_dict[k] = v
+#     model.load_state_dict(pretrained_dict)
 
-def load_model_weights(model, pretrained_state):
-    cur_state = model.state_dict()
-    #print(pretrained_state.keys())
-    pretrained_dict = {k: v for k, v in pretrained_state.items() if k in cur_state}
-    #print(pretrained_dict.keys())
-    model.load_state_dict(pretrained_dict)
+# def load_model(model, optimizer, modelDir, model_smpl_intvl, cuda, verbose):
+#     try:
+#         nmodels = len(os.listdir(modelDir))
+#         if nmodels < 1: raise ValueError("No saved models found")
 
-def load_model(model, optimizer, modelDir, model_smpl_intvl, cuda, verbose):
-    try:
-        nmodels = len(os.listdir(modelDir))
-        if nmodels < 1: raise ValueError("No saved models found")
+#         modelnm = join(modelDir, str(nmodels-1)+'.pth')
+#         if verbose:
+#             print(f'= Saved model found, loading {modelnm}')
+#         checkpoint = torch.load(modelnm)
+#         model.load_state_dict(checkpoint['model_state_dict'])
+#         model.train()
 
-        modelnm = join(modelDir, str(nmodels-1)+'.pth')
-        if verbose:
-            print(f'= Saved model found, loading {modelnm}')
-        checkpoint = torch.load(modelnm)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        model.train()
+#         if cuda:
+#             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+#             for state in optimizer.state.values():
+#                 for k, v in state.items():
+#                     if torch.is_tensor(v):
+#                         state[k] = v.cuda()
+#         else:
+#             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-        if cuda:
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            for state in optimizer.state.values():
-                for k, v in state.items():
-                    if torch.is_tensor(v):
-                        state[k] = v.cuda()
-        else:
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-
-        epoch_trained = checkpoint['epoch_trained']
-        model_file_id = (epoch_trained+1)//model_smpl_intvl+1
-        if verbose: print("= resume training")
-        return model_file_id, epoch_trained, model, optimizer
-    except Exception as e:
-        if verbose:
-            print('!=', e)
-            print("= start training from begining")
-        return 0, -1, model, optimizer
-
-def load_layer_weights(checkpoint, layer_identifier):
-    for n, p in checkpoint.items():
-        #if layer_name in n:
-        if layer_identifier(n):
-            return p
-    assert(False)
+#         epoch_trained = checkpoint['epoch_trained']
+#         model_file_id = (epoch_trained+1)//model_smpl_intvl+1
+#         if verbose: print("= resume training")
+#         return model_file_id, epoch_trained, model, optimizer
+#     except Exception as e:
+#         if verbose:
+#             print('!=', e)
+#             print("= start training from begining")
+#         return 0, -1, model, optimizer

@@ -18,7 +18,7 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
 from wisp.datasets import default_collate
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
-from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, load_pretrained_codebook, forward
+from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, load_pretrained_model_weights, forward
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
 
@@ -63,10 +63,8 @@ class AstroTrainer(BaseTrainer):
     #############
 
     def init_net(self):
-        # self.log_codebook()
         if self.extra_args["pretrain_codebook"]:
-            self.load_codebook()
-        # self.log_codebook()
+            self.load_pretrained_model()
 
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.pipeline.parameters()))
@@ -119,11 +117,11 @@ class AstroTrainer(BaseTrainer):
             "plot_embed_map_during_train" in tasks
         self.plot_codebook_spectra = self.pixel_supervision and self.quantize and \
             "recon_codebook_spectra_during_train" in tasks
-        self.save_latents =  self.pixel_supervision and self.quantize and \
+        self.save_latents = self.pixel_supervision and self.quantize and \
             ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
-        self.save_scaler =  self.pixel_supervision and self.quantize and \
+        self.save_scaler = self.pixel_supervision and self.quantize and \
             self.extra_args["generate_scaler"] and "plot_save_scaler" in tasks
-        self.save_codebook =  self.pixel_supervision and self.quantize and \
+        self.save_codebook = self.pixel_supervision and self.quantize and \
             "save_codebook" in tasks
 
         self.save_redshift =  self.quantize and self.extra_args["generate_redshift"] \
@@ -162,11 +160,11 @@ class AstroTrainer(BaseTrainer):
         self.grad_fname = join(self.log_dir, "grad.png")
 
         if self.extra_args["pretrain_codebook"]:
-            self.codebook_checkpoint_fname = self.get_checkpoint_fname(
-            self.extra_args["pretrain_log_dir"])
+            self.pretrained_model_fname = self.get_checkpoint_fname(
+                self.extra_args["pretrain_log_dir"])
 
         if self.extra_args["resume_train"]:
-            self.pretrained_model_fname = self.get_checkpoint_fname(
+            self.resume_model_fname = self.get_checkpoint_fname(
                 self.extra_args["resume_log_dir"])
 
     def get_loss(self, cho):
@@ -212,27 +210,10 @@ class AstroTrainer(BaseTrainer):
         )
 
     def init_optimizer(self):
-        params, grid_params, codebook_params, rest_params = [], [], [], []
-        params_dict = { name : param for name, param
-                        in self.pipeline.named_parameters() }
-
-        for name in params_dict.keys():
-            if "grid" in name: grid_params.append(params_dict[name])
-            elif "codebook" in name: codebook_params.append(params_dict[name])
-            else: rest_params.append(params_dict[name])
-
-        params.append({"params" : grid_params,
-                       "lr": self.extra_args["grid_lr"] * self.grid_lr_weight})
-        params.append({"params" : codebook_params,
-                       "lr": self.extra_args["codebook_lr"]})
-        params.append({"params" : rest_params,
-                       "lr": self.extra_args["hps_lr"]})
-
-        self.optimizer = self.optim_cls(params, **self.optim_params)
-
-        if self.verbose:
-            log.info(f"init codebook values {qtz_params}")
-            log.info(self.optimizer)
+        if self.extra_args["pretrain_codebook"]:
+            self.init_optimizer_off_pretrain()
+        else:
+            self.init_optimizer_no_pretrain()
 
     #############
     # Training logic
@@ -408,7 +389,8 @@ class AstroTrainer(BaseTrainer):
         total_loss, recon_pixels, ret = self.calculate_loss(data)
 
         total_loss.backward()
-        if self.epoch == 0 or self.extra_args["plot_grad_every"] % self.epoch == 0:
+        if self.epoch != 0 and self.plot_grad_every != -1 \
+           and self.plot_grad_every % self.epoch == 0:
             plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
         self.optimizer.step()
 
@@ -433,6 +415,58 @@ class AstroTrainer(BaseTrainer):
     #############
     # Helper methods
     #############
+
+    def init_optimizer_no_pretrain(self):
+        """ Init optimizer in case where no pretraining is utilized.
+        """
+        params, grid_params, codebook_params, rest_params = [], [], [], []
+        params_dict = { name : param for name, param
+                        in self.pipeline.named_parameters() }
+
+        for name in params_dict.keys():
+            if "grid" in name:
+                grid_params.append(params_dict[name])
+            elif "codebook" in name:
+                codebook_params.append(params_dict[name])
+            else:
+                rest_params.append(params_dict[name])
+
+        params.append({"params" : rest_params,
+                       "lr": self.extra_args["lr"]})
+        params.append({"params" : codebook_params,
+                       "lr": self.extra_args["codebook_lr"]})
+        params.append({"params" : grid_params,
+                       "lr": self.extra_args["grid_lr"] * self.grid_lr_weight})
+        self.optimizer = self.optim_cls(params, **self.optim_params)
+
+        if self.verbose:
+            log.info(f"init codebook values {qtz_params}")
+            log.info(self.optimizer)
+
+    def init_optimizer_off_pretrain(self):
+        """ Optimize parts of the model, freeze other parts shared with pretrain.
+        """
+        params, grid_params, scaler_params, logit_params = [],[],[],[]
+        params_dict = { name : param for name, param
+                        in self.pipeline.named_parameters() }
+
+        for name in params_dict.keys():
+            if "grid" in name:
+                grid_params.append(params_dict[name])
+            elif "scaler_decoder" in name:
+                scaler_params.append(params_dict[name])
+            elif "spatial_decoder.decode" in name:
+                logit_params.append(params_dict[name])
+            else: pass
+
+        params.append({"params" : grid_params,
+                       "lr": self.extra_args["grid_lr"] * self.grid_lr_weight})
+        params.append({"params" : scaler_params, "lr": self.extra_args["lr"]})
+        params.append({"params" : logit_params, "lr": self.extra_args["lr"]})
+
+        self.optimizer = self.optim_cls(params, **self.optim_params)
+        if self.verbose:
+            log.info(self.optimizer)
 
     def set_num_batches(self):
         """ Set number of batches/iterations and batch size for each epoch.
@@ -468,11 +502,13 @@ class AstroTrainer(BaseTrainer):
         return length
 
     def resume_train(self):
+        """ Resume training from saved model.
+        """
         try:
-            assert(exists(self.pretrained_model_fname))
+            assert(exists(self.resume_model_fname))
             if self.verbose:
-                log.info(f"saved model found, loading {self.pretrained_model_fname}")
-            checkpoint = torch.load(self.pretrained_model_fname)
+                log.info(f"resume model found, loading {self.resume_model_fname}")
+            checkpoint = torch.load(self.resume_model_fname)
 
             self.pipeline.load_state_dict(checkpoint["model_state_dict"])
             self.pipeline.eval()
@@ -493,22 +529,22 @@ class AstroTrainer(BaseTrainer):
                 log.info(e)
                 log.info("start training from begining")
 
-    def load_codebook(self):
+    def load_pretrained_model(self):
+        """ Load weights from pretrained model.
+        """
         try:
             if self.verbose:
-                log.info(f"saved model found, loading {self.codebook_checkpoint_fname}")
+                log.info(f"pretrained model found, loading {self.pretrained_model_fname}")
 
-            checkpoint = torch.load(self.codebook_checkpoint_fname)
-
-            load_pretrained_codebook(self.pipeline, checkpoint["model_state_dict"])
+            checkpoint = torch.load(self.pretrained_model_fname)
+            load_pretrained_model_weights(self.pipeline, checkpoint["model_state_dict"])
 
             self.pipeline.train()
-            if self.verbose: log.info("loaded codebook")
+            if self.verbose: log.info("loaded pretrained model")
 
         except Exception as e:
-            if self.verbose:
-                log.info(e)
-                log.info("codebook loading failed")
+            log.info(e)
+            log.info("pretrained model loading FAILED")
 
     def add_to_device(self, data):
         for field in self.gpu_fields:
@@ -667,8 +703,8 @@ class AstroTrainer(BaseTrainer):
             self.plot_spectrum()
 
         if self.save_codebook:
-            # print(self.codebook_to_save, self.codebook_to_save.shape)
-            np.save(join(self.codebook_dir, f"{self.epoch}"), self.codebook_to_save)
+            log.info(self.codebook_to_save)
+            # np.save(join(self.codebook_dir, f"{self.epoch}"), self.codebook_to_save)
 
     def plot_save_scaler(self):
         """ Plot scaler values generated by the decoder before qtz for each pixel.
