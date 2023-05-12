@@ -11,8 +11,8 @@ import logging as log
 from pathlib import Path
 from functools import partial
 from os.path import exists, join
-from torch.utils.data import BatchSampler, SequentialSampler, \
-    RandomSampler, DataLoader
+from torch.utils.data import BatchSampler, \
+    SequentialSampler, RandomSampler, DataLoader
 
 from wisp.trainers import BaseTrainer
 from wisp.utils.plot import plot_grad_flow
@@ -444,7 +444,7 @@ class CodebookTrainer(BaseTrainer):
         redshift_loss = 0
         if self.redshift_supervision:
             gt_redshift = data["redshift"]
-            ids = gt_redshift != -1
+            # ids = gt_redshift != -1
 
             pred_redshift = ret["redshift"]
             if torch.count_nonzero(ids) != 0:

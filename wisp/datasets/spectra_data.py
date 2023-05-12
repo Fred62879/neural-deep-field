@@ -148,6 +148,9 @@ class SpectraData:
     def get_full_wave(self):
         return self.full_wave
 
+    def get_redshift(self):
+        return self.data["redshift"]
+
     #############
     # Helpers
     #############
@@ -236,12 +239,16 @@ class SpectraData:
             self.data["supervision_spectra"] = torch.FloatTensor(
                 np.array(self.data["supervision_spectra"]))[:n]
 
-        ## tmp, dummy redshift
-        # if self.kwargs["redshift_supervision"]:
-        #     dummy_redshift = torch.arange(1, 1+len(all_ids), dtype=torch.float)
-        #     positions = np.array(all_ids).flatten()
-        #     self.fits_obj.data["redshift"][positions] = dummy_redshift
-        ## ends
+        # tmp, dummy redshift
+        if self.kwargs["redshift_supervision"]:
+            # dummy_redshift = torch.arange(1, 1+len(all_ids), dtype=torch.float)
+            # positions = np.array(all_ids).flatten()
+            # self.fits_obj.data["redshift"][positions] = dummy_redshift
+            self.data["redshift"] = torch.arange(
+                1, 1+len(self.kwargs["num_supervision_spectra"]), dtype=torch.float
+            )
+
+        # ends tmp
 
     def load_one_gt_spectra(self, spectra_id, smpl_interval, source_spectra_data):
         ra = source_spectra_data["ra"][spectra_id]

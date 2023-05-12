@@ -201,6 +201,10 @@ def forward(
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
 
+        if redshift_supervision_train:
+            assert(codebook_pretrain)
+            net_args["redshift"] = data["redshift"]
+
         if recon_spectra or recon_codebook_spectra:
             net_args["wave"] = data["wave"]
 

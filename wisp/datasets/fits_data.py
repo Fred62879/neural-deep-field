@@ -59,6 +59,7 @@ class FITSData:
         self.require_pixels = len(tasks.intersection({
             "train","recon_img","log_pixel_value"})) != 0
 
+        ## TODO: REMOVE require_scaler
         self.require_scaler = self.kwargs["space_dim"] == 3 and self.qtz \
             and self.kwargs["generate_scaler"]
         self.require_redshift = self.kwargs["space_dim"] == 3 and self.qtz \

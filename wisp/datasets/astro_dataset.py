@@ -202,6 +202,9 @@ class AstroDataset(Dataset):
         out["full_wave_bound"] = self.get_full_wave_bound()
         out["spectra_supervision_wave_bound_ids"] = self.spectra_dataset.get_spectra_supervision_wave_bound_ids()
 
+    def get_redshift_data(self, out):
+        out["redshift"] = self.spectra_dataset.get_redshift()
+
     def __len__(self):
         """ Length of the dataset in number of coords.
         """
@@ -223,6 +226,9 @@ class AstroDataset(Dataset):
 
         if "spectra_supervision_data" in self.requested_fields:
             self.get_spectra_data(out)
+
+        if "redshift_supervision_data" in self.requested_fields:
+            self.get_redshift_data(out)
 
         if self.transform is not None:
             out = self.transform(out)
