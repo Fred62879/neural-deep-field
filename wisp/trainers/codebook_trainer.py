@@ -40,7 +40,7 @@ class CodebookTrainer(BaseTrainer):
         self.cuda = "cuda" in str(self.device)
         self.verbose = self.extra_args["verbose"]
         self.space_dim = self.extra_args["space_dim"]
-        self.gpu_fields = ["spectra_latents","gt_spectra","full_wave"]
+        self.gpu_fields = ["spectra_latents","gt_spectra","full_wave","redshift"]
 
         self.total_steps = 0
         self.save_data_to_local = False
@@ -81,7 +81,8 @@ class CodebookTrainer(BaseTrainer):
         # set required fields from dataset
         fields = ["spectra_supervision_data"]
         if self.redshift_supervision:
-            fields.append("redshift")
+            # fields.append("redshift")
+            fields.append("redshift_supervision_data")
         self.dataset.set_dataset_fields(fields)
 
         # set input latents for codebook net
@@ -443,13 +444,16 @@ class CodebookTrainer(BaseTrainer):
         # ii) redshift loss
         redshift_loss = 0
         if self.redshift_supervision:
+            # print(data["redshift"], ret["redshift"])
             gt_redshift = data["redshift"]
-            # ids = gt_redshift != -1
 
+            # ids = gt_redshift != -1
             pred_redshift = ret["redshift"]
-            if torch.count_nonzero(ids) != 0:
-                redshift_loss = self.redshift_loss(gt_redshift[ids], pred_redshift[ids]) * self.redshift_beta
-                self.log_dict["redshift_loss"] += redshift_loss.item()
+            # if torch.count_nonzero(ids) != 0:
+            # redshift_loss = self.redshift_loss(gt_redshift[ids], pred_redshift[ids]) * self.redshift_beta
+            redshift_loss = self.redshift_loss(gt_redshift, pred_redshift) \
+                * self.extra_args["redshift_beta"]
+            self.log_dict["redshift_loss"] += redshift_loss.item()
 
         total_loss = spectra_loss + redshift_loss
         self.log_dict["total_loss"] += total_loss.item()
@@ -512,10 +516,15 @@ class CodebookTrainer(BaseTrainer):
         ).detach().cpu().numpy() # [num_supervision_spectra,num_samples]
 
         self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra,
-                                   self.extra_args["spectra_norm_cho"], clip=True)
+                                   self.extra_args["spectra_norm_cho"], clip=True,
+                                   save_spectra=True)
+
+    ############
+    # Validation
+    ############
 
     def validate(self):
-        """ Reconstruct codebook spectra using current model.
+        """ Perform validation (recon gt spectra, codebook spectra etc.).
         """
         load_model_weights(self.infer_pipeline, self.train_pipeline.state_dict())
         self.infer_pipeline.eval()
@@ -534,7 +543,7 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.plot_spectrum(
             self.codebook_spectra_dir, fname, codebook_spectra,
             spectra_norm_cho=self.extra_args["spectra_norm_cho"],
-            save_spectra=False, codebook=True,
+            save_spectra=False, codebook=True, save_spectra=True,
             clip=self.extra_args["plot_clipped_spectrum"])
 
     def get_valid_data(self):

@@ -24,6 +24,14 @@ if __name__ == "__main__":
         )
         trainer.train()
 
+    if "pretrain_infer" in tasks and args.pretrain_codebook:
+        # infer for pretrained model (recon gt spectra & codebook spectra ect.)
+        inferrer = get_inferrer_from_config(
+            pipelines,
+            dataset, device, args
+        )
+        inferrer.infer()
+
     if "train" in tasks:
         optim_cls, optim_params = get_optimizer_from_config(args)
         trainer = get_trainer_from_config(

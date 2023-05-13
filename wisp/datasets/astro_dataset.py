@@ -38,7 +38,7 @@ class AstroDataset(Dataset):
 
         if self.space_dim == 3:
             self.unbatched_fields = {
-                "trans_data","spectra_supervision_data"
+                "trans_data","spectra_supervision_data","redshift_supervision_data"
             }
         else:
             self.unbatched_fields = set()
@@ -142,8 +142,8 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_pixels(idx)
         elif field == "weights":
             data = self.fits_dataset.get_weights(idx)
-        elif field == "redshift":
-            data = self.fits_dataset.get_redshifts(idx)
+        # elif field == "redshift":
+        #     data = self.fits_dataset.get_redshifts(idx)
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
         else:

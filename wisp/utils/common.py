@@ -155,7 +155,7 @@ def forward(
         save_soft_qtz_weights=False
 ):
     # forward should only be called under one and only one of the following states
-    train = pixel_supervision_train or spectra_supervision_train or redshift_supervision_train
+    train = pixel_supervision_train or spectra_supervision_train #or redshift_supervision_train
     is_valid = reduce(
         lambda x, y: x ^ y,
         [codebook_pretrain, train, recon_img, recon_spectra, recon_codebook_spectra]

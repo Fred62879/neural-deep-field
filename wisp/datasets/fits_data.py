@@ -85,8 +85,8 @@ class FITSData:
         if self.require_pixels:
             self.load_all_fits()
 
-        if self.require_redshift:
-            self.get_redshift_all_fits()
+        # if self.require_redshift:
+        #     self.get_redshift_all_fits()
 
     def set_path(self, dataset_path):
         input_path = join(dataset_path, "input")

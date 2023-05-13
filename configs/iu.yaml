@@ -13,7 +13,7 @@ global:
     #tasks: ['infer','plot_latent_embed']
     #tasks: ['infer','plot_pixel_distrib']
     #tasks: ['infer','save_soft_qtz_weights']
-    tasks: ['infer','recon_codebook_spectra']
+    #tasks: ['infer','recon_codebook_spectra']
     #tasks: ['infer','plot_embed_map','plot_redshift']
     #tasks: ['infer','plot_save_scaler','plot_redshift']
     #tasks: ['infer','recon_gt_spectra','log_pixel_value']
@@ -103,7 +103,7 @@ qtz:
 
 spatial_decod:
     generate_scaler: True
-    generate_redshift: False
+    generate_redshift: True
 
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1
@@ -195,7 +195,7 @@ infer:
     spectra_norm_cho: "sum"
     average_spectra: True
     trusted_range_only: True     # for gt spectra
-    plot_clipped_spectrum: False  # for recon spectra
+    plot_clipped_spectrum: True  # for recon spectra
     plot_spectrum_with_gt: True
     plot_spectrum_with_trans: False
     plot_spectrum_together: True

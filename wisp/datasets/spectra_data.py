@@ -244,10 +244,8 @@ class SpectraData:
             # dummy_redshift = torch.arange(1, 1+len(all_ids), dtype=torch.float)
             # positions = np.array(all_ids).flatten()
             # self.fits_obj.data["redshift"][positions] = dummy_redshift
-            self.data["redshift"] = torch.arange(
-                1, 1+len(self.kwargs["num_supervision_spectra"]), dtype=torch.float
-            )
-
+            self.data["redshift"] = torch.rand(
+                self.kwargs["num_supervision_spectra"], dtype=torch.float)
         # ends tmp
 
     def load_one_gt_spectra(self, spectra_id, smpl_interval, source_spectra_data):
