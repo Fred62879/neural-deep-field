@@ -26,10 +26,7 @@ if __name__ == "__main__":
 
     if "pretrain_infer" in tasks and args.pretrain_codebook:
         # infer for pretrained model (recon gt spectra & codebook spectra ect.)
-        inferrer = get_inferrer_from_config(
-            pipelines,
-            dataset, device, args
-        )
+        inferrer = get_inferrer_from_config(pipelines, dataset, device, args)
         inferrer.infer()
 
     if "train" in tasks:

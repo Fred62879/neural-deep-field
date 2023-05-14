@@ -68,6 +68,10 @@ def get_pipelines_from_config(args, tasks={}):
             pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
             pipelines["codebook"] = AstroPipeline(codebook_nef)
 
+        if "pretrain_infer" in tasks and args.pretrain_codebook:
+            pretrain_nef = CodebookPretrainNerf(**vars(args))
+            pipelines["pretrain_infer"] = AstroPipeline(pretrain_nef)
+
         # full pipline for training and/or inferrence
         nef_train = globals()[args.nef_type](**vars(args))
         pipelines["full"] = AstroPipeline(nef_train)
@@ -87,6 +91,7 @@ def get_pipelines_from_config(args, tasks={}):
 
     for _, pipeline in pipelines.items():
         pipeline.to(device)
+    print(pipelines.keys())
     return device, pipelines
 
 def get_trainer_from_config(trainer_cls, pipeline, dataset, optim_cls, optim_params, device, args):
@@ -96,7 +101,6 @@ def get_trainer_from_config(trainer_cls, pipeline, dataset, optim_cls, optim_par
     return trainer
 
 def get_inferrer_from_config(pipelines, dataset, device, args):
-
     inferrer = globals()[args.inferrer_type](
         pipelines, dataset, device, **vars(args))
     return inferrer

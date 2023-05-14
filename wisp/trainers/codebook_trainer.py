@@ -81,7 +81,6 @@ class CodebookTrainer(BaseTrainer):
         # set required fields from dataset
         fields = ["spectra_supervision_data"]
         if self.redshift_supervision:
-            # fields.append("redshift")
             fields.append("redshift_supervision_data")
         self.dataset.set_dataset_fields(fields)
 
@@ -328,19 +327,12 @@ class CodebookTrainer(BaseTrainer):
     #############
 
     def init_log_dict(self):
-        """ Custom log dict.
-        """
+        """ Custom log dict. """
         super().init_log_dict()
         self.log_dict["spectra_loss"] = 0.0
         self.log_dict["redshift_loss"] = 0.0
 
     def pre_step(self):
-        # if self.epoch == 0 and self.extra_args["log_gpu_every"] > -1 \
-        #    and self.epoch % self.extra_args["log_gpu_every"] == 0:
-        #     gpu_info = get_gpu_info()
-        #     free = gpu_info.free / 1e9
-        #     used = gpu_info.used / 1e9
-        #     log.info(f"Free/Used GPU memory: ~{free}GB / ~{used}GB")
         pass
 
     def step(self, data):
@@ -353,7 +345,8 @@ class CodebookTrainer(BaseTrainer):
 
         total_loss, ret = self.calculate_loss(data)
         total_loss.backward()
-        if self.epoch == 0 or (self.plot_grad_every != -1 and self.plot_grad_every % self.epoch == 0):
+        if self.epoch == 0 or \
+           (self.plot_grad_every != -1 and self.plot_grad_every % self.epoch == 0):
             plot_grad_flow(self.params_dict.items(), self.grad_fname)
         self.optimizer.step()
 
@@ -366,6 +359,45 @@ class CodebookTrainer(BaseTrainer):
 
     def post_step(self):
         pass
+
+    #############
+    # Validation
+    #############
+
+    def validate(self):
+        """ Perform validation (recon gt spectra, codebook spectra etc.).
+        """
+        load_model_weights(self.infer_pipeline, self.train_pipeline.state_dict())
+        self.infer_pipeline.eval()
+
+        data = self.get_valid_data()
+        ret = forward(data,
+                      self.infer_pipeline,
+                      self.total_steps,
+                      self.space_dim,
+                      self.extra_args["trans_sample_method"],
+                      recon_codebook_spectra=True)
+
+        codebook_spectra = ret["intensity"].detach().cpu().numpy()
+
+        fname = f"ep{self.epoch}-it{self.iteration}"
+        self.dataset.plot_spectrum(
+            self.codebook_spectra_dir, fname, codebook_spectra,
+            spectra_norm_cho=self.extra_args["spectra_norm_cho"],
+            save_spectra=True, codebook=True,
+            clip=self.extra_args["plot_clipped_spectrum"])
+
+    def get_valid_data(self):
+        bsz = self.extra_args["qtz_num_embed"]
+        latents = load_embed(self.train_pipeline.state_dict(),
+                             transpose=False, tensor=True)[:,None]
+        wave = torch.FloatTensor(self.dataset.get_full_wave())[None,:,None].tile(bsz,1,1)
+        data = {
+            "coords": latents.to(self.device), # [bsz,nsmpl,latent_dim]
+            "wave": wave.to(self.device),      # [bsz,nsmpl,1]
+            "full_wave_bound": self.dataset.get_full_wave_bound()
+        }
+        return data
 
     #############
     # Helper methods
@@ -482,6 +514,7 @@ class CodebookTrainer(BaseTrainer):
         checkpoint = {
             "iterations": self.total_steps,
             "epoch_trained": self.epoch,
+            "latents": self.latents,
             "model_state_dict": self.train_pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
         }
@@ -518,42 +551,3 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra,
                                    self.extra_args["spectra_norm_cho"], clip=True,
                                    save_spectra=True)
-
-    ############
-    # Validation
-    ############
-
-    def validate(self):
-        """ Perform validation (recon gt spectra, codebook spectra etc.).
-        """
-        load_model_weights(self.infer_pipeline, self.train_pipeline.state_dict())
-        self.infer_pipeline.eval()
-
-        data = self.get_valid_data()
-        ret = forward(data,
-                      self.infer_pipeline,
-                      self.total_steps,
-                      self.space_dim,
-                      self.extra_args["trans_sample_method"],
-                      recon_codebook_spectra=True)
-
-        codebook_spectra = ret["intensity"].detach().cpu().numpy()
-
-        fname = f"ep{self.epoch}-it{self.iteration}"
-        self.dataset.plot_spectrum(
-            self.codebook_spectra_dir, fname, codebook_spectra,
-            spectra_norm_cho=self.extra_args["spectra_norm_cho"],
-            save_spectra=False, codebook=True, save_spectra=True,
-            clip=self.extra_args["plot_clipped_spectrum"])
-
-    def get_valid_data(self):
-        bsz = self.extra_args["qtz_num_embed"]
-        latents = load_embed(self.train_pipeline.state_dict(),
-                             transpose=False, tensor=True)[:,None]
-        wave = torch.FloatTensor(self.dataset.get_full_wave())[None,:,None].tile(bsz,1,1)
-        data = {
-            "coords": latents.to(self.device), # [bsz,nsmpl,latent_dim]
-            "wave": wave.to(self.device),      # [bsz,nsmpl,1]
-            "full_wave_bound": self.dataset.get_full_wave_bound()
-        }
-        return data

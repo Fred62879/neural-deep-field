@@ -43,6 +43,8 @@ class AstroInferrer(BaseInferrer):
             self.full_pipeline = pipelines["full"]
         if "spectra_infer" in pipelines:
             self.spectra_infer_pipeline = pipelines["spectra_infer"]
+        if "pretrain_infer" in pipelines:
+            self.pretrain_infer_pipeline = pipelines["pretrain_infer"]
         if "codebook" in pipelines:
             self.codebook_pipeline = pipelines["codebook"]
 
@@ -76,7 +78,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames = sort_alphanumeric(self.selected_model_fnames)
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -127,25 +129,33 @@ class AstroInferrer(BaseInferrer):
         # keep only tasks required to perform
         self.group_tasks = []
 
-        if self.recon_img or self.recon_synthetic_band or \
-           self.plot_embed_map or self.plot_latent_embed or \
-           self.plot_redshift or self.plot_scaler or \
-           self.save_soft_qtz_weights:
-            self.group_tasks.append("infer_all_coords_full_model")
+        # perform inferrence either after pretrain or normal training
+        if "pretrain_infer" in tasks:
+            if self.plot_redshift or self.save_soft_qtz_weights or self.recon_gt_spectra:
+                self.group_tasks.append("infer_codebook_pretrain")
+            if self.recon_codebook_spectra:
+                self.group_tasks.append("infer_hardcode_coords_modified_model")
+        else:
+            if self.recon_img or self.recon_synthetic_band or \
+               self.plot_embed_map or self.plot_latent_embed or \
+               self.plot_redshift or self.plot_scaler or \
+               self.save_soft_qtz_weights:
+                self.group_tasks.append("infer_all_coords_full_model")
 
-        if self.recon_codebook_spectra:
-            self.group_tasks.append("infer_hardcode_coords_modified_model")
+            if self.recon_codebook_spectra:
+                self.group_tasks.append("infer_hardcode_coords_modified_model")
 
-        if self.recon_dummy_spectra or self.recon_gt_spectra:
-            self.group_tasks.append("infer_selected_coords_partial_model")
+            if self.recon_dummy_spectra or self.recon_gt_spectra:
+                self.group_tasks.append("infer_selected_coords_partial_model")
 
-        if self.plot_pixel_distrib:
-            self.group_tasks.append("infer_no_model_run")
+            if self.plot_pixel_distrib:
+                self.group_tasks.append("infer_no_model_run")
 
         # set all grouped tasks to False, only required tasks will be toggled afterwards
         self.infer_all_coords_full_model = False
         self.infer_hardcode_coords_modified_model = False
         self.infer_selected_coords_partial_model = False
+        self.infer_codebook_pretrain = False
         self.infer_without_model_run = False
 
         if self.verbose:
@@ -182,6 +192,15 @@ class AstroInferrer(BaseInferrer):
                     self.run_checkpoint_hardcode_coords_modified_model,
                     self.post_checkpoint_hardcode_coords_modified_model ]
 
+            elif group_task == "infer_codebook_pretrain":
+                self.run_model = True
+                self.infer_funcs[group_task] = [
+                    self.pre_inferrence_codebook_pretrain,
+                    self.post_inferrence_codebook_pretrain,
+                    self.pre_checkpoint_codebook_pretrain,
+                    self.run_checkpoint_codebook_pretrain,
+                    self.post_checkpoint_codebook_pretrain ]
+
             elif group_task == "infer_no_model_run":
                 self.run_model = False
                 self.infer_funcs[group_task] = [None]*5
@@ -197,8 +216,9 @@ class AstroInferrer(BaseInferrer):
         self.use_full_wave = True
         self.model_output = "pixel_intensity"
         self.coords_source = "fits"
-        self.batched_fields = ["coords"]
-        if self.recon_img: self.batched_fields.append("pixels")
+        self.requested_fields = ["coords"]
+        if self.recon_img: self.requested_fields.append("pixels")
+        self.dataset_mode = "infer"
         self.dataset_length = self.dataset.get_num_coords()
 
         self.batch_size = self.extra_args["infer_batch_size"]
@@ -239,7 +259,8 @@ class AstroInferrer(BaseInferrer):
         self.use_full_wave = True
         self.model_output = "spectra"
         self.coords_source = "spectra"
-        self.batched_fields = ["coords"]
+        self.requested_fields = ["coords"]
+        self.dataset_mode = "infer"
         self.dataset_length = self.dataset.get_num_spectra_coords()
 
         #self.num_spectra = self.dataset.get_num_spectra_coords()
@@ -262,9 +283,10 @@ class AstroInferrer(BaseInferrer):
         """
         self.use_full_wave = True
         self.model_output = "spectra"
-        self.batched_fields = ["coords"]
+        self.requested_fields = ["coords"]
         self.coords_source = "codebook_latents"
 
+        self.dataset_mode = "infer"
         self.dataset_length = self.extra_args["qtz_num_embed"]
 
         self.batch_size = min(self.extra_args["infer_batch_size"],
@@ -272,6 +294,23 @@ class AstroInferrer(BaseInferrer):
         self.reset_dataloader()
 
     def post_inferrence_hardcode_coords_modified_model(self):
+        pass
+
+    def pre_inferrence_codebook_pretrain(self):
+        """ Codebook spectra reconstruction.
+        """
+        self.use_full_wave = True
+        self.model_output = "spectra"
+        self.requested_fields = ["coords","spectra_supervision_data"]
+        self.coords_source = "fits" # TODO remove, we don't use coords
+        self.dataset_mode = "pretrain_infer"
+
+        self.dataset_length = self.extra_args["num_supervision_spectra"]
+        self.batch_size = min(self.extra_args["infer_batch_size"],
+                              self.dataset_length)
+        self.reset_dataloader()
+
+    def post_inferrence_codebook_pretrain(self):
         pass
 
     def inferrence_no_model_run(self):
@@ -504,6 +543,48 @@ class AstroInferrer(BaseInferrer):
             save_spectra=False, codebook=True,
             clip=self.extra_args["plot_clipped_spectrum"])
 
+    def pre_checkpoint_codebook_pretrain(self, model_id):
+        self.reset_data_iterator()
+
+        if self.recon_gt_spectra:
+            self.recon_spectra = []
+
+        if self.plot_redshift:
+            self.redshifts = []
+
+        if self.save_soft_qtz_weights:
+            self.soft_qtz_weights = []
+
+    def run_checkpoint_codebook_pretrain(self, model_id, checkpoint):
+        self.dataset.set_hardcode_data("spectra_latents", checkpoint["latents"].weight)
+        self.infer_pretrain_all(model_id, checkpoint)
+
+    def post_checkpoint_codebook_pretrain(self, model_id):
+        if self.plot_redshift:
+            redshifts = torch.stack(self.redshifts).detach().cpu().numpy()
+            np.set_printoptions(precision=3)
+            log.info(f"Est. redshift {redshifts}")
+
+        if self.save_soft_qtz_weights:
+            weights = torch.stack(self.soft_qtz_weights).detach().cpu().numpy()
+            np.set_printoptions(suppress=True)
+            np.set_printoptions(precision=3)
+            log.info(f"Qtz weights {weights[:,0]}")
+
+        if self.recon_gt_spectra:
+            self.recon_spectra = torch.stack(self.recon_spectra).view(
+                self.dataset.get_num_spectra_to_plot(),
+                self.extra_args["spectra_neighbour_size"]**2, -1
+            ).detach().cpu().numpy()
+
+            self.dataset.plot_spectrum(
+                self.spectra_dir, model_id, self.recon_spectra,
+                spectra_norm_cho=self.extra_args["spectra_norm_cho"],
+                save_spectra=False, clip=self.extra_args["plot_clipped_spectrum"])
+
+            if self.log_pixel_value:
+                self.dataset.log_spectra_pixel_values(self.recon_spectra)
+
     #############
     # Helpers
     #############
@@ -623,14 +704,57 @@ class AstroInferrer(BaseInferrer):
                 if self.verbose: log.info("codebook spectra inferrence done")
                 break
 
+    def infer_pretrain_all(self, model_id, checkpoint):
+        latents = checkpoint["latents"]
+        iterations = checkpoint["epoch_trained"]
+        model_state = checkpoint["model_state_dict"]
+
+        load_model_weights(self.codebook_pipeline, model_state)
+        self.codebook_pipeline.eval()
+
+        while True:
+            try:
+                data = self.next_batch()
+                add_to_device(data, self.extra_args["gpu_data"], self.device)
+
+                with torch.no_grad():
+                    ret = forward(
+                        data,
+                        self.pretrain_infer_pipeline,
+                        iterations,
+                        self.space_dim,
+                        self.extra_args["trans_sample_method"],
+                        recon_spectra=True,
+                        pretrain_infer=True,
+                        quantize_latent=self.quantize_latent,
+                        quantize_spectra=self.quantize_spectra,
+                        quantization_strategy=self.extra_args["quantization_strategy"],
+                        save_soft_qtz_weights=self.save_soft_qtz_weights,
+                        save_redshift=self.plot_redshift)
+
+                if self.plot_redshift:
+                    self.redshifts.extend(ret["redshift"])
+                if self.save_soft_qtz_weights:
+                    self.soft_qtz_weights.extend(ret["soft_qtz_weights"])
+                if self.recon_gt_spectra:
+                    spectra = ret["intensity"]
+                    if spectra.ndim == 3: # bandwise
+                        spectra = spectra.flatten(1,2) # [bsz,nsmpl]
+                    self.recon_spectra.extend(spectra)
+
+            except StopIteration:
+                if self.verbose: log.info("pretrain inferrence done")
+                break
+
     def _configure_dataset(self):
         """ Configure dataset (batched fields and len) for inferrence.
         """
-        if self.space_dim == 3: self.batched_fields.extend(["trans_data"])
+        if self.space_dim == 3: self.requested_fields.extend(["trans_data"])
 
         self.dataset.set_mode("infer")
         self.dataset.set_model_output(self.model_output)
         self.dataset.set_wave_sample_mode(self.use_full_wave)
+        self.dataset.set_mode(self.dataset_mode)
         self.dataset.set_dataset_length(self.dataset_length)
-        self.dataset.set_dataset_fields(self.batched_fields)
+        self.dataset.set_dataset_fields(self.requested_fields)
         self.dataset.set_dataset_coords_source(self.coords_source)

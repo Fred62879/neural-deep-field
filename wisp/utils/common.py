@@ -136,6 +136,7 @@ def forward(
         space_dim,
         trans_sample_method,
         codebook_pretrain=False,
+        pretrain_infer=False,
         pixel_supervision_train=False,
         spectra_supervision_train=False,
         redshift_supervision_train=False,
@@ -189,7 +190,7 @@ def forward(
         # transmission wave min and max value (used for linear normalization)
         net_args["full_wave_bound"] = data["full_wave_bound"]
 
-        if codebook_pretrain:
+        if codebook_pretrain or pretrain_infer:
             net_args["spectra_latents"] = data["spectra_latents"]
             net_args["full_wave"] = data["full_wave"]
             net_args["full_wave_bound"] = data["full_wave_bound"]

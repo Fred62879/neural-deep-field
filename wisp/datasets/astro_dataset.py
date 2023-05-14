@@ -188,7 +188,7 @@ class AstroDataset(Dataset):
         # the others are forwarded only for spectrum plotting
         spectra_coords = self.spectra_dataset.get_spectra_grid_coords()
 
-        if self.mode == "codebook_pretrain":
+        if self.mode == "codebook_pretrain" or self.mode == "pretrain_infer":
             spectra_coords = spectra_coords[:self.kwargs["num_supervision_spectra"]]
             out["spectra_latents"] = self.data["spectra_latents"]
 
@@ -233,6 +233,7 @@ class AstroDataset(Dataset):
         if self.transform is not None:
             out = self.transform(out)
 
+        # print(out["coords"].shape, out["wave"].shape)
         return out
 
     ############

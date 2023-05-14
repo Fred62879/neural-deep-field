@@ -41,6 +41,8 @@ class SpectraData:
 
         self.codebook_pretrain = self.kwargs["pretrain_codebook"] and \
             "codebook_pretrain" in tasks
+        self.pretrain_infer = self.kwargs["pretrain_codebook"] and \
+            "pretrain_infer" in tasks
         self.require_spectra_coords = self.kwargs["mark_spectra"] and \
             ("plot_redshift" in tasks or "plot_embed_map" in tasks)
         self.recon_spectra = self.recon_gt_spectra or self.recon_dummy_spectra or \
@@ -49,6 +51,7 @@ class SpectraData:
 
         return self.kwargs["space_dim"] == 3 and (
             self.codebook_pretrain or \
+            self.pretrain_infer or \
             self.spectra_supervision_train or \
             self.recon_spectra or self.require_spectra_coords)
 
@@ -68,6 +71,7 @@ class SpectraData:
 
         if self.recon_gt_spectra or \
            self.codebook_pretrain or \
+           self.pretrain_infer or \
            self.require_spectra_coords or \
            self.spectra_supervision_train:
             self.load_gt_spectra_data()
@@ -232,9 +236,9 @@ class SpectraData:
 
         self.data["gt_spectra_grid_coords"] = torch.stack(
             self.data["gt_spectra_grid_coords"]).type(
-            torch.FloatTensor)[:,:,None].view(-1,1,coord_dim) # [num_coords,num_neighbours,.]
+                torch.FloatTensor)[:,:,None].view(-1,1,coord_dim) #[num_coords,num_neighbours,.]
 
-        if self.spectra_supervision_train or self.codebook_pretrain:
+        if self.spectra_supervision_train or self.codebook_pretrain or self.pretrain_infer:
             n = self.kwargs["num_supervision_spectra"]
             self.data["supervision_spectra"] = torch.FloatTensor(
                 np.array(self.data["supervision_spectra"]))[:n]
@@ -270,7 +274,8 @@ class SpectraData:
         self.data["gt_spectra_img_coords"].append(img_coords)   # [num_neighbours,2/3]
         self.data["gt_spectra_grid_coords"].append(grid_coords) # [num_neighbours,2/3] [0~1]
 
-        if not self.codebook_pretrain and not self.spectra_supervision_train and not self.recon_spectra: return
+        if not self.codebook_pretrain and not self.pretrain_infer \
+           and not self.spectra_supervision_train and not self.recon_spectra: return
 
         # ii) load actual spectra data
         fname = join(self.spectra_path, fits_uid,
@@ -282,7 +287,7 @@ class SpectraData:
             trusted_range=None if not self.kwargs["trusted_range_only"] else [wave_lo, wave_hi])
 
         # iii) get data for for spectra supervision
-        if self.spectra_supervision_train or self.codebook_pretrain:
+        if self.spectra_supervision_train or self.codebook_pretrain or self.pretrain_infer:
             supervision_spectra_wave_bound = [
                 source_spectra_data["spectra_supervision_wave_lo"][spectra_id],
                 source_spectra_data["spectra_supervision_wave_hi"][spectra_id]]
@@ -440,7 +445,9 @@ class SpectraData:
                 fname = join(cur_spectra_dir, f"spectra_{i}_{name}")
                 fig.tight_layout();plt.savefig(fname);plt.close()
 
-            if save_spectra: np.save(fname, cur_spectra)
+            if save_spectra:
+                fname = join(cur_spectra_dir, f"spectra_{i}_{name}")
+                np.save(fname, cur_spectra)
 
         if self.kwargs["plot_spectrum_together"]:
             fname = join(spectra_dir, sub_dir, f"all_spectra_{name}")
