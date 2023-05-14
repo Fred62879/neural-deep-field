@@ -82,13 +82,11 @@ class CodebookTrainer(BaseTrainer):
         fields = ["spectra_supervision_data"]
         if self.redshift_supervision:
             fields.append("redshift_supervision_data")
-        self.dataset.set_dataset_fields(fields)
+        self.dataset.set_fields(fields)
 
         # set input latents for codebook net
         self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
-
-        self.dataset.set_dataset_length(
-            self.extra_args["num_supervision_spectra"])
+        self.dataset.set_length(self.extra_args["num_supervision_spectra"])
         self.dataset.set_model_output("spectra")
 
     def summarize_training_tasks(self):

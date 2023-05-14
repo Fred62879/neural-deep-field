@@ -55,7 +55,7 @@ class BaseInferrer(ABC):
         self.group_tasks = []
 
         self.summarize_inferrence_tasks()
-        self.generate_inferrence_funcs()
+        self.set_inferrence_funcs()
 
     def set_checkpoint(self, model_id, checkpoint):
         self.model_id = model_id
@@ -66,7 +66,7 @@ class BaseInferrer(ABC):
         self.group_tasks = []
 
     @abstractmethod
-    def generate_inferrence_funcs(self):
+    def set_inferrence_funcs(self):
         self.infer_funcs = {}
 
     #############

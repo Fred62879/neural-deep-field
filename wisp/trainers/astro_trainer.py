@@ -93,9 +93,9 @@ class AstroTrainer(BaseTrainer):
         length = self.get_dataset_length()
 
         self.dataset.set_mode("train")
-        self.dataset.set_dataset_length(length)
-        self.dataset.set_dataset_fields(fields)
-        self.dataset.set_dataset_coords_source("fits")
+        self.dataset.set_length(length)
+        self.dataset.set_fields(fields)
+        self.dataset.set_coords_source("fits")
         self.dataset.set_model_output("pixel_intensity")
 
     def summarize_training_tasks(self):

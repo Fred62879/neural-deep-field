@@ -59,7 +59,7 @@ class AstroDataset(Dataset):
         self.coords_source = "fits"
         self.model_output = "pixel_intensity"
         self.use_full_wave = False
-        self.set_dataset_length(0)
+        self.set_length(0)
 
     ############
     # Setters
@@ -78,16 +78,16 @@ class AstroDataset(Dataset):
         """
         self.model_output = model_output
 
-    def set_dataset_coords_source(self, coords_source):
+    def set_coords_source(self, coords_source):
         """ Set dataset source of coords that controls:
               i) whether load fits coords ("fits") or spectra coords ("spectra")
         """
         self.coords_source = coords_source
 
-    def set_dataset_length(self, length):
+    def set_length(self, length):
         self.dataset_length = length
 
-    def set_dataset_fields(self, fields):
+    def set_fields(self, fields):
         self.requested_fields = set(fields)
 
     def set_hardcode_data(self, field, data):
