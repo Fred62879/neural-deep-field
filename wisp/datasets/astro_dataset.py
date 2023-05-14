@@ -38,7 +38,7 @@ class AstroDataset(Dataset):
 
         if self.space_dim == 3:
             self.unbatched_fields = {
-                "trans_data","spectra_supervision_data","redshift_supervision_data"
+                "trans_data","spectra_data","redshift_data"
             }
         else:
             self.unbatched_fields = set()
@@ -55,11 +55,11 @@ class AstroDataset(Dataset):
         self.mask_dataset = MaskData(self.fits_dataset, self.root, self.device, **self.kwargs)
 
         # randomly initialize
+        self.set_length(0)
         self.mode = "train"
         self.coords_source = "fits"
-        self.model_output = "pixel_intensity"
         self.use_full_wave = False
-        self.set_length(0)
+        self.perform_integration = True
 
     ############
     # Setters
@@ -68,15 +68,11 @@ class AstroDataset(Dataset):
     def set_mode(self, mode):
         self.mode = mode
 
-    def set_wave_sample_mode(self, use_full_wave: bool):
+    def toggle_wave_sampling(self, use_full_wave: bool):
         self.use_full_wave = use_full_wave
 
-    def set_model_output(self, model_output):
-        """ Set expected model output.
-            If output pixel intensity, we give wave, trans, nsmpl
-            If output spectra, only give wave
-        """
-        self.model_output = model_output
+    def toggle_integration(self, integrate: bool):
+        self.perform_integration = integrate
 
     def set_coords_source(self, coords_source):
         """ Set dataset source of coords that controls:
@@ -142,8 +138,9 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_pixels(idx)
         elif field == "weights":
             data = self.fits_dataset.get_weights(idx)
-        # elif field == "redshift":
-        #     data = self.fits_dataset.get_redshifts(idx)
+        elif field == "redshift":
+            assert 0
+            data = self.fits_dataset.get_redshifts(idx)
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
         else:
@@ -157,9 +154,10 @@ class AstroDataset(Dataset):
         # trans wave min and max value (used for linear normalization)
         out["full_wave_bound"] = self.get_full_wave_bound()
 
-        if self.model_output == "pixel_intensity":
+        if self.perform_integration:
             if self.kwargs["trans_sample_method"] == "hardcode":
-                out["wave"] = self.trans_dataset.get_hdcd_wave()[None,:,None].tile(batch_size,1,1)
+                out["wave"] = self.trans_dataset.get_hdcd_wave()
+                out["wave"] = out["wave"][None,:,None].tile(batch_size,1,1)
                 out["trans"] = self.trans_dataset.get_hdcd_trans()
                 out["nsmpl"] = self.trans_dataset.get_hdcd_nsmpl()
             else:
@@ -172,35 +170,37 @@ class AstroDataset(Dataset):
                 nsmpl = out["trans"].shape[1]
                 out["trans"] = torch.cat((out["trans"], torch.ones(1,nsmpl)), dim=0)
                 out["nsmpl"] = torch.cat((out["nsmpl"], torch.tensor([nsmpl])), dim=0)
-
-        elif self.model_output == "spectra":
+        else:
             out["wave"] = torch.FloatTensor(self.get_full_wave())
             out["wave"] = out["wave"][None,:,None].tile(batch_size,1,1)
 
     def get_spectra_data(self, out):
-        """ Get unbatched spectra data (only for spectra supervision training).
+        """ Get unbatched spectra data
+            For either spectra supervision training or codebook pretrain.
         """
+        assert(self.kwargs["pretrain_codebook"] ^ self.kwargs["spectra_supervision"])
+
         # get only supervision spectra (not all gt spectra) for loss calculation
         out["gt_spectra"] = self.spectra_dataset.get_supervision_spectra()
 
-        # get all coords to plot all spectra (gt, dummy, incl. neighbours)
-        # the first #num_supervision_spectra are gt coords for supervision
-        # the others are forwarded only for spectrum plotting
-        spectra_coords = self.spectra_dataset.get_spectra_grid_coords()
+        out["spectra_supervision_wave_bound_ids"] = \
+            self.spectra_dataset.get_spectra_supervision_wave_bound_ids()
 
-        if self.mode == "codebook_pretrain" or self.mode == "pretrain_infer":
-            spectra_coords = spectra_coords[:self.kwargs["num_supervision_spectra"]]
-            out["spectra_latents"] = self.data["spectra_latents"]
-
-        if "coords" in out:
-            out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
+        if self.kwargs["pretrain_codebook"]:
+            out["coords"] = self.data["spectra_latents"]
         else:
-            out["coords"] = spectra_coords
+            out["full_wave"] = self.get_full_wave()
 
-        out["num_spectra_coords"] = len(spectra_coords)
-        out["full_wave"] = self.get_full_wave()
-        out["full_wave_bound"] = self.get_full_wave_bound()
-        out["spectra_supervision_wave_bound_ids"] = self.spectra_dataset.get_spectra_supervision_wave_bound_ids()
+            # get all coords to plot all spectra (gt, dummy, incl. neighbours)
+            spectra_coords = self.spectra_dataset.get_spectra_grid_coords()
+            if "coords" in out:
+                out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
+            else:
+                out["coords"] = spectra_coords
+
+            # the first #num_supervision_spectra are gt coords for supervision
+            # the others are forwarded only for spectrum plotting
+            out["num_spectra_coords"] = len(spectra_coords)
 
     def get_redshift_data(self, out):
         out["redshift"] = self.spectra_dataset.get_redshift()
@@ -224,16 +224,15 @@ class AstroDataset(Dataset):
         if "trans_data" in self.requested_fields:
             self.get_trans_data(len(idx), out)
 
-        if "spectra_supervision_data" in self.requested_fields:
+        if "spectra_data" in self.requested_fields:
             self.get_spectra_data(out)
 
-        if "redshift_supervision_data" in self.requested_fields:
+        if "redshift_data" in self.requested_fields:
             self.get_redshift_data(out)
 
+        # self.print_shape(out)
         if self.transform is not None:
             out = self.transform(out)
-
-        # print(out["coords"].shape, out["wave"].shape)
         return out
 
     ############
@@ -253,3 +252,10 @@ class AstroDataset(Dataset):
 
     def log_spectra_pixel_values(self, spectra):
         return self.spectra_dataset.log_spectra_pixel_values(spectra)
+
+    def print_shape(self, out):
+        for n,p in out.items():
+            # print(n, type(p))
+            if type(p) == tuple or type(p) == list:
+                print(n, len(p))
+            else: print(n, p.shape)

@@ -23,9 +23,9 @@ class CodebookNef(BaseNeuralField):
 
     def register_forward_functions(self):
         channels = ["intensity"]
-        self._register_forward_function( self.get_codebook_spectra, channels )
+        self._register_forward_function( self.recon_codebook_spectra, channels )
 
-    def get_codebook_spectra(self, coords, wave, full_wave_bound, qtz_args=None):
+    def recon_codebook_spectra(self, coords, wave, full_wave_bound, qtz_args=None):
         """ Output given latents without any modifications.
             @Params:
               coords: [(1,)bsz,num_samples,latents_dim]

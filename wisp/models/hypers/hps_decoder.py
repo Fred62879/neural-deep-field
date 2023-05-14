@@ -38,6 +38,7 @@ class HyperSpectralDecoder(nn.Module):
             latents = self.convert(wave, input, redshift, wave_bound)
 
         spectra = self.spectra_decoder(latents)[...,0]
+        # print(spectra.shape, spectra)
 
         if quantize_spectra:
             _, spectra = self.qtz(input, spectra, ret, qtz_args)
@@ -105,6 +106,7 @@ class HyperSpectralDecoder(nn.Module):
               intensity: reconstructed pixel values
               spectra:   reconstructed spectra
         """
+        # print(latents.shape, wave.shape)
         timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
 
         if num_spectra_coords > 0:

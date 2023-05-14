@@ -156,10 +156,13 @@ def forward(
         save_soft_qtz_weights=False
 ):
     # forward should only be called under one and only one of the following states
-    train = pixel_supervision_train or spectra_supervision_train #or redshift_supervision_train
+    train = pixel_supervision_train or spectra_supervision_train
+    recon_all = not train and not codebook_pretrain and (recon_img or save_scaler or save_latents or save_codebook or save_redshift or save_embed_ids or save_soft_qtz_weights)
+
+    # print(codebook_pretrain, train, recon_all, recon_spectra, recon_codebook_spectra)
     is_valid = reduce(
         lambda x, y: x ^ y,
-        [codebook_pretrain, train, recon_img, recon_spectra, recon_codebook_spectra]
+        [codebook_pretrain, train, recon_all, recon_spectra, recon_codebook_spectra]
     )
     assert(is_valid)
 
@@ -187,18 +190,18 @@ def forward(
            (quantize_spectra or (quantize_latent and quantization_strategy == "soft")):
             requested_channels.append("soft_qtz_weights")
 
-        # transmission wave min and max value (used for linear normalization)
+        # transmission wave, and min and max value (used for linear normalization)
+        net_args["wave"] = data["wave"]
         net_args["full_wave_bound"] = data["full_wave_bound"]
 
-        if codebook_pretrain or pretrain_infer:
-            net_args["spectra_latents"] = data["spectra_latents"]
-            net_args["full_wave"] = data["full_wave"]
-            net_args["full_wave_bound"] = data["full_wave_bound"]
-            net_args["spectra_supervision_wave_bound_ids"] = data["spectra_supervision_wave_bound_ids"]
+        # if codebook_pretrain or pretrain_infer:
+            # net_args["full_wave"] = data["full_wave"]
+            # net_args["spectra_latents"] = data["spectra_latents"]
+            # net_args["spectra_supervision_wave_bound_ids"] = \
+            #     data["spectra_supervision_wave_bound_ids"]
 
         if pixel_supervision_train or recon_img:
             assert(trans_sample_method != "bandwise")
-            net_args["wave"] = data["wave"]
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
 
@@ -206,13 +209,10 @@ def forward(
             assert(codebook_pretrain)
             net_args["redshift"] = data["redshift"]
 
-        if recon_spectra or recon_codebook_spectra:
-            net_args["wave"] = data["wave"]
-
         if spectra_supervision_train:
+            net_args["full_wave"] = data["full_wave"]
             # num of coords for gt, dummy (incl. neighbours) spectra
             net_args["num_spectra_coords"] = data["num_spectra_coords"]
-            net_args["full_wave"] = data["full_wave"]
 
         if quantize_latent or quantize_spectra:
             qtz_args = defaultdict(lambda: False)

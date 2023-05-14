@@ -13,8 +13,8 @@ from torch.utils.data import BatchSampler, SequentialSampler, DataLoader
 class BaseInferrer(ABC):
     """ Base class for inferrence.
     """
-
-    def __init__(self, pipelines, dataset, device, **extra_args):
+    def __init__(self, pipelines, dataset, device, mode, **extra_args):
+        self.mode = mode
         self.device = device
         self.dataset = dataset
         self.pipelines = pipelines

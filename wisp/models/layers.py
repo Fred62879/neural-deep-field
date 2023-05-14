@@ -187,9 +187,9 @@ class Quantization(nn.Module):
             # weights = weights / (torch.sum(weights, dim=-1, keepdim=True) + 1e-6)
 
             if self.kwargs["quantize_spectra"]:
-                codebook = codebook.permute(1,0,2) # [bsz,num_embeds,nsmpl]
-            else:
-                pass # codebook [num_embeds,embed_dim]
+                # codebook here is actually codebook spectra
+                codebook = codebook.permute(1,0,2) # [bsz,num_embeds,full_nsmpl]
+            else: pass # codebook [num_embeds,embed_dim]
 
             z_q = torch.matmul(weights, codebook)
 

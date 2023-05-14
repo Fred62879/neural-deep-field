@@ -40,7 +40,7 @@ class CodebookTrainer(BaseTrainer):
         self.cuda = "cuda" in str(self.device)
         self.verbose = self.extra_args["verbose"]
         self.space_dim = self.extra_args["space_dim"]
-        self.gpu_fields = ["spectra_latents","gt_spectra","full_wave","redshift"]
+        self.gpu_fields = ["coords","wave","gt_spectra","redshift"]
 
         self.total_steps = 0
         self.save_data_to_local = False
@@ -79,22 +79,24 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_mode("codebook_pretrain")
 
         # set required fields from dataset
-        fields = ["spectra_supervision_data"]
+        fields = ["trans_data","spectra_data"]
         if self.redshift_supervision:
-            fields.append("redshift_supervision_data")
+            fields.append("redshift_data")
         self.dataset.set_fields(fields)
 
         # set input latents for codebook net
+        self.dataset.set_coords_source("spectra_latents")
         self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
+
+        self.dataset.toggle_integration(False)
         self.dataset.set_length(self.extra_args["num_supervision_spectra"])
-        self.dataset.set_model_output("spectra")
 
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
 
-        self.save_qtz_weights = "save_soft_qtz_weights_during_train" in tasks
+        self.log_soft_qtz_weights = "log_soft_qtz_weights_during_train" in tasks
         self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
-        self.save_redshift =  "save_redshift_during_train" in tasks and self.extra_args["generate_redshift"]
+        self.log_redshift =  "log_redshift_during_train" in tasks and self.extra_args["generate_redshift"]
         self.redshift_supervision = self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"]
 
         if self.plot_spectra:
@@ -192,7 +194,7 @@ class CodebookTrainer(BaseTrainer):
         params.append({"params": net_params,
                        "lr": self.extra_args["codebook_pretrain_lr"]})
         self.optimizer = self.optim_cls(params, **self.optim_params)
-        log.info(self.optimizer)
+        if self.verbose: log.info(self.optimizer)
 
     #############
     # Training logic
@@ -268,13 +270,13 @@ class CodebookTrainer(BaseTrainer):
         if self.save_local_every > -1 and self.epoch % self.save_local_every == 0:
             self.save_data_to_local = True
 
-            if self.save_redshift: self.redshifts = []
+            if self.log_redshift: self.redshifts = []
             if self.plot_spectra: self.smpl_spectra = []
-            if self.save_qtz_weights: self.qtz_weights = []
+            if self.log_soft_qtz_weights: self.qtz_weights = []
 
             # re-init dataloader to make sure pixels are in order
             self.shuffle_dataloader = False
-            # self.dataset.set_wave_sample_mode(use_full_wave=False)
+            # self.dataset.toggle_wave_sampling(use_full_wave=False)
             self.use_all_pixels = True
             self.set_num_batches()
             self.init_dataloader()
@@ -314,7 +316,7 @@ class CodebookTrainer(BaseTrainer):
             self.shuffle_dataloader = True
             self.save_data_to_local = False
             self.set_num_batches()
-            self.dataset.set_wave_sample_mode(use_full_wave=False)
+            self.dataset.toggle_wave_sampling(use_full_wave=False)
             self.init_dataloader()
             self.reset_data_iterator()
 
@@ -351,9 +353,9 @@ class CodebookTrainer(BaseTrainer):
         self.timer.check("backward and step")
 
         if self.save_data_to_local:
-            if self.save_redshift: self.redshifts.extend(ret["redshift"])
+            if self.log_redshift: self.redshifts.extend(ret["redshift"])
             if self.plot_spectra: self.smpl_spectra.append(ret["spectra"])
-            if self.save_qtz_weights: self.qtz_weights.extend(ret["soft_qtz_weights"])
+            if self.log_soft_qtz_weights: self.qtz_weights.extend(ret["soft_qtz_weights"])
 
     def post_step(self):
         pass
@@ -454,8 +456,8 @@ class CodebookTrainer(BaseTrainer):
                       quantize_spectra=True,
                       quantization_strategy="soft",
                       save_spectra=self.plot_spectra,
-                      save_redshift=self.save_redshift,
-                      save_soft_qtz_weights=self.save_qtz_weights)
+                      save_redshift=self.log_redshift,
+                      save_soft_qtz_weights=self.log_soft_qtz_weights)
 
         # i) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
@@ -522,30 +524,31 @@ class CodebookTrainer(BaseTrainer):
 
     def save_local(self):
         if self.plot_spectra:
-            self.plot_spectrum()
+            self._plot_spectrum()
 
-        if self.save_redshift:
-            self.log_redshift()
+        if self.log_redshift:
+            self._log_redshift()
 
-        if self.save_qtz_weights:
-            self.log_qtz_weights()
+        if self.log_soft_qtz_weights:
+            self._log_qtz_weights()
 
-    def log_redshift(self):
+    def _log_redshift(self):
         redshifts = torch.stack(self.redshifts).detach().cpu().numpy()
         np.set_printoptions(precision=3)
         log.info(f"Est. redshift {redshifts}")
 
-    def log_qtz_weights(self):
+    def _log_qtz_weights(self):
         weights = torch.stack(self.qtz_weights).detach().cpu().numpy()
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
         log.info(f"Qtz weights {weights[:,0]}")
 
-    def plot_spectrum(self):
+    def _plot_spectrum(self):
         self.smpl_spectra = torch.stack(self.smpl_spectra).view(
             self.extra_args["num_supervision_spectra"], -1
         ).detach().cpu().numpy() # [num_supervision_spectra,num_samples]
 
-        self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra,
+        fname = f"ep{self.epoch}-it{self.iteration}"
+        self.dataset.plot_spectrum(self.spectra_dir, fname, self.smpl_spectra,
                                    self.extra_args["spectra_norm_cho"], clip=True,
                                    save_spectra=True)

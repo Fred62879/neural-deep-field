@@ -85,7 +85,7 @@ class AstroTrainer(BaseTrainer):
                 pass
 
         if self.spectra_supervision:
-            fields.append("spectra_supervision_data")
+            fields.append("spectra_data")
 
         if self.redshift_supervision:
             fields.append("redshift")
@@ -312,7 +312,7 @@ class AstroTrainer(BaseTrainer):
 
             # re-init dataloader to make sure pixels are in order
             self.shuffle_dataloader = False
-            self.dataset.set_wave_sample_mode(use_full_wave=False)
+            self.dataset.toggle_wave_sampling(use_full_wave=False)
             self.use_all_pixels = True
             self.set_num_batches()
             self.init_dataloader()
@@ -350,7 +350,7 @@ class AstroTrainer(BaseTrainer):
             self.shuffle_dataloader = True
             self.save_data_to_local = False
             self.set_num_batches()
-            self.dataset.set_wave_sample_mode(use_full_wave=False)
+            self.dataset.toggle_wave_sampling(use_full_wave=False)
             self.init_dataloader()
             self.reset_data_iterator()
 

@@ -343,6 +343,9 @@ class SpectraData:
             if clip:
                 clip_range = self.kwargs["codebook_spectra_clip_range"]
                 bound_ids = get_bound_id(clip_range, full_wave, within_bound=True)
+                # print(full_wave)
+                # print(full_wave[bound_ids[0]], full_wave[bound_ids[1]])
+                # print(clip_range, bound_ids)
                 recon_spectra_wave = np.arange(
                     full_wave[bound_ids[0]], full_wave[bound_ids[-1]],
                     self.kwargs["trans_sample_interval"])
