@@ -22,7 +22,7 @@ class CodebookPretrainNerf(BaseNeuralField):
     def register_forward_functions(self):
         """ Register forward functions with the channels that they output.
         """
-        channels = ["intensity","spectra","redshift","soft_qtz_weights"]
+        channels = ["intensity","spectra","redshift","soft_qtz_weights","codebook"]
         self._register_forward_function(self.pretrain, channels)
 
     def init_model(self):
@@ -44,6 +44,7 @@ class CodebookPretrainNerf(BaseNeuralField):
               coords: [num_supervision_spectra,latent_dim]
               wave:   full wave [bsz,nsmpl,1]
         """
+        # print(coords.shape, wave.shape)
         # print(wave, full_wave_bound)
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]

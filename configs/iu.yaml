@@ -1,6 +1,6 @@
 
 global:
-    verbose: False
+    verbose: True
     print_shape: False
     activate_timer: False
     dataloader_drop_last: True
@@ -8,7 +8,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','log_redshift_during_train','log_soft_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_codebook_spectra','recon_gt_spectra','log_redshift','log_soft_qtz_weights']
+    tasks: ['pretrain_infer','recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights']
 
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','plot_latent_embed']
@@ -104,7 +104,7 @@ qtz:
 
 spatial_decod:
     generate_scaler: True
-    generate_redshift: False
+    generate_redshift: True
 
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1

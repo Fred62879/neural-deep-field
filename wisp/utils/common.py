@@ -157,7 +157,7 @@ def forward(
 ):
     # forward should only be called under one and only one of the following states
     train = pixel_supervision_train or spectra_supervision_train
-    recon_all = not train and not codebook_pretrain and (recon_img or save_scaler or save_latents or save_codebook or save_redshift or save_embed_ids or save_soft_qtz_weights)
+    recon_all = not train and not codebook_pretrain and (recon_img or save_scaler or save_latents or save_redshift or save_embed_ids or save_soft_qtz_weights)
 
     # print(codebook_pretrain, train, recon_all, recon_spectra, recon_codebook_spectra)
     is_valid = reduce(
@@ -193,12 +193,6 @@ def forward(
         # transmission wave, and min and max value (used for linear normalization)
         net_args["wave"] = data["wave"]
         net_args["full_wave_bound"] = data["full_wave_bound"]
-
-        # if codebook_pretrain or pretrain_infer:
-            # net_args["full_wave"] = data["full_wave"]
-            # net_args["spectra_latents"] = data["spectra_latents"]
-            # net_args["spectra_supervision_wave_bound_ids"] = \
-            #     data["spectra_supervision_wave_bound_ids"]
 
         if pixel_supervision_train or recon_img:
             assert(trans_sample_method != "bandwise")

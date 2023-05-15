@@ -174,7 +174,10 @@ class Quantization(nn.Module):
         self.num_embed = kwargs["qtz_num_embed"]
         self.latent_dim = kwargs["qtz_latent_dim"]
 
-    def quantize(self, z, codebook, temperature, find_embed_id):
+    def quantize(self, z, codebook, temperature, find_embed_id, save_codebook):
+        """ @Param
+              codebook [num_embeds,embed_dim]
+        """
         if self.quantization_strategy == "soft":
             if find_embed_id:
                 min_embed_ids = torch.argmax(z, dim=-1)
@@ -187,10 +190,7 @@ class Quantization(nn.Module):
             # weights = weights / (torch.sum(weights, dim=-1, keepdim=True) + 1e-6)
 
             if self.kwargs["quantize_spectra"]:
-                # codebook here is actually codebook spectra
                 codebook = codebook.permute(1,0,2) # [bsz,num_embeds,full_nsmpl]
-            else: pass # codebook [num_embeds,embed_dim]
-
             z_q = torch.matmul(weights, codebook)
 
         elif self.quantization_strategy == "hard":
@@ -211,7 +211,10 @@ class Quantization(nn.Module):
         else:
             raise ValueError("Unsupported quantization strategy")
 
-        return z_q, min_embed_ids, weights
+        # at this point, codebook is either still in the original form
+        # or became codebook spectra (which we need when recon codebook spectra
+        #  individually for each spectra)
+        return z_q, min_embed_ids, codebook, weights
 
     def partial_loss(self, z, z_q):
         codebook_loss = torch.mean((z_q.detach() - z)**2) + \
@@ -232,8 +235,9 @@ class Quantization(nn.Module):
                  save_codebook: save codebook weights value to local
                  save_soft_qtz_weights: save weights for each code (when doing soft qtz)
         """
-        z_q, min_embed_ids, codebook_weights = self.quantize(
-            z, codebook, qtz_args["temperature"], qtz_args["find_embed_id"])
+        z_q, min_embed_ids, codebook, codebook_weights = self.quantize(
+            z, codebook, qtz_args["temperature"], qtz_args["find_embed_id"],
+            qtz_args["save_codebook"])
 
         if self.quantization_strategy == "hard":
             ret["min_embed_ids"] = min_embed_ids
@@ -245,6 +249,9 @@ class Quantization(nn.Module):
             z_q = z + (z_q - z).detach()
 
         elif self.quantization_strategy == "soft":
+            if qtz_args["save_codebook"]:
+                ret["codebook"] = codebook # [bsz,num_embeds,full_nsmpl]
+
             if qtz_args["find_embed_id"]:
                 ret["min_embed_ids"] = min_embed_ids
 

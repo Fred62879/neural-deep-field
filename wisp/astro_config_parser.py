@@ -59,7 +59,6 @@ def get_pipelines_from_config(args, tasks={}):
     else: device = "cpu"
 
     if args.dataset_type == 'astro':
-
         # pipeline for codebook pretraining and inferrence
         if "codebook_pretrain" in tasks and args.pretrain_codebook:
             assert(args.quantize_latent or args.quantize_spectra)
@@ -71,6 +70,8 @@ def get_pipelines_from_config(args, tasks={}):
         if "pretrain_infer" in tasks and args.pretrain_codebook:
             pretrain_nef = CodebookPretrainNerf(**vars(args))
             pipelines["pretrain_infer"] = AstroPipeline(pretrain_nef)
+            if "recon_codebook_spectra_individ" in tasks and args.generate_redshift:
+                pipelines["codebook_individ"] = AstroPipeline(pretrain_nef)
 
         # full pipline for training and/or inferrence
         nef_train = globals()[args.nef_type](**vars(args))
