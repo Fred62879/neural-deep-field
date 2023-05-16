@@ -75,7 +75,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames = sort_alphanumeric(self.selected_model_fnames)
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -300,6 +300,7 @@ class AstroInferrer(BaseInferrer):
         """
         self.use_full_wave = True
         self.perform_integration = False
+        self.coords_source = "codebook_latents"
         self.requested_fields = ["coords"]
 
         if self.recon_codebook_spectra:
@@ -466,6 +467,8 @@ class AstroInferrer(BaseInferrer):
         if self.log_redshift:
             assert(self.mode == "pretrain_infer")
             redshifts = torch.stack(self.redshifts).detach().cpu().numpy()
+            fname = join(self.redshift_dir, f"{model_id}.pth")
+            np.save(fname, redshifts)
             np.set_printoptions(precision=3)
             log.info(f"Est. redshift {redshifts}")
 
@@ -503,6 +506,8 @@ class AstroInferrer(BaseInferrer):
         if self.log_soft_qtz_weights:
             assert(self.mode == "pretrain_infer")
             weights = torch.stack(self.soft_qtz_weights).detach().cpu().numpy()
+            fname = join(self.soft_qtz_weights_dir, f"{model_id}.pth")
+            np.save(fname, weights)
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
             log.info(f"Qtz weights {weights[:,0]}")
@@ -544,6 +549,7 @@ class AstroInferrer(BaseInferrer):
     def post_checkpoint_hardcode_coords_modified_model(self, model_id):
         # [(num_supervision_spectra,)num_embeds,nsmpl]
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
+        # np.save('code.npy',self.codebook_spectra)
 
         # if spectra is 2d, add dummy 1st dim to simplify code
         if self.recon_codebook_spectra:
@@ -684,6 +690,7 @@ class AstroInferrer(BaseInferrer):
                     else:
                         spectra = ret["codebook"]
 
+                # np.save('code.npy',spectra.detach().cpu().numpy())
                 self.codebook_spectra.extend(spectra)
 
             except StopIteration:

@@ -38,7 +38,6 @@ class HyperSpectralDecoder(nn.Module):
             latents = self.convert(wave, input, redshift, wave_bound)
 
         spectra = self.spectra_decoder(latents)[...,0]
-        # print(spectra.shape, spectra)
 
         if quantize_spectra:
             _, spectra = self.qtz(input, spectra, ret, qtz_args)
@@ -122,8 +121,8 @@ class HyperSpectralDecoder(nn.Module):
             latents, wave, ret["scaler"], ret["redshift"], full_wave_bound, ret,
             codebook, qtz_args, quantize_spectra)
 
-        if "spectra" not in ret:
-            ret["spectra"] = spectra
+        # if "spectra" not in ret:
+        #     ret["spectra"] = spectra
 
         intensity = self.inte(spectra, trans, nsmpl)
         ret["intensity"] = intensity

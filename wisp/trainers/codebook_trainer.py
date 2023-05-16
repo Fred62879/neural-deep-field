@@ -94,9 +94,9 @@ class CodebookTrainer(BaseTrainer):
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
 
-        self.log_soft_qtz_weights = "log_soft_qtz_weights_during_train" in tasks
+        self.save_soft_qtz_weights = "save_soft_qtz_weights_during_train" in tasks
         self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
-        self.log_redshift =  "log_redshift_during_train" in tasks and self.extra_args["generate_redshift"]
+        self.save_redshift =  "save_redshift_during_train" in tasks and self.extra_args["generate_redshift"]
         self.redshift_supervision = self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"]
 
         if self.plot_spectra:
@@ -107,8 +107,11 @@ class CodebookTrainer(BaseTrainer):
         if self.verbose: log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
-                ["model_dir","spectra_dir","codebook_spectra_dir"],
-                ["models","train_spectra","codebook_spectra"]):
+                ["model_dir","spectra_dir","codebook_spectra_dir",
+                 "redshift_dir","soft_qtz_weight_dir"],
+                ["models","train_spectra","codebook_spectra",
+                 "redshift","soft_qtz_weights"]
+        ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -270,9 +273,9 @@ class CodebookTrainer(BaseTrainer):
         if self.save_local_every > -1 and self.epoch % self.save_local_every == 0:
             self.save_data_to_local = True
 
-            if self.log_redshift: self.redshifts = []
+            if self.save_redshift: self.redshifts = []
             if self.plot_spectra: self.smpl_spectra = []
-            if self.log_soft_qtz_weights: self.qtz_weights = []
+            if self.save_soft_qtz_weights: self.qtz_weights = []
 
             # re-init dataloader to make sure pixels are in order
             self.shuffle_dataloader = False
@@ -353,9 +356,9 @@ class CodebookTrainer(BaseTrainer):
         self.timer.check("backward and step")
 
         if self.save_data_to_local:
-            if self.log_redshift: self.redshifts.extend(ret["redshift"])
+            if self.save_redshift: self.redshifts.extend(ret["redshift"])
             if self.plot_spectra: self.smpl_spectra.append(ret["spectra"])
-            if self.log_soft_qtz_weights: self.qtz_weights.extend(ret["soft_qtz_weights"])
+            if self.save_soft_qtz_weights: self.qtz_weights.extend(ret["soft_qtz_weights"])
 
     def post_step(self):
         pass
@@ -456,8 +459,8 @@ class CodebookTrainer(BaseTrainer):
                       quantize_spectra=True,
                       quantization_strategy="soft",
                       save_spectra=self.plot_spectra,
-                      save_redshift=self.log_redshift,
-                      save_soft_qtz_weights=self.log_soft_qtz_weights)
+                      save_redshift=self.save_redshift,
+                      save_soft_qtz_weights=self.save_soft_qtz_weights)
 
         # i) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
@@ -526,19 +529,23 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_spectra:
             self._plot_spectrum()
 
-        if self.log_redshift:
-            self._log_redshift()
+        if self.save_redshift:
+            self._save_redshift()
 
-        if self.log_soft_qtz_weights:
-            self._log_qtz_weights()
+        if self.save_soft_qtz_weights:
+            self._save_soft_qtz_weights()
 
-    def _log_redshift(self):
+    def _save_redshift(self):
         redshifts = torch.stack(self.redshifts).detach().cpu().numpy()
+        fname = join(self.redshift_dir, f"model-ep{self.epoch}-it{self.iteration}.pth")
+        np.save(fname, redshifts)
         np.set_printoptions(precision=3)
         log.info(f"Est. redshift {redshifts}")
 
-    def _log_qtz_weights(self):
+    def _save_soft_qtz_weights(self):
         weights = torch.stack(self.qtz_weights).detach().cpu().numpy()
+        fname = join(self.soft_qtz_weight_dir, f"model-ep{self.epoch}-it{self.iteration}.pth")
+        np.save(fname, weights)
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
         log.info(f"Qtz weights {weights[:,0]}")

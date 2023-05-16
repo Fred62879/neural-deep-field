@@ -1,14 +1,14 @@
 
 global:
-    verbose: True
+    verbose: False
     print_shape: False
     activate_timer: False
     dataloader_drop_last: True
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','log_redshift_during_train','log_soft_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights']
+    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_soft_qtz_weights_during_train']
+    tasks: ['pretrain_infer','recon_codebook_spectra'] #,'recon_gt_spectra','log_redshift','log_soft_qtz_weights']
 
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','plot_latent_embed']
@@ -193,16 +193,16 @@ infer:
     recon_cutout_start_pos: [ [[256,256]] ] #, [[86,188]] ] #[86,188]
 
     # recon spectra
-    spectra_norm_cho: "sum"
+    spectra_norm_cho: "max"
     average_spectra: True
     trusted_range_only: True     # for gt spectra
-    plot_clipped_spectrum: True  # for recon spectra
+    plot_clipped_spectrum: False  # for recon spectra
     plot_spectrum_with_gt: True
     plot_spectrum_with_trans: False
     plot_spectrum_together: True
     infer_spectra_individually: False
     num_spectra_plot_per_row: 5
-    codebook_spectra_clip_range: [6000,8000]
+    codebook_spectra_clip_range: [6000,8000] #[4152,5536]
     dummy_spectra_clip_range: [6000,8000]
 
     mark_spectra: True

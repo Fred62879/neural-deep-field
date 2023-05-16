@@ -361,7 +361,7 @@ class SpectraData:
             fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
 
         for i, cur_spectra in enumerate(recon_spectra):
-            sub_dir = spectra_norm_cho + "_"
+            sub_dir = ""
             plot_gt_spectra = not codebook and self.kwargs["plot_spectrum_with_gt"] \
                 and i < len(gt_spectra)
 
@@ -392,14 +392,16 @@ class SpectraData:
             else:
                 recon_wave = full_wave
 
-            # normalize spectra within trusted range
-            if spectra_norm_cho == "max":
-                cur_spectra /= np.max(cur_spectra)
-            elif spectra_norm_cho == "sum":
-                cur_spectra /= np.sum(cur_spectra)
-            elif spectra_norm_cho == "scale_gt":
-                # scale gt spectra s.t. its max is same as recon
-                cur_recon_max = np.max(cur_spectra)
+            # normalize spectra within trusted range (gt spectra only)
+            if not codebook:
+                sub_dir += spectra_norm_cho + "_"
+                if spectra_norm_cho == "max":
+                    cur_spectra /= np.max(cur_spectra)
+                elif spectra_norm_cho == "sum":
+                    cur_spectra /= np.sum(cur_spectra)
+                elif spectra_norm_cho == "scale_gt":
+                    # scale gt spectra s.t. its max is same as recon
+                    cur_recon_max = np.max(cur_spectra)
 
             if plot_gt_spectra:
                 sub_dir += "with_gt_"

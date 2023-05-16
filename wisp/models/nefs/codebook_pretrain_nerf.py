@@ -44,8 +44,6 @@ class CodebookPretrainNerf(BaseNeuralField):
               coords: [num_supervision_spectra,latent_dim]
               wave:   full wave [bsz,nsmpl,1]
         """
-        # print(coords.shape, wave.shape)
-        # print(wave, full_wave_bound)
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]
         coords = coords[:,None]
