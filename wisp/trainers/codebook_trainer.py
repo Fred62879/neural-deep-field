@@ -479,7 +479,6 @@ class CodebookTrainer(BaseTrainer):
         # ii) redshift loss
         redshift_loss = 0
         if self.redshift_supervision:
-            # print(data["redshift"], ret["redshift"])
             gt_redshift = data["redshift"]
 
             # ids = gt_redshift != -1

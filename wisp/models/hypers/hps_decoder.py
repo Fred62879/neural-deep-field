@@ -47,7 +47,7 @@ class HyperSpectralDecoder(nn.Module):
             spectra = (scaler * spectra.T).T
 
         spectra = self.norm(spectra)
-        return spectra
+        ret["spectra"] = spectra
 
     def forward_with_full_wave(self, latents, full_wave, full_wave_bound,
                                num_spectra_coords, ret, codebook, qtz_args, quantize_spectra):
@@ -117,12 +117,9 @@ class HyperSpectralDecoder(nn.Module):
             latents = latents[:-num_spectra_coords]
             if latents.shape[0] == 0: return
 
-        spectra = self.reconstruct_spectra(
+        self.reconstruct_spectra(
             latents, wave, ret["scaler"], ret["redshift"], full_wave_bound, ret,
             codebook, qtz_args, quantize_spectra)
 
-        # if "spectra" not in ret:
-        #     ret["spectra"] = spectra
-
-        intensity = self.inte(spectra, trans, nsmpl)
+        intensity = self.inte(ret["spectra"], trans, nsmpl)
         ret["intensity"] = intensity
