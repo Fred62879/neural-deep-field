@@ -183,22 +183,18 @@ class Quantization(nn.Module):
                 min_embed_ids = torch.argmax(z, dim=-1)
             else: min_embed_ids = None
 
-            weights = nn.functional.softmax(
-                z * temperature * self.kwargs["qtz_temperature_scale"], dim=-1
-            ) # [bsz,1,num_embeds]
-            # weights = z * temperature * self.kwargs["qtz_temperature_scale"]
+            # weights = nn.functional.softmax(
+            #     z * temperature * self.kwargs["qtz_temperature_scale"], dim=-1
+            # ) # [bsz,1,num_embeds]
+            weights = z * temperature * self.kwargs["qtz_temperature_scale"]
             # regularize s.t. l2 norm of weights sum to 1
-            # regu = torch.pow(torch.sum(weights**2, dim=-1, keepdim=True), 0.5) + 1e-10
-            # weights = weights / regu
+            regu = torch.pow(torch.sum(weights**2, dim=-1, keepdim=True), 0.5) + 1e-10
+            weights = weights / regu
 
             if self.kwargs["quantize_spectra"]:
                 codebook = codebook.permute(1,0,2) # [bsz,num_embeds,full_nsmpl]
 
             z_q = torch.matmul(weights, codebook)
-            # import numpy as np
-            # np.save('weights.npy',weights.detach().cpu().numpy())
-            # np.save('codebook.npy',codebook.detach().cpu().numpy())
-            # np.save('z_q.npy',z_q.detach().cpu().numpy())
 
         elif self.quantization_strategy == "hard":
             assert(self.kwargs["quantize_latent"])

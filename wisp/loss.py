@@ -11,8 +11,10 @@ def spectra_supervision_loss(loss, gt_spectra, recon_spectra):
           gt/recon_spectra: [bsz, num_smpls]
     '''
     # norm spectra each so they sum to 1 (earth movers distance)
-    gt_spectra /= (torch.sum(gt_spectra, dim=-1)[...,None])
-    recon_spectra /= (torch.sum(recon_spectra, dim=-1)[...,None])
+    # DON'T use /= or spectra will be modified in place and if we save spectra later on
+    # the spectra will be inaccurate
+    gt_spectra = gt_spectra / (torch.sum(gt_spectra, dim=-1)[...,None])
+    recon_spectra = recon_spectra / (torch.sum(recon_spectra, dim=-1)[...,None])
 
     emd = calculate_emd(gt_spectra, recon_spectra)
     emd = torch.mean(torch.abs(emd))
