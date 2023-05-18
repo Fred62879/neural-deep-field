@@ -508,7 +508,7 @@ def define_cmd_line_args():
     infer_group.add_argument("--inferrer-type", type=str, help="Inferrer class to use",
                              choices=["AstroInferrer"])
 
-    infer_group.add_argument("--infer-log-fname", type=str)
+    infer_group.add_argument("--infer-log-dir", type=str)
     infer_group.add_argument("--infer-batch-size", type=int, default=4096)
     infer_group.add_argument("--infer-use-all-wave", action="store_true",
                              help="should set this to true, implementation assumes infer with all lambda")

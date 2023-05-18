@@ -331,7 +331,8 @@ class SpectraData:
     #############
 
     def plot_spectrum(self, spectra_dir, name, recon_spectra, spectra_norm_cho,
-                      save_spectra=False, clip=True, codebook=False):
+                      save_spectra=False, save_spectra_together=False,
+                      clip=True, codebook=False):
         """ Plot given spectra.
             @Param
               recon_spectra: [num_spectra(,num_neighbours),full_num_smpl]
@@ -396,9 +397,9 @@ class SpectraData:
             if not codebook:
                 sub_dir += spectra_norm_cho + "_"
                 if spectra_norm_cho == "max":
-                    cur_spectra /= np.max(cur_spectra)
+                    cur_spectra = cur_spectra / np.max(cur_spectra)
                 elif spectra_norm_cho == "sum":
-                    cur_spectra /= np.sum(cur_spectra)
+                    cur_spectra = cur_spectra / np.sum(cur_spectra)
                 elif spectra_norm_cho == "scale_gt":
                     # scale gt spectra s.t. its max is same as recon
                     cur_recon_max = np.max(cur_spectra)
@@ -410,9 +411,9 @@ class SpectraData:
                 cur_gt_spectra_wave = gt_spectra_wave[i]
 
                 if spectra_norm_cho == "max":
-                    cur_gt_spectra /= np.max(cur_gt_spectra)
+                    cur_gt_spectra = cur_gt_spectra / np.max(cur_gt_spectra)
                 elif spectra_norm_cho == "sum":
-                    cur_gt_spectra /= np.sum(cur_gt_spectra)
+                    cur_gt_spectra = cur_gt_spectra / np.sum(cur_gt_spectra)
                 elif spectra_norm_cho == "scale_gt":
                     cur_gt_spectra = cur_gt_spectra / np.max(cur_gt_spectra) * cur_recon_max
                 elif spectra_norm_cho == "scale_recon":
@@ -453,6 +454,10 @@ class SpectraData:
             if save_spectra:
                 fname = join(cur_spectra_dir, f"spectra_{i}_{name}")
                 np.save(fname, cur_spectra)
+
+        if save_spectra_together:
+            fname = join(cur_spectra_dir, name)
+            np.save(fname, recon_spectra)
 
         if self.kwargs["plot_spectrum_together"]:
             fname = join(spectra_dir, sub_dir, f"all_spectra_{name}")

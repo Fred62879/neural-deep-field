@@ -250,6 +250,7 @@ class AstroInferrer(BaseInferrer):
             self.calculate_metrics = self.recon_img and self.metric_options is not None
 
             if self.calculate_metrics:
+                num_fits = self.dataset.get_num_fits()
                 self.metrics = np.zeros((self.num_metrics, 0, num_fits, self.num_bands))
                 self.metrics_zscale = np.zeros((self.num_metrics, 0, num_fits, self.num_bands))
                 self.metric_fnames = [ join(self.metric_dir, f"{option}.npy")
@@ -549,18 +550,19 @@ class AstroInferrer(BaseInferrer):
     def post_checkpoint_hardcode_coords_modified_model(self, model_id):
         # [(num_supervision_spectra,)num_embeds,nsmpl]
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
-        # np.save('code.npy',self.codebook_spectra)
 
         # if spectra is 2d, add dummy 1st dim to simplify code
         if self.recon_codebook_spectra:
             self.codebook_spectra = [self.codebook_spectra]
+            prefix = ""
+        else: prefix = "individ"
 
         for i, codebook_spectra in enumerate(self.codebook_spectra):
-            fname = f"{i}_{model_id}"
+            fname = f"{prefix}_{i}_{model_id}"
             self.dataset.plot_spectrum(
                 self.codebook_spectra_dir, fname, codebook_spectra,
                 spectra_norm_cho=self.extra_args["spectra_norm_cho"],
-                save_spectra=True, codebook=True,
+                save_spectra_together=True, codebook=True,
                 clip=self.extra_args["plot_clipped_spectrum"]
             )
 

@@ -96,7 +96,6 @@ class AstroTrainer(BaseTrainer):
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
         self.dataset.set_coords_source("fits")
-        self.dataset.set_model_output("pixel_intensity")
 
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
@@ -451,6 +450,7 @@ class AstroTrainer(BaseTrainer):
                         in self.pipeline.named_parameters() }
 
         for name in params_dict.keys():
+            print(name)
             if "grid" in name:
                 grid_params.append(params_dict[name])
             elif "scaler_decoder" in name:
@@ -459,6 +459,7 @@ class AstroTrainer(BaseTrainer):
                 logit_params.append(params_dict[name])
             else: pass
 
+        assert 0
         params.append({"params" : grid_params,
                        "lr": self.extra_args["grid_lr"] * self.grid_lr_weight})
         params.append({"params" : scaler_params, "lr": self.extra_args["lr"]})
@@ -586,8 +587,8 @@ class AstroTrainer(BaseTrainer):
 
             if self.extra_args["weight_train"]:
                 weights = data["weights"]
-                gt_pixels *= weights
-                recon_pixels *= weights
+                gt_pixels = gt_pixels * weights
+                recon_pixels = recon_pixels * weights
 
             if self.spectral_inpaint:
                 mask = data["masks"]

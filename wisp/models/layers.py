@@ -196,6 +196,10 @@ class Quantization(nn.Module):
 
             z_q = torch.matmul(weights, codebook)
 
+            # import numpy as np
+            # np.save('codebook.npy', codebook.detach().cpu().numpy())
+            # np.save('zq.npy',z_q.detach().cpu().numpy())
+
         elif self.quantization_strategy == "hard":
             assert(self.kwargs["quantize_latent"])
 

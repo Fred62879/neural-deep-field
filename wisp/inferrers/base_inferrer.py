@@ -36,14 +36,14 @@ class BaseInferrer(ABC):
         self.reset_data_iterator()
 
         # set log dir
-        if extra_args["infer_log_fname"] is not None:
-            infer_log_fname = extra_args["infer_log_fname"]
+        if extra_args["infer_log_dir"] is not None:
+            infer_log_dir = extra_args["infer_log_dir"]
         else:
             fnames = os.listdir(join(extra_args["log_dir"],extra_args["exp_name"]))
             fnames.sort()
-            infer_log_fname = fnames[-1]
+            infer_log_dir = fnames[-1]
 
-        self.log_dir = join(extra_args["log_dir"], extra_args["exp_name"], infer_log_fname)
+        self.log_dir = join(extra_args["log_dir"], extra_args["exp_name"], infer_log_dir)
 
         # Default TensorBoard Logging
         self.writer = SummaryWriter(self.log_dir, purge_step=0)

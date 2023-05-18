@@ -8,9 +8,10 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_soft_qtz_weights_during_train']
-    #tasks: ['pretrain_infer','recon_codebook_spectra'] #,'recon_gt_spectra','log_redshift','log_soft_qtz_weights']
+    tasks: ['pretrain_infer','recon_codebook_spectra','recon_gt_spectra','log_redshift','log_soft_qtz_weights']
 
     #tasks: ['infer','plot_redshift']
+    #tasks: ['infer','recon_gt_spectra']
     #tasks: ['infer','plot_latent_embed']
     #tasks: ['infer','plot_pixel_distrib']
     #tasks: ['infer','save_soft_qtz_weights']
@@ -164,7 +165,7 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230404-123911_no_spatial_decode'
-    pretrain_log_dir: '20230508-155624_pretrain_no_redshift'
+    pretrain_log_dir: '20230517-130823'
     pretrained_model_name: 'model-ep2000-it1.pth'
 
     num_trans_samples: 40
@@ -183,7 +184,7 @@ infer:
 
     # recon img
     to_HDU: False
-    #infer_log_fname: '20230427-111337_qtz_spectra_2048'
+    #infer_log_dir: '20230517-130823'
     metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
