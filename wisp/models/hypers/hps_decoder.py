@@ -27,7 +27,6 @@ class HyperSpectralDecoder(nn.Module):
 
     def reconstruct_spectra(self, input, wave, scaler, redshift, wave_bound, ret,
                             codebook, qtz_args, quantize_spectra):
-        #print(redshift)
         if quantize_spectra:
             bsz = wave.shape[0]
             # each input coord has #num_code spectra generated

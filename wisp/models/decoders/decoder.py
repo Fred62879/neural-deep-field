@@ -36,7 +36,7 @@ class Decoder(nn.Module):
                 input_dim = self.kwargs["space_dim"]
 
         else: #if kwargs["space_dim"] == 3:
-            if self.kwargs["quantize_latent"]:
+            if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
                 latents_dim = self.kwargs["qtz_latent_dim"]
             elif self.kwargs["decode_spatial_embedding"]:
                 latents_dim = self.kwargs["spatial_decod_output_dim"]

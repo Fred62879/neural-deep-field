@@ -423,18 +423,18 @@ class AstroTrainer(BaseTrainer):
                         in self.pipeline.named_parameters() }
 
         for name in params_dict.keys():
-            if "grid" in name:
+            if "spatial_encoder.grid" in name:
                 grid_params.append(params_dict[name])
             elif "codebook" in name:
                 codebook_params.append(params_dict[name])
             else:
                 rest_params.append(params_dict[name])
 
-        params.append({"params" : rest_params,
+        params.append({"params": rest_params,
                        "lr": self.extra_args["lr"]})
-        params.append({"params" : codebook_params,
+        params.append({"params": codebook_params,
                        "lr": self.extra_args["codebook_lr"]})
-        params.append({"params" : grid_params,
+        params.append({"params": grid_params,
                        "lr": self.extra_args["grid_lr"] * self.grid_lr_weight})
         self.optimizer = self.optim_cls(params, **self.optim_params)
 
@@ -450,8 +450,7 @@ class AstroTrainer(BaseTrainer):
                         in self.pipeline.named_parameters() }
 
         for name in params_dict.keys():
-            print(name)
-            if "grid" in name:
+            if "spatial_encoder.grid" in name:
                 grid_params.append(params_dict[name])
             elif "scaler_decoder" in name:
                 scaler_params.append(params_dict[name])
@@ -459,11 +458,10 @@ class AstroTrainer(BaseTrainer):
                 logit_params.append(params_dict[name])
             else: pass
 
-        assert 0
-        params.append({"params" : grid_params,
+        params.append({"params": grid_params,
                        "lr": self.extra_args["grid_lr"] * self.grid_lr_weight})
-        params.append({"params" : scaler_params, "lr": self.extra_args["lr"]})
-        params.append({"params" : logit_params, "lr": self.extra_args["lr"]})
+        params.append({"params": scaler_params, "lr": self.extra_args["lr"]})
+        #params.append({"params": logit_params, "lr": self.extra_args["lr"]})
 
         self.optimizer = self.optim_cls(params, **self.optim_params)
         if self.verbose:

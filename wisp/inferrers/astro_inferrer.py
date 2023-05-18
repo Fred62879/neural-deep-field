@@ -555,10 +555,10 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             self.codebook_spectra = [self.codebook_spectra]
             prefix = ""
-        else: prefix = "individ"
+        else: prefix = "individ_"
 
         for i, codebook_spectra in enumerate(self.codebook_spectra):
-            fname = f"{prefix}_{i}_{model_id}"
+            fname = f"{prefix}{i}_{model_id}"
             self.dataset.plot_spectrum(
                 self.codebook_spectra_dir, fname, codebook_spectra,
                 spectra_norm_cho=self.extra_args["spectra_norm_cho"],

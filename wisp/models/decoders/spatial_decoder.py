@@ -34,7 +34,7 @@ class SpatialDecoder(nn.Module):
         self.init_model()
 
     def init_model(self):
-        if self.decode_spatial_embedding: # or self.quantize_z:
+        if self.decode_spatial_embedding or self.qtz:
             self.init_decoder()
 
         if self.quantize_z:

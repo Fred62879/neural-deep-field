@@ -394,8 +394,10 @@ class SpectraData:
                 recon_wave = full_wave
 
             # normalize spectra within trusted range (gt spectra only)
-            if not codebook:
+            if 1: #not codebook:
                 sub_dir += spectra_norm_cho + "_"
+                assert(np.max(cur_spectra) > 0)
+
                 if spectra_norm_cho == "max":
                     cur_spectra = cur_spectra / np.max(cur_spectra)
                 elif spectra_norm_cho == "sum":
@@ -406,9 +408,9 @@ class SpectraData:
 
             if plot_gt_spectra:
                 sub_dir += "with_gt_"
-
                 cur_gt_spectra = gt_spectra[i]
                 cur_gt_spectra_wave = gt_spectra_wave[i]
+                assert(np.max(cur_gt_spectra) > 0)
 
                 if spectra_norm_cho == "max":
                     cur_gt_spectra = cur_gt_spectra / np.max(cur_gt_spectra)
