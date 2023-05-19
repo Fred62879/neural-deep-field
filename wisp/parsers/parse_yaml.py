@@ -432,6 +432,7 @@ def define_cmd_line_args():
     #                          help="ratio of masked pixels used for spectral inpaint training per epoch")
 
     train_group.add_argument("--pretrain-codebook", action="store_true")
+    train_group.add_argument("--pretrain-pixel-supervision", action="store_true")
     train_group.add_argument("--weight-train", action="store_true")
     train_group.add_argument("--train-use-all-wave", action="store_true")
     train_group.add_argument("--infer-during-train", action="store_true")

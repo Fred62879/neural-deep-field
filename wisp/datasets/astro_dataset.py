@@ -182,6 +182,7 @@ class AstroDataset(Dataset):
 
         # get only supervision spectra (not all gt spectra) for loss calculation
         out["gt_spectra"] = self.spectra_dataset.get_supervision_spectra()
+        out["gt_spectra_pixels"] = self.spectra_dataset.get_spectra_pixels()
 
         out["spectra_supervision_wave_bound_ids"] = \
             self.spectra_dataset.get_spectra_supervision_wave_bound_ids()

@@ -166,14 +166,6 @@ class AstroTrainer(BaseTrainer):
             self.resume_model_fname = self.get_checkpoint_fname(
                 self.extra_args["resume_log_dir"])
 
-    def get_loss(self, cho):
-        if cho == "l1":
-            loss = nn.L1Loss() if not self.cuda else nn.L1Loss().cuda()
-        elif cho == "l2":
-            loss = nn.MSELoss() if not self.cuda else nn.MSELoss().cuda()
-        else: raise Exception("Unsupported loss choice")
-        return loss
-
     def init_loss(self):
         if self.spectra_supervision:
             loss = self.get_loss(self.extra_args["spectra_loss_cho"])

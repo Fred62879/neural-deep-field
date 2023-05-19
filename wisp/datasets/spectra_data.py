@@ -93,6 +93,11 @@ class SpectraData:
         """
         return self.data["supervision_spectra"]
 
+    def get_spectra_pixels(self):
+        """ Get values for pixels with gt spectra
+        """
+        return self.data["gt_spectra_pixels"]
+
     def get_num_spectra_to_plot(self):
         return len(self.data["spectra_grid_coords"])
 
@@ -238,18 +243,22 @@ class SpectraData:
             self.data["gt_spectra_grid_coords"]).type(
                 torch.FloatTensor)[:,:,None].view(-1,1,coord_dim) #[num_coords,num_neighbours,.]
 
+        self.data["gt_spectra_pixels"] = torch.stack(
+            self.data["gt_spectra_pixels"]).type(
+                torch.FloatTensor)[:,:,None].view(-1,self.kwargs["num_bands"])
+
         if self.spectra_supervision_train or self.codebook_pretrain or self.pretrain_infer:
             n = self.kwargs["num_supervision_spectra"]
             self.data["supervision_spectra"] = torch.FloatTensor(
                 np.array(self.data["supervision_spectra"]))[:n]
 
         # tmp, dummy redshift
-        if self.kwargs["redshift_supervision"]:
-            # dummy_redshift = torch.arange(1, 1+len(all_ids), dtype=torch.float)
-            # positions = np.array(all_ids).flatten()
-            # self.fits_obj.data["redshift"][positions] = dummy_redshift
-            self.data["redshift"] = torch.rand(
-                self.kwargs["num_supervision_spectra"], dtype=torch.float)
+        # if self.kwargs["redshift_supervision"]:
+        #     # dummy_redshift = torch.arange(1, 1+len(all_ids), dtype=torch.float)
+        #     # positions = np.array(all_ids).flatten()
+        #     # self.fits_obj.data["redshift"][positions] = dummy_redshift
+        #     self.data["redshift"] = torch.rand(
+        #         self.kwargs["num_supervision_spectra"], dtype=torch.float)
         # ends tmp
 
     def load_one_gt_spectra(self, spectra_id, smpl_interval, source_spectra_data):
@@ -273,6 +282,10 @@ class SpectraData:
         self.data["gt_spectra_coord_ids"].append(ids)           # [num_neighbours,1]
         self.data["gt_spectra_img_coords"].append(img_coords)   # [num_neighbours,2/3]
         self.data["gt_spectra_grid_coords"].append(grid_coords) # [num_neighbours,2/3] [0~1]
+
+        # ii) get pixel values
+        pixels = self.fits_obj.get_pixels(ids)
+        self.data["gt_spectra_pixels"].append(pixels)
 
         if not self.codebook_pretrain and not self.pretrain_infer \
            and not self.spectra_supervision_train and not self.recon_spectra: return
@@ -396,7 +409,7 @@ class SpectraData:
             # normalize spectra within trusted range (gt spectra only)
             if 1: #not codebook:
                 sub_dir += spectra_norm_cho + "_"
-                assert(np.max(cur_spectra) > 0)
+                # assert(np.max(cur_spectra) > 0)
 
                 if spectra_norm_cho == "max":
                     cur_spectra = cur_spectra / np.max(cur_spectra)

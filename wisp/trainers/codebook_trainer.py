@@ -40,7 +40,7 @@ class CodebookTrainer(BaseTrainer):
         self.cuda = "cuda" in str(self.device)
         self.verbose = self.extra_args["verbose"]
         self.space_dim = self.extra_args["space_dim"]
-        self.gpu_fields = ["coords","wave","gt_spectra","redshift"]
+        self.gpu_fields = extra_args["gpu_data"]
 
         self.total_steps = 0
         self.save_data_to_local = False
@@ -88,7 +88,8 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_coords_source("spectra_latents")
         self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
 
-        self.dataset.toggle_integration(False)
+        self.dataset.toggle_wave_sampling(True) # TODO: False if we have too many spectra
+        self.dataset.toggle_integration(self.pixel_supervision)
         self.dataset.set_length(self.extra_args["num_supervision_spectra"])
 
     def summarize_training_tasks(self):
@@ -97,6 +98,7 @@ class CodebookTrainer(BaseTrainer):
         self.save_soft_qtz_weights = "save_soft_qtz_weights_during_train" in tasks
         self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
         self.save_redshift =  "save_redshift_during_train" in tasks and self.extra_args["generate_redshift"]
+        self.pixel_supervision = self.extra_args["pretrain_pixel_supervision"]
         self.redshift_supervision = self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"]
 
         if self.plot_spectra:
@@ -150,6 +152,10 @@ class CodebookTrainer(BaseTrainer):
     def init_loss(self):
         loss = self.get_loss(self.extra_args["spectra_loss_cho"])
         self.spectra_loss = partial(spectra_supervision_loss, loss)
+
+        if self.pixel_supervision:
+            loss = self.get_loss(self.extra_args["pixel_loss_cho"])
+            self.pixel_loss = partial(redshift_supervision_loss, loss)
 
         if self.redshift_supervision:
             loss = self.get_loss(self.extra_args["redshift_loss_cho"])
@@ -332,6 +338,7 @@ class CodebookTrainer(BaseTrainer):
     def init_log_dict(self):
         """ Custom log dict. """
         super().init_log_dict()
+        self.log_dict["pixel_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
         self.log_dict["redshift_loss"] = 0.0
 
@@ -379,6 +386,7 @@ class CodebookTrainer(BaseTrainer):
                       self.total_steps,
                       self.space_dim,
                       self.extra_args["trans_sample_method"],
+                      pixel_supervision_train=True,
                       recon_codebook_spectra=True)
 
         codebook_spectra = ret["intensity"].detach().cpu().numpy()
@@ -455,6 +463,7 @@ class CodebookTrainer(BaseTrainer):
                       self.space_dim,
                       self.extra_args["trans_sample_method"],
                       codebook_pretrain=True,
+                      pixel_supervision_train=self.pixel_supervision,
                       redshift_supervision_train=self.redshift_supervision,
                       quantize_spectra=True,
                       quantization_strategy="soft",
@@ -476,7 +485,16 @@ class CodebookTrainer(BaseTrainer):
             spectra_loss = self.spectra_loss(gt_spectra, recon_spectra)
             self.log_dict["spectra_loss"] += spectra_loss.item()
 
-        # ii) redshift loss
+        # ii) pixel supervision loss
+        if self.pixel_supervision:
+            gt_pixels = data["gt_spectra_pixels"]
+            recon_pixels = ret["intensity"]
+            #print(gt_pixels.shape, recon_pixels.shape)
+
+            recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
+            self.log_dict["pixel_loss"] += recon_loss.item()
+
+        # iii) redshift loss
         redshift_loss = 0
         if self.redshift_supervision:
             gt_redshift = data["redshift"]
@@ -504,6 +522,8 @@ class CodebookTrainer(BaseTrainer):
         log_text = "EPOCH {}/{}".format(self.epoch, self.num_epochs)
         log_text += " | total loss: {:>.3E}".format(self.log_dict["total_loss"] / n)
         log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
+        if self.pixel_supervision:
+            log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / n)
         if self.redshift_supervision:
             log_text += " | redshift loss: {:>.3E}".format(self.log_dict["redshift_loss"] / n)
         log.info(log_text)

@@ -8,14 +8,14 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_soft_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_codebook_spectra','recon_gt_spectra','log_redshift','log_soft_qtz_weights']
+    #tasks: ['pretrain_infer','recon_codebook_spectra','recon_gt_spectra','log_redshift','log_soft_qtz_weights']
 
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','recon_gt_spectra']
     #tasks: ['infer','plot_latent_embed']
     #tasks: ['infer','plot_pixel_distrib']
     #tasks: ['infer','save_soft_qtz_weights']
-    tasks: ['infer','recon_codebook_spectra']
+    #tasks: ['infer','recon_codebook_spectra']
     #tasks: ['infer','plot_embed_map','plot_redshift']
     #tasks: ['infer','plot_save_scaler','plot_redshift']
     #tasks: ['infer','recon_gt_spectra','log_pixel_value']
@@ -23,7 +23,7 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
-    tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
+    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
     #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
@@ -148,9 +148,10 @@ trainer:
     save_as_new: True
     train_pixel_ratio: .1 # change dataloader sampler
     #masked_pixl_ratio_per_epoch: 1
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift','spectra_latents']
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift','spectra_latents','gt_spectra_pixels']
 
     pretrain_codebook: True
+    pretrain_pixel_supervision: True
     pixel_supervision: True
     spectra_supervision: False
     redshift_supervision: False

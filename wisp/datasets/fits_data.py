@@ -57,7 +57,11 @@ class FITSData:
 
         self.require_weights = "train" in tasks and self.load_weights
         self.require_pixels = len(tasks.intersection({
-            "train","recon_img","log_pixel_value"})) != 0
+            "train","recon_img","log_pixel_value",
+        })) != 0 or (
+            ("codebook_pretrain" in tasks or "pretrain_infer" in tasks) and \
+            self.kwargs["pretrain_pixel_supervision"]
+        )
 
         ## TODO: REMOVE require_scaler
         self.require_scaler = self.kwargs["space_dim"] == 3 and self.qtz \

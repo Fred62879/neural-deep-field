@@ -448,3 +448,15 @@ class BaseTrainer(ABC):
     @iteration.setter
     def iteration(self, iteration: int) -> int:
         self.scene_state.optimization.iteration = iteration
+
+    ################
+    # Helpers
+    ################
+
+    def get_loss(self, cho):
+        if cho == "l1":
+            loss = nn.L1Loss() if not self.cuda else nn.L1Loss().cuda()
+        elif cho == "l2":
+            loss = nn.MSELoss() if not self.cuda else nn.MSELoss().cuda()
+        else: raise Exception("Unsupported loss choice")
+        return loss
