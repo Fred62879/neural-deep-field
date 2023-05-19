@@ -8,7 +8,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_soft_qtz_weights_during_train']
-    #tasks: ['pretrain_infer','recon_codebook_spectra','recon_gt_spectra','log_redshift','log_soft_qtz_weights']
+    tasks: ['pretrain_infer','recon_codebook_spectra','recon_gt_spectra','log_redshift','log_soft_qtz_weights']
 
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','recon_gt_spectra']

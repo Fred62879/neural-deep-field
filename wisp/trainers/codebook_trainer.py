@@ -343,7 +343,7 @@ class CodebookTrainer(BaseTrainer):
         self.log_dict["redshift_loss"] = 0.0
 
     def pre_step(self):
-        pass
+        self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
 
     def step(self, data):
         """ Advance the training by one step using the batched data supplied.
@@ -386,7 +386,6 @@ class CodebookTrainer(BaseTrainer):
                       self.total_steps,
                       self.space_dim,
                       self.extra_args["trans_sample_method"],
-                      pixel_supervision_train=True,
                       recon_codebook_spectra=True)
 
         codebook_spectra = ret["intensity"].detach().cpu().numpy()
@@ -399,14 +398,17 @@ class CodebookTrainer(BaseTrainer):
             clip=self.extra_args["plot_clipped_spectrum"])
 
     def get_valid_data(self):
+        """ Get data for codebook spectra recon.
+        """
         bsz = self.extra_args["qtz_num_embed"]
         latents = load_embed(self.train_pipeline.state_dict(),
                              transpose=False, tensor=True)[:,None]
+
         wave = torch.FloatTensor(self.dataset.get_full_wave())[None,:,None].tile(bsz,1,1)
         data = {
             "coords": latents.to(self.device), # [bsz,nsmpl,latent_dim]
             "wave": wave.to(self.device),      # [bsz,nsmpl,1]
-            "full_wave_bound": self.dataset.get_full_wave_bound()
+            "full_wave_bound": self.dataset.get_full_wave_bound(),
         }
         return data
 
@@ -457,6 +459,8 @@ class CodebookTrainer(BaseTrainer):
         total_loss = 0
         add_to_device(data, self.gpu_fields, self.device)
 
+        # print(data["coords"])
+        # print('*', self.latents.weight)
         ret = forward(data,
                       self.train_pipeline,
                       self.total_steps,
@@ -489,7 +493,6 @@ class CodebookTrainer(BaseTrainer):
         if self.pixel_supervision:
             gt_pixels = data["gt_spectra_pixels"]
             recon_pixels = ret["intensity"]
-            #print(gt_pixels.shape, recon_pixels.shape)
 
             recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
             self.log_dict["pixel_loss"] += recon_loss.item()

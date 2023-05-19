@@ -156,7 +156,6 @@ def forward(
         save_soft_qtz_weights=False
 ):
     # forward should only be called under one and only one of the following states
-    print(data.keys())
     train = spectra_supervision_train
     recon_all = not train and not codebook_pretrain and (recon_img or save_scaler or save_latents or save_redshift or save_embed_ids or save_soft_qtz_weights)
 

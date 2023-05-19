@@ -69,7 +69,7 @@ def get_pipelines_from_config(args, tasks={}):
 
         # pipeline for codebook pretrain inferrence
         if "pretrain_infer" in tasks and args.pretrain_codebook:
-            pretrain_nef = CodebookPretrainNerf(**vars(args))
+            pretrain_nef = CodebookPretrainNerf(False, **vars(args))
             pipelines["pretrain_infer"] = AstroPipeline(pretrain_nef)
             if "recon_codebook_spectra_individ" in tasks and args.generate_redshift:
                 pipelines["codebook_individ"] = AstroPipeline(pretrain_nef)
@@ -93,7 +93,6 @@ def get_pipelines_from_config(args, tasks={}):
 
     for _, pipeline in pipelines.items():
         pipeline.to(device)
-    print(pipelines.keys())
     return device, pipelines
 
 def get_trainer_from_config(trainer_cls, pipeline, dataset, optim_cls, optim_params, device, args):

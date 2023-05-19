@@ -243,9 +243,10 @@ class SpectraData:
             self.data["gt_spectra_grid_coords"]).type(
                 torch.FloatTensor)[:,:,None].view(-1,1,coord_dim) #[num_coords,num_neighbours,.]
 
-        self.data["gt_spectra_pixels"] = torch.stack(
-            self.data["gt_spectra_pixels"]).type(
-                torch.FloatTensor)[:,:,None].view(-1,self.kwargs["num_bands"])
+        if self.kwargs["pretrain_pixel_supervision"]:
+            self.data["gt_spectra_pixels"] = torch.stack(
+                self.data["gt_spectra_pixels"]).type(
+                    torch.FloatTensor)[:,:,None].view(-1,self.kwargs["num_bands"])
 
         if self.spectra_supervision_train or self.codebook_pretrain or self.pretrain_infer:
             n = self.kwargs["num_supervision_spectra"]
@@ -283,14 +284,16 @@ class SpectraData:
         self.data["gt_spectra_img_coords"].append(img_coords)   # [num_neighbours,2/3]
         self.data["gt_spectra_grid_coords"].append(grid_coords) # [num_neighbours,2/3] [0~1]
 
-        # ii) get pixel values
-        pixels = self.fits_obj.get_pixels(ids)
-        self.data["gt_spectra_pixels"].append(pixels)
-
         if not self.codebook_pretrain and not self.pretrain_infer \
-           and not self.spectra_supervision_train and not self.recon_spectra: return
+           and not self.spectra_supervision_train and not self.recon_spectra \
+           and not self.kwargs["pretrain_pixel_supervision"]: return
 
-        # ii) load actual spectra data
+        # ii) get pixel values
+        if self.kwargs["pretrain_pixel_supervision"]:
+            pixels = self.fits_obj.get_pixels(ids)
+            self.data["gt_spectra_pixels"].append(pixels)
+
+        # iii) load actual spectra data
         fname = join(self.spectra_path, fits_uid,
                      source_spectra_data["spectra_fname"][spectra_id])
 
@@ -299,7 +302,7 @@ class SpectraData:
             interpolate=True, sigma=self.kwargs["spectra_smooth_sigma"],
             trusted_range=None if not self.kwargs["trusted_range_only"] else [wave_lo, wave_hi])
 
-        # iii) get data for for spectra supervision
+        # iv) get data for for spectra supervision
         if self.spectra_supervision_train or self.codebook_pretrain or self.pretrain_infer:
             supervision_spectra_wave_bound = [
                 source_spectra_data["spectra_supervision_wave_lo"][spectra_id],
@@ -319,7 +322,7 @@ class SpectraData:
                 supervision_spectra_wave_bound, gt_wave, within_bound=True)
             self.data["supervision_spectra"].append(gt_spectra[id_lo:id_hi + 1])
 
-        # iv) get data for gt spectrum plotting
+        # v) get data for gt spectrum plotting
         if self.recon_spectra:
             if self.kwargs["plot_clipped_spectrum"]:
                 # plot only within a given range
