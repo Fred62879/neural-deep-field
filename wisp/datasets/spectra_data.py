@@ -243,7 +243,7 @@ class SpectraData:
             self.data["gt_spectra_grid_coords"]).type(
                 torch.FloatTensor)[:,:,None].view(-1,1,coord_dim) #[num_coords,num_neighbours,.]
 
-        if self.kwargs["pretrain_pixel_supervision"]:
+        if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["gt_spectra_pixels"] = torch.stack(
                 self.data["gt_spectra_pixels"]).type(
                     torch.FloatTensor)[:,:,None].view(-1,self.kwargs["num_bands"])
@@ -286,10 +286,10 @@ class SpectraData:
 
         if not self.codebook_pretrain and not self.pretrain_infer \
            and not self.spectra_supervision_train and not self.recon_spectra \
-           and not self.kwargs["pretrain_pixel_supervision"]: return
+           and not self.kwargs["codebook_pretrain_pixel_supervision"]: return
 
         # ii) get pixel values
-        if self.kwargs["pretrain_pixel_supervision"]:
+        if self.kwargs["codebook_pretrain_pixel_supervision"]:
             pixels = self.fits_obj.get_pixels(ids)
             self.data["gt_spectra_pixels"].append(pixels)
 
@@ -440,7 +440,10 @@ class SpectraData:
             # plot spectra
             if self.kwargs["plot_spectrum_together"]:
                 if nrows == 1:
-                    axis = axs[i%ncols]
+                    if ncols == 1:
+                        axis = axs
+                    else:
+                        axis = axs[i%ncols]
                 else: axis = axs[i//ncols,i%ncols]
             else:
                 fig, axs = plt.subplots(1)

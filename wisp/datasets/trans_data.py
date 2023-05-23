@@ -122,6 +122,7 @@ class TransData:
             hdcd_wave = self.data["hdcd_wave"]
             return (min(hdcd_wave), max(hdcd_wave))
         return ( min(self.data["full_wave"]), max(self.data["full_wave"]) )
+        # return ( 0, max(self.data["full_wave"]) )
 
     def sample_wave_trans(self, batch_size, num_samples, use_full_wave=False):
         """ Sample lambda and transmission data for given sampling methods.

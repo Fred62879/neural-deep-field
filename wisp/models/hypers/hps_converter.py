@@ -65,16 +65,15 @@ class HyperSpectralConverter(nn.Module):
 
     def linear_norm_wave(self, wave, wave_bound):
         (lo, hi) = wave_bound # 3940, 10870
-        return (wave - lo) / (hi - lo)
+        #return (wave - lo) / (hi - lo)
+        return 2*(wave - lo) / (hi - lo)-1
 
     def shift_wave(self, wave, redshift):
         wave = wave.permute(1,2,0)
 
-        if wave.ndim == 3:
-            nsmpl = wave.shape[0] # [nsmpl,1,bsz]
+        if wave.ndim == 3: # [nsmpl,1,bsz]
             wave = wave / (1 + redshift) # dont use `/=` this will change wave object
-        elif wave.ndim == 4:
-            nsmpl = wave.shape[2] # [nbands,nsmpl,1,bsz]
+        elif wave.ndim == 4: # [nbands,nsmpl,1,bsz]
             wave = wave / (1 + redshift)
         else:
             raise Exception("Wrong wave dimension when doing wave shifting.")
@@ -92,6 +91,9 @@ class HyperSpectralConverter(nn.Module):
               if add:    [bsz,num_samples,embed_dim]
               if concat: [bsz,num_samples,3 or spa_embed_dim+spe_embed_dim]
         """
+        #print('****')
+        #print(spatial.shape, spatial)
+        #assert 0
         if self.combine_method == "add":
             assert(spatial.shape == spectral.shape)
             latents = spatial + spectral # [...,embed_dim]
@@ -120,11 +122,17 @@ class HyperSpectralConverter(nn.Module):
             wave = self.shift_wave(wave, redshift)
 
         # normalize lambda values to [0,1]
+        #print(wave[0,:,0])
         wave = self.linear_norm_wave(wave, wave_bound)
+        #import numpy as np
+        #np.save('tmp.npy',wave.detach().cpu().numpy())
+        #print(wave[0,:,0])
+        #assert 0
 
         if self.encode_wave:
             assert(coords_encode_dim != self.kwargs["space_dim"])
             wave = self.wave_encoder(wave) # [bsz,num_samples,wave_embed_dim]
+            #print(wave.shape, wave)
 
         else: # assert coords are not encoded as well, should only use siren in this case
             if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:

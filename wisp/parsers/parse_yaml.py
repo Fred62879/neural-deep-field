@@ -432,7 +432,7 @@ def define_cmd_line_args():
     #                          help="ratio of masked pixels used for spectral inpaint training per epoch")
 
     train_group.add_argument("--pretrain-codebook", action="store_true")
-    train_group.add_argument("--pretrain-pixel-supervision", action="store_true")
+    train_group.add_argument("--codebook-pretrain-pixel-supervision", action="store_true")
     train_group.add_argument("--weight-train", action="store_true")
     train_group.add_argument("--train-use-all-wave", action="store_true")
     train_group.add_argument("--infer-during-train", action="store_true")
@@ -446,6 +446,8 @@ def define_cmd_line_args():
     train_group.add_argument("--spectra-supervision-start-epoch", type=int)
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")
     train_group.add_argument("--redshift-beta", type=float, help="redshift loss weight scaler.")
+    train_group.add_argument("--pretrain-pixel-beta", type=float)
+    train_group.add_argument("--pretrain-redshift-beta", type=float)
 
     train_group.add_argument("--quantize-latent", action="store_true")
     train_group.add_argument("--quantize-spectra", action="store_true")

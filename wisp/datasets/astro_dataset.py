@@ -105,6 +105,9 @@ class AstroDataset(Dataset):
     def get_zscale_ranges(self, fits_uid=None):
         return self.fits_dataset.get_zscale_ranges(fits_uid)
 
+    def get_spectra_pixels(self):
+        return self.spectra_dataset.get_spectra_pixels()
+
     def get_spectra_coord_ids(self):
         return self.spectra_dataset.get_spectra_coord_ids()
 
@@ -183,7 +186,7 @@ class AstroDataset(Dataset):
         # get only supervision spectra (not all gt spectra) for loss calculation
         out["gt_spectra"] = self.spectra_dataset.get_supervision_spectra()
 
-        if self.kwargs["pretrain_pixel_supervision"]:
+        if self.kwargs["codebook_pretrain_pixel_supervision"]:
             out["gt_spectra_pixels"] = self.spectra_dataset.get_spectra_pixels()
 
         out["spectra_supervision_wave_bound_ids"] = \
@@ -233,7 +236,7 @@ class AstroDataset(Dataset):
         if "redshift_data" in self.requested_fields:
             self.get_redshift_data(out)
 
-        # self.print_shape(out)
+        #self.print_shape(out)
         if self.transform is not None:
             out = self.transform(out)
         return out
@@ -262,7 +265,8 @@ class AstroDataset(Dataset):
 
     def print_shape(self, out):
         for n,p in out.items():
-            # print(n, type(p))
-            if type(p) == tuple or type(p) == list:
+            if p is None:
+                print(f"{n} is None")
+            elif type(p) == tuple or type(p) == list:
                 print(n, len(p))
             else: print(n, p.shape)

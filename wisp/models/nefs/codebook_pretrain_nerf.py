@@ -10,11 +10,11 @@ from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
 class CodebookPretrainNerf(BaseNeuralField):
-    def __init__(self, **kwargs):
+    def __init__(self, pretrain_pixel_supervision, **kwargs):
         super(CodebookPretrainNerf, self).__init__()
 
         self.kwargs = kwargs
-        self.pixel_supervision = kwargs["pretrain_pixel_supervision"]
+        self.pixel_supervision = pretrain_pixel_supervision
         self.init_model()
 
     def get_nef_type(self):

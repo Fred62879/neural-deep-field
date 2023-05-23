@@ -4,6 +4,7 @@ import time
 import torch
 import wandb
 import numpy as np
+import torch.nn as nn
 import logging as log
 
 from datetime import datetime

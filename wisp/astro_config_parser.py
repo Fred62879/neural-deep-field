@@ -62,16 +62,24 @@ def get_pipelines_from_config(args, tasks={}):
         # pipeline for codebook pretraining
         if "codebook_pretrain" in tasks and args.pretrain_codebook:
             assert(args.quantize_latent or args.quantize_spectra)
-            pretrain_nef = CodebookPretrainNerf(**vars(args))
+            pretrain_nef = CodebookPretrainNerf(
+                args.codebook_pretrain_pixel_supervision, **vars(args))
             codebook_nef = CodebookNef(integrate=False, **vars(args))
             pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
             pipelines["codebook"] = AstroPipeline(codebook_nef)
 
         # pipeline for codebook pretrain inferrence
         if "pretrain_infer" in tasks and args.pretrain_codebook:
-            pretrain_nef = CodebookPretrainNerf(False, **vars(args))
+            pretrain_nef = CodebookPretrainNerf(
+                args.codebook_pretrain_pixel_supervision, **vars(args))
             pipelines["pretrain_infer"] = AstroPipeline(pretrain_nef)
+
+            if "recon_gt_spectra" in tasks:
+                spectra_nef = CodebookPretrainNerf(False, **vars(args))
+                pipelines["spectra_infer"] = AstroPipeline(spectra_nef)
+
             if "recon_codebook_spectra_individ" in tasks and args.generate_redshift:
+                pretrain_nef = CodebookPretrainNerf(False, **vars(args))
                 pipelines["codebook_individ"] = AstroPipeline(pretrain_nef)
 
         # full pipline for training and/or inferrence
@@ -79,7 +87,7 @@ def get_pipelines_from_config(args, tasks={}):
         pipelines["full"] = AstroPipeline(nef_train)
 
         # pipeline for spectra inferrence
-        if "recon_gt_spectra" in tasks or "recon_dummy_spectra" in tasks:
+        if "infer" in tasks and ("recon_gt_spectra" in tasks or "recon_dummy_spectra" in tasks):
             nef_infer_spectra = globals()[args.nef_type](
                 integrate=False, qtz_calculate_loss=False, **vars(args))
             pipelines["spectra_infer"] = AstroPipeline(nef_infer_spectra)

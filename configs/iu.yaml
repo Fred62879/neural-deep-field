@@ -7,8 +7,8 @@ global:
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_soft_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_codebook_spectra','recon_gt_spectra','log_redshift','log_soft_qtz_weights']
+    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_pixel_values_during_train','save_soft_qtz_weights_during_train']
+    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights','recon_img']
 
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','recon_gt_spectra']
@@ -143,7 +143,7 @@ trainer:
     log_tb_every: -1
     log_cli_every: 400
     log_gpu_every: -1
-    plot_grad_every: 50
+    plot_grad_every: -1
     save_local_every: 400
     save_as_new: True
     train_pixel_ratio: .1 # change dataloader sampler
@@ -151,12 +151,14 @@ trainer:
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift','spectra_latents','gt_spectra_pixels']
 
     pretrain_codebook: True
-    pretrain_pixel_supervision: True
+    codebook_pretrain_pixel_supervision: True
     pixel_supervision: True
     spectra_supervision: False
     redshift_supervision: False
     spectra_beta: 1
     redshift_beta: 1
+    pretrain_pixel_beta: 1
+    pretrain_redshift_beta: 0.1
     spectra_supervision_start_epoch: 0
 
     decode_spatial_embedding: False
@@ -165,8 +167,8 @@ trainer:
     weight_train: False
     train_use_all_wave: False
     resume_train: False
-    #resume_log_dir: '20230404-123911_no_spatial_decode'
-    pretrain_log_dir: '20230517-130823'
+    #resume_log_dir: '20230522-110017'
+    #pretrain_log_dir: '20230521-123606'
     pretrained_model_name: 'model-ep2000-it1.pth'
 
     num_trans_samples: 40
@@ -195,12 +197,12 @@ infer:
     recon_cutout_start_pos: [ [[256,256]] ] #, [[86,188]] ] #[86,188]
 
     # recon spectra
-    spectra_norm_cho: "max"
+    spectra_norm_cho: "none"
     average_spectra: True
     trusted_range_only: True     # for gt spectra
     plot_clipped_spectrum: False  # for recon spectra
     plot_spectrum_with_gt: False
-    plot_spectrum_with_trans: True
+    plot_spectrum_with_trans: False
     plot_spectrum_together: True
     infer_spectra_individually: False
     num_spectra_plot_per_row: 5

@@ -60,7 +60,7 @@ class FITSData:
             "train","recon_img","log_pixel_value",
         })) != 0 or (
             ("codebook_pretrain" in tasks or "pretrain_infer" in tasks) and \
-            self.kwargs["pretrain_pixel_supervision"]
+            self.kwargs["codebook_pretrain_pixel_supervision"]
         )
 
         ## TODO: REMOVE require_scaler

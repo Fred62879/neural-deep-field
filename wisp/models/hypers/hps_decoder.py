@@ -44,9 +44,7 @@ class HyperSpectralDecoder(nn.Module):
             spectra = spectra[:,0] # [bsz,nsmpl]
 
         if self.scale and scaler is not None:
-            # print('scale')
             spectra = (scaler * spectra.T).T
-        # else: print('no scale')
 
         spectra = self.norm(spectra)
         ret["spectra"] = spectra

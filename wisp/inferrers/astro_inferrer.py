@@ -83,7 +83,10 @@ class AstroInferrer(BaseInferrer):
         if self.mode == "pretrain_infer":
             assert("pretrain_infer" in pipelines)
             self.full_pipeline = pipelines["pretrain_infer"]
-            self.spectra_infer_pipeline = pipelines["pretrain_infer"]
+
+            if self.recon_gt_spectra:
+                self.spectra_infer_pipeline = pipelines["spectra_infer"]
+
             if self.recon_codebook_spectra:
                 self.codebook_pipeline = pipelines["codebook"]
             elif self.recon_codebook_spectra_individ:
@@ -106,10 +109,11 @@ class AstroInferrer(BaseInferrer):
 
         # infer all coords using original model
         self.pretrain_infer = self.mode == "pretrain_infer"
-        self.recon_img = "recon_img" in tasks
         self.recon_HSI = "recon_HSI" in tasks
         self.plot_pixel_distrib = "plot_pixel_distrib" in tasks
+        self.recon_img = "recon_img" in tasks and "infer" in tasks
         self.recon_synthetic_band = "recon_synthetic_band" in tasks
+        self.recon_img_pretrain = "recon_img" in tasks and "pretrain_infer" in tasks
 
         self.plot_embed_map = "plot_embed_map" in tasks \
             and (self.quantize_latent or self.quantize_spectra) \
@@ -159,7 +163,8 @@ class AstroInferrer(BaseInferrer):
         # keep only tasks required to perform
         self.group_tasks = []
 
-        if self.recon_img or self.recon_synthetic_band or \
+        if self.recon_img or self.recon_img_pretrain or \
+           self.recon_synthetic_band or \
            self.plot_embed_map or self.plot_latent_embed or \
            self.plot_redshift or self.log_redshift  or self.plot_scaler or \
            self.save_soft_qtz_weights or self.log_soft_qtz_weights:
@@ -228,10 +233,10 @@ class AstroInferrer(BaseInferrer):
         self.fits_uids = self.dataset.get_fits_uids()
         self.use_full_wave = True
         self.coords_source = "fits"
-        self.perform_integration = self.recon_img
+        self.perform_integration = self.recon_img or self.recon_img_pretrain
 
         self.requested_fields = ["coords"]
-        if self.recon_img:
+        if self.recon_img or self.recon_img_pretrain:
             self.requested_fields.append("pixels")
         if self.pretrain_infer:
             self.requested_fields.append("spectra_data")
@@ -338,6 +343,9 @@ class AstroInferrer(BaseInferrer):
             # self.recon_flat_trans_now = self.recon_flat_trans and model_id == self.num_models
             self.recon_pixels = []
 
+        if self.recon_img_pretrain:
+            self.recon_pixels = []
+
         if self.recon_synthetic_band:
             self.recon_synthetic_pixels = []
 
@@ -394,6 +402,17 @@ class AstroInferrer(BaseInferrer):
                 self.metrics = np.concatenate((self.metrics, cur_metrics[:,None]), axis=1)
                 self.metrics_zscale = np.concatenate((
                     self.metrics_zscale, cur_metrics_zscale[:,None]), axis=1)
+
+        if self.recon_img_pretrain:
+            assert(self.mode == "pretrain_infer")
+            vals = torch.stack(self.recon_pixels).detach().cpu().numpy()
+            fname = join(self.recon_dir, f"{model_id}.pth")
+            np.save(fname, vals)
+            np.set_printoptions(suppress=True)
+            np.set_printoptions(precision=3)
+            log.info(f"Recon vals {vals}")
+            gt_vals = self.dataset.get_spectra_pixels().numpy()
+            log.info(f"GT vals {gt_vals}")
 
         if self.recon_synthetic_band:
             re_args = {
@@ -598,14 +617,14 @@ class AstroInferrer(BaseInferrer):
                         quantize_spectra=self.quantize_spectra,
                         quantization_strategy=self.extra_args["quantization_strategy"],
                         save_soft_qtz_weights=self.save_soft_qtz_weights or self.log_soft_qtz_weights,
-                        recon_img=self.recon_img,
+                        recon_img=self.recon_img or self.recon_img_pretrain,
                         save_scaler=self.plot_scaler,
                         save_embed_ids=self.plot_embed_map,
                         save_latents=self.plot_latent_embed,
                         save_redshift=self.plot_redshift or self.log_redshift,
                     )
 
-                if self.recon_img:
+                if self.recon_img or self.recon_img_pretrain:
                     # artifically generated transmission function (last channel)
                     if self.recon_synthetic_band:
                         self.recon_synthetic_pixels.extend(ret["intensity"][...,-1:])
