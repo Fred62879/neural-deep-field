@@ -521,8 +521,15 @@ class CodebookTrainer(BaseTrainer):
                 * self.extra_args["redshift_beta"]
             self.log_dict["redshift_loss"] += redshift_loss.item()
 
+        # if self.epoch < 1000:
+        #     # total_loss = recon_loss*self.recon_beta + redshift_loss*self.z_beta
+        #     total_loss = spectra_loss
+        # else:
+        #     # total_loss = spectra_loss + recon_loss*self.recon_beta + redshift_loss*self.z_beta
+
         total_loss = recon_loss*self.recon_beta + redshift_loss*self.z_beta
         # total_loss = spectra_loss + recon_loss*self.recon_beta + redshift_loss*self.z_beta
+
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss")
         return total_loss, ret

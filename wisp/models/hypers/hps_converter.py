@@ -65,8 +65,8 @@ class HyperSpectralConverter(nn.Module):
 
     def linear_norm_wave(self, wave, wave_bound):
         (lo, hi) = wave_bound # 3940, 10870
-        #return (wave - lo) / (hi - lo)
-        return 2*(wave - lo) / (hi - lo)-1
+        return (wave - lo) / (hi - lo)
+        # return 2*(wave - lo) / (hi - lo)-1
 
     def shift_wave(self, wave, redshift):
         wave = wave.permute(1,2,0)

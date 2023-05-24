@@ -307,6 +307,7 @@ class SpectraData:
             supervision_spectra_wave_bound = [
                 source_spectra_data["spectra_supervision_wave_lo"][spectra_id],
                 source_spectra_data["spectra_supervision_wave_hi"][spectra_id]]
+            # supervision_spectra_wave_bound = [7900,8000]
 
             # find id of min and max lambda in terms of the transmission wave (full_wave)
             # the min and max lambda for the spectra may not coincide exactly with the
