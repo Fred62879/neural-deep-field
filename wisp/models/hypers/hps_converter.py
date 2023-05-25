@@ -69,6 +69,8 @@ class HyperSpectralConverter(nn.Module):
         # return 2*(wave - lo) / (hi - lo)-1
 
     def shift_wave(self, wave, redshift):
+        """ Convert observed lambda to emitted lambda.
+        """
         wave = wave.permute(1,2,0)
 
         if wave.ndim == 3: # [nsmpl,1,bsz]

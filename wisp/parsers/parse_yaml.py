@@ -442,6 +442,7 @@ def define_cmd_line_args():
                              help="whether training supervised by spectra or not.")
     train_group.add_argument("--redshift-supervision", action="store_true",
                              help="whether training supervised by redshift or not.")
+    train_group.add_argument("--use-gt-redshift", action="store_true")
 
     train_group.add_argument("--spectra-supervision-start-epoch", type=int)
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")

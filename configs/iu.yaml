@@ -8,7 +8,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_pixel_values_during_train','save_soft_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights','recon_img']
+    tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights','recon_img']
 
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','recon_gt_spectra']
@@ -105,7 +105,11 @@ qtz:
 
 spatial_decod:
     generate_scaler: True
-    generate_redshift: True
+
+    generate_redshift: False # only one of these
+    use_gt_redshift: True    # two can be True
+                             # set redshift_supervision to True
+                             # to make these two effective
 
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1
@@ -197,11 +201,11 @@ infer:
     recon_cutout_start_pos: [ [[256,256]] ] #, [[86,188]] ] #[86,188]
 
     # recon spectra
-    spectra_norm_cho: "none"
+    spectra_norm_cho: "sum"
     average_spectra: True
     trusted_range_only: True     # for gt spectra
-    plot_clipped_spectrum: False  # for recon spectra
-    plot_spectrum_with_gt: False
+    plot_clipped_spectrum: True  # for recon spectra
+    plot_spectrum_with_gt: True
     plot_spectrum_with_trans: False
     plot_spectrum_together: True
     infer_spectra_individually: False

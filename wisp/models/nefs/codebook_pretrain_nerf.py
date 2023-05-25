@@ -33,13 +33,14 @@ class CodebookPretrainNerf(BaseNeuralField):
         self.spatial_decoder = SpatialDecoder(
             output_scaler=False,
             output_redshift=self.kwargs["generate_redshift"],
+            apply_gt_redshift=self.kwargs["use_gt_redshift"],
             qtz_calculate_loss=False,
             **self.kwargs)
 
         self.hps_decoder = HyperSpectralDecoder(
             integrate=self.pixel_supervision, scale=self.pixel_supervision, **self.kwargs)
 
-    def pretrain(self, coords, wave, full_wave_bound, trans=None, nsmpl=None, qtz_args=None):
+    def pretrain(self, coords, wave, full_wave_bound, trans=None, nsmpl=None, qtz_args=None, specz=None):
         """ Pretrain codebook.
             @Param
               coords: [num_supervision_spectra,latent_dim]
@@ -49,7 +50,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         bsz = coords.shape[0]
         coords = coords[:,None]
 
-        latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret)
+        latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)
 
         self.hps_decoder(
             latents, wave, trans, nsmpl, full_wave_bound,

@@ -140,6 +140,7 @@ def forward(
         pixel_supervision_train=False,
         spectra_supervision_train=False,
         redshift_supervision_train=False,
+        use_gt_redshift=False,
         recon_img=False, # reconstruct img, embed map, redshift heatmap, etc.
         recon_spectra=False,
         recon_codebook_spectra=False,
@@ -199,9 +200,9 @@ def forward(
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
 
-        # if redshift_supervision_train:
-        #     assert(codebook_pretrain)
-        #     net_args["redshift"] = data["redshift"]
+        if use_gt_redshift:
+            # assert(codebook_pretrain or pretrain_infer)
+            net_args["specz"] = data["gt_spectra_redshift"]
 
         if spectra_supervision_train:
             net_args["full_wave"] = data["full_wave"]

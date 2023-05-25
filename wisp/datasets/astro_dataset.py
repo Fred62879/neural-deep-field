@@ -189,8 +189,8 @@ class AstroDataset(Dataset):
         # get only supervision spectra (not all gt spectra) for loss calculation
         out["gt_spectra"] = self.spectra_dataset.get_supervision_spectra()
 
-        if self.kwargs["redshift_supervision"]:
-            out["gt_spectra_redshift"] = self.spectra_dataset.get_supervision_redshift()
+        #if self.kwargs["redshift_supervision"]:
+        #    out["gt_spectra_redshift"] = self.spectra_dataset.get_supervision_redshift()
 
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             out["gt_spectra_pixels"] = self.spectra_dataset.get_supervision_pixels()
@@ -214,6 +214,10 @@ class AstroDataset(Dataset):
             # the others are forwarded only for spectrum plotting
             out["num_spectra_coords"] = len(spectra_coords)
 
+    def get_redshift_data(self, out):
+        if self.kwargs["redshift_supervision"]:
+            out["gt_spectra_redshift"] = self.spectra_dataset.get_supervision_redshift()
+
     def __len__(self):
         """ Length of the dataset in number of coords.
         """
@@ -235,6 +239,9 @@ class AstroDataset(Dataset):
 
         if "spectra_data" in self.requested_fields:
             self.get_spectra_data(out)
+
+        if "redshift_data" in self.requested_fields:
+            self.get_redshift_data(out)
 
         #self.print_shape(out)
         if self.transform is not None:

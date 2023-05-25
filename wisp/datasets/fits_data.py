@@ -66,8 +66,9 @@ class FITSData:
         ## TODO: REMOVE require_scaler
         self.require_scaler = self.kwargs["space_dim"] == 3 and self.qtz \
             and self.kwargs["generate_scaler"]
-        self.require_redshift = self.kwargs["space_dim"] == 3 and self.qtz \
-            and self.kwargs["generate_redshift"] and self.kwargs["redshift_supervision"]
+        # self.require_redshift = self.kwargs["space_dim"] == 3 and self.qtz \
+        #     and self.kwargs["generate_redshift"] and self.kwargs["redshift_supervision"]
+        self.require_redshift = False
 
         self.require_coords = self.kwargs["spectra_supervision"] or \
             self.require_scaler or self.require_redshift or \

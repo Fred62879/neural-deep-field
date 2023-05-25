@@ -282,7 +282,10 @@ class AstroInferrer(BaseInferrer):
         self.perform_integration = False
         self.coords_source = "spectra"
         self.requested_fields = ["coords"]
+
         if self.pretrain_infer:
+            if self.extra_args["use_gt_redshift"]:
+                self.requested_fields.append("redshift_data")
             self.dataset_length = self.extra_args["num_supervision_spectra"]
         else:
             self.dataset_length = self.dataset.get_num_spectra_coords()
@@ -313,6 +316,8 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             self.dataset_length = self.extra_args["qtz_num_embed"]
         elif self.recon_codebook_spectra_individ:
+            if pretrain_infer and self.extra_args["use_gt_redshift"]:
+                self.requested_fields.append("redshift_data")
             self.dataset_length = self.extra_args["num_supervision_spectra"]
 
         self.batch_size = min(self.extra_args["infer_batch_size"], self.dataset_length)
@@ -666,6 +671,7 @@ class AstroInferrer(BaseInferrer):
                         # self.extra_args["num_epochs"],
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
+                        use_gt_redshift=self.extra_args["use_gt_redshift"],
                         pretrain_infer=self.pretrain_infer,
                         quantize_latent=self.quantize_latent,
                         quantize_spectra=self.quantize_spectra,
@@ -700,6 +706,7 @@ class AstroInferrer(BaseInferrer):
                         iterations,
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
+                        use_gt_redshift=self.extra_args["use_gt_redshift"],
                         quantize_latent=self.quantize_latent,
                         quantize_spectra=self.quantize_spectra,
                         quantization_strategy=self.extra_args["quantization_strategy"],
@@ -709,10 +716,10 @@ class AstroInferrer(BaseInferrer):
 
                     if self.recon_codebook_spectra:
                         spectra = ret["intensity"]
-                    else:
+                    elif self.recon_codebook_spectra_individ:
                         spectra = ret["codebook"]
+                    else: assert 0
 
-                # np.save('code.npy',spectra.detach().cpu().numpy())
                 self.codebook_spectra.extend(spectra)
 
             except StopIteration:

@@ -78,7 +78,7 @@ def get_pipelines_from_config(args, tasks={}):
                 spectra_nef = CodebookPretrainNerf(False, **vars(args))
                 pipelines["spectra_infer"] = AstroPipeline(spectra_nef)
 
-            if "recon_codebook_spectra_individ" in tasks and args.generate_redshift:
+            if "recon_codebook_spectra_individ" in tasks and args.redshift_supervision:
                 pretrain_nef = CodebookPretrainNerf(False, **vars(args))
                 pipelines["codebook_individ"] = AstroPipeline(pretrain_nef)
 

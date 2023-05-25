@@ -128,7 +128,8 @@ class AstroTrainer(BaseTrainer):
 
         self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
         self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
-        self.redshift_supervision = self.space_dim == 3 and self.quantize and self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"]
+        self.redshift_supervision = self.space_dim == 3 and self.quantize and self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"] and not self.extra_args["use_gt_redshift"]
+        assert not self.extra_args["use_gt_redshift"] # don't use gt redshift during main train
 
         if self.save_cropped_recon:
             # save selected-cropped train image reconstruction

@@ -82,7 +82,7 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_mode("codebook_pretrain")
 
         # set required fields from dataset
-        fields = ["trans_data","spectra_data"]
+        fields = ["trans_data","spectra_data","redshift_data"]
         self.dataset.set_fields(fields)
 
         # set input latents for codebook net
@@ -97,7 +97,7 @@ class CodebookTrainer(BaseTrainer):
         tasks = set(self.extra_args["tasks"])
 
         self.pixel_supervision = self.extra_args["codebook_pretrain_pixel_supervision"]
-        self.redshift_supervision = self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"]
+        self.redshift_supervision = self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"] and not self.extra_args["use_gt_redshift"]
 
         self.save_soft_qtz_weights = "save_soft_qtz_weights_during_train" in tasks
         self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
@@ -440,7 +440,6 @@ class CodebookTrainer(BaseTrainer):
 
     def resume_train(self):
         try:
-            print(self.pretrained_model_fname)
             assert(exists(self.pretrained_model_fname))
             if self.verbose:
                 log.info(f"saved model found, loading {self.pretrained_model_fname}")
@@ -478,6 +477,7 @@ class CodebookTrainer(BaseTrainer):
                       codebook_pretrain=True,
                       pixel_supervision_train=self.pixel_supervision,
                       redshift_supervision_train=self.redshift_supervision,
+                      use_gt_redshift=self.extra_args["use_gt_redshift"],
                       quantize_spectra=True,
                       quantization_strategy="soft",
                       save_spectra=self.plot_spectra,
