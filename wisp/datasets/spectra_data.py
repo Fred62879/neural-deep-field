@@ -88,22 +88,14 @@ class SpectraData:
     # Getters
     #############
 
-    def get_supervision_spectra(self):
-        """ Get gt spectra (with same wave range as recon) for supervision.
-        """
-        return self.data["supervision_spectra"]
-
-    def get_spectra_pixels(self):
-        """ Get values for pixels with gt spectra
-        """
-        return self.data["gt_spectra_pixels"]
+    def get_full_wave(self):
+        return self.full_wave
 
     def get_num_spectra_to_plot(self):
         return len(self.data["spectra_grid_coords"])
 
     def get_num_gt_spectra(self):
-        """ Get number of gt spectra (doesn't count neighbours).
-        """
+        """ Get number of gt spectra (doesn't count neighbours). """
         if self.recon_gt_spectra or self.spectra_supervision_train:
             return len(self.kwargs["gt_spectra_ids"])
         return 0
@@ -114,8 +106,7 @@ class SpectraData:
         return self.data["spectra_grid_coords"]
 
     def get_spectra_img_coords(self):
-        """ Get image coords of all selected spectra (gt & dummy, incl. neighbours).
-        """
+        """ Get image coords of all selected spectra (gt & dummy, incl. neighbours). """
         return self.data["spectra_img_coords"]
 
     def get_num_spectra_coords(self):
@@ -125,40 +116,46 @@ class SpectraData:
         return self.get_spectra_grid_coords().shape[0]
 
     def get_spectra_coord_ids(self):
-        """ Get pixel id of all selected spectra (correspond to coords).
-        """
+        """ Get pixel id of all selected spectra (correspond to coords). """
         return self.data["spectra_coord_ids"]
 
     def get_spectra_supervision_wave_bound_ids(self):
-        """ Get ids of boundary lambda of spectra supervision.
-        """
+        """ Get ids of boundary lambda of spectra supervision. """
         return self.data["spectra_supervision_wave_bound_ids"]
 
     def get_spectra_recon_wave_bound_ids(self):
-        """ Get ids of boundary lambda of recon spectra.
-        """
+        """ Get ids of boundary lambda of recon spectra. """
         return self.data["spectra_recon_wave_bound_ids"]
 
     def get_recon_spectra_wave(self):
-        """ Get lambda values (for plotting).
-        """
+        """ Get lambda values (for plotting). """
         return self.data["recon_wave"]
 
     def get_gt_spectra(self):
-        """ Get gt spectra (for plotting).
-        """
+        """ Get gt spectra (for plotting). """
         return self.data["gt_spectra"]
 
+    def get_gt_spectra_pixels(self):
+        return self.data["gt_spectra_pixels"]
+
+    def get_gt_spectra_pixels(self):
+        return self.data["gt_spectra_redshift"]
+
     def get_gt_spectra_wave(self):
-        """ Get lambda values (for plotting).
-        """
+        """ Get lambda values (for plotting). """
         return self.data["gt_spectra_wave"]
 
-    def get_full_wave(self):
-        return self.full_wave
+    def get_supervision_spectra(self):
+        """ Get gt spectra (with same wave range as recon) used for supervision. """
+        return self.data["supervision_spectra"]
 
-    def get_redshift(self):
-        return self.data["redshift"]
+    def get_supervision_pixels(self):
+        """ Get pix values for pixels used for spectra supervision. """
+        return self.data["supervision_pixels"]
+
+    def get_supervision_redshift(self):
+        """ Get redshift values for pixels used for spectra supervision. """
+        return self.data["supervision_redshift"]
 
     #############
     # Helpers
@@ -243,15 +240,21 @@ class SpectraData:
             self.data["gt_spectra_grid_coords"]).type(
                 torch.FloatTensor)[:,:,None].view(-1,1,coord_dim) #[num_coords,num_neighbours,.]
 
-        if self.kwargs["codebook_pretrain_pixel_supervision"]:
-            self.data["gt_spectra_pixels"] = torch.stack(
-                self.data["gt_spectra_pixels"]).type(
-                    torch.FloatTensor)[:,:,None].view(-1,self.kwargs["num_bands"])
-
         if self.spectra_supervision_train or self.codebook_pretrain or self.pretrain_infer:
             n = self.kwargs["num_supervision_spectra"]
+
             self.data["supervision_spectra"] = torch.FloatTensor(
                 np.array(self.data["supervision_spectra"]))[:n]
+
+            if self.kwargs["codebook_pretrain_pixel_supervision"]:
+                pixels = torch.stack(self.data["gt_pixels"]).type(torch.FloatTensor)
+                self.data["gt_pixels"] = pixels[:,:,None].view(-1,self.kwargs["num_bands"])
+                self.data["supervision_pixels"] = self.data["gt_pixels"][:n]
+
+            if self.kwargs["redshift_supervision"]:
+                 self.data["gt_redshift"] = torch.FloatTensor(
+                     np.array(self.data["gt_redshift"])).flatten()
+                 self.data["supervision_redshift"] = self.data["gt_redshift"][:n]
 
         # tmp, dummy redshift
         # if self.kwargs["redshift_supervision"]:
@@ -288,12 +291,7 @@ class SpectraData:
            and not self.spectra_supervision_train and not self.recon_spectra \
            and not self.kwargs["codebook_pretrain_pixel_supervision"]: return
 
-        # ii) get pixel values
-        if self.kwargs["codebook_pretrain_pixel_supervision"]:
-            pixels = self.fits_obj.get_pixels(ids)
-            self.data["gt_spectra_pixels"].append(pixels)
-
-        # iii) load actual spectra data
+        # ii) load actual spectra data
         fname = join(self.spectra_path, fits_uid,
                      source_spectra_data["spectra_fname"][spectra_id])
 
@@ -302,7 +300,7 @@ class SpectraData:
             interpolate=True, sigma=self.kwargs["spectra_smooth_sigma"],
             trusted_range=None if not self.kwargs["trusted_range_only"] else [wave_lo, wave_hi])
 
-        # iv) get data for for spectra supervision
+        # iii) get data for for spectra supervision
         if self.spectra_supervision_train or self.codebook_pretrain or self.pretrain_infer:
             supervision_spectra_wave_bound = [
                 source_spectra_data["spectra_supervision_wave_lo"][spectra_id],
@@ -323,7 +321,17 @@ class SpectraData:
                 supervision_spectra_wave_bound, gt_wave, within_bound=True)
             self.data["supervision_spectra"].append(gt_spectra[id_lo:id_hi + 1])
 
-        # v) get data for gt spectrum plotting
+            # get pixel values
+            if self.kwargs["codebook_pretrain_pixel_supervision"]:
+                pixels = self.fits_obj.get_pixels(ids)
+                self.data["gt_pixels"].append(pixels)
+
+            # get redshift values
+            if self.kwargs["redshift_supervision"]:
+                redshift = source_spectra_data["specz"][spectra_id]
+                self.data["gt_redshift"].append(redshift)
+
+        # iv) get data for gt spectrum plotting
         if self.recon_spectra:
             if self.kwargs["plot_clipped_spectrum"]:
                 # plot only within a given range

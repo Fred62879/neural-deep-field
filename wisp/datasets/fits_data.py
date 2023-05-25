@@ -344,24 +344,24 @@ class FITSData:
     # Load redshifts
     ##############
 
-    def get_redshift_one_fits(self, id, fits_uid):
-        if self.use_full_fits:
-            num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
-            redshifts = -1 * np.ones((num_rows, num_cols))
-        else:
-            num_rows = self.fits_cutout_num_rows[index]
-            num_cols = self.fits_cutout_num_cols[index]
-            redshifts = -1 * np.ones((num_rows, num_cols))
+    # def get_redshift_one_fits(self, id, fits_uid):
+    #     if self.use_full_fits:
+    #         num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
+    #         redshifts = -1 * np.ones((num_rows, num_cols))
+    #     else:
+    #         num_rows = self.fits_cutout_num_rows[index]
+    #         num_cols = self.fits_cutout_num_cols[index]
+    #         redshifts = -1 * np.ones((num_rows, num_cols))
 
-        return redshifts
+    #     return redshifts
 
-    def get_redshift_all_fits(self):
-        """ Load dummy redshift values for now.
-        """
-        redshift = [ self.get_redshift_one_fits(id, fits_uid)
-                     for id, fits_uid in enumerate(self.fits_uids) ]
-        redshift = np.array(redshift).flatten()
-        self.data["redshift"] = torch.FloatTensor(redshift)
+    # def get_redshift_all_fits(self):
+    #     """ Load dummy redshift values for now.
+    #     """
+    #     redshift = [ self.get_redshift_one_fits(id, fits_uid)
+    #                  for id, fits_uid in enumerate(self.fits_uids) ]
+    #     redshift = np.array(redshift).flatten()
+    #     self.data["redshift"] = torch.FloatTensor(redshift)
 
     ##############
     # Load coords
@@ -482,10 +482,10 @@ class FITSData:
             return self.data["weights"][idx]
         return self.data["weights"]
 
-    def get_redshifts(self, idx=None):
-        if idx is not None:
-            return self.data["redshift"][idx]
-        return self.data["redshift"]
+    # def get_redshifts(self, idx=None):
+    #     if idx is not None:
+    #         return self.data["redshift"][idx]
+    #     return self.data["redshift"]
 
     def get_coord(self, idx):
         if type(idx) == list:

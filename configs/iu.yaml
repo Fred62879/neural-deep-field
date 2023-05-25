@@ -8,7 +8,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_pixel_values_during_train','save_soft_qtz_weights_during_train']
-    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights','recon_img']
+    tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights','recon_img']
 
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','recon_gt_spectra']
@@ -105,7 +105,7 @@ qtz:
 
 spatial_decod:
     generate_scaler: True
-    generate_redshift: False
+    generate_redshift: True
 
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1
@@ -148,16 +148,16 @@ trainer:
     save_as_new: True
     train_pixel_ratio: .1 # change dataloader sampler
     #masked_pixl_ratio_per_epoch: 1
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift','spectra_latents','gt_spectra_pixels']
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
     pretrain_codebook: True
-    codebook_pretrain_pixel_supervision: True
+    codebook_pretrain_pixel_supervision: False
     pixel_supervision: True
     spectra_supervision: False
-    redshift_supervision: False
+    redshift_supervision: True
     spectra_beta: 1
     redshift_beta: 1
-    pretrain_pixel_beta: 0.01
+    pretrain_pixel_beta: 1
     pretrain_redshift_beta: 0.1
     spectra_supervision_start_epoch: 0
 
@@ -168,15 +168,15 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230522-110017'
-    #pretrain_log_dir: '20230521-123606'
-    pretrained_model_name: 'model-ep20000-it1.pth'
+    pretrain_log_dir: '20230524-132802'
+    pretrained_model_name: 'model-ep2000-it1.pth'
 
     num_trans_samples: 40
     uniform_sample_trans: True
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 1
+    num_supervision_spectra: 5
     spectra_neighbour_size: 1
 
 infer:
@@ -187,7 +187,7 @@ infer:
 
     # recon img
     to_HDU: False
-    #infer_log_dir: '20230517-153440'
+    #infer_log_dir: '20230524-130115_pretrain_0.01_weight'
     metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
@@ -265,7 +265,7 @@ dataset:
     hardcode_num_trans_samples: 12
     trans_sample_interval: 10
 
-    gt_spectra_ids: [9] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
+    gt_spectra_ids: [5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
 
     spectra_smooth_sigma: 50
     # spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]

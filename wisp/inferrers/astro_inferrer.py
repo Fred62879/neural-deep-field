@@ -75,7 +75,7 @@ class AstroInferrer(BaseInferrer):
         self.selected_model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames = sort_alphanumeric(self.selected_model_fnames)
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -113,7 +113,8 @@ class AstroInferrer(BaseInferrer):
         self.plot_pixel_distrib = "plot_pixel_distrib" in tasks
         self.recon_img = "recon_img" in tasks and "infer" in tasks
         self.recon_synthetic_band = "recon_synthetic_band" in tasks
-        self.recon_img_pretrain = "recon_img" in tasks and "pretrain_infer" in tasks
+        self.recon_img_pretrain = "recon_img" in tasks and "pretrain_infer" in tasks and \
+            self.extra_args["codebook_pretrain_pixel_supervision"]
 
         self.plot_embed_map = "plot_embed_map" in tasks \
             and (self.quantize_latent or self.quantize_spectra) \
@@ -411,7 +412,7 @@ class AstroInferrer(BaseInferrer):
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
             log.info(f"Recon vals {vals}")
-            gt_vals = self.dataset.get_spectra_pixels().numpy()
+            gt_vals = self.dataset.get_supervision_spectra_pixels().numpy()
             log.info(f"GT vals {gt_vals}")
 
         if self.recon_synthetic_band:

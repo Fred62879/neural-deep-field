@@ -105,8 +105,11 @@ class AstroDataset(Dataset):
     def get_zscale_ranges(self, fits_uid=None):
         return self.fits_dataset.get_zscale_ranges(fits_uid)
 
-    def get_spectra_pixels(self):
-        return self.spectra_dataset.get_spectra_pixels()
+    def get_supervision_spectra_pixels(self):
+        return self.spectra_dataset.get_supervision_pixels()
+
+    def get_supervision_spectra_redshift(self):
+        return self.spectra_dataset.get_supervision_redshift()
 
     def get_spectra_coord_ids(self):
         return self.spectra_dataset.get_spectra_coord_ids()
@@ -141,9 +144,9 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_pixels(idx)
         elif field == "weights":
             data = self.fits_dataset.get_weights(idx)
-        elif field == "redshift":
-            assert 0
-            data = self.fits_dataset.get_redshifts(idx)
+        # elif field == "redshift":
+        #     assert 0
+        #     data = self.fits_dataset.get_redshifts(idx)
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
         else:
@@ -186,8 +189,11 @@ class AstroDataset(Dataset):
         # get only supervision spectra (not all gt spectra) for loss calculation
         out["gt_spectra"] = self.spectra_dataset.get_supervision_spectra()
 
+        if self.kwargs["redshift_supervision"]:
+            out["gt_spectra_redshift"] = self.spectra_dataset.get_supervision_redshift()
+
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
-            out["gt_spectra_pixels"] = self.spectra_dataset.get_spectra_pixels()
+            out["gt_spectra_pixels"] = self.spectra_dataset.get_supervision_pixels()
 
         out["spectra_supervision_wave_bound_ids"] = \
             self.spectra_dataset.get_spectra_supervision_wave_bound_ids()
@@ -207,9 +213,6 @@ class AstroDataset(Dataset):
             # the first #num_supervision_spectra are gt coords for supervision
             # the others are forwarded only for spectrum plotting
             out["num_spectra_coords"] = len(spectra_coords)
-
-    def get_redshift_data(self, out):
-        out["redshift"] = self.spectra_dataset.get_redshift()
 
     def __len__(self):
         """ Length of the dataset in number of coords.
@@ -232,9 +235,6 @@ class AstroDataset(Dataset):
 
         if "spectra_data" in self.requested_fields:
             self.get_spectra_data(out)
-
-        if "redshift_data" in self.requested_fields:
-            self.get_redshift_data(out)
 
         #self.print_shape(out)
         if self.transform is not None:

@@ -3,6 +3,12 @@ import numpy as np
 
 from wisp.utils.numerical import calculate_emd
 
+def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
+    gt_pixels = gt_pixels / (torch.sum(gt_pixels, dim=-1)[...,None])
+    recon_pixels = recon_pixels / (torch.sum(recon_pixels, dim=-1)[...,None])
+    emd = calculate_emd(gt_pixels, recon_pixels)
+    emd = torch.mean(torch.abs(emd))
+    return emd
 
 def spectra_supervision_loss(loss, gt_spectra, recon_spectra):
     ''' Loss function for few-shot spectra supervision
