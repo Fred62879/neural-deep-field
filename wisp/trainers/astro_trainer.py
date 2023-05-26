@@ -88,7 +88,7 @@ class AstroTrainer(BaseTrainer):
             fields.append("spectra_data")
 
         if self.redshift_supervision:
-            fields.append("redshift")
+            fields.append("redshift_data")
 
         length = self.get_dataset_length()
 

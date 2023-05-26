@@ -579,7 +579,9 @@ class CodebookTrainer(BaseTrainer):
         # np.save(fname, vals)
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
-        log.info(f"Pixel vals gt/recon {gt_vals} / {recon_vals}")
+        # log.info(f"Pixel vals gt/recon {gt_vals} / {recon_vals}")
+        ratio = gt_vals / recon_vals
+        log.info(f"gt/recon ratio: {ratio}")
 
     def _save_redshift(self):
         redshifts = torch.stack(self.redshifts).detach().cpu().numpy()

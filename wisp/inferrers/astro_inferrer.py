@@ -316,7 +316,7 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             self.dataset_length = self.extra_args["qtz_num_embed"]
         elif self.recon_codebook_spectra_individ:
-            if pretrain_infer and self.extra_args["use_gt_redshift"]:
+            if self.pretrain_infer and self.extra_args["use_gt_redshift"]:
                 self.requested_fields.append("redshift_data")
             self.dataset_length = self.extra_args["num_supervision_spectra"]
 
@@ -416,9 +416,11 @@ class AstroInferrer(BaseInferrer):
             np.save(fname, vals)
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
-            log.info(f"Recon vals {vals}")
+            # log.info(f"Recon vals {vals}")
             gt_vals = self.dataset.get_supervision_spectra_pixels().numpy()
-            log.info(f"GT vals {gt_vals}")
+            # log.info(f"GT vals {gt_vals}")
+            ratio = gt_vals / vals
+            log.info(f"gt/recon ratio: {ratio}")
 
         if self.recon_synthetic_band:
             re_args = {

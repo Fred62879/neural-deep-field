@@ -8,7 +8,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_pixel_values_during_train','save_soft_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights','recon_img']
+    #tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights','recon_img']
 
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','recon_gt_spectra']
@@ -26,7 +26,7 @@ global:
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
     #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
-    #tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
+    tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
 optimizer:
     optimizer_type: 'adam'
@@ -106,8 +106,8 @@ qtz:
 spatial_decod:
     generate_scaler: True
 
-    generate_redshift: False # only one of these
-    use_gt_redshift: True    # two can be True
+    generate_redshift: True # only one of these
+    use_gt_redshift: False    # two can be True
                              # set redshift_supervision to True
                              # to make these two effective
 
@@ -155,13 +155,13 @@ trainer:
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
     pretrain_codebook: True
-    codebook_pretrain_pixel_supervision: False
+    codebook_pretrain_pixel_supervision: True
     pixel_supervision: True
     spectra_supervision: False
-    redshift_supervision: True
+    redshift_supervision: False
     spectra_beta: 1
     redshift_beta: 1
-    pretrain_pixel_beta: 1
+    pretrain_pixel_beta: .1
     pretrain_redshift_beta: 0.1
     spectra_supervision_start_epoch: 0
 
@@ -172,8 +172,8 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230522-110017'
-    pretrain_log_dir: '20230524-132802'
-    pretrained_model_name: 'model-ep2000-it1.pth'
+    pretrain_log_dir: '20230526-153147_emd_beta_0.1_20000'
+    pretrained_model_name: 'model-ep20000-it1.pth'
 
     num_trans_samples: 40
     uniform_sample_trans: True
@@ -191,7 +191,7 @@ infer:
 
     # recon img
     to_HDU: False
-    #infer_log_dir: '20230524-130115_pretrain_0.01_weight'
+    #infer_log_dir: '20230526-151721_emd_beta_1'
     metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
@@ -204,7 +204,7 @@ infer:
     spectra_norm_cho: "sum"
     average_spectra: True
     trusted_range_only: True     # for gt spectra
-    plot_clipped_spectrum: True  # for recon spectra
+    plot_clipped_spectrum: True # for recon spectra
     plot_spectrum_with_gt: True
     plot_spectrum_with_trans: False
     plot_spectrum_together: True
