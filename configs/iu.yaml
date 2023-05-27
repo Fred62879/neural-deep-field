@@ -15,7 +15,7 @@ global:
     #tasks: ['infer','plot_latent_embed']
     #tasks: ['infer','plot_pixel_distrib']
     #tasks: ['infer','save_soft_qtz_weights']
-    #tasks: ['infer','recon_codebook_spectra']
+    tasks: ['infer','recon_codebook_spectra']
     #tasks: ['infer','plot_embed_map','plot_redshift']
     #tasks: ['infer','plot_save_scaler','plot_redshift']
     #tasks: ['infer','recon_gt_spectra','log_pixel_value']
@@ -26,7 +26,7 @@ global:
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
     #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
-    tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
+    #tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
 optimizer:
     optimizer_type: 'adam'
@@ -201,10 +201,10 @@ infer:
     recon_cutout_start_pos: [ [[256,256]] ] #, [[86,188]] ] #[86,188]
 
     # recon spectra
-    spectra_norm_cho: "sum"
+    spectra_norm_cho: "none"
     average_spectra: True
     trusted_range_only: True     # for gt spectra
-    plot_clipped_spectrum: True # for recon spectra
+    plot_clipped_spectrum: False # for recon spectra
     plot_spectrum_with_gt: True
     plot_spectrum_with_trans: False
     plot_spectrum_together: True

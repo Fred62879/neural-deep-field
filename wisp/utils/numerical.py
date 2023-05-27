@@ -44,7 +44,7 @@ def get_coords_range(coords):
     ''' Find min and max of given 2D coords. '''
     min_ra, max_ra = np.min(coords[...,0]), np.max(coords[...,0])
     min_dec, max_dec = np.min(coords[...,1]), np.max(coords[...,1])
-    return (min_ra, max_ra, min_dec, max_dec)
+    return np.array([min_ra, max_ra, min_dec, max_dec])
 
 def normalize_coords(coords):
     ''' Normalize given coords.

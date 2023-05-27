@@ -19,7 +19,8 @@ from wisp.utils.numerical import normalize_coords, normalize, \
 
 
 class FITSData:
-    """ Data class for all selected patches. """
+    """ Data class for FITS files. """
+
     def __init__(self, dataset_path, device, **kwargs):
         self.kwargs = kwargs
         self.load_weights = kwargs["weight_train"]
@@ -145,6 +146,7 @@ class FITSData:
         footprints.sort();tile_ids.sort();subtile_ids.sort()
 
         self.fits_uids, self.fits_groups, self.fits_wgroups = [], {}, {}
+
         for footprint, tile_id, subtile_id in zip(footprints, tile_ids, subtile_ids):
             utile= tile_id + "c" + subtile_id
             tile = tile_id + "%2C" + subtile_id
@@ -154,40 +156,168 @@ class FITSData:
             fits_uid = footprint + tile_id + subtile_id
             self.fits_uids.append(fits_uid)
 
+            # avoid duplication
+            if fits_uid in self.fits_groups and fits_uid in self.fits_wgroups:
+                continue
+
+            hsc_fits_fname = np.array(
+                ["calexp-" + band + "-" + footprint + "-" + tile + ".fits"
+                for band in self.kwargs["sensors_full_name"] if "HSC" in band])
+            nb_fits_fname = np.array(
+                ["calexp-" + band + "-" + footprint + "-" + tile + ".fits"
+                for band in self.kwargs["sensors_full_name"] if "NB" in band])
+            megau_fits_fname = np.array(
+                ["Mega-" + band + "_" + footprint + "_" + utile + ".fits"
+                for band in self.kwargs["sensors_full_name"] if "u" in band])
+            megau_weights_fname = np.array(
+                ["Mega-" + band + "_" + footprint + "_" + utile + ".weight.fits"
+                for band in self.kwargs["sensors_full_name"] if "u" in band])
+
+            self.fits_groups[fits_uid] = np.concatenate(
+                (hsc_fits_fname, nb_fits_fname, megau_fits_fname))
+
+            self.fits_wgroups[fits_uid] = np.concatenate(
+                (hsc_fits_fname, nb_fits_fname, megau_weights_fname))
+
         self.num_fits = len(self.fits_uids)
 
         # make sure no duplicate fits ids exist if use full tile
         if self.use_full_fits:
             assert( len(self.fits_uids) == len(set(self.fits_uids)))
 
-    def load(self):
-        cached = self.load_patch_data_cache and \
-            (not self.load_coords or exists(self.coords_fname)) and \
+    ###############
+    # Load FITS data
+    ###############
+
+    def load_header(self, index, fits_uid):
+        """ Load header for both full tile and current cutout. """
+        fits_fname = self.fits_groups[fits_uid][0]
+        id = 0 if "Mega-u" in fits_fname else 1
+        hdu = fits.open(join(self.input_fits_path, fits_fname))[id]
+        header = hdu.header
+
+        if self.use_full_fits:
+            num_rows, num_cols = header["NAXIS2"], header["NAXIS1"]
+        else:
+            (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
+            num_rows = self.fits_cutout_num_rows[index]
+            num_cols = self.fits_cutout_num_cols[index]
+            pos = (c + num_cols//2, r + num_rows//2)
+
+            wcs = WCS(header)
+            cutout = Cutout2D(hdu.data, position=pos, size=(num_rows,num_cols), wcs=wcs)
+            header = cutout.wcs.to_header()
+
+        self.headers[fits_uid] = header
+        self.num_rows[fits_uid] = num_rows
+        self.num_cols[fits_uid] = num_cols
+
+    def load_headers(self):
+        self.headers, self.num_rows, self.num_cols = {}, {}, {}
+        for index, fits_uid in enumerate(self.fits_uids):
+            self.load_header(index, fits_uid)
+
+    def load_one_fits(self, index, fits_uid, load_pixels=True):
+        """ Load pixel values or variance from one FITS file (tile_id/subtile_id).
+            Load pixel and weights separately to avoid using up mem.
+        """
+        cur_data = []
+
+        for i in range(self.num_bands):
+            if load_pixels:
+                fits_fname = self.fits_groups[fits_uid][i]
+
+                # u band pixel vals in first hdu, others in 2nd hdu
+                is_u = "Mega-u" in fits_fname
+                id = 0 if is_u else 1
+
+                pixels = fits.open(join(self.input_fits_path, fits_fname))[id].data
+                if is_u: # scale u and u* band pixel values
+                    pixels /= self.u_band_scale
+
+                if not self.use_full_fits:
+                    (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
+                    num_rows = self.num_rows[fits_uid]
+                    num_cols = self.num_cols[fits_uid]
+                    pixels = pixels[r:r+num_rows, c:c+num_cols]
+
+                if not self.kwargs["train_pixels_norm"] == "linear":
+                    pixels = normalize(pixels, self.kwargs["train_pixels_norm"], gt=pixels)
+                cur_data.append(pixels)
+
+            else: # load weights
+                fits_wfname = self.fits_wgroups[fits_uid][i]
+                # u band weights in first hdu, others in 4th hdu
+                id = 0 if "Mega-u" in fits_wfname else 3
+                var = fits.open(join(self.input_fits_path, fits_wfname))[id].data
+
+                # u band weights stored as inverse variance, others as variance
+                if id == 3: weight = var
+                else:       weight = 1 / (var + 1e-6) # avoid division by 0
+                if self.use_full_fits:
+                    cur_data.append(weight.flatten())
+                else:
+                    (r, c) = self.fits_cutout_start_pos[index] # start position (r/c)
+                    num_rows = self.fits_cutout_num_rows[index]
+                    num_cols = self.fits_cutout_num_cols[index]
+                    var = var[r:r+num_rows, c:c+num_cols].flatten()
+                    cur_data.append(var)
+
+        if load_pixels:
+            # save gt np img individually for each fits file
+            # since different fits may differ in size
+            cur_data = np.array(cur_data) # [nbands,sz,sz]
+            np.save(self.gt_img_fnames[fits_uid], cur_data)
+            plot_horizontally(cur_data, self.gt_img_fnames[fits_uid], "plot_img")
+
+            if self.kwargs["to_HDU"]:
+                generate_hdu(self.headers[fits_uid], cur_data,
+                             self.gt_img_fnames[fits_uid] + ".fits")
+
+            # flatten into pixels for ease of training
+            cur_data = cur_data.reshape(self.num_bands, -1).T
+            return cur_data # [npixels,nbands]
+
+        # load weights
+        return np.sqrt(np.array(cur_data).T) # [npixels,nbands]
+
+    def load_all_fits(self, to_tensor=True, save_cutout=False):
+        """ Load all images (and weights) and flatten into one array.
+            @Return
+              pixels:  [npixels,nbands]
+              weights: [npixels,nbands]
+        """
+        #if self.cutout_based_train:
+        #    raise Exception("Cutout based train only works on one fits file.")
+
+        cached = self.load_fits_data_cache and exists(self.pixels_fname) and \
+            all([exists(fname) for fname in self.gt_img_fnames]) and \
             (not self.load_weights or exists(self.weights_fname)) and \
-            (not self.load_pixels or (exists(self.pixels_fname) and \
-                                      exists(self.zscale_ranges_fname)))
+            exists(self.zscale_ranges_fname)
+
         if cached:
-            if self.verbose: log.info("PATCH data cached.")
-            if self.load_pixels:
-                pixels = np.load(self.pixels_fname)
-            if self.load_coords:
-                coords = np.load(self.coords_fname)
+            if self.verbose: log.info("FITS data cached.")
+            pixels = np.load(self.pixels_fname)
             if self.load_weights:
                 weights = np.load(self.weights_fname)
-        return
+        else:
+            if self.verbose: log.info("Loading FITS data.")
+            if self.load_weights:
+                if self.verbose: log.info("Loading weights.")
+                weights = np.concatenate([ self.load_one_fits(index, fits_uid, load_pixels=False)
+                                           for index, fits_uid in enumerate(self.fits_uids) ])
+                np.save(self.weights_fname, weights)
+            else: weights = None
 
-        pixels, coords, weights = [], [], []
-        for tract, patch, cutout_num_rows, cutout_num_cols, cutout_start_pos in zip(
-                self.tracts, self.patches, self.cutout_num_rows, self.cutout_num_cols,
-                self.cutout_start_poss
-        ):
-            fits_uid =
-            self.load_one_patch(
-                fits_uid, tract, patch, cutout_num_rows, cutout_num_cols, cutout_start_pos
-            )
+            if self.verbose: log.info("Loading pixels.")
+            pixels = [ self.load_one_fits(index, fits_uid) # nfits*[npixels,nbands]
+                       for index, fits_uid in enumerate(self.fits_uids) ]
 
-        if self.load_pixels:
-            pixels = np.concatenate(pixels)
+            # calcualte zscale range for pixel normalization
+            zscale_ranges = calculate_zscale_ranges_multiple_FITS(pixels)
+            np.save(self.zscale_ranges_fname, zscale_ranges)
+
+            pixels = np.concatenate(pixels) # [total_npixels,nbands]
 
             # apply normalization to pixels as specified
             if self.kwargs["train_pixels_norm"] == "linear":
@@ -195,50 +325,124 @@ class FITSData:
             elif self.kwargs["train_pixels_norm"] == "zscale":
                 pixels = normalize(pixels, "zscale", gt=pixels)
 
-            pixel_max = np.round(np.max(pixels, axis=0), 3)
-            pixel_min = np.round(np.min(pixels, axis=0), 3)
-            log.info(f"train pixels max {pixel_max}")
-            log.info(f"train pixels min {pixel_min}")
-
-            zscale_ranges = calculate_zscale_ranges_multiple_FITS(pixels)
             np.save(self.pixels_fname, pixels)
-            np.save(self.zscale_ranges_fname, zscale_ranges)
-            self.data["pixels"] = torch.FloatTensor(pixels)
 
-        if self.load_coords:
-            coords = np.concatenate(coords)
-            coords, coords_range = normalize_coords(coords)
-            np.save(self.coords_fname, coords)
-            np.save(self.coords_range_fname, coords_range)
-            self.data["coords"] = add_dummy_dim(coords, **self.kwargs)
+        if self.kwargs["plot_img_distrib"]:
+            for fits_uid in self.fits_uids:
+                cur_data = np.load(self.gt_img_fnames[fits_uid] + ".npy")
+                plot_horizontally(cur_data, self.gt_img_distrib_fnames[fits_uid], "plot_distrib")
 
+        pixel_max = np.round(np.max(pixels, axis=0), 3)
+        pixel_min = np.round(np.min(pixels, axis=0), 3)
+        log.info(f"train pixels max {pixel_max}")
+        log.info(f"train pixels min {pixel_min}")
+
+        self.data["pixels"] = torch.FloatTensor(pixels)
         if self.load_weights:
-            weights = np.concatenate(weights)
-            np.save(self.weights_fname, weights)
             self.data["weights"] = torch.FloatTensor(weights)
 
+    ##############
+    # Load redshifts
+    ##############
 
-    def load_one_patch(self, fits_uid, tract, patch, cutout_num_rows, cutout_num_cols, cutout_start_pos):
-        cur_patch = PatchData(
-            self.dataset_path, tract, patch,
-            load_pixels=self.load_pixels,
-            load_coords=self.load_coords,
-            load_weights=self.load_weights,
-            cutout_num_rows=cutout_num_rows
-            cutout_num_cols=cutout_num_cols,
-            cutout_start_pos=cutout_start_pos,
-            **self.kwargs)
+    # def get_redshift_one_fits(self, id, fits_uid):
+    #     if self.use_full_fits:
+    #         num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
+    #         redshifts = -1 * np.ones((num_rows, num_cols))
+    #     else:
+    #         num_rows = self.fits_cutout_num_rows[index]
+    #         num_cols = self.fits_cutout_num_cols[index]
+    #         redshifts = -1 * np.ones((num_rows, num_cols))
 
-        self.headers[fits_uid] = cur_patch.get_header()
-        self.num_rows[fits_uid] = cur_patch.get_num_rows()
-        self.num_cols[fits_uid] = cur_patch.get_num_cols()
+    #     return redshifts
 
-        if self.load_pixels:
-            pixels.append(cur_patch.get_pixels())
-        if self.load_coords:
-            coords.append(cur_patch.get_coords())
-        if self.load_weights:
-            weights.append(cur_patch.get_weights())
+    # def get_redshift_all_fits(self):
+    #     """ Load dummy redshift values for now.
+    #     """
+    #     redshift = [ self.get_redshift_one_fits(id, fits_uid)
+    #                  for id, fits_uid in enumerate(self.fits_uids) ]
+    #     redshift = np.array(redshift).flatten()
+    #     self.data["redshift"] = torch.FloatTensor(redshift)
+
+    ##############
+    # Load coords
+    ##############
+
+    # def get_world_coords_one_fits(self, id, fits_uid):
+    #     """ Get ra/dec coords from one fits file and normalize.
+    #         pix2world calculate coords in x-y order
+    #           coords can be indexed using r-c
+    #         @Return
+    #           coords: 2D coordinates [npixels,2]
+    #     """
+    #     num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
+    #     xids = np.tile(np.arange(0, num_cols), num_rows)
+    #     yids = np.repeat(np.arange(0, num_rows), num_cols)
+
+    #     wcs = WCS(self.headers[fits_uid])
+    #     ras, decs = wcs.all_pix2world(xids, yids, 0) # x-y pixel coord
+    #     if self.use_full_fits:
+    #         coords = np.array([ras, decs]).T
+    #     else:
+    #         coords = np.concatenate(( ras.reshape((num_rows, num_cols, 1)),
+    #                                   decs.reshape((num_rows, num_cols, 1)) ), axis=2)
+    #         # size = self.fits_cutout_sizes[id]
+    #         num_rows = self.num_rows[fits_uid]
+    #         num_cols = self.num_cols[fits_uid]
+
+    #         (r, c) = self.fits_cutout_start_pos[id] # start position (r/c)
+    #         coords = coords[r:r+num_rows,c:c+num_cols].reshape(-1,2)
+    #     return coords
+
+    # def get_world_coords_all_fits(self):
+    #     """ Get ra/dec coord from all fits files and normalize.
+    #         @Return
+    #           coords [num_pixels,1,2]
+    #     """
+    #     if exists(self.coords_fname):
+    #         log.info("Loading coords from cache.")
+    #         coords = np.load(self.coords_fname)
+    #     else:
+    #         log.info("Generating coords.")
+    #         coords = np.concatenate([ self.get_world_coords_one_fits(id, fits_uid)
+    #                                   for id, fits_uid in enumerate(self.fits_uids) ])
+    #         coords, coords_range = normalize_coords(coords)
+    #         np.save(self.coords_fname, coords)
+    #         np.save(self.coords_range_fname, np.array(coords_range))
+
+    #     self.data["coords"] = add_dummy_dim(coords, **self.kwargs)
+
+    def get_pixel_coords_all_fits(self):
+        # assert(not self.use_full_fits)
+        # assert(len(self.fits_uids) == 1)
+        for id, fits_uid in enumerate(self.fits_uids):
+            num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
+            self.get_mgrid_np(num_rows, num_cols)
+            # assert(num_rows == num_cols)
+            # size = self.fits_cutout_sizes[id]
+            # self.get_mgrid_np(size)
+
+    def get_mgrid_np(self, num_rows, num_cols, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
+    #def get_mgrid_np(self, sidelen, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
+        """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version).
+        """
+        # arrays = tuple(dim * [np.linspace(lo, hi, num=sidelen)])
+        # mgrid = np.stack(np.meshgrid(*arrays, indexing=indexing), axis=-1)
+
+        x = np.linspace(lo, hi, num=num_cols)
+        y = np.linspace(lo, hi, num=num_rows)
+        mgrid = np.stack(np.meshgrid(x, y, indexing=indexing), axis=-1)
+
+        if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
+        self.data["coords"] = add_dummy_dim(mgrid, **self.kwargs)
+
+    def get_mgrid_tensor(self, sidelen, lo=-1, hi=1, dim=2, flat=True):
+        """ Generates a flattened grid of (x,y,...) coords in [-1,1] (Tensor version).
+        """
+        tensors = tuple(dim * [torch.linspace(lo, hi, steps=sidelen)])
+        mgrid = torch.stack(torch.meshgrid(*tensors), dim=-1)
+        if flat: mgrid = mgrid.reshape(-1, dim)
+        self.data["coords"] = add_dummy_dim(mgrid, **self.kwargs)
 
     #############
     # Getters
@@ -563,30 +767,6 @@ class FITSData:
                 metrics_zscale = np.concatenate((metrics_zscale, cur_metrics_zscale), axis=1)
 
         return metrics, metrics_zscale
-
-
-    ##############
-    # Load redshifts
-    ##############
-
-    # def get_redshift_one_fits(self, id, fits_uid):
-    #     if self.use_full_fits:
-    #         num_rows, num_cols = self.num_rows[fits_uid], self.num_cols[fits_uid]
-    #         redshifts = -1 * np.ones((num_rows, num_cols))
-    #     else:
-    #         num_rows = self.fits_cutout_num_rows[index]
-    #         num_cols = self.fits_cutout_num_cols[index]
-    #         redshifts = -1 * np.ones((num_rows, num_cols))
-
-    #     return redshifts
-
-    # def get_redshift_all_fits(self):
-    #     """ Load dummy redshift values for now.
-    #     """
-    #     redshift = [ self.get_redshift_one_fits(id, fits_uid)
-    #                  for id, fits_uid in enumerate(self.fits_uids) ]
-    #     redshift = np.array(redshift).flatten()
-    #     self.data["redshift"] = torch.FloatTensor(redshift)
 
 # FITS class ends
 #################
