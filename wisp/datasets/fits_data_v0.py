@@ -13,7 +13,7 @@ from astropy.coordinates import SkyCoord
 
 from wisp.utils.common import generate_hdu
 from wisp.utils.plot import plot_horizontally, mark_on_img
-from wisp.datasets.data_utils import add_dummy_dim, create_uid
+from wisp.datasets.data_utils import add_dummy_dim, create_selected_patches_uid
 from wisp.utils.numerical import normalize_coords, normalize, \
     calculate_metrics, calculate_zscale_ranges_multiple_FITS
 
@@ -125,7 +125,7 @@ class FITSData:
         paths.extend(self.gt_paths)
 
         # image data path creation
-        suffix = create_uid(self, **self.kwargs)
+        suffix = create_selected_patches_uid(self, **self.kwargs)
         self.coords_fname = join(img_data_path, f"coords{suffix}.npy")
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.pixels_fname = join(img_data_path, f"pixels_{norm_str}{suffix}.npy")

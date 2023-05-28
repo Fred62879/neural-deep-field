@@ -4,7 +4,7 @@ import numpy as np
 
 from typing import Callable
 from torch.utils.data import Dataset
-from wisp.datasets.fits_data import FITSData
+from wisp.datasets.fits_data import FitsData
 from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
@@ -48,7 +48,7 @@ class AstroDataset(Dataset):
             Load only needed data based on given tasks (in kwargs).
         """
         self.data = {}
-        self.fits_dataset = FITSData(self.root, self.device, **self.kwargs)
+        self.fits_dataset = FitsData(self.root, self.device, **self.kwargs)
         self.trans_dataset = TransData(self.root, self.device, **self.kwargs)
         self.spectra_dataset = SpectraData(self.fits_dataset, self.trans_dataset,
                                            self.root, self.device, **self.kwargs)

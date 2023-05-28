@@ -268,20 +268,17 @@ class SpectraData:
     def load_one_gt_spectra(self, spectra_id, smpl_interval, source_spectra_data):
         ra = source_spectra_data["ra"][spectra_id]
         dec = source_spectra_data["dec"][spectra_id]
-        footprint = source_spectra_data["footprint"][spectra_id]
-        tile_id = source_spectra_data["tile_id"][spectra_id]
-        subtile_id = source_spectra_data["subtile_id"][spectra_id]
+        tract = source_spectra_data["tract"][spectra_id]
+        patch = source_spectra_data["patch"][spectra_id]
         wave_lo = source_spectra_data["spectrum_plot_wave_lo"][spectra_id]
         wave_hi = source_spectra_data["spectrum_plot_wave_hi"][spectra_id]
-        fits_uid = f"{footprint}{tile_id}{subtile_id}"
 
         if self.kwargs["verbose"]:
             log.info(f'spectra: {spectra_id}, {ra}/{dec}')
 
         # i) get img coord, grid coord, and pixel ids of selected gt spectra
-        img_coords, grid_coords, ids = self.fits_obj.convert_from_world_coords(
-            ra, dec, self.kwargs["spectra_neighbour_size"],
-            footprint, tile_id, subtile_id)
+        img_coords, grid_coords, ids = self.fits_obj.world2pix(
+            ra, dec, self.kwargs["spectra_neighbour_size"], tract, patch)
 
         self.data["gt_spectra_coord_ids"].append(ids)           # [num_neighbours,1]
         self.data["gt_spectra_img_coords"].append(img_coords)   # [num_neighbours,2/3]

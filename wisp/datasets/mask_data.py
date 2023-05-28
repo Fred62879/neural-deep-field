@@ -8,7 +8,7 @@ from pathlib import Path
 from os.path import exists, join
 from collections import defaultdict
 from wisp.utils.plot import plot_horizontally
-from wisp.datasets.data_utils import create_uid
+from wisp.datasets.data_utils import create_selected_patches_uid
 
 
 class MaskData:
@@ -46,7 +46,6 @@ class MaskData:
     def set_path(self, dataset_path):
         input_path = join(dataset_path, "input")
         mask_path = join(input_path, "masks")
-
         # mask path creation
         if self.mask_mode == "region":
             mask_str = "region_" + str(self.kwargs["m_start_r"]) + "_" \
@@ -54,7 +53,7 @@ class MaskData:
                 + str(self.kwargs["mask_size"])
         else: mask_str = str(float(100 * self.inpaint_sample_ratio))
 
-        suffix = create_uid(self.fits_obj, **self.kwargs)[1:] + "_"
+        suffix = create_selected_patches_uid(self.fits_obj, **self.kwargs)[1:] + "_"
         if self.inpaint_cho == "spectral_inpaint":
             self.mask_fname = join(mask_path, suffix + mask_str + ".npy")
             self.masked_pixel_ids_fname = join(mask_path, suffix + mask_str + "_masked_ids.npy")
@@ -188,7 +187,7 @@ class MaskData:
 
             if self.plot_masked_gt:
                 self.plot_masked_gt_img(
-                    _mask, gt_paths[id], gt_img_fnames[fits_uid], zscale_ranges[id])
+                    _mask, gt_paths[fits_uid], gt_img_fnames[fits_uid], zscale_ranges[id])
 
             mask.append(_mask)
             masked_pixel_ids.append(_masked_pixel_ids)

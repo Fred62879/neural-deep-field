@@ -72,7 +72,7 @@ def calculate_zscale_ranges(pixels):
         zmins.append(zmin);zmaxs.append(zmax)
     return np.array([zmins, zmaxs])
 
-def calculate_zscale_ranges_multiple_FITS(pixels):
+def calculate_zscale_ranges_multiple_patches(pixels):
     """ Calculate zscale ranges based on given pixels for each bands separately.
         @Param
           pixels: [n,npixels,nbands]

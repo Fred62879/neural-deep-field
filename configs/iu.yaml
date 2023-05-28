@@ -26,7 +26,7 @@ global:
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
     #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
-    #tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
+    tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
 optimizer:
     optimizer_type: 'adam'
@@ -195,8 +195,8 @@ infer:
     metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
-    recon_cutout_fits_uids: ['981215'] #,'981217']
-    # each fits may have multiple cutouts
+    recon_cutout_patch_uids: ['981215'] #,'981217']
+    # each patch may have multiple cutouts
     recon_cutout_sizes: [ [64] ] #, [32] ]
     recon_cutout_start_pos: [ [[256,256]] ] #, [[86,188]] ] #[86,188]
 
@@ -220,21 +220,20 @@ dataset:
     space_dim: 3
     dataset_type: 'astro'
     plot_img_distrib: True
-    load_fits_data_cache: True
+    load_patch_data_cache: True
     dataset_path: '../../data/pdr3'
     gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
 
-    use_full_fits: False
+    use_full_patch: False
 
-    # if don't use full fits, we can select cutout from tiles
+    # if don't use full patch, we can select cutout from tiles
     # the order of the following 5 fields corresponds to each other
-    fits_footprints: ['9812']
-    fits_tile_ids: ['1']
-    fits_subtile_ids: ['5']
-    fits_cutout_num_rows: [512]
-    fits_cutout_num_cols: [512]
-    fits_cutout_start_pos: [[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    tracts: ['9812']
+    patches: ['1,5']
+    patch_cutout_num_rows: [512]
+    patch_cutout_num_cols: [512]
+    patch_cutout_start_pos: [[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
     #num_bands: 1
     #sensor_collection_name: '1_i'

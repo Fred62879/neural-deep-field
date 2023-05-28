@@ -297,29 +297,27 @@ def define_cmd_line_args():
                             help="Dataset class to use")
     data_group.add_argument("--dataset-path", type=str, help="Path to the dataset")
     data_group.add_argument("--dataset-num-workers", type=int, default=-1,
-                            help="Number of workers for dataset preprocessing, if it supports multiprocessing. \
-                                 -1 indicates no multiprocessing.")
+                            help="Number of workers for dataset preprocessing, \
+                            if it supports multiprocessing. -1 indicates no multiprocessing.")
+
     # Astro Dataset
     data_group.add_argument("--space-dim", type=int)
-    #data_group.add_argument("--load-cache", action="store_true")
 
     # fits data
-    data_group.add_argument("--num-fits",type=int, help="number of chosen FITS files")
-    data_group.add_argument("--fits-tile-ids", nargs="+", help="tile id of chosen FITS files")
-    data_group.add_argument("--fits-subtile-ids", nargs="+", help="subid of chose FITS files")
-    data_group.add_argument("--fits-footprints", nargs="+", help="footprints of chose FITS files")
+    data_group.add_argument("--tracts", nargs="+", help="tracts of chose FITS files")
+    data_group.add_argument("--patches", nargs="+", help="patch ids of chosen FITS files")
 
-    data_group.add_argument("--use-full-fits", action="store_true")
+    data_group.add_argument("--use-full-patch", action="store_true")
     data_group.add_argument("--plot-img-distrib", action="store_true")
-    data_group.add_argument("--load-fits-data-cache", action="store_true")
-    data_group.add_argument("--fits-cutout-num-rows",nargs="+", type=int,
-                            help="size of cutout from fits (if not using full fits)")
-    data_group.add_argument("--fits-cutout-num-cols",nargs="+", type=int,
-                            help="size of cutout from fits (if not using full fits)")
-    data_group.add_argument("--fits-cutout-sizes",nargs="+", type=int,
-                            help="size of cutout from fits (if not using full fits)")
-    data_group.add_argument("--fits-cutout-start-pos", nargs="+", type=list,
-                            help="starting row number of cutout from fits")
+    data_group.add_argument("--load-patch-data-cache", action="store_true")
+    data_group.add_argument("--patch-cutout-num-rows",nargs="+", type=int,
+                            help="size of cutout from patch (if not using full patch)")
+    data_group.add_argument("--patch-cutout-num-cols",nargs="+", type=int,
+                            help="size of cutout from patch (if not using full patch)")
+    data_group.add_argument("--patch-cutout-sizes",nargs="+", type=int,
+                            help="size of cutout from patch (if not using full patch)")
+    data_group.add_argument("--patch-cutout-start-pos", nargs="+", type=list,
+                            help="starting row number of cutout from patch")
 
     data_group.add_argument("--num-bands", type=int)
     data_group.add_argument("--filters", nargs="+", type=str)
@@ -531,7 +529,7 @@ def define_cmd_line_args():
     infer_group.add_argument("--recon-zoomed", action="store_true",
                              help="whether reconstruct zoomed in cutouts or not. \
                              If true, the three below args needs to be specified")
-    infer_group.add_argument("--recon-cutout-fits-uids", nargs="+", type=str,
+    infer_group.add_argument("--recon-cutout-patch-uids", nargs="+", type=str,
                              help="id of tiles to generate reconstructed cutout")
     infer_group.add_argument("--recon-cutout-sizes", nargs="+", type=list,
                              help="list of sizes of each cutout for each tile")

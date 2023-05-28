@@ -6,8 +6,9 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
+from .data_utils import default_collate
+
 from .sdf_dataset import SDFDataset
 from .astro_dataset import AstroDataset
 from .multiview_dataset import MultiviewDataset
 from .random_view_dataset import RandomViewDataset
-from .data_utils import default_collate

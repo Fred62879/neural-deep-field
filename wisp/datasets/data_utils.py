@@ -11,6 +11,7 @@ import torch
 import collections
 import numpy as np
 
+from os.path import join
 from wisp.core import Rays
 from torch._six import string_classes
 from torch.utils.data._utils.collate import default_convert
@@ -18,19 +19,29 @@ from torch.utils.data._utils.collate import default_convert
 np_str_obj_array_pattern = re.compile(r'[SaUO]')
 
 
-def create_uid(fits_obj, **kwargs):
+def set_input_path(dataset_path, sensor_name):
+    input_path = join(dataset_path, "input")
+    input_patch_path = join(input_path, "input_fits")
+    img_data_path = join(input_path, sensor_name, "img_data")
+    return input_patch_path, img_data_path
+
+def create_patch_uid(tract, patch):
+    patch = patch.replace(",", "")
+    return f"{tract}{patch}"
+
+def create_selected_patches_uid(fits_obj, **kwargs):
     """ Form suffix that uniquely identifies the currently selected group of
         patches with the corresponding cropping parameters, if any.
     """
     suffix = ""
-    if kwargs["use_full_fits"]:
-        for fits_uid in fits_obj.fits_uids:
-            suffix += f"_{fits_uid}"
+    if kwargs["use_full_patch"]:
+        for patch_uid in fits_obj.patch_uids:
+            suffix += f"_{patch_uid}"
     else:
-        for (fits_uid, num_rows, num_cols, (r,c)) in zip(
-                fits_obj.fits_uids, fits_obj.fits_cutout_num_rows,
-                fits_obj.fits_cutout_num_cols, fits_obj.fits_cutout_start_pos):
-            suffix += f"_{fits_uid}_{num_rows}_{num_cols}_{r}_{c}"
+        for (patch_uid, num_rows, num_cols, (r,c)) in zip(
+                fits_obj.patch_uids, fits_obj.patch_cutout_num_rows,
+                fits_obj.patch_cutout_num_cols, fits_obj.patch_cutout_start_pos):
+            suffix += f"_{patch_uid}_{num_rows}_{num_cols}_{r}_{c}"
 
     return suffix
 
@@ -49,8 +60,6 @@ def add_dummy_dim(coords, **kwargs):
         else:
             raise ValueError("Unknown collection class")
         coords[...,:2] = coords_2d
-
-    coords = torch.FloatTensor(coords)[:,None]
     return coords
 
 def default_collate(batch):
