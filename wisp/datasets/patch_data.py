@@ -169,10 +169,9 @@ class PatchData:
         id = 0 if "Mega-u" in patch_fname else 1
         hdu = fits.open(join(self.input_patch_path, patch_fname))[id]
         header = hdu.header
+        self.num_rows, self.num_cols = header["NAXIS2"], header["NAXIS1"]
 
-        if self.use_full_patch:
-            num_rows, num_cols = header["NAXIS2"], header["NAXIS1"]
-        else:
+        if not self.use_full_patch:
             (r, c) = self.cutout_start_pos
             num_rows = self.cutout_num_rows
             num_cols = self.cutout_num_cols
@@ -183,8 +182,6 @@ class PatchData:
             header = cutout.wcs.to_header()
 
         self.header = header
-        self.num_rows = num_rows
-        self.num_cols = num_cols
 
     def load_patch(self):
         """ Load all images (and weights) and flatten into one array.
@@ -209,7 +206,6 @@ class PatchData:
             @Return
               coords: 2D coordinates [npixels,2]
         """
-        num_rows, num_cols = self.num_rows, self.num_cols
         xids = np.tile(np.arange(0, self.num_cols), self.num_rows)
         yids = np.repeat(np.arange(0, self.num_rows), self.num_cols)
 
@@ -222,7 +218,8 @@ class PatchData:
                 ras.reshape((self.num_rows, self.num_cols, 1)),
                 decs.reshape((self.num_rows, self.num_cols, 1)) ), axis=2)
             (r, c) = self.cutout_start_pos # start position (r/c)
-            coords = coords[r:r+self.num_rows,c:c+self.num_cols].reshape(-1,2)
+            coords = coords[r : r+self.cutout_num_rows,
+                            c : c+self.cutout_num_cols].reshape(-1,2)
         self.data["coords"] = coords
 
     # def get_pixel_coords_all_patch(self):

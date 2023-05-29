@@ -1,5 +1,6 @@
 
 import torch
+import pickle
 import numpy as np
 import logging as log
 
@@ -88,6 +89,9 @@ class FitsData:
         # image data path creation
         suffix = create_selected_patches_uid(self, **self.kwargs)
         norm_str = self.kwargs["train_pixels_norm"]
+        self.headers_fname = join(img_data_path, f"headers{suffix}.txt")
+        self.num_rows_fname = join(img_data_path, f"num_rows{suffix}.txt")
+        self.num_cols_fname = join(img_data_path, f"num_cols{suffix}.txt")
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.coords_fname = join(img_data_path, f"coords{suffix}.npy")
         self.coords_range_fname = join(img_data_path, f"coords_range{suffix}.npy")
@@ -102,6 +106,9 @@ class FitsData:
         self.data = {}
 
         cached = self.load_patch_data_cache and \
+            exists(self.headers_fname) and \
+            exists(self.num_rows_fname) and \
+            exists(self.num_cols_fname) and \
             (not self.load_coords or exists(self.coords_fname)) and \
             (not self.load_weights or exists(self.weights_fname)) and \
             (not self.load_pixels or (exists(self.pixels_fname) and \
@@ -227,7 +234,7 @@ class FitsData:
             img_coords = np.array([r - start_pos[0], c - start_pos[1], patch_id])
 
         pixel_ids = self.get_pixel_ids(patch_uid, r, c, neighbour_size)
-        grid_coords = self.get_coord(pixel_ids)
+        grid_coords = self.get_coords(pixel_ids)
         # print(r, c, pixel_ids, coords_accurate, self.kwargs["patch_cutout_start_pos"])
         return img_coords, grid_coords, pixel_ids
 
@@ -434,9 +441,17 @@ class FitsData:
     def load_cache(self):
         if self.verbose: log.info("PATCH data cached.")
         pixels, coords, weights = [None]*3
+
+        with open(self.headers_fname, "rb") as fp:
+            self.headers = pickle.load(fp)
+        with open(self.num_rows_fname, "rb") as fp:
+            self.num_rows = pickle.load(fp)
+        with open(self.num_cols_fname, "rb") as fp:
+            self.num_cols = pickle.load(fp)
+
         if self.load_pixels:
             pixels = np.load(self.pixels_fname)
-            zscale_ranges = np.load(self.zscale_ranges_fanme)
+            zscale_ranges = np.load(self.zscale_ranges_fname)
         if self.load_coords:
             coords = np.load(self.coords_fname)
         if self.load_weights:
@@ -454,6 +469,13 @@ class FitsData:
             self.load_one_patch(
                 pixels, coords, weights,
                 tract, patch, cutout_num_rows, cutout_num_cols, cutout_start_pos)
+
+        with open(self.headers_fname, "wb") as fp:
+            pickle.dump(self.headers, fp)
+        with open(self.num_rows_fname, "wb") as fp:
+            pickle.dump(self.num_rows, fp)
+        with open(self.num_cols_fname, "wb") as fp:
+            pickle.dump(self.num_cols, fp)
 
         if self.load_pixels:
             pixels = np.concatenate(pixels)
