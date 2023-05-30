@@ -84,14 +84,10 @@ class FitsData:
         _, img_data_path = set_input_path(dataset_path, self.kwargs["sensor_collection_name"])
         paths = [img_data_path]
 
-        self.gt_paths, self.gt_img_fnames = {}, {}
-
         # image data path creation
         suffix = create_selected_patches_uid(self, **self.kwargs)
         norm_str = self.kwargs["train_pixels_norm"]
-        self.headers_fname = join(img_data_path, f"headers{suffix}.txt")
-        self.num_rows_fname = join(img_data_path, f"num_rows{suffix}.txt")
-        self.num_cols_fname = join(img_data_path, f"num_cols{suffix}.txt")
+        self.meta_data_fname = join(img_data_path, f"meta_data{suffix}.txt")
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.coords_fname = join(img_data_path, f"coords{suffix}.npy")
         self.coords_range_fname = join(img_data_path, f"coords_range{suffix}.npy")
@@ -106,9 +102,7 @@ class FitsData:
         self.data = {}
 
         cached = self.load_patch_data_cache and \
-            exists(self.headers_fname) and \
-            exists(self.num_rows_fname) and \
-            exists(self.num_cols_fname) and \
+            exists(self.meta_data_fname) and \
             (not self.load_coords or exists(self.coords_fname)) and \
             (not self.load_weights or exists(self.weights_fname)) and \
             (not self.load_pixels or (exists(self.pixels_fname) and \
@@ -227,11 +221,12 @@ class FitsData:
         # this only works if spectra coords is included in the loaded coords
         (r, c) = worldToPix(header, ra, dec) # image coord, r and c coord within full tile
 
-        if self.use_full_patch:
-            img_coords = np.array([r, c, patch_id])
-        else:
-            start_pos = self.patch_cutout_start_pos[patch_id]
-            img_coords = np.array([r - start_pos[0], c - start_pos[1], patch_id])
+        img_coords = np.array([r, c, patch_id])
+        # if self.use_full_patch:
+        #     img_coords = np.array([r, c, patch_id])
+        # else:
+        #     start_pos = self.patch_cutout_start_pos[patch_id]
+        #     img_coords = np.array([r - start_pos[0], c - start_pos[1], patch_id])
 
         pixel_ids = self.get_pixel_ids(patch_uid, r, c, neighbour_size)
         grid_coords = self.get_coords(pixel_ids)
@@ -241,14 +236,16 @@ class FitsData:
     def calculate_local_id(self, r, c, index, patch_uid):
         """ Count number of pixels before given position in given patch.
         """
-        if self.use_full_patch:
-            r_lo, c_lo = 0, 0
-            total_cols = self.num_cols[patch_uid]
-        else:
-            (r_lo, c_lo) = self.patch_cutout_start_pos[index]
-            total_cols = self.num_cols[patch_uid]
+        # if self.use_full_patch:
+        #     r_lo, c_lo = 0, 0
+        #     total_cols = self.num_cols[patch_uid]
+        # else:
+        #     (r_lo, c_lo) = self.patch_cutout_start_pos[index]
+        #     total_cols = self.num_cols[patch_uid]
+        # local_id = total_cols * (r - r_lo) + c - c_lo
 
-        local_id = total_cols * (r - r_lo) + c - c_lo
+        total_cols = self.num_cols[patch_uid]
+        local_id = total_cols * r + c
         return local_id
 
     def calculate_global_offset(self, patch_uid):
@@ -321,11 +318,11 @@ class FitsData:
         #         np.save(fn + "_restored.npy", recon)
 
         if re_args["log_max"]:
-            #recon_min = np.round(np.min(recon_patch, axis=(1,2)), 1)
-            #recon_mean = np.round(np.mean(recon_patch, axis=(1,2)), 1)
+            recon_min = np.round(np.min(recon_patch, axis=(1,2)), 3)
+            recon_mean = np.round(np.mean(recon_patch, axis=(1,2)), 3)
             recon_max = np.round(np.max(recon_patch, axis=(1,2)), 1)
-            # log.info(f"recon. pixel min {recon_min}")
-            # log.info(f"recon. pixel mean {recon_mean}")
+            log.info(f"recon. pixel min {recon_min}")
+            log.info(f"recon. pixel mean {recon_mean}")
             log.info(f"recon. pixel max {recon_max}")
 
         if re_args["save_locally"]:
@@ -352,7 +349,11 @@ class FitsData:
         if re_args["calculate_metrics"]:
             gt_fname = self.gt_img_fnames[patch_uid] + ".npy"
             gt_tile = np.load(gt_fname)
+            gt_min = np.round(np.min(gt_tile, axis=(1,2)), 3)
+            gt_mean = np.round(np.mean(gt_tile, axis=(1,2)), 3)
             gt_max = np.round(np.max(gt_tile, axis=(1,2)), 1)
+            log.info(f"GT. pixel min {gt_min}")
+            log.info(f"GT. pixel mean {gt_mean}")
             log.info(f"GT. pixel max {gt_max}")
 
             metrics = calculate_metrics(
@@ -383,20 +384,16 @@ class FitsData:
                               "plot_img", zscale_ranges=zscale_ranges)
 
     def restore_evaluate_one_tile(self, index, patch_uid, num_pixels_acc, pixels, **re_args):
-        if self.use_full_patch:
-            num_rows, num_cols = self.num_rows[patch_uid], self.num_cols[patch_uid]
-        else:
-            num_rows, num_cols = self.num_rows[patch_uid], self.num_cols[patch_uid]
-            # num_rows, num_cols = self.patch_cutout_sizes[index], self.patch_cutout_sizes[index]
+        num_rows, num_cols = self.num_rows[patch_uid], self.num_cols[patch_uid]
         cur_num_pixels = num_rows * num_cols
 
-        cur_tile = np.array(pixels[num_pixels_acc : num_pixels_acc + cur_num_pixels]).T. \
+        cur_patch = np.array(pixels[num_pixels_acc : num_pixels_acc + cur_num_pixels]).T. \
             reshape((re_args["num_bands"], num_rows, num_cols))
 
         if "zoom" in re_args and re_args["zoom"] and patch_uid in re_args["cutout_patch_uids"]:
-            self.restore_evaluate_zoomed_tile(cur_tile, patch_uid, **re_args)
+            self.restore_evaluate_zoomed_tile(cur_patch, patch_uid, **re_args)
 
-        cur_metrics, cur_metrics_zscale = self.evaluate(index, patch_uid, cur_tile, **re_args)
+        cur_metrics, cur_metrics_zscale = self.evaluate(index, patch_uid, cur_patch, **re_args)
         num_pixels_acc += cur_num_pixels
         return num_pixels_acc, cur_metrics, cur_metrics_zscale
 
@@ -442,12 +439,10 @@ class FitsData:
         if self.verbose: log.info("PATCH data cached.")
         pixels, coords, weights = [None]*3
 
-        with open(self.headers_fname, "rb") as fp:
-            self.headers = pickle.load(fp)
-        with open(self.num_rows_fname, "rb") as fp:
-            self.num_rows = pickle.load(fp)
-        with open(self.num_cols_fname, "rb") as fp:
-            self.num_cols = pickle.load(fp)
+        with open(self.meta_data_fname, "rb") as fp:
+            meta_data = pickle.load(fp)
+        (self.headers, self.num_rows, self.num_cols,
+         self.gt_paths, self.gt_img_fnames) = meta_data
 
         if self.load_pixels:
             pixels = np.load(self.pixels_fname)
@@ -460,6 +455,7 @@ class FitsData:
 
     def process_data(self):
         pixels, coords, weights = [], [], []
+        self.gt_paths, self.gt_img_fnames = {}, {}
         self.headers, self.num_rows, self.num_cols = {}, {}, {}
 
         for tract, patch, cutout_num_rows, cutout_num_cols, cutout_start_pos in zip(
@@ -470,16 +466,13 @@ class FitsData:
                 pixels, coords, weights,
                 tract, patch, cutout_num_rows, cutout_num_cols, cutout_start_pos)
 
-        with open(self.headers_fname, "wb") as fp:
-            pickle.dump(self.headers, fp)
-        with open(self.num_rows_fname, "wb") as fp:
-            pickle.dump(self.num_rows, fp)
-        with open(self.num_cols_fname, "wb") as fp:
-            pickle.dump(self.num_cols, fp)
+        meta_data = (self.headers, self.num_rows, self.num_cols,
+                     self.gt_paths, self.gt_img_fnames)
+
+        with open(self.meta_data_fname, "wb") as fp:
+            pickle.dump(meta_data, fp)
 
         if self.load_pixels:
-            pixels = np.concatenate(pixels)
-
             # apply normalization to pixels as specified
             if self.kwargs["train_pixels_norm"] == "linear":
                 pixels = normalize(pixels, "linear")
@@ -487,6 +480,8 @@ class FitsData:
                 pixels = normalize(pixels, "zscale", gt=pixels)
 
             zscale_ranges = calculate_zscale_ranges_multiple_patches(pixels)
+
+            pixels = np.concatenate(pixels)
             np.save(self.pixels_fname, pixels)
             np.save(self.zscale_ranges_fname, zscale_ranges)
 

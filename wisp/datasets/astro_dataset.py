@@ -93,17 +93,17 @@ class AstroDataset(Dataset):
     # Getters
     ############
 
-    def get_fits_uids(self):
-        return self.fits_dataset.get_fits_uids()
+    def get_patch_uids(self):
+        return self.fits_dataset.get_patch_uids()
 
-    def get_num_fits(self):
-        return len(self.get_fits_uids())
+    def get_num_patches(self):
+        return len(self.get_patch_uids())
 
     def get_num_coords(self):
         return self.fits_dataset.get_num_coords()
 
-    def get_zscale_ranges(self, fits_uid=None):
-        return self.fits_dataset.get_zscale_ranges(fits_uid)
+    def get_zscale_ranges(self, patch_uid=None):
+        return self.fits_dataset.get_zscale_ranges(patch_uid)
 
     def get_supervision_spectra_pixels(self):
         return self.spectra_dataset.get_supervision_pixels()

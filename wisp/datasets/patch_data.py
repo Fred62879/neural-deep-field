@@ -15,7 +15,7 @@ from wisp.utils.common import generate_hdu
 from wisp.utils.plot import plot_horizontally
 from wisp.utils.numerical import normalize, calculate_zscale_ranges
 from wisp.datasets.data_utils import set_input_path, create_patch_uid, \
-    create_selected_patches_uid
+    create_selected_patches_uid, get_mgrid_np, add_dummy_dim
 
 
 class PatchData:
@@ -109,7 +109,8 @@ class PatchData:
         self.load_header()
 
         if self.load_coords:
-            self.get_world_coords()
+            # self.get_world_coords()
+            self.get_grid_coords()
 
         if self.load_pixels or self.load_weights:
             self.load_patch()
@@ -125,11 +126,11 @@ class PatchData:
         return self.header
 
     def get_num_rows(self):
-        """ Return num of rows of the full patch. """
-        return self.num_rows
+        """ Return num of rows of current patch (full or cutout). """
+        return self.cur_num_rows
 
     def get_num_cols(self):
-        return self.num_cols
+        return self.cur_num_cols
 
     def get_gt_path(self):
         return self.gt_path
@@ -169,9 +170,12 @@ class PatchData:
         id = 0 if "Mega-u" in patch_fname else 1
         hdu = fits.open(join(self.input_patch_path, patch_fname))[id]
         header = hdu.header
-        self.num_rows, self.num_cols = header["NAXIS2"], header["NAXIS1"]
+        self.full_num_rows, self.full_num_cols = header["NAXIS2"], header["NAXIS1"]
 
-        if not self.use_full_patch:
+        if self.use_full_patch:
+            self.cur_num_rows = self.full_num_rows
+            self.cur_num_cols = self.full_num_cols
+        else:
             (r, c) = self.cutout_start_pos
             num_rows = self.cutout_num_rows
             num_cols = self.cutout_num_cols
@@ -180,6 +184,9 @@ class PatchData:
             wcs = WCS(header)
             cutout = Cutout2D(hdu.data, position=pos, size=(num_rows,num_cols), wcs=wcs)
             header = cutout.wcs.to_header()
+
+            self.cur_num_rows = num_rows
+            self.cur_num_cols = num_cols
 
         self.header = header
 
@@ -206,8 +213,8 @@ class PatchData:
             @Return
               coords: 2D coordinates [npixels,2]
         """
-        xids = np.tile(np.arange(0, self.num_cols), self.num_rows)
-        yids = np.repeat(np.arange(0, self.num_rows), self.num_cols)
+        xids = np.tile(np.arange(0, self.full_num_cols), self.full_num_rows)
+        yids = np.repeat(np.arange(0, self.full_num_rows), self.full_num_cols)
 
         wcs = WCS(self.header)
         ras, decs = wcs.all_pix2world(xids, yids, 0) # x-y pixel coord
@@ -215,36 +222,16 @@ class PatchData:
             coords = np.array([ras, decs]).T
         else:
             coords = np.concatenate((
-                ras.reshape((self.num_rows, self.num_cols, 1)),
-                decs.reshape((self.num_rows, self.num_cols, 1)) ), axis=2)
+                ras.reshape((self.full_num_rows, self.full_num_cols, 1)),
+                decs.reshape((self.full_num_rows, self.full_num_cols, 1)) ), axis=2)
             (r, c) = self.cutout_start_pos # start position (r/c)
             coords = coords[r : r+self.cutout_num_rows,
                             c : c+self.cutout_num_cols].reshape(-1,2)
         self.data["coords"] = coords
 
-    # def get_pixel_coords_all_patch(self):
-    #     for id, patch_uid in enumerate(self.patch_uids):
-    #         num_rows, num_cols = self.num_rows[patch_uid], self.num_cols[patch_uid]
-    #         self.get_mgrid_np(num_rows, num_cols)
-
-    # def get_mgrid_np(self, num_rows, num_cols, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
-    #     #def get_mgrid_np(self, sidelen, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
-    #     """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version).
-    #     """
-    #     x = np.linspace(lo, hi, num=num_cols)
-    #     y = np.linspace(lo, hi, num=num_rows)
-    #     mgrid = np.stack(np.meshgrid(x, y, indexing=indexing), axis=-1)
-
-    #     if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
-    #     self.data["coords"] = add_dummy_dim(mgrid, **self.kwargs)
-
-    # def get_mgrid_tensor(self, sidelen, lo=-1, hi=1, dim=2, flat=True):
-    #     """ Generates a flattened grid of (x,y,...) coords in [-1,1] (Tensor version).
-    #     """
-    #     tensors = tuple(dim * [torch.linspace(lo, hi, steps=sidelen)])
-    #     mgrid = torch.stack(torch.meshgrid(*tensors), dim=-1)
-    #     if flat: mgrid = mgrid.reshape(-1, dim)
-    #     self.data["coords"] = add_dummy_dim(mgrid, **self.kwargs)
+    def get_grid_coords(self):
+        coords = get_mgrid_np(self.cur_num_rows, self.cur_num_cols)
+        self.data["coords"] = coords
 
     def read_fits_file(self):
         """ Load pixel values or variance from one PATCH file (patch_id/subpatch_id).

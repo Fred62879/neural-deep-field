@@ -231,7 +231,7 @@ class AstroInferrer(BaseInferrer):
     #############
 
     def pre_inferrence_all_coords_full_model(self):
-        self.fits_uids = self.dataset.get_fits_uids()
+        self.patch_uids = self.dataset.get_patch_uids()
         self.use_full_wave = True
         self.coords_source = "fits"
         self.perform_integration = self.recon_img or self.recon_img_pretrain
@@ -256,9 +256,10 @@ class AstroInferrer(BaseInferrer):
             self.calculate_metrics = self.recon_img and self.metric_options is not None
 
             if self.calculate_metrics:
-                num_fits = self.dataset.get_num_fits()
-                self.metrics = np.zeros((self.num_metrics, 0, num_fits, self.num_bands))
-                self.metrics_zscale = np.zeros((self.num_metrics, 0, num_fits, self.num_bands))
+                num_patches = self.dataset.get_num_patches()
+                self.metrics = np.zeros((self.num_metrics, 0, num_patches, self.num_bands))
+                self.metrics_zscale = np.zeros((
+                    self.num_metrics, 0, num_patches, self.num_bands))
                 self.metric_fnames = [ join(self.metric_dir, f"{option}.npy")
                                        for option in self.metric_options ]
                 self.metric_fnames_z = [ join(self.metric_dir, f"{option}_zscale.npy")
@@ -394,7 +395,7 @@ class AstroInferrer(BaseInferrer):
                 "calculate_metrics": self.calculate_metrics,
                 "recon_synthetic_band": False,
                 "zoom": self.extra_args["recon_zoomed"],
-                "cutout_fits_uids": self.extra_args["recon_cutout_fits_uids"],
+                "cutout_patch_uids": self.extra_args["recon_cutout_patch_uids"],
                 "cutout_sizes": self.extra_args["recon_cutout_sizes"],
                 "cutout_start_pos": self.extra_args["recon_cutout_start_pos"],
                 "zoomed_recon_dir": self.zoomed_recon_dir,
@@ -437,7 +438,7 @@ class AstroInferrer(BaseInferrer):
                 "calculate_metrics": False,
                 "recon_synthetic_band": True,
                 "zoom": self.extra_args["recon_zoomed"],
-                "cutout_fits_uids": self.extra_args["recon_cutout_fits_uids"],
+                "cutout_patch_uids": self.extra_args["recon_cutout_patch_uids"],
                 "cutout_sizes": self.extra_args["recon_cutout_sizes"],
                 "cutout_start_pos": self.extra_args["recon_cutout_start_pos"],
                 "zoomed_recon_dir": self.zoomed_recon_dir,
@@ -464,14 +465,14 @@ class AstroInferrer(BaseInferrer):
                 "plot_func": plot_embed_map_log,
                 "zscale": False,
                 "to_HDU": False,
-                "match_fits": True,
+                "match_patch": True,
                 "calculate_metrics": False,
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.embed_ids, **re_args)
 
         if self.plot_redshift:
             if self.extra_args["mark_spectra"]:
-                positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/fits_id
+                positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/patch_id
                 markers = np.array(self.extra_args["spectra_markers"])
             else:
                 positions, markers = [], []
@@ -486,7 +487,7 @@ class AstroInferrer(BaseInferrer):
                 "to_HDU": False,
                 "save_locally": False,
                 "plot_func": plot_annotated_heat_map,
-                "match_fits": True,
+                "match_patch": True,
                 "zscale": False,
                 "calculate_metrics": False,
             }
@@ -510,7 +511,7 @@ class AstroInferrer(BaseInferrer):
                 "to_HDU": False,
                 "save_locally": False,
                 "plot_func": plot_horizontally,
-                "match_fits": False,
+                "match_patch": False,
                 "zscale": True,
                 "calculate_metrics": False,
             }
@@ -525,7 +526,7 @@ class AstroInferrer(BaseInferrer):
                 "log_max": False,
                 "to_HDU": False,
                 "save_locally": True,
-                "match_fits": False,
+                "match_patch": False,
                 "zscale": False,
                 "calculate_metrics": False,
             }
@@ -762,7 +763,7 @@ class AstroInferrer(BaseInferrer):
         self.dataset.set_hardcode_data("codebook_latents", codebook_latents)
 
     # def calculate_recon_spectra_pixel_values(self):
-    #     for fits_uid in self.fits_uids:
+    #     for patch_uid in self.patch_uids:
     #         # calculate spectrum pixel recon value
     #         if args.plot_spectrum:
     #             print("recon spectrum pixel", recon[args.spectrum_pos])

@@ -225,6 +225,7 @@ def forward(
             net_args["qtz_args"] = qtz_args
 
     else: raise ValueError("Unsupported space dimension.")
+
     requested_channels = set(requested_channels)
     return pipeline(channels=requested_channels, **net_args)
 

@@ -6,7 +6,7 @@ import numpy as np
 import logging as log
 import matplotlib.pyplot as plt
 
-from wisp.datasets.data_utils import add_dummy_dim
+from wisp.datasets.data_utils import add_dummy_dim, create_patch_uid
 
 from pathlib import Path
 from astropy.io import fits
@@ -289,7 +289,8 @@ class SpectraData:
            and not self.kwargs["codebook_pretrain_pixel_supervision"]: return
 
         # ii) load actual spectra data
-        fname = join(self.spectra_path, fits_uid,
+        patch_uid = create_patch_uid(tract, patch)
+        fname = join(self.spectra_path, patch_uid,
                      source_spectra_data["spectra_fname"][spectra_id])
 
         gt_wave, gt_spectra = load_gt_spectra(

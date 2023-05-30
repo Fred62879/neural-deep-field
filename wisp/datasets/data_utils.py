@@ -45,6 +45,25 @@ def create_selected_patches_uid(fits_obj, **kwargs):
 
     return suffix
 
+def get_mgrid_np(num_rows, num_cols, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
+    #def get_mgrid_np(self, sidelen, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
+    """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version).
+    """
+    x = np.linspace(lo, hi, num=num_cols)
+    y = np.linspace(lo, hi, num=num_rows)
+    mgrid = np.stack(np.meshgrid(x, y, indexing=indexing), axis=-1)
+
+    if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
+    return mgrid
+
+def get_mgrid_tensor(self, sidelen, lo=-1, hi=1, dim=2, flat=True):
+    """ Generates a flattened grid of (x,y,...) coords in [-1,1] (Tensor version).
+    """
+    tensors = tuple(dim * [torch.linspace(lo, hi, steps=sidelen)])
+    mgrid = torch.stack(torch.meshgrid(*tensors), dim=-1)
+    if flat: mgrid = mgrid.reshape(-1, dim)
+    return mgrid
+
 def add_dummy_dim(coords, **kwargs):
     if kwargs["coords_encode_method"] == "grid" and kwargs["grid_dim"] == 3:
         num_coords = coords.shape[0]

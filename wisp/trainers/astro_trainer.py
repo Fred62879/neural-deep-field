@@ -66,6 +66,7 @@ class AstroTrainer(BaseTrainer):
         if self.extra_args["pretrain_codebook"]:
             self.load_pretrained_model()
 
+        log.info(self.pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.pipeline.parameters()))
         )
