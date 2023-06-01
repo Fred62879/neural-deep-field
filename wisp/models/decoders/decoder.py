@@ -24,7 +24,7 @@ class Decoder(nn.Module):
     def get_input_dim(self):
         if self.kwargs["space_dim"] == 2:
 
-            if self.kwargs["coords_encode_method"] == "positional":
+            if self.kwargs["coords_encode_method"] == "positional_encoding":
                 assert(self.kwargs["decoder_activation_type"] == "relu")
                 input_dim = self.kwargs["coords_embed_dim"]
 

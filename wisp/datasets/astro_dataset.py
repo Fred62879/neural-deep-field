@@ -243,6 +243,9 @@ class AstroDataset(Dataset):
         if "redshift_data" in self.requested_fields:
             self.get_redshift_data(out)
 
+        print(out["coords"].shape, out["coords"])
+        print(out["wave"].shape, out["wave"])
+        assert 0
         #self.print_shape(out)
         if self.transform is not None:
             out = self.transform(out)

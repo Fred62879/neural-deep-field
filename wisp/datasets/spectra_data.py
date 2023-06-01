@@ -15,6 +15,8 @@ from collections import defaultdict
 from scipy.interpolate import interp1d
 from scipy.ndimage import gaussian_filter1d
 from astropy.convolution import convolve, Gaussian1DKernel
+from multiprocessing import cpu_count
+from multiprocessing.pool import ThreadPool
 
 
 class SpectraData:
@@ -59,7 +61,12 @@ class SpectraData:
         input_path = join(dataset_path, "input")
         self.spectra_path = join(input_path, "spectra")
         self.input_fits_path = join(input_path, "input_fits")
-        self.spectra_data_fname = join(self.spectra_path, "spectra.csv")
+        self.manual_table_fname = join(self.spectra_path, "deimos_old", "spectra.csv")
+        self.zcosmos_table_fname = join(self.spectra_path, "zcosmos", "zcosmos_table.fits")
+        self.deimos_table_fname = join(self.spectra_path, "deimos", "deimos_redshift_linksIRSA.tbl")
+
+        self.deimos_spectra_path = join(self.spectra_path, "1d_fits")
+        self.zcosmos_spectra_path = join(self.spectra_path, "v20150922")
 
     def load_accessory_data(self):
         self.full_wave = self.trans_obj.get_full_wave()
@@ -228,7 +235,14 @@ class SpectraData:
         """
         spectra_ids = self.kwargs["gt_spectra_ids"]
         smpl_interval = self.kwargs["trans_sample_interval"]
-        source_spectra_data = read_spectra_data(self.spectra_data_fname)
+
+        if self.spectra_data_source == "zcosmos":
+            source_spectra_data = read_zcosmos_table(self.zcosmos_table_fname)
+        elif self.spectra_data_source == "deimos":
+            source_spectra_data = read_deimos_table(self.deimos_table_fname)
+        elif self.spectra_data_source == "manual":
+            source_spectra_data = read_manual_table(self.manual_table_fname)
+        else: raise ValueError("Unsupported spectra data source")
 
         for i, spectra_id in enumerate(spectra_ids):
             self.load_one_gt_spectra(spectra_id, smpl_interval, source_spectra_data)
@@ -293,7 +307,7 @@ class SpectraData:
         fname = join(self.spectra_path, patch_uid,
                      source_spectra_data["spectra_fname"][spectra_id])
 
-        gt_wave, gt_spectra = load_gt_spectra(
+        gt_wave, gt_spectra = process_gt_spectra(
             fname, self.full_wave, smpl_interval,
             interpolate=True, sigma=self.kwargs["spectra_smooth_sigma"],
             trusted_range=None if not self.kwargs["trusted_range_only"] else [wave_lo, wave_hi])
@@ -525,25 +539,60 @@ class SpectraData:
 # SpectraData class ends
 #############
 
-def read_spectra_data(fname):
-    data, colnames, datatypes = {}, None, None
-    with open(fname) as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        line_count = 0
-        for row in csv_reader:
-            if line_count == 0:
-                colnames = row
-                for entry in row:
-                    data[entry] = []
-            elif line_count == 1:
-                datatypes = row
-            else:
-                for colname, entry in zip(colnames, row):
-                    data[colname].append(entry)
-            line_count += 1
-    for dtype, colname in zip(datatypes, colnames):
-        data[colname] = np.array(data[colname]).astype(dtype)
-    return data
+#############
+# Spectra processing
+#############
+
+def process_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1, trusted_range=None, save_np=True, plot=True, format="default"):
+    """ Load gt spectra (intensity values) for spectra supervision and
+          spectrum plotting. Also smooth the gt spectra which has significantly
+          larger discretization values than the transmission data.
+        If requried, interpolate with same discretization value as trans data.
+
+        @Param
+          fname: filename of np array that stores the gt spectra data.
+          full_wave: all lambda values for the transmission data.
+          smpl_interval: discretization values of the transmission data.
+        @Return
+          gt_wave/spectra: spectra data with the corresponding lambda values.
+                           for plotting purposes only
+          gt_spectra_for_supervision:
+            None if not interpolate
+            o.w. gt spectra data tightly bounded by recon wave bound.
+                 the range of it is identical to that of recon spectra and thus
+                 can be directly compare with.
+    """
+    gt_wave, gt_spectra = unpack_gt_spectra(fname, format=format)
+
+    if sigma > 0:
+        gt_spectra = convolve_spectra(gt_spectra, std=sigma)
+
+    if interpolate:
+        f_gt = interp1d(gt_wave, gt_spectra)
+
+        # make sure wave range to interpolate stay within gt spectra wave range
+        # full_wave is full transmission wave
+        if trusted_range is not None:
+            (lo, hi) = trusted_range
+        else:
+            (lo_id, hi_id) = get_bound_id(
+                ( min(gt_wave),max(gt_wave) ), full_wave, within_bound=True)
+            lo = full_wave[lo_id] # lo <= full_wave[lo_id]
+            hi = full_wave[hi_id] # hi >= full_wave[hi_id]
+
+        # new gt wave range with same discretization value as transmission wave
+        gt_wave = np.arange(lo, hi + 1, smpl_interval)
+
+        # use new gt wave to get interpolated spectra
+        gt_spectra = f_gt(gt_wave)
+
+    if save_np: np.save(fname + ".npy", gt)
+    if plot:
+        plt.plot(gt_wave, gt_spectra)
+        plt.savefig(fname + ".png")
+        plt.close()
+
+    return gt_wave, gt_spectra
 
 def convolve_spectra(spectra, std=140, border=True):
     """ Smooth gt spectra with given std.
@@ -590,61 +639,6 @@ def get_bound_id(wave_bound, source_wave, within_bound=True):
 
     return [id_lo, id_hi]
 
-def load_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1, trusted_range=None, save_np=True, plot=True):
-
-    """ Load gt spectra (intensity values) for spectra supervision and
-          spectrum plotting. Also smooth the gt spectra which has significantly
-          larger discretization values than the transmission data.
-        If requried, interpolate with same discretization value as trans data.
-
-        @Param
-          fname: filename of np array that stores the gt spectra data.
-          full_wave: all lambda values for the transmission data.
-          smpl_interval: discretization values of the transmission data.
-        @Return
-          gt_wave/spectra: spectra data with the corresponding lambda values.
-                           for plotting purposes only
-          gt_spectra_for_supervision:
-            None if not interpolate
-            o.w. gt spectra data tightly bounded by recon wave bound.
-                 the range of it is identical to that of recon spectra and thus
-                 can be directly compare with.
-    """
-    gt = np.array(
-        pandas.read_table(fname + ".tbl", comment="#", delim_whitespace=True)
-    )
-    gt_wave, gt_spectra = gt[:,0], gt[:,1]
-
-    if sigma > 0:
-        gt_spectra = convolve_spectra(gt_spectra, std=sigma)
-
-    if interpolate:
-        f_gt = interp1d(gt_wave, gt_spectra)
-
-        # make sure wave range to interpolate stay within gt spectra wave range
-        # full_wave is full transmission wave
-        if trusted_range is not None:
-            (lo, hi) = trusted_range
-        else:
-            (lo_id, hi_id) = get_bound_id(
-                ( min(gt_wave),max(gt_wave) ), full_wave, within_bound=True)
-            lo = full_wave[lo_id] # lo <= full_wave[lo_id]
-            hi = full_wave[hi_id] # hi >= full_wave[hi_id]
-
-        # new gt wave range with same discretization value as transmission wave
-        gt_wave = np.arange(lo, hi + 1, smpl_interval)
-
-        # use new gt wave to get interpolated spectra
-        gt_spectra = f_gt(gt_wave)
-
-    if save_np: np.save(fname + ".npy", gt)
-    if plot:
-        plt.plot(gt_wave, gt_spectra)
-        plt.savefig(fname + ".png")
-        plt.close()
-
-    return gt_wave, gt_spectra
-
 def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
     gt = np.load(gt_fn)
     gt_wave, gt_spectra = gt[:,0], gt[:,1]
@@ -658,3 +652,89 @@ def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
     f = interpolate.interp1d(gt_wave, gt_spectra)
     gt_spectra_intp = f(wave)
     return wave, gt_spectra_intp, gen_spectra
+
+#############
+# Spectra loading
+#############
+
+def read_deimos_table(fname):
+    """ Read metadata table for deimos spectra data.
+    """
+    df = pandas.read_table(fname,comment='#',delim_whitespace=True)
+    df.rename(columns={"ID": "id"}, inplace=True)
+    df.drop(columns=['sel', 'imag', 'kmag', 'Qf', 'Q',
+                     'Remarks', 'ascii1d', 'jpg1d', 'fits2d'], inplace=True)
+    df.drop([0], inplace=True) # drop first row which is datatype
+    return df
+
+def read_zcosmos_table(fname):
+    """ Read metadata table for zcosmos spectra data.
+    """
+    df = Table.read(fname).to_pandas()
+    df.rename(columns={
+        'OBJECT_ID': 'id',
+        'RAJ2000':'ra',
+        'DEJ2000':'dec',
+        'REDSHIFT':'zspec',
+        'FILANEMS':'fname'
+    }, inplace=True)
+    df.drop(columns=['CC','IMAG_AB','FLAG_S','FLAG_X','FLAG_R','FLAG_UV'], inplace=True)
+    return df
+
+def read_manual_table(fname):
+    data, colnames, datatypes = {}, None, None
+    with open(fname) as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter=',')
+        line_count = 0
+        for row in csv_reader:
+            if line_count == 0:
+                colnames = row
+                for entry in row:
+                    data[entry] = []
+            elif line_count == 1:
+                datatypes = row
+            else:
+                for colname, entry in zip(colnames, row):
+                    data[colname].append(entry)
+            line_count += 1
+    for dtype, colname in zip(datatypes, colnames):
+        data[colname] = np.array(data[colname]).astype(dtype)
+    return data
+
+def unpack_gt_spectra(fname, format="default"):
+    if format == "default":
+        data = np.array(
+            pandas.read_table(fname + ".tbl", comment="#", delim_whitespace=True)
+        )
+        gt_wave, gt_spectra = data[:,0], data[:,1]
+
+    elif format == "zcosmos":
+        data = fits.open(fname)[1].data[0]
+        gt_wave, gt_spectra = data[0], data[1]
+
+    elif format == "deimos":
+        data = fits.open(fname)[1].data[0]
+        gt_wave, gt_spectra = data[2], data[0]
+
+    return gt_wave, gt_spectra
+
+def download_deimos_data_parallel(http_prefix, local_path, fnames):
+    urls = [f"{http_prefix}/{fname}" for fname in fnames]
+    out_fnames = [f"{local_path}/{fname}" for fname in fnames]
+    inputs = zip(urls, out_fnames)
+    cpus = cpu_count()
+    results = ThreadPool(cpus - 1).imap_unordered(download_from_url, inputs)
+    for result in results:
+        print('url:', result[0], 'time (s):', result[1])
+
+def download_from_url(input_):
+    t0 = time.time()
+    (url, fname) = input_
+    try:
+        r = requests.get(url)
+        # open(out_fname, "wb").write(r.content)
+        with open(fname, 'wb') as f:
+            f.write(r.content)
+        return(url, time.time() - t0)
+    except Exception as e:
+        print('Exception in download_url():', e)
