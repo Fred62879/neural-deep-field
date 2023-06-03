@@ -223,6 +223,8 @@ dataset:
     plot_img_distrib: True
     load_patch_data_cache: True
     dataset_path: '../../data/pdr3'
+    coords_range_fname: 'coords_range0' # make sure pretrain and main train
+                                        # use the same norm range for coords
     gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
 
@@ -232,6 +234,7 @@ dataset:
     # the order of the following 5 fields corresponds to each other
     tracts: ['9812']
     patches: ['1,5']
+    patch_selection_cho: "test"
     patch_cutout_num_rows: [64]
     patch_cutout_num_cols: [64]
     patch_cutout_start_pos: [[86,188]] #[[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]

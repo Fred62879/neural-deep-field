@@ -31,6 +31,13 @@ class SpectraData:
         self.load_accessory_data()
         self.load_spectra()
 
+        self.all_tracts = kwargs["all_spectra_tracts"]
+        self.all_patches = kwargs["all_spectra_patches"]
+        self.wave_lo = kwargs["spectrum_plot_wave_lo"]
+        self.wave_hi = kwargs["spectrum_plot_wave_hi"]
+        self.super_wave_lo = kwargs["spectra_supervision_wave_lo"]
+        self.super_wave_hi = kwargs["spectra_supervision_wave_hi"]
+
     def require_any_data(self, tasks):
         tasks = set(tasks)
 
@@ -58,15 +65,34 @@ class SpectraData:
             self.recon_spectra or self.require_spectra_coords)
 
     def set_path(self, dataset_path):
-        input_path = join(dataset_path, "input")
-        self.spectra_path = join(input_path, "spectra")
-        self.input_fits_path = join(input_path, "input_fits")
-        self.manual_table_fname = join(self.spectra_path, "deimos_old", "spectra.csv")
-        self.zcosmos_table_fname = join(self.spectra_path, "zcosmos", "zcosmos_table.fits")
-        self.deimos_table_fname = join(self.spectra_path, "deimos", "deimos_redshift_linksIRSA.tbl")
+        """ Create path and filename of required files.
+            source_metadata_table:    ra,dec,zspec,spectra_fname
+            processed_metadata_table: added pixel val and tract-patch
+        """
+        spectra_path = join(dataset_path, "input/spectra")
 
-        self.deimos_spectra_path = join(self.spectra_path, "1d_fits")
-        self.zcosmos_spectra_path = join(self.spectra_path, "v20150922")
+        if self.spectra_data_source == "manual":
+            self.source_metadata_table_fname = join(spectra_path, "deimos_old", "spectra.csv")
+
+        elif self.spectra_data_source == "deimos":
+            path = join(spectra_path, "deimos")
+            self.spectra_path = join(path, "1d_fits")
+            self.source_metadata_table_fname = join(path, "source_deimos_table.fits")
+
+            processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
+            self.processed_metadata_table_fname = join(
+                processed_data_path, "processed_deimos_table.fits")
+
+        elif self.spectra_data_source == "zcosmos":
+            path = join(spectra_path, "zcosmos")
+            self.spectra_path = join(path, "v20150922")
+            self.source_metadata_table_fname = join(path, "source_zcosmos_table.tbl")
+
+            processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
+            self.processed_metadata_table_fname = join(
+                processed_data_path, "processed_zcosmos_table.tbl")
+
+        else: raise ValueError("Unsupported spectra data source choice.")
 
     def load_accessory_data(self):
         self.full_wave = self.trans_obj.get_full_wave()
@@ -152,17 +178,23 @@ class SpectraData:
         """ Get lambda values (for plotting). """
         return self.data["gt_spectra_wave"]
 
-    def get_supervision_spectra(self):
+    def get_supervision_spectra(self, idx=None):
         """ Get gt spectra (with same wave range as recon) used for supervision. """
-        return self.data["supervision_spectra"]
+        if idx is None:
+            return self.data["supervision_spectra"]
+        return self.data["supervision_spectra"][idx]
 
-    def get_supervision_pixels(self):
+    def get_supervision_pixels(self, idx=None):
         """ Get pix values for pixels used for spectra supervision. """
-        return self.data["supervision_pixels"]
+        if idx is None:
+            return self.data["supervision_pixels"]
+        return self.data["supervision_pixels"][idx]
 
-    def get_supervision_redshift(self):
+    def get_supervision_redshift(self, idx=None):
         """ Get redshift values for pixels used for spectra supervision. """
-        return self.data["supervision_redshift"]
+        if idx is None:
+            return self.data["supervision_redshift"]
+        return self.data["supervision_redshift"][idx]
 
     #############
     # Helpers
@@ -233,20 +265,15 @@ class SpectraData:
               During training, we only load if do spectra supervision
               During inferrence, the two options give same coords but different spectra
         """
-        spectra_ids = self.kwargs["gt_spectra_ids"]
-        smpl_interval = self.kwargs["trans_sample_interval"]
+        if self.load_spectra_data_from_cache and \
+           exists(self.processed_data_fname):
+            self.load_cached_spectra_data()
+        else:
+            self.process_spectra()
 
-        if self.spectra_data_source == "zcosmos":
-            source_spectra_data = read_zcosmos_table(self.zcosmos_table_fname)
-        elif self.spectra_data_source == "deimos":
-            source_spectra_data = read_deimos_table(self.deimos_table_fname)
-        elif self.spectra_data_source == "manual":
-            source_spectra_data = read_manual_table(self.manual_table_fname)
-        else: raise ValueError("Unsupported spectra data source")
+        self.transform_data()
 
-        for i, spectra_id in enumerate(spectra_ids):
-            self.load_one_gt_spectra(spectra_id, smpl_interval, source_spectra_data)
-
+    def transform_data(self):
         coord_dim = 3 if self.kwargs["coords_encode_method"] == "grid" and \
             self.kwargs["grid_dim"] == 3 else 2
 
@@ -270,98 +297,137 @@ class SpectraData:
                      np.array(self.data["gt_redshift"])).flatten()
                  self.data["supervision_redshift"] = self.data["gt_redshift"][:n]
 
-        # tmp, dummy redshift
-        # if self.kwargs["redshift_supervision"]:
-        #     # dummy_redshift = torch.arange(1, 1+len(all_ids), dtype=torch.float)
-        #     # positions = np.array(all_ids).flatten()
-        #     # self.fits_obj.data["redshift"][positions] = dummy_redshift
-        #     self.data["redshift"] = torch.rand(
-        #         self.kwargs["num_supervision_spectra"], dtype=torch.float)
-        # ends tmp
+        # iii) get data for for spectra supervision
+        supervision_spectra_wave_bound = [
+            source_spectra_data["spectra_supervision_wave_lo"][spectra_id],
+            source_spectra_data["spectra_supervision_wave_hi"][spectra_id]]
 
-    def load_one_gt_spectra(self, spectra_id, smpl_interval, source_spectra_data):
-        ra = source_spectra_data["ra"][spectra_id]
-        dec = source_spectra_data["dec"][spectra_id]
-        tract = source_spectra_data["tract"][spectra_id]
-        patch = source_spectra_data["patch"][spectra_id]
-        wave_lo = source_spectra_data["spectrum_plot_wave_lo"][spectra_id]
-        wave_hi = source_spectra_data["spectrum_plot_wave_hi"][spectra_id]
+        # find id of min and max lambda in terms of the transmission wave (full_wave)
+        # the min and max lambda for the spectra may not coincide exactly with the
+        # trans lambda, here we replace with closest trans lambda
+        (id_lo, id_hi) = get_bound_id(
+            supervision_spectra_wave_bound, self.full_wave, within_bound=False)
+        self.data["spectra_supervision_wave_bound_ids"].append([id_lo, id_hi + 1])
 
-        if self.kwargs["verbose"]:
-            log.info(f'spectra: {spectra_id}, {ra}/{dec}')
+        # clip gt spectra to the specified range
+        supervision_spectra_wave_bound = [
+            self.full_wave[id_lo], self.full_wave[id_hi]]
+        (id_lo, id_hi) = get_bound_id(
+            supervision_spectra_wave_bound, gt_wave, within_bound=True)
+        self.data["supervision_spectra"].append(gt_spectra[id_lo:id_hi + 1])
+
+        # iv) get data for gt spectrum plotting
+        if self.kwargs["plot_clipped_spectrum"]:
+            # plot only within a given range
+            recon_spectra_wave_bound = [
+                source_spectra_data["spectrum_plot_wave_lo"][spectra_id],
+                source_spectra_data["spectrum_plot_wave_hi"][spectra_id]]
+        else:
+            recon_spectra_wave_bound = [ self.full_wave[0], self.full_wave[-1] ]
+
+        (id_lo, id_hi) = get_bound_id(
+            recon_spectra_wave_bound, self.full_wave, within_bound=False)
+
+        gt_spectra
+        gt_recon_wave = np.arange(self.full_wave[id_lo], self.full_wave[id_hi] + 1, smpl_interval)
+        gt_spectra_wave = gt_wave
+        spectra_recon_wave_bound_ids = [id_lo, id_hi + 1]
+
+    def process_spectra(self):
+        patches = []
+        header_wcs, headers, pixels = [], [], []
+
+        spectra_ids = [[]*num_patches]*num_tracts
+        for i in range(self.num_gt_spectra):
+            cur_spectra_ids = []
+            ra = metadata.iloc[i]["ra"]
+            dec = metadata.iloc[i]["dec"]
+            tract, patch, i, j = locate_tract_patch(
+                ra, dec, wcs, headers, self.all_tracts, self.all_patches)
+
+
+        for tract in self.all_tracts:
+            cur_patches, cur_wcs, cur_headers, cur_pixels = [], [], [], []
+
+            for patch in self.all_patches:
+                cur_patch = PatchData(
+                    self.dataset_path, tract, patch,
+                    load_pixels=True,
+                    pixel_norm_cho=self.kwargs["train_pixels_norm"],
+                    **self.kwargs)
+
+                header = cur_patch.get_header()
+                pixels = cur_patch.get_pixels()
+
+                cur_pixels.append(pixels)
+                cur_headers.append(header)
+                cur_wcs.append(WCS(header))
+                cur_patches.append(cur_patch)
+
+            pixels.append(cur_pixels)
+            headers.append(cur_headers)
+            header_wcs.append(cur_wcs)
+            patches.append(cur_patches)
+
+        metadata = self.load_metadata().iloc[:self.num_gt_spectra]
+        df["tract"] = ""
+        df["patch"] = ""
+
+        for i in range(self.num_gt_spectra):
+            self.process_one_spectra(metadata)
+
+    def process_one_spectra(self, id, metadata, patches, wcs, headers, pixels):
+        smpl_interval = self.kwargs["trans_sample_interval"]
+        ra = metadata.iloc[id]["ra"]
+        dec = metadata.iloc[id]["dec"]
+        spectra_fname = metadata.iloc[id]["fname"]
+        coords_fname = spectra_fname[:-4] + ".npy"
+        pix_val_fname = spectra_fname[:-4] + ".npy"
+
+        tract, patch, i, j = locate_tract_patch(
+            ra, dec, wcs, headers, self.all_tracts, self.all_patches)
 
         # i) get img coord, grid coord, and pixel ids of selected gt spectra
-        img_coords, grid_coords, ids = self.fits_obj.world2pix(
-            ra, dec, self.kwargs["spectra_neighbour_size"], tract, patch)
+        # img_coords, grid_coords, ids = self.fits_obj.world2pix(
+        #     ra, dec, self.kwargs["spectra_neighbour_size"], tract, patch)
 
-        self.data["gt_spectra_coord_ids"].append(ids)           # [num_neighbours,1]
-        self.data["gt_spectra_img_coords"].append(img_coords)   # [num_neighbours,2/3]
+        img_coords = worldToPix(headers[i][j], ra, dec) # used for marking spectra on img [1,2]
+
+        pixel_ids = patches[i][j].get_pixel_ids(r, c, neighbour_size)
+        grid_coords = patches[i][j].get_coords(pixel_ids)
+        grid_coords = patches[i][j].
+        coords = np.array([ids])
         self.data["gt_spectra_grid_coords"].append(grid_coords) # [num_neighbours,2/3] [0~1]
+        np.save(coords_fname, coords)
+        np.save(
 
-        if not self.codebook_pretrain and not self.pretrain_infer \
-           and not self.spectra_supervision_train and not self.recon_spectra \
-           and not self.kwargs["codebook_pretrain_pixel_supervision"]: return
+        # ii) get pixel values
+        pixels = self.fits_obj.get_pixels(ids)
+        np.save(pix_val_fname, pixels)
 
-        # ii) load actual spectra data
+        # iii) load actual spectra data
         patch_uid = create_patch_uid(tract, patch)
-        fname = join(self.spectra_path, patch_uid,
-                     source_spectra_data["spectra_fname"][spectra_id])
+        fname = join(self.spectra_path, source_spectra_data["spectra_fname"][spectra_id])
 
         gt_wave, gt_spectra = process_gt_spectra(
             fname, self.full_wave, smpl_interval,
             interpolate=True, sigma=self.kwargs["spectra_smooth_sigma"],
             trusted_range=None if not self.kwargs["trusted_range_only"] else [wave_lo, wave_hi])
 
-        # iii) get data for for spectra supervision
-        if self.spectra_supervision_train or self.codebook_pretrain or self.pretrain_infer:
-            supervision_spectra_wave_bound = [
-                source_spectra_data["spectra_supervision_wave_lo"][spectra_id],
-                source_spectra_data["spectra_supervision_wave_hi"][spectra_id]]
-            # supervision_spectra_wave_bound = [7900,8000]
+        metadata.iloc[id]["tract"] = tract
+        metadata.iloc[id]["patch"] = patch
+        metadata.iloc[id]["coords_fname"] = coords_fname
+        metadata.iloc[id]["pix_val_fname"] = pix_val_fname
 
-            # find id of min and max lambda in terms of the transmission wave (full_wave)
-            # the min and max lambda for the spectra may not coincide exactly with the
-            # trans lambda, here we replace with closest trans lambda
-            (id_lo, id_hi) = get_bound_id(
-                supervision_spectra_wave_bound, self.full_wave, within_bound=False)
-            self.data["spectra_supervision_wave_bound_ids"].append([id_lo, id_hi + 1])
-
-            # clip gt spectra to the specified range
-            supervision_spectra_wave_bound = [
-                self.full_wave[id_lo], self.full_wave[id_hi]]
-            (id_lo, id_hi) = get_bound_id(
-                supervision_spectra_wave_bound, gt_wave, within_bound=True)
-            self.data["supervision_spectra"].append(gt_spectra[id_lo:id_hi + 1])
-
-            # get pixel values
-            if self.kwargs["codebook_pretrain_pixel_supervision"]:
-                pixels = self.fits_obj.get_pixels(ids)
-                self.data["gt_pixels"].append(pixels)
-
-            # get redshift values
-            if self.kwargs["redshift_supervision"]:
-                redshift = source_spectra_data["specz"][spectra_id]
-                self.data["gt_redshift"].append(redshift)
-
-        # iv) get data for gt spectrum plotting
-        if self.recon_spectra:
-            if self.kwargs["plot_clipped_spectrum"]:
-                # plot only within a given range
-                recon_spectra_wave_bound = [
-                    source_spectra_data["spectrum_plot_wave_lo"][spectra_id],
-                    source_spectra_data["spectrum_plot_wave_hi"][spectra_id]]
-            else:
-                recon_spectra_wave_bound = [ self.full_wave[0], self.full_wave[-1] ]
-
-            (id_lo, id_hi) = get_bound_id(
-                recon_spectra_wave_bound, self.full_wave, within_bound=False)
-
-            self.data["gt_spectra"].append(gt_spectra)
-            self.data["gt_recon_wave"].append(
-                np.arange(self.full_wave[id_lo], self.full_wave[id_hi] + 1, smpl_interval)
-            )
-            self.data["gt_spectra_wave"].append(gt_wave)
-            self.data["spectra_recon_wave_bound_ids"].append([id_lo, id_hi + 1])
+    def load_metadata(self):
+        if self.spectra_data_source == "manual":
+            source_spectra_data = read_manual_table(self.manual_table_fname)
+        elif self.spectra_data_source == "deimos":
+            source_spectra_data = read_deimos_table(self.deimos_table_fname)
+        elif self.spectra_data_source == "zcosmos":
+            source_spectra_data = read_zcosmos_table(self.zcosmos_table_fname)
+        else: raise ValueError("Unsupported spectra data source")
+        return source_spectra_data
 
     #############
     # Utilities
@@ -526,8 +592,10 @@ class SpectraData:
                 np.array(cur_coords), cur_markers, fits_id)
 
     def log_spectra_pixel_values(self, spectra):
-        gt_pixel_ids = self.get_spectra_coord_ids().flatten()
-        gt_pixels = self.fits_obj.get_pixels(idx=gt_pixel_ids).numpy()
+        assert 0
+        # gt_pixel_ids = self.get_spectra_coord_ids().flatten()
+        # gt_pixels = self.fits_obj.get_pixels(idx=gt_pixel_ids).numpy()
+        gt_pixels = self.data[""] # todo
         gt_pixels = np.round(gt_pixels, 2)
         np.set_printoptions(suppress = True)
         log.info(f"GT spectra pixel values: {gt_pixels}")
@@ -542,6 +610,18 @@ class SpectraData:
 #############
 # Spectra processing
 #############
+
+def locate_tract_patch(ra, dec, wcs, headers, tracts, patches):
+    for i, tract in enumerate(tracts):
+        for j, patch in enumerate(patches):
+            num_rows, num_cols = headers[i][j]["NAXIS2"], headers[i][j]["NAXIS1"]
+            if self.is_in_patch(ra, dec, wcs[i][j], num_rows, num_cols):
+                return tract, patch, i, j
+    assert 0
+
+def is_in_patch(ra, dec, wcs, num_rows, num_cols):
+    x, y = wcs.world2pix(ra, dec, origin=0)
+    return x >= 0 and y >= 0 and x < num_cols and y < num_rows
 
 def process_gt_spectra(fname, full_wave, smpl_interval, interpolate=False, sigma=-1, trusted_range=None, save_np=True, plot=True, format="default"):
     """ Load gt spectra (intensity values) for spectra supervision and
@@ -661,10 +741,11 @@ def read_deimos_table(fname):
     """ Read metadata table for deimos spectra data.
     """
     df = pandas.read_table(fname,comment='#',delim_whitespace=True)
-    df.rename(columns={"ID": "id"}, inplace=True)
+    df.rename(columns={"ID": "id", "fits1d": "fname"}, inplace=True)
     df.drop(columns=['sel', 'imag', 'kmag', 'Qf', 'Q',
                      'Remarks', 'ascii1d', 'jpg1d', 'fits2d'], inplace=True)
     df.drop([0], inplace=True) # drop first row which is datatype
+    df.dropna(subset=["ra","dec","fits1d"], inplace=True)
     return df
 
 def read_zcosmos_table(fname):

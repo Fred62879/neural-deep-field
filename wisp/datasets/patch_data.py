@@ -8,7 +8,6 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from os.path import join, exists
 from astropy.nddata import Cutout2D
-from wisp.utils.common import worldToPix
 from astropy.coordinates import SkyCoord
 
 from wisp.utils.common import generate_hdu
@@ -24,7 +23,7 @@ class PatchData:
     def __init__(self, dataset_path, tract, patch,
                  load_pixels=False, load_coords=False, load_weights=False,
                  cutout_num_rows=None, cutout_num_cols=None, cutout_start_pos=None,
-                 pixel_norm_cho=None, **kwargs
+                 pixel_norm_cho=None, use_full_patch=True, **kwargs
     ):
         """ @Param
                dataset_path: path of local data directory.
@@ -38,6 +37,7 @@ class PatchData:
         self.load_pixels = load_pixels
         self.load_coords = load_coords
         self.load_weights = load_weights
+        self.use_full_patch = use_full_patch
         self.cutout_num_rows = cutout_num_rows
         self.cutout_num_cols = cutout_num_cols
         self.cutout_start_pos = cutout_start_pos
@@ -46,7 +46,6 @@ class PatchData:
         self.verbose = kwargs["verbose"]
         self.num_bands = kwargs["num_bands"]
         self.u_band_scale = kwargs["u_band_scale"]
-        self.use_full_patch = kwargs["use_full_patch"]
         self.sensors_full_name = kwargs["sensors_full_name"]
         self.load_patch_data_cache = kwargs["load_patch_data_cache"]
         self.qtz = kwargs["quantize_latent"] or kwargs["quantize_spectra"]
@@ -159,6 +158,42 @@ class PatchData:
         if idx is not None:
             return self.data["coords"][idx]
         return self.data["coords"]
+
+    ############
+    # Utilities
+    ############
+
+    def calculate_local_id(self, r, c):
+        """ Count number of pixels before given position in current patch.
+        """
+        return self.full_num_cols * r + c
+
+    def calculate_neighbour_ids(self, r, c, neighbour_size):
+        """ Get id of pixels within neighbour_size of given position in current patch.
+            e.g. For neighbour_size being: 2, 3, 4, the collected ids:
+            . .   . . .   . . . .
+            . *   . * .   . . . .
+                  . . .   . . * .
+                          . . . .
+        """
+        ids = []
+        offset = neighbour_size // 2
+        for i in range(r - offset, r + (neighbour_size - offset)):
+            for j in range(c - offset, c + (neighbour_size - offset)):
+                local_id = self.calculate_local_id(i, j)
+                ids.append(local_id)
+        return ids
+
+    def get_pixel_ids(self, r, c, neighbour_size=1):
+        """ Get id of given position in current patch.
+            If neighbour_size is > 1, also find id of neighbour pixels within neighbour_size.
+        """
+        if neighbour_size <= 1:
+            local_id = self.calculate_local_id(r, c, index, patch_uid)
+            ids = [local_id]
+        else:
+            ids = self.calculate_neighbour_ids(r, c, neighbour_size)
+        return ids
 
     ############
     # Helpers

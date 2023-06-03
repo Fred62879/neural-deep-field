@@ -84,13 +84,20 @@ class FitsData:
         _, img_data_path = set_input_path(dataset_path, self.kwargs["sensor_collection_name"])
         paths = [img_data_path]
 
-        # image data path creation
-        suffix = create_selected_patches_uid(self, **self.kwargs)
+        # suffix that defines that currently selected group of image patches
+        if self.kwargs["tract_selection_cho"] is None:
+            # concatenate all selected patches together
+            # use only with small number of selections
+            suffix = create_selected_patches_uid(self, **self.kwargs)
+        else:
+            suffix = self.kwargs["tract_selection_cho"]
+
         norm_str = self.kwargs["train_pixels_norm"]
         self.meta_data_fname = join(img_data_path, f"meta_data{suffix}.txt")
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.coords_fname = join(img_data_path, f"coords{suffix}.npy")
-        self.coords_range_fname = join(img_data_path, f"coords_range{suffix}.npy")
+        # self.coords_range_fname = join(img_data_path, f"coords_range{suffix}.npy")
+        self.coords_range_fname = join(img_data_path, self.kwargs["coords_range_fname"])
         self.pixels_fname = join(img_data_path, f"pixels_{norm_str}{suffix}.npy")
         self.zscale_ranges_fname = join(img_data_path, f"zscale_ranges_{norm_str}{suffix}.npy")
 
@@ -103,10 +110,11 @@ class FitsData:
 
         cached = self.load_patch_data_cache and \
             exists(self.meta_data_fname) and \
-            (not self.load_coords or exists(self.coords_fname)) and \
             (not self.load_weights or exists(self.weights_fname)) and \
             (not self.load_pixels or (exists(self.pixels_fname) and \
-                                      exists(self.zscale_ranges_fname)))
+                                      exists(self.zscale_ranges_fname))) and \
+            (not self.load_coords or (exists(self.coords_fname) and \
+                                      exists(self.coords_range_fname)))
 
         if cached: pixels, coords, weights = self.load_cache()
         else:      pixels, coords, weights = self.process_data()
@@ -449,6 +457,8 @@ class FitsData:
             zscale_ranges = np.load(self.zscale_ranges_fname)
         if self.load_coords:
             coords = np.load(self.coords_fname)
+            coords_range = np.load(self.coords_range_fname)
+            coords, _ = normalize_coords(coords, coords_range=coords_range)
         if self.load_weights:
             weights = np.load(self.weights_fname)
         return pixels, coords, weights
@@ -487,8 +497,8 @@ class FitsData:
 
         if self.load_coords:
             coords = np.concatenate(coords)
+            np.save(self.coords_fname, coords) # save un-normed coords
             coords, coords_range = normalize_coords(coords)
-            np.save(self.coords_fname, coords)
             np.save(self.coords_range_fname, coords_range)
 
         if self.load_weights:
@@ -509,6 +519,7 @@ class FitsData:
             cutout_num_cols=cutout_num_cols,
             cutout_start_pos=cutout_start_pos,
             pixel_norm_cho=self.kwargs["train_pixels_norm"],
+            use_full_patch=self.kwargs["use_full_patch"],
             **self.kwargs)
 
         patch_uid = cur_patch.get_patch_uid()

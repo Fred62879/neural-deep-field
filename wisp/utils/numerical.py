@@ -46,13 +46,14 @@ def get_coords_range(coords):
     min_dec, max_dec = np.min(coords[...,1]), np.max(coords[...,1])
     return np.array([min_ra, max_ra, min_dec, max_dec])
 
-def normalize_coords(coords):
+def normalize_coords(coords, coords_range=None):
     ''' Normalize given coords.
         Currently only supports linear normalization.
         @Param
           coords: [...,2] (float32)
     '''
-    coords_range = get_coords_range(coords)
+    if coords_range is None:
+        coords_range = get_coords_range(coords)
     (min_x, max_x, min_y, max_y) = coords_range
     coords[...,0] = (coords[...,0] - min_x) / (max_x - min_x)
     coords[...,1] = (coords[...,1] - min_y) / (max_y - min_y)

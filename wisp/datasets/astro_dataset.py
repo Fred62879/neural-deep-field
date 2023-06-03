@@ -144,9 +144,12 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_pixels(idx)
         elif field == "weights":
             data = self.fits_dataset.get_weights(idx)
-        # elif field == "redshift":
-        #     assert 0
-        #     data = self.fits_dataset.get_redshifts(idx)
+        elif field == "spectra":
+            data = self.spectra_dataset.get_supervision_spectra(idx)
+        elif field == "spectra_pixels":
+            data = self.spectra_dataset.get_supervision_pxiels(idx)
+        elif field == "spectra_redshift":
+            data = self.spectra_dataset.get_supervision_redshift(idx)
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
         else:
@@ -183,6 +186,8 @@ class AstroDataset(Dataset):
     def get_spectra_data(self, out):
         """ Get unbatched spectra data
             For either spectra supervision training or codebook pretrain.
+            Used only with very small amount of spectra.
+            If we train on large amount of spectra, use batched data instead.
         """
         assert(self.kwargs["pretrain_codebook"] ^ self.kwargs["spectra_supervision"])
 

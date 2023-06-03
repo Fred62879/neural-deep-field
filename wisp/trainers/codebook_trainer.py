@@ -106,9 +106,6 @@ class CodebookTrainer(BaseTrainer):
         self.save_pixel_values = "save_pixel_values_during_train" in tasks and \
             self.extra_args["codebook_pretrain_pixel_supervision"]
 
-        if self.plot_spectra:
-            self.selected_spectra_ids = self.dataset.get_spectra_coord_ids()
-
     def set_log_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         if self.verbose: log.info(f"logging to {self.log_dir}")
