@@ -279,6 +279,10 @@ dataset:
     # spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]
     spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]
 
+    spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
+    spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
+    spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
+
 inpaint:
     inpaint_cho: 'no_inpaint' #'spectral_inpaint'
     inpaint_sample_ratio: 0.01 # 0-1

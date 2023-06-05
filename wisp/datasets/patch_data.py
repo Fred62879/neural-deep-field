@@ -175,6 +175,7 @@ class PatchData:
             . *   . * .   . . . .
                   . . .   . . * .
                           . . . .
+            @Return: ids [n,]
         """
         ids = []
         offset = neighbour_size // 2
@@ -187,12 +188,14 @@ class PatchData:
     def get_pixel_ids(self, r, c, neighbour_size=1):
         """ Get id of given position in current patch.
             If neighbour_size is > 1, also find id of neighbour pixels within neighbour_size.
+            @Return: ids [n,]
         """
         if neighbour_size <= 1:
             local_id = self.calculate_local_id(r, c, index, patch_uid)
             ids = [local_id]
         else:
             ids = self.calculate_neighbour_ids(r, c, neighbour_size)
+        ids = np.array(ids)
         return ids
 
     ############
