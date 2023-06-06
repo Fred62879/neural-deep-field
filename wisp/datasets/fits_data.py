@@ -85,12 +85,12 @@ class FitsData:
         paths = [img_data_path]
 
         # suffix that defines that currently selected group of image patches
-        if self.kwargs["tract_selection_cho"] is None:
+        if self.kwargs["patch_selection_cho"] is None:
             # concatenate all selected patches together
             # use only with small number of selections
             suffix = create_selected_patches_uid(self, **self.kwargs)
         else:
-            suffix = self.kwargs["tract_selection_cho"]
+            suffix = self.kwargs["patch_selection_cho"]
 
         norm_str = self.kwargs["train_pixels_norm"]
         self.meta_data_fname = join(img_data_path, f"meta_data{suffix}.txt")
@@ -519,7 +519,7 @@ class FitsData:
             cutout_num_cols=cutout_num_cols,
             cutout_start_pos=cutout_start_pos,
             pixel_norm_cho=self.kwargs["train_pixels_norm"],
-            use_full_patch=self.kwargs["use_full_patch"],
+            full_patch=self.kwargs["use_full_patch"],
             **self.kwargs)
 
         patch_uid = cur_patch.get_patch_uid()

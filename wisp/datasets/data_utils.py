@@ -11,13 +11,41 @@ import torch
 import collections
 import numpy as np
 
-from os.path import join
 from wisp.core import Rays
+from functools import lru_cache
+from os.path import join, exists
 from torch._six import string_classes
 from torch.utils.data._utils.collate import default_convert
 
 np_str_obj_array_pattern = re.compile(r'[SaUO]')
 
+
+@lru_cache
+def patch_exists(path, tract, patch):
+    """ Check whether the given patch file exists.
+        @Param
+          tract: image tract, e.g. `9812`
+          patch: image patch, e.g. `1,2`
+    """
+    fname = create_patch_fname(tract, patch, "G") # a random band
+    fname = join(path, fname)
+    return exists(fname)
+
+def create_patch_fname(tract, patch, band, megau=False, weights=False):
+    """ Create image patch file name.
+        @Param
+          tract: image tract, e.g. `9812`
+          patch: image patch, e.g. `1,3` (converted to `1%2C3` or 1c3)
+          band:  filter name, e.g. `HSC-G`, `NB111`
+    """
+    if megau:
+        patch = patch.replace(",","c")
+        if weights:
+            return "Mega-" + band + "_" + self.tract + "_" + upatch + ".weight.fits"
+        return "Mega-" + band + "_" + tract + "_" + upatch + ".fits"
+
+    patch = patch.replace(",","%2C")
+    return "calexp-" + band + "-" + tract + "-" + patch + ".fits"
 
 def set_input_path(dataset_path, sensor_name):
     input_path = join(dataset_path, "input")

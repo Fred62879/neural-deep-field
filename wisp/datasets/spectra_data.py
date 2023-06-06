@@ -6,10 +6,12 @@ import numpy as np
 import logging as log
 import matplotlib.pyplot as plt
 
-from wisp.datasets.data_utils import add_dummy_dim, create_patch_uid
+from wisp.datasets.data_utils import add_dummy_dim, \
+    create_patch_uid, set_input_path, patch_exists
 
 from pathlib import Path
 from astropy.io import fits
+from functools import partial
 from os.path import join, exists
 from collections import defaultdict
 from scipy.interpolate import interp1d
@@ -27,25 +29,29 @@ class SpectraData:
         self.device = device
         self.fits_obj = fits_obj
         self.trans_obj = trans_obj
-        self.set_path(dataset_path)
-        self.load_accessory_data()
-        self.load_spectra()
 
+        self.num_gt_spectra = kwargs["num_gt_spectra"]
         self.all_tracts = kwargs["spectra_tracts"]
         self.all_patches_r = kwargs["spectra_patches_r"]
         self.all_patches_c = kwargs["spectra_patches_c"]
         self.num_tracts = len(self.all_tracts)
+        self.num_patches_c = len(self.all_patches_c)
         self.num_patches = len(self.all_patches_r)*len(self.all_patches_c)
 
         self.wave_lo = kwargs["spectrum_plot_wave_lo"]
         self.wave_hi = kwargs["spectrum_plot_wave_hi"]
-        super_wave_lo = kwargs["spectra_supervision_wave_lo"]
-        super_wave_hi = kwargs["spectra_supervision_wave_hi"]
         self.smooth_sigma = kwargs["spectra_smooth_sigma"]
         self.neighbour_size = kwargs["spectra_neighbour_size"]
-        self.wave_discretz_interval = kwargs["trans_smpl_interval"]
+        self.spectra_data_source = kwargs["spectra_data_source"]
+        self.wave_discretz_interval = kwargs["trans_sample_interval"]
         self.trusted_wave_range = None if not kwargs["trusted_range_only"] \
-            else [super_wave_lo, super_wave_hi]
+            else [kwargs["spectra_supervision_wave_lo"],
+                  kwargs["spectra_supervision_wave_hi"]]
+        self.load_spectra_data_from_cache = kwargs["load_spectra_data_from_cache"]
+
+        self.set_path(dataset_path)
+        self.load_accessory_data()
+        self.load_spectra()
 
     def require_any_data(self, tasks):
         tasks = set(tasks)
@@ -78,6 +84,9 @@ class SpectraData:
             source_metadata_table:    ra,dec,zspec,spectra_fname
             processed_metadata_table: added pixel val and tract-patch
         """
+        self.input_patch_path, _ = set_input_path(
+            dataset_path, self.kwargs["sensor_collection_name"])
+
         spectra_path = join(dataset_path, "input/spectra")
 
         if self.spectra_data_source == "manual":
@@ -88,7 +97,7 @@ class SpectraData:
             path = join(spectra_path, "deimos")
 
             self.spectra_path = join(path, "source_spectra")
-            self.source_metadata_table_fname = join(path, "source_deimos_table.fits")
+            self.source_metadata_table_fname = join(path, "source_deimos_table.tbl")
 
             processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
             self.processed_spectra_path = join(processed_data_path, "processed_spectra")
@@ -279,13 +288,14 @@ class SpectraData:
               During training, we only load if do spectra supervision
               During inferrence, the two options give same coords but different spectra
         """
-        if self.load_spectra_data_from_cache and \
-           exists(self.processed_data_fname):
-            self.load_cached_spectra_data()
+        # save data for all spectra together (only when amount of spectra is small)
+        if exists(self.processed_metadata_table_fname):
+            self.load_processed_spectra()
         else:
             self.process_spectra()
 
-        self.transform_data()
+        if self.load_spectra_data_from_cache:
+            self.transform_data()
 
     def transform_data(self):
         coord_dim = 3 if self.kwargs["coords_encode_method"] == "grid" and \
@@ -347,6 +357,16 @@ class SpectraData:
         gt_spectra_wave = gt_wave
         spectra_recon_wave_bound_ids = [id_lo, id_hi + 1]
 
+    def load_metadata(self):
+        if self.spectra_data_source == "manual":
+            source_spectra_data = read_manual_table(self.manual_table_fname)
+        elif self.spectra_data_source == "deimos":
+            source_spectra_data = read_deimos_table(self.source_metadata_table_fname)
+        elif self.spectra_data_source == "zcosmos":
+            source_spectra_data = read_zcosmos_table(self.source_metadata_table_fname)
+        else: raise ValueError("Unsupported spectra data source")
+        return source_spectra_data
+
     def process_spectra(self):
         df = self.load_metadata().iloc[:self.num_gt_spectra]
         df["tract"] = ""
@@ -358,6 +378,13 @@ class SpectraData:
             cur_wcs, cur_headers = [], []
             for patch_r in self.all_patches_r:
                 for patch_c in self.all_patches_c:
+                    if not patch_exists(
+                            self.input_patch_path, tract, f"{patch_r},{patch_c}"
+                    ):
+                        cur_headers.append(None)
+                        cur_wcs.append(None)
+                        continue
+
                     cur_patch = PatchData(
                         self.dataset_path, tract, f"{patch_r},{patch_c}", **self.kwargs)
                     header = cur_patch.get_header()
@@ -372,16 +399,22 @@ class SpectraData:
         localize = partial(locate_tract_patch,
                            header_wcs, headers, self.all_tracts,
                            self.all_patches_r, self.all_patches_c)
-
-        # id of spectra in each patch
-        spectra_ids = [ [[] for i in range(self.num_patches_r * self.num_patches_c)]
-                        for j in range(self.num_tracts) ]
+        spectra_ids = [
+            [ [] for i in range(self.num_patches) ]
+            for j in range(self.num_tracts)
+        ] # id of spectra in each patch (contain patches that dont exist)
 
         for idx in range(self.num_gt_spectra):
-            ra = metadata.iloc[idx]["ra"]
-            dec = metadata.iloc[idx]["dec"]
+            ra = df.iloc[idx]["ra"]
+            dec = df.iloc[idx]["dec"]
             tract, patch, i, j = localize(ra, dec)
-            spectra_ids[i][j].append(idx) # idx spectra belongs to tract i, patch j
+
+            if tract == -1:
+                df.drop([idx+1], inplace=True) # drop current spectra
+                continue
+
+            # idx spectra belongs to tract i, patch j (which exists)
+            spectra_ids[i][j].append(idx)
             df.iloc[idx]["tract"] = tract
             df.iloc[idx]["patch"] = patch
 
@@ -390,6 +423,8 @@ class SpectraData:
         for i, tract in enumerate(self.all_tracts):
             for j, patch_r in enumerate(self.all_patches_r):
                 for k, patch_c in enumerate(self.all_patches_c):
+                    if not patch_exists(self.input_patch_path, tract, patch): continue
+
                     cur_patch = PatchData(
                         self.dataset_path, tract, f"{patch_r},{patch_c}",
                         load_pixels=True,
@@ -398,40 +433,40 @@ class SpectraData:
                     l = j * self.num_patches_c + k
                     self.process(cur_patch, spectra_ids[i][l])
 
-    def process_spectra_in_one_patch(self, metadata, patch, spectra_ids):
+    def process_spectra_in_one_patch(self, df, patch, spectra_ids):
         """ Get coords and pixel values for all spectra (specified by spectra_ids)
               within the same given patch.
             @Params
-              metadata: source metadata dataframe for all spectra
+              df: source metadata dataframe for all spectra
               patch: patch that contains the current spectra
               spectra_ids: ids for spectra within the current patch
         """
-        ras = np.array(list(metadata.iloc[spectra_ids]["ra"]))
-        decs = np.array(list(metadata.iloc[spectra_ids]["dec"]))
+        ras = np.array(list(df.iloc[spectra_ids]["ra"]))
+        decs = np.array(list(df.iloc[spectra_ids]["dec"]))
 
         # get img coords for all spectra within current patch
         wcs = WCS(patch.get_header())
         radecs = np.concatenate((ras, decs), axis=-1)
         img_coords = wcs.all_world2pix(radecs, 1) # [n,2]
 
-        process_one_spectra = partial(self.process_one_spectra, metadata, patch)
+        process_one_spectra = partial(self.process_one_spectra, df, patch)
         for i, (idx, coord) in enumerate(zip(spectra_ids, img_coords)):
             process_one_spectra(idx, coord)
 
-    def process_one_spectra(self, metadata, patch, idx, coord):
+    def process_one_spectra(self, df, patch, idx, coord):
         """ Get pixel and normalized coord and
               process spectra data for one spectra.
             @Params
-              metadata: source metadata dataframe for all spectra
+              df: source metadata dataframe for all spectra
               patch: patch that contains the current spectra
-              idx: spectra idx (within the metadata table)
+              idx: spectra idx (within the df table)
               coord: img coord for current spectra
         """
-        spectra_fname = metadata.iloc[idx]["spectra_fname"][:-4]
+        spectra_fname = df.iloc[idx]["spectra_fname"][:-4]
         pix_fname = f"{spectra_fname}_pix.npy"
         coord_fname = f"{spectra_fname}_pix.npy"
-        metadata.iloc[idx]["pix_fname"] = pix_fname
-        metadata.iloc[idx]["coord_fname"] = coord_fname
+        df.iloc[idx]["pix_fname"] = pix_fname
+        df.iloc[idx]["coord_fname"] = coord_fname
 
         pixel_ids = patch.get_pixel_ids(coord[0], coord[1],
                                         neighbour_size=self.neighbour_size)
@@ -449,16 +484,6 @@ class SpectraData:
             sigma=self.smooth_sigma,
             trusted_range=self.trusted_range
         )
-
-    def load_metadata(self):
-        if self.spectra_data_source == "manual":
-            source_spectra_data = read_manual_table(self.manual_table_fname)
-        elif self.spectra_data_source == "deimos":
-            source_spectra_data = read_deimos_table(self.deimos_table_fname)
-        elif self.spectra_data_source == "zcosmos":
-            source_spectra_data = read_zcosmos_table(self.zcosmos_table_fname)
-        else: raise ValueError("Unsupported spectra data source")
-        return source_spectra_data
 
     #############
     # Utilities
@@ -642,15 +667,18 @@ class SpectraData:
 # Spectra processing
 #############
 
-def locate_tract_patch(wcs, headers, tracts, patches_r, patches_c):
+def locate_tract_patch(wcs, headers, tracts, patches_r, patches_c, ra, dec):
     for i, tract in enumerate(tracts):
         for j, patch_r in enumerate(patches_r):
             for k, patch_c in enumerate(patches_c):
                 l = j * len(patches_c) + k
+                if headers[i][l] is None: continue
+
                 num_rows, num_cols = headers[i][l]["NAXIS2"], headers[i][l]["NAXIS1"]
                 if self.is_in_patch(ra, dec, wcs[i][l], num_rows, num_cols):
                     return tract, patch, i, l
-    assert 0
+
+    return -1,-1,-1,-1
 
 def is_in_patch(ra, dec, wcs, num_rows, num_cols):
     x, y = wcs.world2pix(ra, dec, origin=0)

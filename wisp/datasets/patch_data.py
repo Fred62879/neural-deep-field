@@ -14,7 +14,7 @@ from wisp.utils.common import generate_hdu
 from wisp.utils.plot import plot_horizontally
 from wisp.utils.numerical import normalize, calculate_zscale_ranges
 from wisp.datasets.data_utils import set_input_path, create_patch_uid, \
-    create_selected_patches_uid, get_mgrid_np, add_dummy_dim
+    create_patch_fname, create_selected_patches_uid, get_mgrid_np, add_dummy_dim
 
 
 class PatchData:
@@ -23,7 +23,7 @@ class PatchData:
     def __init__(self, dataset_path, tract, patch,
                  load_pixels=False, load_coords=False, load_weights=False,
                  cutout_num_rows=None, cutout_num_cols=None, cutout_start_pos=None,
-                 pixel_norm_cho=None, use_full_patch=True, **kwargs
+                 pixel_norm_cho=None, full_patch=True, **kwargs
     ):
         """ @Param
                dataset_path: path of local data directory.
@@ -37,7 +37,7 @@ class PatchData:
         self.load_pixels = load_pixels
         self.load_coords = load_coords
         self.load_weights = load_weights
-        self.use_full_patch = use_full_patch
+        self.use_full_patch = full_patch
         self.cutout_num_rows = cutout_num_rows
         self.cutout_num_cols = cutout_num_cols
         self.cutout_start_pos = cutout_start_pos
@@ -50,33 +50,38 @@ class PatchData:
         self.load_patch_data_cache = kwargs["load_patch_data_cache"]
         self.qtz = kwargs["quantize_latent"] or kwargs["quantize_spectra"]
 
-        self.compile_patch_fnames()
+        self.patch_uid = create_patch_uid(tract, patch)
         self.set_path(dataset_path)
+
+        self.verify_patch_exists(tract, patch)
+        if not self.patch_exists(): return
+
+        self.compile_patch_fnames()
         self.load_data()
 
     #############
     # Initializations
     #############
 
+    def verify_patch_exists(self, tract, patch):
+        fname = create_patch_fname(tract, patch, "HSC-G")
+        fname = join(self.input_patch_path, fname)
+        self.patch_file_exists = exists(fname)
+
     def compile_patch_fnames(self):
         """ Get fnames of all given patch input for all bands.
         """
-        self.patch_uid = create_patch_uid(self.tract, self.patch)
-
-        upatch = self.patch.replace(",","c")
-        patch = self.patch.replace(",","%2C")
-
         hsc_patch_fname = np.array(
-            ["calexp-" + band + "-" + self.tract + "-" + patch + ".fits"
+            [create_patch_fname(self.tract, self.patch, band)
             for band in self.kwargs["sensors_full_name"] if "HSC" in band])
         nb_patch_fname = np.array(
-            ["calexp-" + band + "-" + self.tract + "-" + patch + ".fits"
+            [create_patch_fname(self.tract, self.patch, band)
             for band in self.kwargs["sensors_full_name"] if "NB" in band])
         megau_patch_fname = np.array(
-            ["Mega-" + band + "_" + self.tract + "_" + upatch + ".fits"
+            [create_patch_fname(self.tract, self.patch, band, megau=True)
             for band in self.kwargs["sensors_full_name"] if "u" in band])
         megau_weights_fname = np.array(
-            ["Mega-" + band + "_" + self.tract + "_" + upatch + ".weight.fits"
+            [create_patch_fname(self.tract, self.patch, band, megau=True, weights=True)
             for band in self.kwargs["sensors_full_name"] if "u" in band])
 
         self.patch_group = np.concatenate(
@@ -117,6 +122,9 @@ class PatchData:
     #############
     # Getters
     #############
+
+    def patch_exists(self):
+        return self.patch_file_exists
 
     def get_patch_uid(self):
         return self.patch_uid
