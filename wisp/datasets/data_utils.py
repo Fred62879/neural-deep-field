@@ -27,7 +27,7 @@ def patch_exists(path, tract, patch):
           tract: image tract, e.g. `9812`
           patch: image patch, e.g. `1,2`
     """
-    fname = create_patch_fname(tract, patch, "G") # a random band
+    fname = create_patch_fname(tract, patch, "HSC-G") # a random band
     fname = join(path, fname)
     return exists(fname)
 

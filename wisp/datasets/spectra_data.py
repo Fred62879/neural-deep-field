@@ -6,11 +6,13 @@ import numpy as np
 import logging as log
 import matplotlib.pyplot as plt
 
+from wisp.datasets.patch_data import PatchData
 from wisp.datasets.data_utils import add_dummy_dim, \
     create_patch_uid, set_input_path, patch_exists
 
 from pathlib import Path
 from astropy.io import fits
+from astropy.wcs import WCS
 from functools import partial
 from os.path import join, exists
 from collections import defaultdict
@@ -29,6 +31,7 @@ class SpectraData:
         self.device = device
         self.fits_obj = fits_obj
         self.trans_obj = trans_obj
+        self.dataset_path = dataset_path
 
         self.num_gt_spectra = kwargs["num_gt_spectra"]
         self.all_tracts = kwargs["spectra_tracts"]
@@ -102,18 +105,18 @@ class SpectraData:
             processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
             self.processed_spectra_path = join(processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(
-                processed_data_path, "processed_deimos_table.fits")
+                processed_data_path, "processed_deimos_table.tbl")
 
         elif self.spectra_data_source == "zcosmos":
             path = join(spectra_path, "zcosmos")
 
             self.spectra_path = join(path, "source_spectra")
-            self.source_metadata_table_fname = join(path, "source_zcosmos_table.tbl")
+            self.source_metadata_table_fname = join(path, "source_zcosmos_table.fits")
 
             processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
             self.processed_spectra_path = join(processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(
-                processed_data_path, "processed_zcosmos_table.tbl")
+                processed_data_path, "processed_zcosmos_table.fits")
 
         else: raise ValueError("Unsupported spectra data source choice.")
 
@@ -367,8 +370,16 @@ class SpectraData:
         else: raise ValueError("Unsupported spectra data source")
         return source_spectra_data
 
+    def save_metadata(self, df, fname):
+        if self.spectra_data_source == "deimos":
+            save_deimos_table(df, fname)
+        elif self.spectra_data_source == "zcosmos":
+            save_zcosmos_table(df, fname)
+        else: raise ValueError("Unsupported spectra data source")
+
     def process_spectra(self):
         df = self.load_metadata().iloc[:self.num_gt_spectra]
+        num_gt_spectra = len(df)
         df["tract"] = ""
         df["patch"] = ""
 
@@ -380,7 +391,7 @@ class SpectraData:
                 for patch_c in self.all_patches_c:
                     if not patch_exists(
                             self.input_patch_path, tract, f"{patch_r},{patch_c}"
-                    ):
+                    ) or not (tract == '9812' and patch_r == '1' and patch_c == '5'):
                         cur_headers.append(None)
                         cur_wcs.append(None)
                         continue
@@ -392,8 +403,8 @@ class SpectraData:
                     cur_headers.append(header)
                     cur_wcs.append(wcs)
 
-                headers.append(cur_headers)
-                header_wcs.append(cur_wcs)
+            headers.append(cur_headers)
+            header_wcs.append(cur_wcs)
 
         # locate tract and patch for each spectra
         localize = partial(locate_tract_patch,
@@ -404,26 +415,31 @@ class SpectraData:
             for j in range(self.num_tracts)
         ] # id of spectra in each patch (contain patches that dont exist)
 
-        for idx in range(self.num_gt_spectra):
+        spectra_to_drop = []
+        for idx in range(num_gt_spectra):
             ra = df.iloc[idx]["ra"]
             dec = df.iloc[idx]["dec"]
             tract, patch, i, j = localize(ra, dec)
 
             if tract == -1:
-                df.drop([idx+1], inplace=True) # drop current spectra
+                spectra_to_drop.append(idx)
                 continue
 
             # idx spectra belongs to tract i, patch j (which exists)
             spectra_ids[i][j].append(idx)
-            df.iloc[idx]["tract"] = tract
-            df.iloc[idx]["patch"] = patch
+            df.at[idx,"tract"] = tract
+            df.at[idx,"patch"] = patch
+
+        # print(len(spectra_to_drop))
+        # print(spectra_ids)
 
         # load pixels and coords for each spectra
-        process = partial(process_spectra_in_one_patch, df)
+        process_each_patch = partial(self.process_spectra_in_one_patch, df)
         for i, tract in enumerate(self.all_tracts):
             for j, patch_r in enumerate(self.all_patches_r):
                 for k, patch_c in enumerate(self.all_patches_c):
-                    if not patch_exists(self.input_patch_path, tract, patch): continue
+                    if not patch_exists(self.input_patch_path, tract, f"{patch_r},{patch_c}"):
+                        continue
 
                     cur_patch = PatchData(
                         self.dataset_path, tract, f"{patch_r},{patch_c}",
@@ -431,7 +447,11 @@ class SpectraData:
                         pixel_norm_cho=self.kwargs["train_pixels_norm"],
                         **self.kwargs)
                     l = j * self.num_patches_c + k
-                    self.process(cur_patch, spectra_ids[i][l])
+                    process_each_patch(cur_patch, spectra_ids[i][l])
+
+        df.drop(spectra_to_drop, inplace=True) # drop nonexist spectra
+        df.reset_index(inplace=True)
+        df.to_pickle(self.processed_metadata_table_fname)
 
     def process_spectra_in_one_patch(self, df, patch, spectra_ids):
         """ Get coords and pixel values for all spectra (specified by spectra_ids)
@@ -441,6 +461,9 @@ class SpectraData:
               patch: patch that contains the current spectra
               spectra_ids: ids for spectra within the current patch
         """
+        if len(spectra_ids) == 0: return
+
+        print(spectra_ids)
         ras = np.array(list(df.iloc[spectra_ids]["ra"]))
         decs = np.array(list(df.iloc[spectra_ids]["dec"]))
 
@@ -675,13 +698,13 @@ def locate_tract_patch(wcs, headers, tracts, patches_r, patches_c, ra, dec):
                 if headers[i][l] is None: continue
 
                 num_rows, num_cols = headers[i][l]["NAXIS2"], headers[i][l]["NAXIS1"]
-                if self.is_in_patch(ra, dec, wcs[i][l], num_rows, num_cols):
-                    return tract, patch, i, l
-
+                if is_in_patch(ra, dec, wcs[i][l], num_rows, num_cols):
+                    return tract, f"{patch_r},{patch_c}", i, l
     return -1,-1,-1,-1
 
 def is_in_patch(ra, dec, wcs, num_rows, num_cols):
-    x, y = wcs.world2pix(ra, dec, origin=0)
+    x, y = wcs.wcs_world2pix(ra, dec, 0)
+    # print(x, y, num_rows, num_cols)
     return x >= 0 and y >= 0 and x < num_cols and y < num_rows
 
 def process_gt_spectra(infname, outfname, full_wave, smpl_interval,
@@ -809,6 +832,10 @@ def read_deimos_table(fname):
                      'Remarks', 'ascii1d', 'jpg1d', 'fits2d'], inplace=True)
     df.drop([0], inplace=True) # drop first row which is datatype
     df.dropna(subset=["ra","dec","fname"], inplace=True)
+    df.reset_index(inplace=True) # reset index after dropping
+    df["ra"] = pandas.to_numeric(df["ra"])
+    df["dec"] = pandas.to_numeric(df["dec"])
+    df["zspec"] = pandas.to_numeric(df["zspec"])
     return df
 
 def read_zcosmos_table(fname):
@@ -823,7 +850,20 @@ def read_zcosmos_table(fname):
         'FILANEMS':'fname'
     }, inplace=True)
     df.drop(columns=['CC','IMAG_AB','FLAG_S','FLAG_X','FLAG_R','FLAG_UV'], inplace=True)
+    df.drop([0], inplace=True) # drop first row which is datatype
+    df.dropna(subset=["ra","dec","fname"], inplace=True)
+    df.reset_index(inplace=True) # reset index after dropping
+    df["ra"] = pandas.to_numeric(df["ra"])
+    df["dec"] = pandas.to_numeric(df["dec"])
+    df["zspec"] = pandas.to_numeric(df["zspec"])
     return df
+
+def save_deimos_table(df, fname):
+    df.to_pickle(fname)
+
+def save_zcosmos_table(df, fname):
+    table = Table.from_pandas(df)
+    table.write(fname)
 
 def read_manual_table(fname):
     data, colnames, datatypes = {}, None, None
