@@ -33,6 +33,8 @@ class SpectraData:
         self.trans_obj = trans_obj
         self.dataset_path = dataset_path
 
+        self.num_bands = kwargs["num_bands"]
+        self.space_dim = kwargs["space_dim"]
         self.num_gt_spectra = kwargs["num_gt_spectra"]
         self.all_tracts = kwargs["spectra_tracts"]
         self.all_patches_r = kwargs["spectra_patches_r"]
@@ -87,6 +89,7 @@ class SpectraData:
             source_metadata_table:    ra,dec,zspec,spectra_fname
             processed_metadata_table: added pixel val and tract-patch
         """
+        paths = []
         self.input_patch_path, _ = set_input_path(
             dataset_path, self.kwargs["sensor_collection_name"])
 
@@ -99,26 +102,33 @@ class SpectraData:
         elif self.spectra_data_source == "deimos":
             path = join(spectra_path, "deimos")
 
-            self.spectra_path = join(path, "source_spectra")
+            self.source_spectra_path = join(path, "source_spectra")
             self.source_metadata_table_fname = join(path, "source_deimos_table.tbl")
 
             processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
             self.processed_spectra_path = join(processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(
                 processed_data_path, "processed_deimos_table.tbl")
+            self.processed_spectra_data_fname = join(
+                processed_data_path, "processed_spectra.npy")
 
         elif self.spectra_data_source == "zcosmos":
             path = join(spectra_path, "zcosmos")
 
-            self.spectra_path = join(path, "source_spectra")
+            self.source_spectra_path = join(path, "source_spectra")
             self.source_metadata_table_fname = join(path, "source_zcosmos_table.fits")
 
             processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
             self.processed_spectra_path = join(processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(
                 processed_data_path, "processed_zcosmos_table.fits")
+            self.processed_spectra_data_fname = join(
+                processed_data_path, "processed_spectra.npy")
 
         else: raise ValueError("Unsupported spectra data source choice.")
+
+        for path in [processed_data_path, self.processed_spectra_path]:
+            Path(path).mkdir(parents=True, exist_ok=True)
 
     def load_accessory_data(self):
         self.full_wave = self.trans_obj.get_full_wave()
@@ -135,13 +145,13 @@ class SpectraData:
            self.spectra_supervision_train:
             self.load_gt_spectra_data()
 
-        if self.recon_dummy_spectra:
-            self.load_dummy_spectra_data()
+        # if self.recon_dummy_spectra:
+        #     self.load_dummy_spectra_data()
 
-        self.load_plot_spectra_data()
+        # self.load_plot_spectra_data()
 
-        if self.recon_gt_spectra:
-            self.mark_spectra_on_img()
+        # if self.recon_gt_spectra:
+        #     self.mark_spectra_on_img()
 
     #############
     # Getters
@@ -291,14 +301,49 @@ class SpectraData:
               During training, we only load if do spectra supervision
               During inferrence, the two options give same coords but different spectra
         """
-        # save data for all spectra together (only when amount of spectra is small)
-        if exists(self.processed_metadata_table_fname):
+        if not self.load_spectra_data_from_cache or \
+           not exists(self.gt_spectra_pixs_fname) or \
+           not exists(self.gt_spectra_coords_fname) or \
+           not exists(self.gt_spectra_fluxes_fname):
+
+            # process and save data for each spectra, individually
+            if not exists(self.processed_metadata_table_fname):
+                self.process_spectra()
+            # load data for each individual spectra
             self.load_processed_spectra()
         else:
-            self.process_spectra()
+            # save data for all spectra together (only when amount of spectra is small)
+            self.load_cached_spectra_data()
 
-        if self.load_spectra_data_from_cache:
-            self.transform_data()
+        #print(self.data["pixs"].shape)
+        #print(self.data["gt_spectra_grid_coords"].shape)
+        #print(self.data["fluxes"].shape)
+
+        self.transform_data()
+
+    def load_cached_spectra_data(self):
+        self.data["pixs"] = np.load(self.gt_spectra_pixs_fname)
+        self.data["gt_spectra_grid_coords"] = np.load(self.gt_spectra_coords_fname)
+        self.data["fluxes"] = np.load(self.gt_spectra_fluxes_fname)
+
+    def load_processed_spectra(self):
+        """ Load processed data for each spectra and save together.
+        """
+        df = pandas.read_pickle(self.processed_metadata_table_fname)
+        num_gt_spectra = len(df)
+        pixs, coords, fluxes = [], [], []
+        for i in range(num_gt_spectra):
+            pixs.append( np.load(join(self.processed_spectra_path, df.iloc[i]["pix_fname"])) )
+            coords.append( np.load(join(self.processed_spectra_path, df.iloc[i]["coord_fname"])) )
+            fluxes.append( np.load(join(self.processed_spectra_path, df.iloc[i]["spectra_fname"])) )
+
+        self.data["pixs"] = np.concatenate(pixs, axis=0)
+        self.data["gt_spectra_grid_coords"] = np.concatenate(coords, axis=0)
+        self.data["fluxes"] = np.concatenate(fluxes, axis=0)
+
+        np.save(self.gt_spectra_pixs_fname, self.data["pixs"])
+        np.save(self.gt_spectra_coords_fname, self.data["gt_spectra_grid_coords"])
+        np.save(self.gt_spectra_fluxes_fname, self.data["fluxes"])
 
     def transform_data(self):
         coord_dim = 3 if self.kwargs["coords_encode_method"] == "grid" and \
@@ -360,7 +405,11 @@ class SpectraData:
         gt_spectra_wave = gt_wave
         spectra_recon_wave_bound_ids = [id_lo, id_hi + 1]
 
-    def load_metadata(self):
+    #############
+    # Data loading
+    #############
+
+    def load_source_metadata(self):
         if self.spectra_data_source == "manual":
             source_spectra_data = read_manual_table(self.manual_table_fname)
         elif self.spectra_data_source == "deimos":
@@ -370,15 +419,8 @@ class SpectraData:
         else: raise ValueError("Unsupported spectra data source")
         return source_spectra_data
 
-    def save_metadata(self, df, fname):
-        if self.spectra_data_source == "deimos":
-            save_deimos_table(df, fname)
-        elif self.spectra_data_source == "zcosmos":
-            save_zcosmos_table(df, fname)
-        else: raise ValueError("Unsupported spectra data source")
-
     def process_spectra(self):
-        df = self.load_metadata().iloc[:self.num_gt_spectra]
+        df = self.load_source_metadata().iloc[:self.num_gt_spectra]
         num_gt_spectra = len(df)
         df["tract"] = ""
         df["patch"] = ""
@@ -438,19 +480,23 @@ class SpectraData:
         for i, tract in enumerate(self.all_tracts):
             for j, patch_r in enumerate(self.all_patches_r):
                 for k, patch_c in enumerate(self.all_patches_c):
-                    if not patch_exists(self.input_patch_path, tract, f"{patch_r},{patch_c}"):
+                    l = j * self.num_patches_c + k
+
+                    if len(spectra_ids[i][l]) == 0 or \
+                       not patch_exists(self.input_patch_path, tract, f"{patch_r},{patch_c}"):
                         continue
 
                     cur_patch = PatchData(
                         self.dataset_path, tract, f"{patch_r},{patch_c}",
                         load_pixels=True,
+                        load_coords=True,
                         pixel_norm_cho=self.kwargs["train_pixels_norm"],
                         **self.kwargs)
-                    l = j * self.num_patches_c + k
                     process_each_patch(cur_patch, spectra_ids[i][l])
 
         df.drop(spectra_to_drop, inplace=True) # drop nonexist spectra
         df.reset_index(inplace=True)
+        df.drop(columns=["index"], inplace=True) # drop extra index added by `reset_index`
         df.to_pickle(self.processed_metadata_table_fname)
 
     def process_spectra_in_one_patch(self, df, patch, spectra_ids):
@@ -463,14 +509,13 @@ class SpectraData:
         """
         if len(spectra_ids) == 0: return
 
-        print(spectra_ids)
         ras = np.array(list(df.iloc[spectra_ids]["ra"]))
         decs = np.array(list(df.iloc[spectra_ids]["dec"]))
 
         # get img coords for all spectra within current patch
         wcs = WCS(patch.get_header())
-        radecs = np.concatenate((ras, decs), axis=-1)
-        img_coords = wcs.all_world2pix(radecs, 1) # [n,2]
+        radecs = np.concatenate((ras[:,None], decs[:,None]), axis=-1)
+        img_coords = wcs.all_world2pix(radecs, 1).astype(int) # [n,2]
 
         process_one_spectra = partial(self.process_one_spectra, df, patch)
         for i, (idx, coord) in enumerate(zip(spectra_ids, img_coords)):
@@ -485,27 +530,30 @@ class SpectraData:
               idx: spectra idx (within the df table)
               coord: img coord for current spectra
         """
-        spectra_fname = df.iloc[idx]["spectra_fname"][:-4]
-        pix_fname = f"{spectra_fname}_pix.npy"
-        coord_fname = f"{spectra_fname}_pix.npy"
-        df.iloc[idx]["pix_fname"] = pix_fname
-        df.iloc[idx]["coord_fname"] = coord_fname
+        spectra_fname = df.iloc[idx]["spectra_fname"]
+        fname = spectra_fname[:-5]
+        pix_fname = f"{fname}_pix.npy"
+        coord_fname = f"{fname}_coord.npy"
+        df.at[idx,"pix_fname"] = pix_fname
+        df.at[idx,"coord_fname"] = coord_fname
+        df.at[idx,"spectra_fname"] = f"{fname}.npy"
 
         pixel_ids = patch.get_pixel_ids(coord[0], coord[1],
                                         neighbour_size=self.neighbour_size)
-        pixels = patch.get_pixels(pixel_ids)
+        pixels = patch.get_pixels(pixel_ids)[None,:]
         np.save(join(self.processed_spectra_path, pix_fname), pixels)
-        grid_coords = patch.get_coords(pixel_ids) # [n,]
+        grid_coords = patch.get_coords(pixel_ids)[None,:] # [n,]
         np.save(join(self.processed_spectra_path, coord_fname), grid_coords)
 
         # process source spectra and save locally
         process_gt_spectra(
             join(self.source_spectra_path, spectra_fname),
-            join(self.processed_spectra_path, spectra_fname),
+            join(self.processed_spectra_path, fname),
             self.full_wave,
             self.wave_discretz_interval,
             sigma=self.smooth_sigma,
-            trusted_range=self.trusted_range
+            trusted_range=self.trusted_wave_range,
+            format=self.spectra_data_source
         )
 
     #############
@@ -704,7 +752,6 @@ def locate_tract_patch(wcs, headers, tracts, patches_r, patches_c, ra, dec):
 
 def is_in_patch(ra, dec, wcs, num_rows, num_cols):
     x, y = wcs.wcs_world2pix(ra, dec, 0)
-    # print(x, y, num_rows, num_cols)
     return x >= 0 and y >= 0 and x < num_cols and y < num_rows
 
 def process_gt_spectra(infname, outfname, full_wave, smpl_interval,
@@ -728,13 +775,13 @@ def process_gt_spectra(infname, outfname, full_wave, smpl_interval,
                  the range of it is identical to that of recon spectra and thus
                  can be directly compare with.
     """
-    gt_wave, gt_spectra = unpack_gt_spectra(infname, format=format)
+    wave, flux, ivar = unpack_gt_spectra(infname, format=format)
 
     if sigma > 0:
-        gt_spectra = convolve_spectra(gt_spectra, std=sigma)
+        flux = convolve_spectra(flux, std=sigma)
 
     if interpolate:
-        f_gt = interp1d(gt_wave, gt_spectra)
+        f_gt = interp1d(wave, flux)
 
         # make sure wave range to interpolate stay within gt spectra wave range
         # full_wave is full transmission wave
@@ -747,18 +794,17 @@ def process_gt_spectra(infname, outfname, full_wave, smpl_interval,
             hi = full_wave[hi_id] # hi >= full_wave[hi_id]
 
         # new gt wave range with same discretization value as transmission wave
-        gt_wave = np.arange(lo, hi + 1, smpl_interval)
+        wave_interp = np.arange(lo, hi + 1, smpl_interval)
 
         # use new gt wave to get interpolated spectra
-        gt_spectra = f_gt(gt_wave)
+        flux_interp = f_gt(wave_interp)
 
     if save:
-        np.save(outfname + ".npy", gt)
+        np.save(outfname + ".npy", flux_interp[None,:])
     if plot:
-        plt.plot(gt_wave, gt_spectra)
+        plt.plot(wave_interp, flux_interp)
         plt.savefig(outfname + ".png")
         plt.close()
-    # return gt_wave, gt_spectra
 
 def convolve_spectra(spectra, std=140, border=True):
     """ Smooth gt spectra with given std.
@@ -827,12 +873,13 @@ def read_deimos_table(fname):
     """ Read metadata table for deimos spectra data.
     """
     df = pandas.read_table(fname,comment='#',delim_whitespace=True)
-    df.rename(columns={"ID": "id", "fits1d": "fname"}, inplace=True)
+    df.rename(columns={"ID": "id", "fits1d": "spectra_fname"}, inplace=True)
     df.drop(columns=['sel', 'imag', 'kmag', 'Qf', 'Q',
                      'Remarks', 'ascii1d', 'jpg1d', 'fits2d'], inplace=True)
     df.drop([0], inplace=True) # drop first row which is datatype
-    df.dropna(subset=["ra","dec","fname"], inplace=True)
+    df.dropna(subset=["ra","dec","spectra_fname"], inplace=True)
     df.reset_index(inplace=True) # reset index after dropping
+    df.drop(columns=["index"], inplace=True)
     df["ra"] = pandas.to_numeric(df["ra"])
     df["dec"] = pandas.to_numeric(df["dec"])
     df["zspec"] = pandas.to_numeric(df["zspec"])
@@ -847,23 +894,16 @@ def read_zcosmos_table(fname):
         'RAJ2000':'ra',
         'DEJ2000':'dec',
         'REDSHIFT':'zspec',
-        'FILANEMS':'fname'
+        'FILANEMS':'spectra_fname'
     }, inplace=True)
     df.drop(columns=['CC','IMAG_AB','FLAG_S','FLAG_X','FLAG_R','FLAG_UV'], inplace=True)
     df.drop([0], inplace=True) # drop first row which is datatype
-    df.dropna(subset=["ra","dec","fname"], inplace=True)
+    df.dropna(subset=["ra","dec","spectra_fname"], inplace=True)
     df.reset_index(inplace=True) # reset index after dropping
     df["ra"] = pandas.to_numeric(df["ra"])
     df["dec"] = pandas.to_numeric(df["dec"])
     df["zspec"] = pandas.to_numeric(df["zspec"])
     return df
-
-def save_deimos_table(df, fname):
-    df.to_pickle(fname)
-
-def save_zcosmos_table(df, fname):
-    table = Table.from_pandas(df)
-    table.write(fname)
 
 def read_manual_table(fname):
     data, colnames, datatypes = {}, None, None
@@ -891,16 +931,16 @@ def unpack_gt_spectra(fname, format="default"):
             pandas.read_table(fname + ".tbl", comment="#", delim_whitespace=True)
         )
         gt_wave, gt_spectra = data[:,0], data[:,1]
-
-    elif format == "zcosmos":
+    else:
+        header = fits.open(fname)[1].header
         data = fits.open(fname)[1].data[0]
-        gt_wave, gt_spectra = data[0], data[1]
+        data_names = [header["TTYPE1"],header["TTYPE2"],header["TTYPE3"]]
+        wave_id = data_names.index("LAMBDA")
+        flux_id = data_names.index("FLUX")
+        ivar_id = data_names.index("IVAR")
+        wave, flux, ivar = data[wave_id], data[flux_id], data[ivar_id]
 
-    elif format == "deimos":
-        data = fits.open(fname)[1].data[0]
-        gt_wave, gt_spectra = data[2], data[0]
-
-    return gt_wave, gt_spectra
+    return wave, flux, ivar
 
 def download_deimos_data_parallel(http_prefix, local_path, fnames):
     urls = [f"{http_prefix}/{fname}" for fname in fnames]

@@ -174,7 +174,7 @@ class PatchData:
     def calculate_local_id(self, r, c):
         """ Count number of pixels before given position in current patch.
         """
-        return self.full_num_cols * r + c
+        return self.cur_num_cols * r + c
 
     def calculate_neighbour_ids(self, r, c, neighbour_size):
         """ Get id of pixels within neighbour_size of given position in current patch.
@@ -199,7 +199,7 @@ class PatchData:
             @Return: ids [n,]
         """
         if neighbour_size <= 1:
-            local_id = self.calculate_local_id(r, c, index, patch_uid)
+            local_id = self.calculate_local_id(r, c)
             ids = [local_id]
         else:
             ids = self.calculate_neighbour_ids(r, c, neighbour_size)
@@ -331,6 +331,8 @@ class PatchData:
                 generate_hdu(self.header, cur_pixels, self.gt_img_fname + ".fits")
 
             if self.kwargs["plot_img_distrib"]:
+                if np.isnan(cur_pixels).any():
+                    print(self.tract, self.patch, "contains nan")
                 plot_horizontally(cur_pixels, self.gt_img_distrib_fname, "plot_distrib")
 
             # flatten pixels for ease of training [npixels,nbands]
