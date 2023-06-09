@@ -38,12 +38,13 @@ class CodebookTrainer(BaseTrainer):
         dst = join(self.log_dir, "config.yaml")
         shutil.copyfile(extra_args["config"], dst)
 
-        self.cuda = "cuda" in str(self.device)
-        self.verbose = self.extra_args["verbose"]
-        self.space_dim = self.extra_args["space_dim"]
+        self.cuda = "cuda" in str(device)
+        self.verbose = extra_args["verbose"]
+        self.space_dim = extra_args["space_dim"]
         self.gpu_fields = extra_args["gpu_data"]
-        self.recon_beta = extra_args["pretrain_pixel_beta"]
         self.z_beta = extra_args["pretrain_redshift_beta"]
+        self.recon_beta = extra_args["pretrain_pixel_beta"]
+        self.num_sup_spectra = dataset.get_num_supervision_spectra()
 
         self.total_steps = 0
         self.save_data_to_local = False
@@ -69,7 +70,7 @@ class CodebookTrainer(BaseTrainer):
         self.train_pipeline = self.pipeline[0]
         self.infer_pipeline = self.pipeline[1]
         self.latents = nn.Embedding(
-            self.extra_args["num_supervision_spectra"],
+            self.num_sup_spectra,
             self.extra_args["codebook_pretrain_latent_dim"]
         )
         log.info("Total number of parameters: {}".format(
@@ -91,7 +92,7 @@ class CodebookTrainer(BaseTrainer):
 
         self.dataset.toggle_wave_sampling(True) # TODO: False if we have too many spectra
         self.dataset.toggle_integration(self.pixel_supervision)
-        self.dataset.set_length(self.extra_args["num_supervision_spectra"])
+        self.dataset.set_length(self.num_sup_spectra)
 
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
@@ -371,7 +372,7 @@ class CodebookTrainer(BaseTrainer):
             if self.save_soft_qtz_weights: self.qtz_weights.extend(ret["soft_qtz_weights"])
             if self.save_pixel_values:
                 self.recon_pixel_vals.extend(ret["intensity"])
-                self.gt_pixel_vals.extend(data["gt_spectra_pixels"])
+                self.gt_pixel_vals.extend(data["spectra_sup_pixels"])
 
     def post_step(self):
         pass
@@ -483,10 +484,9 @@ class CodebookTrainer(BaseTrainer):
 
         # i) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
-        gt_spectra = data["gt_spectra"]
+        gt_spectra = data["spectra_sup_fluxes"]
 
-        # todo: efficiently slice spectra with different bound
-        (lo, hi) = data["spectra_supervision_wave_bound_ids"][0]
+        (lo, hi) = data["spectra_sup_wave_bound_ids"]
         recon_spectra = ret["spectra"][:,lo:hi]
 
         if len(recon_spectra) == 0:
@@ -498,7 +498,7 @@ class CodebookTrainer(BaseTrainer):
         # ii) pixel supervision loss
         recon_loss = 0
         if self.pixel_supervision:
-            gt_pixels = data["gt_spectra_pixels"]
+            gt_pixels = data["spectra_sup_pixels"]
             recon_pixels = ret["intensity"]
 
             recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
@@ -600,8 +600,8 @@ class CodebookTrainer(BaseTrainer):
 
     def _plot_spectrum(self):
         self.smpl_spectra = torch.stack(self.smpl_spectra).view(
-            self.extra_args["num_supervision_spectra"], -1
-        ).detach().cpu().numpy() # [num_supervision_spectra,num_samples]
+            self.num_sup_spectra, -1
+        ).detach().cpu().numpy() # [num_sup_spectra,num_samples]
 
         fname = f"ep{self.epoch}-it{self.iteration}"
         self.dataset.plot_spectrum(self.spectra_dir, fname, self.smpl_spectra,

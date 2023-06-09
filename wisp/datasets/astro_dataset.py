@@ -102,6 +102,9 @@ class AstroDataset(Dataset):
     def get_num_coords(self):
         return self.fits_dataset.get_num_coords()
 
+    def get_num_supervision_spectra(self):
+        return self.spectra_dataset.get_num_supervision_spectra()
+
     def get_zscale_ranges(self, patch_uid=None):
         return self.fits_dataset.get_zscale_ranges(patch_uid)
 
@@ -192,19 +195,16 @@ class AstroDataset(Dataset):
         assert(self.kwargs["pretrain_codebook"] ^ self.kwargs["spectra_supervision"])
 
         # get only supervision spectra (not all gt spectra) for loss calculation
-        out["gt_spectra"] = self.spectra_dataset.get_supervision_spectra()
-
-        #if self.kwargs["redshift_supervision"]:
-        #    out["gt_spectra_redshift"] = self.spectra_dataset.get_supervision_redshift()
-
+        out["spectra_sup_fluxes"] = self.spectra_dataset.get_supervision_fluxes()
+        out["spectra_sup_wave_bound_ids"] = self.spectra_dataset.get_supervision_wave_bound_ids()
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
-            out["gt_spectra_pixels"] = self.spectra_dataset.get_supervision_pixels()
+            out["spectra_sup_pixels"] = self.spectra_dataset.get_supervision_pixels()
+        if self.kwargs["redshift_supervision"]:
+            out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
 
-        out["spectra_supervision_wave_bound_ids"] = \
-            self.spectra_dataset.get_spectra_supervision_wave_bound_ids()
-
+        n = self.spectra_dataset.get_num_gt_spectra()
         if self.kwargs["pretrain_codebook"]:
-            out["coords"] = self.data["spectra_latents"]
+            out["coords"] = self.data["spectra_latents"][:n]
         else:
             out["full_wave"] = self.get_full_wave()
 
@@ -248,10 +248,7 @@ class AstroDataset(Dataset):
         if "redshift_data" in self.requested_fields:
             self.get_redshift_data(out)
 
-        print(out["coords"].shape, out["coords"])
-        print(out["wave"].shape, out["wave"])
-        assert 0
-        #self.print_shape(out)
+        # self.print_shape(out)
         if self.transform is not None:
             out = self.transform(out)
         return out

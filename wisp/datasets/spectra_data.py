@@ -54,13 +54,6 @@ class SpectraData:
                   kwargs["spectra_supervision_wave_hi"]]
 
         self.load_spectra_data_from_cache = kwargs["load_spectra_data_from_cache"]
-        self.generate_supervision_data = self.pretrain_infer or \
-            self.codebook_pretrain or self.spectra_supervision_train
-        self.data_not_cached = not self.load_spectra_data_from_cache or \
-            not exists(self.gt_spectra_fname) or \
-            not exists(self.gt_spectra_pixs_fname) or \
-            not exists(self.gt_spectra_coords_fname) or \
-            not exists(self.gt_spectra_redshift_fname)
 
         self.set_path(dataset_path)
         self.load_accessory_data()
@@ -100,7 +93,6 @@ class SpectraData:
         paths = []
         self.input_patch_path, _ = set_input_path(
             dataset_path, self.kwargs["sensor_collection_name"])
-
         spectra_path = join(dataset_path, "input/spectra")
 
         if self.spectra_data_source == "manual":
@@ -109,10 +101,8 @@ class SpectraData:
 
         elif self.spectra_data_source == "deimos":
             path = join(spectra_path, "deimos")
-
             self.source_spectra_path = join(path, "source_spectra")
             self.source_metadata_table_fname = join(path, "source_deimos_table.tbl")
-
             processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
             self.processed_spectra_path = join(processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(
@@ -120,10 +110,8 @@ class SpectraData:
 
         elif self.spectra_data_source == "zcosmos":
             path = join(spectra_path, "zcosmos")
-
             self.source_spectra_path = join(path, "source_spectra")
             self.source_metadata_table_fname = join(path, "source_zcosmos_table.fits")
-
             processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
             self.processed_spectra_path = join(processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(
@@ -131,14 +119,10 @@ class SpectraData:
 
         else: raise ValueError("Unsupported spectra data source choice.")
 
-        self.gt_spectra_fname = join(
-            processed_data_path, "gt_spectra.npy")
-        self.gt_spectra_pixs_fname = join(
-            processed_data_path, "gt_spectra_pixs.npy")
-        self.gt_spectra_coords_fname = join(
-            processed_data_path, "gt_spectra_coords.npy")
-        self.gt_spectra_redshift_fname = join(
-            processed_data_path, "gt_spectra_redshift.npy")
+        self.gt_spectra_fluxes_fname = join(processed_data_path, "gt_spectra_fluxes.npy")
+        self.gt_spectra_pixels_fname = join(processed_data_path, "gt_spectra_pixels.npy")
+        self.gt_spectra_coords_fname = join(processed_data_path, "gt_spectra_coords.npy")
+        self.gt_spectra_redshift_fname = join(processed_data_path, "gt_spectra_redshift.npy")
 
         for path in [processed_data_path, self.processed_spectra_path]:
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -177,10 +161,12 @@ class SpectraData:
         return len(self.data["spectra_grid_coords"])
 
     def get_num_gt_spectra(self):
-        """ Get number of gt spectra (doesn't count neighbours). """
-        if self.recon_gt_spectra or self.spectra_supervision_train:
-            return len(self.kwargs["gt_spectra_ids"])
-        return 0
+        """ Get #gt spectra (doesn't count neighbours). """
+        return len(self.data["gt_spectra_fluxes"])
+
+    def get_num_supervision_spectra(self):
+        """ Get #supervision spectra (doesn't count neighbours). """
+        return self.num_supervision_spectra
 
     def get_spectra_grid_coords(self):
         """ Get grid (training) coords of all selected spectra (gt & dummy, incl. neighbours).
@@ -200,10 +186,6 @@ class SpectraData:
     def get_spectra_coord_ids(self):
         """ Get pixel id of all selected spectra (correspond to coords). """
         return self.data["spectra_coord_ids"]
-
-    def get_spectra_supervision_wave_bound_ids(self):
-        """ Get ids of boundary lambda of spectra supervision. """
-        return self.data["spectra_supervision_wave_bound_ids"]
 
     def get_spectra_recon_wave_bound_ids(self):
         """ Get ids of boundary lambda of recon spectra. """
@@ -227,11 +209,15 @@ class SpectraData:
         """ Get lambda values (for plotting). """
         return self.data["gt_spectra_wave"]
 
-    def get_supervision_spectra(self, idx=None):
+    def get_supervision_wave_bound_ids(self):
+        """ Get ids of boundary lambda of spectra supervision. """
+        return self.data["supervision_wave_bound_ids"]
+
+    def get_supervision_fluxes(self, idx=None):
         """ Get gt spectra (with same wave range as recon) used for supervision. """
         if idx is None:
-            return self.data["supervision_spectra"]
-        return self.data["supervision_spectra"][idx]
+            return self.data["supervision_fluxes"]
+        return self.data["supervision_fluxes"][idx]
 
     def get_supervision_pixels(self, idx=None):
         """ Get pix values for pixels used for spectra supervision. """
@@ -322,39 +308,37 @@ class SpectraData:
 
     def load_gt_spectra_data(self):
         """ Load gt spectra data.
-            i) spectra data (for supervision) (used for training and inferrence):
-               gt spectra
-               spectra coords
-           ii) spectra data (no supervision) (for spectrum plotting only)
-                  (coord with gt spectra located at center of cutout)
-               gt spectra
-               spectra coords
-               Note that:
-              During training, we only load if do spectra supervision
-              During inferrence, the two options give same coords but different spectra
+            The full loading workflow is:
+              i) we first load source metadata table and process each spectra (
+                 fluxes, wave, coords, pixels) and save processed data individually.
+              ii) then we load these saved spectra and further process to gather
+                  them together and save all data together.
+              iii) finally we do necessary transformations.
         """
-        if self.data_not_cached:
+        self.find_full_wave_bound_ids()
+
+        if not self.load_spectra_data_from_cache or \
+           not exists(self.gt_spectra_fluxes_fname) or \
+           not exists(self.gt_spectra_pixels_fname) or \
+           not exists(self.gt_spectra_coords_fname) or \
+           not exists(self.gt_spectra_redshift_fname):
+
             # process and save data for each spectra individually
             if not exists(self.processed_metadata_table_fname):
                 self.process_spectra()
-
-            # load data for each individual spectra
+            # load data for each individual spectra and save together
             self.load_processed_spectra()
-
-            if self.generate_supervision_data:
-                self.generate_supervision_data_()
-                self.clip_spectra()
-
-            self.save_all_spectra_together()
+            self.generate_supervision_data()
         else:
-            # data for all spectra are together (only when amount of spectra is small)
+            # data for all spectra are saved together (small amount of spectra)
             self.load_cached_spectra_data()
 
         self.transform_data()
 
     def transform_data(self):
+        self.train_valid_split()
         self.to_tensor([
-            "gt_spectra_fluxes","gt_spectra_pixs",
+            "gt_spectra_fluxes","gt_spectra_pixels",
             "gt_spectra_grid_coords","gt_spectra_redshift"
         ])
 
@@ -362,77 +346,70 @@ class SpectraData:
     # Loading helpers
     #############
 
-    def generate_supervision_data_(self):
-        """ Clip supervision spectra to trusted range.
-        """
-        n = self.kwargs["num_supervision_spectra"]
-        if self.kwargs["redshift_supervision"]:
-            self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][:n]
-
-        for spectra in self.data["gt_spectra"]:
-            self.clip_spectra()
-
-        self.data["supervision_spectra_fluxes"] = self.data["gt_spectra_fluxes"][:n]
-        if self.kwargs["codebook_pretrain_pixel_supervision"]:
-            self.data["supervision_pixels"] = self.data["gt_spectra_pixs"][:n]
-
-    def clip_spectra(self):
-        supervision_spectra_wave_bound = [
-            self.kwargs["spectra_supervision_wave_lo"],
-            self.kwargs["spectra_supervision_wave_hi"]]
-
-        # find id of min and max wave of supervision range
-        #   in terms of the transmission wave (full_wave).
-        # since the min and max wave for the supervision range may
-        #   not coincide exactly with the trans wave, we find closest trans wave to replace
-        (id_lo, id_hi) = get_bound_id(
-            supervision_spectra_wave_bound, self.full_wave, within_bound=False)
-        print(id_lo, id_hi)
-        self.data["spectra_supervision_wave_bound_ids"] = [id_lo, id_hi + 1]
-        supervision_spectra_wave_bound = [
-            self.full_wave[id_lo], self.full_wave[id_hi]]
-        print(supervision_spectra_wave_bound)
-
-        # clip gt spectra to the specified range
-        gt_wave = self.data["gt_spectra_wave"][0] # all spectra have the same wave
-        (id_lo, id_hi) = get_bound_id(
-            supervision_spectra_wave_bound, gt_wave, within_bound=True)
-        print(gt_wave, id_lo, id_hi)
-
-        print(self.data["supervision_spectra_fluxes"].shape)
-        self.data["supervision_spectra_fluxes"] = self.data[
-            "supervision_spectra_fluxes"][:,id_lo:id_hi+1]
-
     def to_tensor(self, fields):
         for field in fields:
             self.data[field] = torch.FloatTensor(self.data[field])
 
+    def train_valid_split(self):
+        n = min(self.kwargs["num_supervision_spectra"],
+                len(self.data["gt_spectra_fluxes"]))
+        self.num_supervision_spectra = n
+
+        self.data["supervision_fluxes"] = self.data["gt_spectra_fluxes"][:n]
+        if self.kwargs["codebook_pretrain_pixel_supervision"]:
+            self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][:n]
+        if self.kwargs["redshift_supervision"]:
+            self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][:n]
+
     def load_cached_spectra_data(self):
         """ Load spectra data (which are saved together).
         """
-        self.data["gt_spectra_pixs"] = np.load(self.gt_spectra_pixs_fname)
+        self.data["gt_spectra_fluxes"] = np.load(self.gt_spectra_fluxes_fname)
+        self.data["gt_spectra_pixels"] = np.load(self.gt_spectra_pixels_fname)
         self.data["gt_spectra_redshift"] = np.load(self.gt_spectra_redshift_fname)
         self.data["gt_spectra_grid_coords"] = np.load(self.gt_spectra_coords_fname)
 
-        spectra = np.load(self.gt_spectra_fname)
-        self.data["gt_spectra_wave"] = spectra[:,1]
-        self.data["gt_spectra_fluxes"] = spectra[:,0]
-
-        # print(self.data["gt_spectra_pixs"].shape)
+        # print(self.data["gt_spectra_fluxes"].shape)
+        # print(self.data["gt_spectra_pixels"].shape)
         # print(self.data["gt_spectra_redshift"].shape)
         # print(self.data["gt_spectra_grid_coords"].shape)
-        # print(self.data["gt_spectra_wave"].shape)
-        # print(self.data["gt_spectra_fluxes"].shape)
+
+    def generate_supervision_data(self):
+        """ Clip supervision spectra to trusted range.
+        """
+        if not self.pretrain_infer and \
+           not self.codebook_pretrain and \
+           not self.spectra_supervision_train:
+            return
+
+        # clip all spectra to trusted range
+        clipped_flux = []
+        for (flux, wave) in self.data["gt_spectra"]:
+            # print('before', wave)
+            (id_lo, id_hi) = get_bound_id(
+                supervision_spectra_wave_bound, wave, within_bound=True)
+            # print('after', wave[id_lo:id_hi+1])
+            clipped_flux.append(flux[id_lo:id_hi+1][None,:])
+
+        clipped_flux = np.concatenate(clipped_flux, axis=0) # [n,nsmpl]
+        self.data["gt_spectra_fluxes"] = clipped_flux
+
+        # save data for all spectra together
+        np.save(self.gt_spectra_fluxes_fname, self.data["gt_spectra_fluxes"])
+        np.save(self.gt_spectra_pixels_fname, self.data["gt_spectra_pixels"])
+        np.save(self.gt_spectra_redshift_fname, self.data["gt_spectra_redshift"])
+        np.save(self.gt_spectra_coords_fname, self.data["gt_spectra_grid_coords"])
 
     def load_processed_spectra(self):
         """ Load processed data for each spectra and save together.
         """
         df = pandas.read_pickle(self.processed_metadata_table_fname)
         num_gt_spectra = len(df)
-        redshift, pixs, coords, spectra = [], [], [], []
+        redshift, pixels, coords, spectra = [], [], [], []
+
         for i in range(num_gt_spectra):
             redshift.append(df.iloc[i]["zspec"])
-            pixs.append(
+            pixels.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["pix_fname"])))
             coords.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["coord_fname"])))
@@ -441,28 +418,8 @@ class SpectraData:
 
         self.data["gt_spectra"] = spectra
         self.data["gt_spectra_redshift"] = np.array(redshift)
-        self.data["gt_spectra_pixs"] = np.concatenate(pixs, axis=0)
+        self.data["gt_spectra_pixels"] = np.concatenate(pixels, axis=0)
         self.data["gt_spectra_grid_coords"] = np.concatenate(coords, axis=0)
-
-        #spectra_data = np.concatenate(spectra, axis=0)
-        #self.data["gt_spectra_wave"] = spectra_data[:,1]
-        #self.data["gt_spectra_fluxes"] = spectra_data[:,0]
-
-    def save_all_spectra_together(self):
-        np.save(self.gt_spectra_fname, spectra_data)
-        np.save(self.gt_spectra_pixs_fname, self.data["gt_spectra_pixs"])
-        np.save(self.gt_spectra_redshift_fname, self.data["gt_spectra_redshift"])
-        np.save(self.gt_spectra_coords_fname, self.data["gt_spectra_grid_coords"])
-
-    def load_source_metadata(self):
-        if self.spectra_data_source == "manual":
-            source_spectra_data = read_manual_table(self.manual_table_fname)
-        elif self.spectra_data_source == "deimos":
-            source_spectra_data = read_deimos_table(self.source_metadata_table_fname)
-        elif self.spectra_data_source == "zcosmos":
-            source_spectra_data = read_zcosmos_table(self.source_metadata_table_fname)
-        else: raise ValueError("Unsupported spectra data source")
-        return source_spectra_data
 
     def process_spectra(self):
         df = self.load_source_metadata().iloc[:self.num_gt_spectra]
@@ -477,8 +434,7 @@ class SpectraData:
             for patch_r in self.all_patches_r:
                 for patch_c in self.all_patches_c:
                     if not patch_exists(
-                            self.input_patch_path, tract, f"{patch_r},{patch_c}"
-                    ) or not (tract == '9812' and patch_r == '1' and patch_c == '5'):
+                            self.input_patch_path, tract, f"{patch_r},{patch_c}"):
                         cur_headers.append(None)
                         cur_wcs.append(None)
                         continue
@@ -516,9 +472,6 @@ class SpectraData:
             spectra_ids[i][j].append(idx)
             df.at[idx,"tract"] = tract
             df.at[idx,"patch"] = patch
-
-        # print(len(spectra_to_drop))
-        # print(spectra_ids)
 
         # load pixels and coords for each spectra
         process_each_patch = partial(self.process_spectra_in_one_patch, df)
@@ -600,6 +553,32 @@ class SpectraData:
             format=self.spectra_data_source,
             #trusted_range=self.trusted_wave_range,
         )
+
+    def load_source_metadata(self):
+        if self.spectra_data_source == "manual":
+            source_spectra_data = read_manual_table(self.manual_table_fname)
+        elif self.spectra_data_source == "deimos":
+            source_spectra_data = read_deimos_table(self.source_metadata_table_fname)
+        elif self.spectra_data_source == "zcosmos":
+            source_spectra_data = read_zcosmos_table(self.source_metadata_table_fname)
+        else: raise ValueError("Unsupported spectra data source")
+        return source_spectra_data
+
+    def find_full_wave_bound_ids(self):
+        """ Find id of min and max wave of supervision range in terms of
+              the transmission wave (full_wave).
+            Since the min and max wave for the supervision range may not
+              coincide exactly with the trans wave, we find closest trans wave to replace
+        """
+        supervision_spectra_wave_bound = [
+            self.kwargs["spectra_supervision_wave_lo"],
+            self.kwargs["spectra_supervision_wave_hi"]
+        ]
+        (id_lo, id_hi) = get_bound_id(
+            supervision_spectra_wave_bound, self.full_wave, within_bound=False)
+        self.data["supervision_wave_bound_ids"] = [id_lo, id_hi + 1]
+        self.data["supervision_spectra_wave_bound"] = [
+            self.full_wave[id_lo], self.full_wave[id_hi]]
 
     #############
     # Utilities
@@ -699,10 +678,8 @@ class SpectraData:
             # plot spectra
             if self.kwargs["plot_spectrum_together"]:
                 if nrows == 1:
-                    if ncols == 1:
-                        axis = axs
-                    else:
-                        axis = axs[i%ncols]
+                    if ncols == 1: axis = axs
+                    else:          axis = axs[i%ncols]
                 else: axis = axs[i//ncols,i%ncols]
             else:
                 fig, axs = plt.subplots(1)
@@ -714,15 +691,13 @@ class SpectraData:
 
             axis.set_title(i)
             axis.plot(recon_wave, cur_spectra, color="black", label="spectrum")
-            # axis.set_ylim([0.003,0.007])
             if plot_gt_spectra:
                 axis.plot(cur_gt_spectra_wave, cur_gt_spectra, color="blue", label="gt")
 
             if sub_dir != "":
                 if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]
                 cur_spectra_dir = join(spectra_dir, sub_dir)
-            else:
-                cur_spectra_dir = spectra_dir
+            else: cur_spectra_dir = spectra_dir
 
             if not exists(cur_spectra_dir):
                 Path(cur_spectra_dir).mkdir(parents=True, exist_ok=True)
@@ -749,7 +724,6 @@ class SpectraData:
         spectra_fits_ids = set(spectra_img_coords[:,-1])
 
         for fits_id in spectra_fits_ids:
-
             # collect spectra in the same tile
             cur_coords, cur_markers = [], []
             for i, (r, c, cur_fits_id) in zip(
@@ -841,7 +815,7 @@ def process_gt_spectra(infname, outfname, full_wave, smpl_interval,
 
     if save:
         data = np.concatenate((
-            flux[None,:], wave[None,:]), axis=0)[None,:] # [1,2,nsmpl]
+            flux[None,:], wave[None,:]), axis=0) # [2,nsmpl]
         np.save(outfname + ".npy", data)
     if plot:
         plt.plot(wave, flux)

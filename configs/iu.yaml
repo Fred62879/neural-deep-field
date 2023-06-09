@@ -42,9 +42,9 @@ optimizer:
 net:
     nef_type: 'AstroHyperSpectralNerf'
     #nef_type: 'AstroNerf'
-    encode_wave: False
-    encode_coords: False
-    coords_encode_method: 'positional_encoding'
+    encode_wave: True
+    encode_coords: True
+    coords_encode_method: 'grid' #'positional_encoding'
     wave_encode_method: 'positional_encoding'
     mlp_output_norm_method: 'sinh'
 
@@ -56,7 +56,7 @@ embedder:
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 1000
+    wave_embed_dim: 16
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -83,10 +83,10 @@ grid:
     codebook_bitwidth: 20
 
 decoder:
-    decoder_num_layers: 3
-    decoder_hidden_dim: 128
+    decoder_num_layers: 1
+    decoder_hidden_dim: 64
     decoder_layer_type: 'none'
-    decoder_activation_type: "sin"
+    decoder_activation_type: "relu"
 
     siren_seed: 0
     siren_first_w0: 24
@@ -152,12 +152,12 @@ trainer:
     save_as_new: True
     train_pixel_ratio: .1 # change dataloader sampler
     #masked_pixl_ratio_per_epoch: 1
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','gt_spectra','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_fluxes','spectra_sup_pixels','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
     pretrain_codebook: True
     codebook_pretrain_pixel_supervision: True
     pixel_supervision: True
-    spectra_supervision: True
+    spectra_supervision: False
     redshift_supervision: True
     spectra_beta: 1
     redshift_beta: 1
@@ -167,7 +167,7 @@ trainer:
 
     decode_spatial_embedding: False
     quantize_latent: False
-    quantize_spectra: False
+    quantize_spectra: True
     weight_train: False
     train_use_all_wave: False
     resume_train: False
@@ -201,10 +201,10 @@ infer:
     recon_cutout_start_pos: [ [[256,256]] ] #, [[86,188]] ] #[86,188]
 
     # recon spectra
-    spectra_norm_cho: "none"
+    spectra_norm_cho: "max"
     average_spectra: True
     trusted_range_only: True     # for gt spectra
-    plot_clipped_spectrum: False # for recon spectra
+    plot_clipped_spectrum: True # for recon spectra
     plot_spectrum_with_gt: True
     plot_spectrum_with_trans: False
     plot_spectrum_together: True
