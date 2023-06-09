@@ -44,6 +44,8 @@ class AstroInferrer(BaseInferrer):
         """
         super().__init__(pipelines, dataset, device, mode, **extra_args)
 
+        self.num_sup_spectra = dataset.get_num_supervision_spectra()
+
         self.set_log_path()
         self.select_models()
         self.init_model(pipelines)
@@ -243,7 +245,7 @@ class AstroInferrer(BaseInferrer):
             self.requested_fields.append("spectra_data")
 
         if self.pretrain_infer:
-            self.dataset_length = self.extra_args["num_supervision_spectra"]
+            self.dataset_length = self.num_sup_spectra
         else:
             self.dataset_length = self.dataset.get_num_coords()
         self.batch_size = min(self.extra_args["infer_batch_size"], self.dataset_length)
@@ -287,7 +289,7 @@ class AstroInferrer(BaseInferrer):
         if self.pretrain_infer:
             if self.extra_args["use_gt_redshift"]:
                 self.requested_fields.append("redshift_data")
-            self.dataset_length = self.extra_args["num_supervision_spectra"]
+            self.dataset_length = self.num_sup_spectra
         else:
             self.dataset_length = self.dataset.get_num_spectra_coords()
 
@@ -319,7 +321,7 @@ class AstroInferrer(BaseInferrer):
         elif self.recon_codebook_spectra_individ:
             if self.pretrain_infer and self.extra_args["use_gt_redshift"]:
                 self.requested_fields.append("redshift_data")
-            self.dataset_length = self.extra_args["num_supervision_spectra"]
+            self.dataset_length = self.num_sup_spectra
 
         self.batch_size = min(self.extra_args["infer_batch_size"], self.dataset_length)
         self.reset_dataloader()
@@ -418,7 +420,7 @@ class AstroInferrer(BaseInferrer):
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
             # log.info(f"Recon vals {vals}")
-            gt_vals = self.dataset.get_supervision_spectra_pixels().numpy()
+            gt_vals = self.dataset.get_supervision_spectra_pixels()
             # log.info(f"GT vals {gt_vals}")
             ratio = gt_vals / vals
             log.info(f"gt/recon ratio: {ratio}")
@@ -552,7 +554,8 @@ class AstroInferrer(BaseInferrer):
 
     def post_checkpoint_selected_coords_partial_model(self, model_id):
         self.recon_spectra = torch.stack(self.recon_spectra).view(
-            self.dataset.get_num_spectra_to_plot(),
+            #self.dataset.get_num_spectra_to_plot(),
+            self.dataset_length,
             self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()
 

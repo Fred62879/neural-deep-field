@@ -8,7 +8,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_pixel_values_during_train','save_soft_qtz_weights_during_train']
-    #tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights','recon_img']
+    tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights','recon_img']
 
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','recon_gt_spectra']
@@ -210,8 +210,10 @@ infer:
     plot_spectrum_together: True
     infer_spectra_individually: False
     num_spectra_plot_per_row: 5
-    codebook_spectra_clip_range: [6000,8000] #[4152,5536]
+
     dummy_spectra_clip_range: [6000,8000]
+    recon_spectra_clip_range: [6000,8000]
+    codebook_spectra_clip_range: [6000,8000] #[4152,5536]
 
     mark_spectra: True
 
@@ -285,8 +287,8 @@ dataset:
 
     num_gt_spectra: 3
     processed_spectra_cho: "test"
-    spectrum_plot_wave_lo: 6000
-    spectrum_plot_wave_hi: 9000
+    # spectrum_plot_wave_lo: 6000
+    # spectrum_plot_wave_hi: 9000
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 9000
     load_spectra_data_from_cache: True

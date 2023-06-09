@@ -93,26 +93,19 @@ class AstroDataset(Dataset):
     # Getters
     ############
 
-    def get_patch_uids(self):
-        return self.fits_dataset.get_patch_uids()
-
     def get_num_patches(self):
         return len(self.get_patch_uids())
+
+
+    def get_patch_uids(self):
+        return self.fits_dataset.get_patch_uids()
 
     def get_num_coords(self):
         return self.fits_dataset.get_num_coords()
 
-    def get_num_supervision_spectra(self):
-        return self.spectra_dataset.get_num_supervision_spectra()
-
     def get_zscale_ranges(self, patch_uid=None):
         return self.fits_dataset.get_zscale_ranges(patch_uid)
 
-    def get_supervision_spectra_pixels(self):
-        return self.spectra_dataset.get_supervision_pixels()
-
-    def get_supervision_spectra_redshift(self):
-        return self.spectra_dataset.get_supervision_redshift()
 
     def get_spectra_coord_ids(self):
         return self.spectra_dataset.get_spectra_coord_ids()
@@ -120,8 +113,11 @@ class AstroDataset(Dataset):
     def get_spectra_img_coords(self):
         return self.spectra_dataset.get_spectra_img_coords()
 
-    def get_num_spectra_to_plot(self):
-        return self.spectra_dataset.get_num_spectra_to_plot()
+    def get_supervision_spectra_pixels(self):
+        return self.spectra_dataset.get_supervision_pixels()
+
+    def get_supervision_spectra_redshift(self):
+        return self.spectra_dataset.get_supervision_redshift()
 
     def get_num_gt_spectra(self):
         return self.spectra_dataset.get_num_gt_spectra()
@@ -129,11 +125,19 @@ class AstroDataset(Dataset):
     def get_num_spectra_coords(self):
         return self.spectra_dataset.get_num_spectra_coords()
 
+    def get_num_spectra_to_plot(self):
+        return self.spectra_dataset.get_num_spectra_to_plot()
+
+    def get_num_supervision_spectra(self):
+        return self.spectra_dataset.get_num_supervision_spectra()
+
+
     def get_full_wave(self):
         return self.trans_dataset.get_full_wave()
 
     def get_full_wave_bound(self):
         return self.trans_dataset.get_full_wave_bound()
+
 
     def get_batched_data(self, field, idx):
         if field == "coords":
