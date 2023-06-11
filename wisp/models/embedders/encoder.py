@@ -7,7 +7,7 @@ from wisp.utils.common import get_input_latents_dim
 
 import sys
 sys.path.insert(0, './wisp/models/embedders')
-from pe import RandGaus
+from wisp.models.embedders.pe import RandGaus
 
 
 class Encoder(nn.Module):

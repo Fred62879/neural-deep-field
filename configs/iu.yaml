@@ -107,7 +107,7 @@ spatial_decod:
     generate_scaler: True
 
     generate_redshift: False # only one of these
-    use_gt_redshift: False    # two can be True
+    use_gt_redshift: True    # two can be True
                              # set redshift_supervision to True
                              # to make these two effective
 
@@ -133,7 +133,7 @@ hyperspectral:
 
 trainer:
     trainer_type: 'AstroTrainer'
-    log_dir: '../../data/pdr3/output'
+    log_dir: '/scratch/projects/vision/data/pdr3/output'
     perf: False
 
     pixel_loss_cho: l1
@@ -180,7 +180,7 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 3
+    num_supervision_spectra: 10
     spectra_neighbour_size: 1
 
 infer:
@@ -214,9 +214,9 @@ infer:
     infer_spectra_individually: False
     num_spectra_plot_per_row: 5
 
-    dummy_spectra_clip_range: [6000,9000]
-    recon_spectra_clip_range: [6000,9000]
-    codebook_spectra_clip_range: [6000,9000] #[4152,5536]
+    dummy_spectra_clip_range: [6000,8000]
+    recon_spectra_clip_range: [6000,8000]
+    codebook_spectra_clip_range: [6000,8000] #[4152,5536]
 
     mark_spectra: True
 
@@ -227,7 +227,7 @@ dataset:
     dataset_type: 'astro'
     plot_img_distrib: True
     load_patch_data_cache: True
-    dataset_path: '../../data/pdr3'
+    dataset_path: '/scratch/projects/vision/data/pdr3'
     coords_range_fname: 'coords_range0' # make sure pretrain and main train
                                         # use the same norm range for coords
     gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
@@ -284,13 +284,11 @@ dataset:
     spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
-    num_gt_spectra: 3
+    num_gt_spectra: 20
     processed_spectra_cho: "test"
-    # spectrum_plot_wave_lo: 6000
-    # spectrum_plot_wave_hi: 9000
     spectra_supervision_wave_lo: 6000
-    spectra_supervision_wave_hi: 9000
-    load_spectra_data_from_cache: True
+    spectra_supervision_wave_hi: 8000
+    load_spectra_data_from_cache: False
 
 inpaint:
     inpaint_cho: 'no_inpaint' #'spectral_inpaint'

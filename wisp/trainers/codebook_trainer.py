@@ -51,7 +51,7 @@ class CodebookTrainer(BaseTrainer):
         self.shuffle_dataloader = False
         self.dataloader_drop_last = False
 
-        self.set_log_path()
+        self.set_path()
         self.summarize_training_tasks()
 
         self.init_net()
@@ -107,9 +107,9 @@ class CodebookTrainer(BaseTrainer):
         self.save_pixel_values = "save_pixel_values_during_train" in tasks and \
             self.extra_args["codebook_pretrain_pixel_supervision"]
 
-    def set_log_path(self):
+    def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
-        if self.verbose: log.info(f"logging to {self.log_dir}")
+        log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
                 ["model_dir","spectra_dir","codebook_spectra_dir",
@@ -400,9 +400,9 @@ class CodebookTrainer(BaseTrainer):
         fname = f"ep{self.epoch}-it{self.iteration}"
         self.dataset.plot_spectrum(
             self.codebook_spectra_dir, fname, codebook_spectra,
-            spectra_norm_cho=self.extra_args["spectra_norm_cho"],
-            save_spectra=True, codebook=True,
-            clip=self.extra_args["plot_clipped_spectrum"])
+            save_spectra=True, is_codebook=True,
+            clip=self.extra_args["plot_clipped_spectrum"],
+            flux_norm_cho=self.extra_args["flux_norm_cho"])
 
     def get_valid_data(self):
         """ Get data for codebook spectra recon.
@@ -605,5 +605,5 @@ class CodebookTrainer(BaseTrainer):
 
         fname = f"ep{self.epoch}-it{self.iteration}"
         self.dataset.plot_spectrum(self.spectra_dir, fname, self.smpl_spectra,
-                                   self.extra_args["spectra_norm_cho"], clip=True,
+                                   self.extra_args["flux_norm_cho"], clip=True,
                                    save_spectra=True)

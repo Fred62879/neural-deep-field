@@ -373,8 +373,6 @@ def define_cmd_line_args():
 
     data_group.add_argument("--num-gt-spectra", type=int)
     data_group.add_argument("--processed-spectra-cho", type=str)
-    data_group.add_argument("--spectrum-plot-wave-lo", type=int)
-    data_group.add_argument("--spectrum-plot-wave-hi", type=int)
     data_group.add_argument("--spectra-supervision-wave-lo", type=int)
     data_group.add_argument("--spectra-supervision-wave-hi", type=int)
     data_group.add_argument("--load_spectra_data_from_cache", action="store_true")

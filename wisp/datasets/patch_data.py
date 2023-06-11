@@ -113,8 +113,8 @@ class PatchData:
         self.load_header()
 
         if self.load_coords:
-            # self.get_world_coords()
-            self.get_grid_coords()
+            self.get_world_coords()
+            # self.get_grid_coords()
 
         if self.load_pixels or self.load_weights:
             self.load_patch()
@@ -162,7 +162,7 @@ class PatchData:
         return self.data["coords"].shape[0]
 
     def get_coords(self, idx=None):
-        """ Get all coords [n,1,2] """
+        """ Get indexed (world) coords [n,1,2] """
         if idx is not None:
             return self.data["coords"][idx]
         return self.data["coords"]
@@ -275,9 +275,9 @@ class PatchData:
                             c : c+self.cutout_num_cols].reshape(-1,2)
         self.data["coords"] = coords
 
-    def get_grid_coords(self):
-        coords = get_mgrid_np(self.cur_num_rows, self.cur_num_cols)
-        self.data["coords"] = coords
+    # def get_grid_coords(self):
+    #     coords = get_mgrid_np(self.cur_num_rows, self.cur_num_cols)
+    #     self.data["coords"] = coords
 
     def read_fits_file(self):
         """ Load pixel values or variance from one PATCH file (patch_id/subpatch_id).

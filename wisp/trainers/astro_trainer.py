@@ -146,7 +146,7 @@ class AstroTrainer(BaseTrainer):
 
     def set_log_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
-        if self.verbose: log.info(f"logging to {self.log_dir}")
+        log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","spectra_dir","embed_map_dir",

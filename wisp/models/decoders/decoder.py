@@ -8,8 +8,8 @@ from wisp.models.activations import get_activation_class
 
 import sys
 sys.path.insert(0, "./wisp/models/decoders")
-from siren import Siren
-from basic_decoders import BasicDecoder
+from wisp.models.decoders.siren import Siren
+from wisp.models.decoders.basic_decoders import BasicDecoder
 
 
 class Decoder(nn.Module):
