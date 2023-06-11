@@ -119,6 +119,7 @@ class SpectraData:
 
         else: raise ValueError("Unsupported spectra data source choice.")
 
+        self.gt_spectra_wave_fname = join(processed_data_path, "gt_spectra_wave.npy")
         self.gt_spectra_fluxes_fname = join(processed_data_path, "gt_spectra_fluxes.npy")
         self.gt_spectra_pixels_fname = join(processed_data_path, "gt_spectra_pixels.npy")
         self.gt_spectra_coords_fname = join(processed_data_path, "gt_spectra_coords.npy")
@@ -195,19 +196,21 @@ class SpectraData:
         """ Get lambda values (for plotting). """
         return self.data["recon_wave"]
 
-    def get_gt_spectra(self):
-        """ Get gt spectra (for plotting). """
+    def get_gt_spectra_wave(self):
+        """ Get gt spectra wave (all gt spectra are clipped to the
+              same wave range).
+        """
+        return self.data["gt_spectra_wave"]
+
+    def get_gt_spectra_fluxes(self):
+        """ Get gt spectra flux (trusted range only) for plotting. """
         return self.data["gt_spectra_fluxes"]
 
     def get_gt_spectra_pixels(self):
         return self.data["gt_spectra_pixels"]
 
-    def get_gt_spectra_pixels(self):
+    def get_gt_spectra_redshift(self):
         return self.data["gt_spectra_redshift"]
-
-    def get_gt_spectra_wave(self):
-        """ Get lambda values (for plotting). """
-        return self.data["gt_spectra_wave"]
 
     def get_supervision_wave_bound_ids(self):
         """ Get ids of boundary lambda of spectra supervision. """
@@ -362,11 +365,13 @@ class SpectraData:
     def load_cached_spectra_data(self):
         """ Load spectra data (which are saved together).
         """
+        self.data["gt_spectra_wave"] = np.load(self.gt_spectra_wave_fname)
         self.data["gt_spectra_fluxes"] = np.load(self.gt_spectra_fluxes_fname)
         self.data["gt_spectra_pixels"] = np.load(self.gt_spectra_pixels_fname)
         self.data["gt_spectra_redshift"] = np.load(self.gt_spectra_redshift_fname)
         self.data["gt_spectra_grid_coords"] = np.load(self.gt_spectra_coords_fname)
 
+        # print(self.data["gt_spectra_wave"].shape)
         # print(self.data["gt_spectra_fluxes"].shape)
         # print(self.data["gt_spectra_pixels"].shape)
         # print(self.data["gt_spectra_redshift"].shape)
@@ -394,6 +399,7 @@ class SpectraData:
         self.data["gt_spectra_fluxes"] = clipped_flux
 
         # save data for all spectra together
+        np.save(self.gt_spectra_wave_fname, self.data["gt_spectra_wave"])
         np.save(self.gt_spectra_fluxes_fname, self.data["gt_spectra_fluxes"])
         np.save(self.gt_spectra_pixels_fname, self.data["gt_spectra_pixels"])
         np.save(self.gt_spectra_redshift_fname, self.data["gt_spectra_redshift"])
@@ -614,7 +620,7 @@ class SpectraData:
             self, full_wave, flux_norm_cho, clip, is_codebook, bound_ids,
             gt_flux, gt_wave, recon_flux, recon_wave
     ):
-        """ Get data for spectrum plotting for given spectra.
+        """ Collect data for spectrum plotting for the given spectra.
         """
         sub_dir = ""
         plot_gt_spectrum = self.kwargs["plot_spectrum_with_gt"] \
@@ -632,26 +638,28 @@ class SpectraData:
             else: recon_flux = recon_flux[0]
         else: assert(recon_flux.ndim == 1)
 
-        # get wave (x-axis)
-        if not clip:                 recon_wave = full_wave
-        elif is_codebook:            recon_wave = recon_spectra_wave
-        elif recon_wave is not None: recon_wave = recon_wave
-        else:                        recon_wave = full_wave
+        if not clip: # get wave (x-axis)
+            recon_wave = full_wave
+        elif is_codebook or recon_wave is not None:
+            recon_wave = recon_wave
+        else: recon_wave = full_wave
 
         sub_dir, gt_flux, recon_flux = self.normalize_one_flux(
-            is_codebook, plot_gt_spectrum, , flux_norm_cho, gt_flux, recon_flux
+            sub_dir, is_codebook, plot_gt_spectrum, flux_norm_cho, gt_flux, recon_flux
         )
-        pargs = (sub_dir, idx, gt_flux, gt_wave, recon_flux, recon_wave)
+        pargs = (sub_dir, gt_flux, gt_wave, recon_flux, recon_wave, plot_gt_spectrum)
         return pargs
 
-    def plot_and_save_one_spectrum(self, fig, axs, nrows, ncols, save_spectra, plot_gt_spectrum, pargs):
+    def plot_and_save_one_spectrum(
+            self, name, spectra_dir, fig, axs, nrows, ncols, save_spectra, idx, pargs
+    ):
         """ Plot one spectrum and save as required.
         """
-        sub_dir, idx, gt_flux, gt_wave, recon_flux, recon_wave = pargs
+        sub_dir, gt_flux, gt_wave, recon_flux, recon_wave, plot_gt_spectrum = pargs
 
         if self.kwargs["plot_spectrum_together"]:
-            if nrows == 1: axis = axs if ncols == 1 else axs[i%ncols]
-            else:          axis = axs[i//ncols, i%ncols]
+            if nrows == 1: axis = axs if ncols == 1 else axs[idx%ncols]
+            else:          axis = axs[idx//ncols, idx%ncols]
         else: fig, axs = plt.subplots(1); axis = axs[0]
 
         if self.kwargs["plot_spectrum_with_trans"]:
@@ -659,9 +667,9 @@ class SpectraData:
             self.trans_obj.plot_trans(axis=axis)
 
         axis.set_title(idx)
-        axis.plot(recon_spectra_wave, recon_spectra_flux, color="black", label="Recon.")
-        if plot_gt_spectra:
-            axis.plot(gt_spectra_wave, gt_spectra_flux, color="blue", label="GT")
+        axis.plot(recon_wave, recon_flux, color="black", label="Recon.")
+        if plot_gt_spectrum:
+            axis.plot(gt_wave, gt_flux, color="blue", label="GT")
 
         if sub_dir != "":
             if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]
@@ -675,12 +683,15 @@ class SpectraData:
             fig.tight_layout(); plt.savefig(fname); plt.close()
 
         if save_spectra:
-            fname = join(cur_spectra_dir, f"spectra_{i}_{name}")
-            np.save(fname, cur_spectra)
+            fname = join(cur_spectra_dir, f"spectra_{idx}_{name}")
+            np.save(fname, recon_flux)
+
+        return sub_dir
 
     def gather_spectrum_plotting_data(self, clip, is_codebook):
-        full_wave = self.get_full_wave()
-        gt_flux = self.get_gt_spectra_flux()
+        full_wave = self.get_full_wave()     # [full_nsmpl]
+        gt_wave = self.get_gt_spectra_wave() # [nsmpl]
+        gt_fluxes = self.get_gt_spectra_fluxes().numpy() # [n,nsmpl]
 
         if clip:
             if is_codebook: clip_range = self.kwargs["codebook_spectra_clip_range"]
@@ -691,9 +702,9 @@ class SpectraData:
         recon_wave = np.arange(
             full_wave[id_lo], full_wave[id_hi] + 1, self.wave_discretz_interval)
         recon_wave_bound_ids = [id_lo, id_hi + 1]
-        return full_wave, gt_flux, gt_wave, recon_wave, bound_ids
+        return full_wave, gt_fluxes, gt_wave, recon_wave, recon_wave_bound_ids
 
-    def plot_spectrum(self, spectra_dir, name, recon_flux, flux_norm_cho,
+    def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
                       clip=True, is_codebook=False, save_spectra=False,
                       save_spectra_together=False
     ):
@@ -702,24 +713,25 @@ class SpectraData:
               recon_flux: [num_spectra(,num_neighbours),full_num_smpl]
                           in same lambda range as `full_wave`
         """
-        full_wave, gt_flux, gt_wave, recon_wave, bound_ids = self.load_spectrum_plotting_data()
+        full_wave, gt_fluxes, gt_wave, recon_wave, bound_ids = \
+            self.gather_spectrum_plotting_data(clip, is_codebook)
 
         if self.kwargs["plot_spectrum_together"]:
-            ncols = min(len(recon_spectra), self.kwargs["num_spectra_plot_per_row"])
-            nrows = int(np.ceil(len(recon_spectra) / ncols))
+            ncols = min(len(recon_fluxes), self.kwargs["num_spectra_plot_per_row"])
+            nrows = int(np.ceil(len(recon_fluxes) / ncols))
             fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
 
-        get_data = partial(self.get_one_spectrum_plot_data,
+        get_data = partial(self.gather_one_spectrum_plot_data,
                            full_wave, flux_norm_cho, clip, is_codebook, bound_ids)
         plot_and_save = partial(self.plot_and_save_one_spectrum,
-                                fig, axs, nrows, ncols, save_spectra, )
-        for idx, cur_flux in enumerate(recon_flux):
-            pargs = get_data(gt_flux, gt_wave, recon_flux, recon_wave)
-            plot_and_save(pargs)
+                                name, spectra_dir, fig, axs, nrows, ncols, save_spectra)
+        for idx, (gt_flux, cur_flux) in enumerate(zip(gt_fluxes, recon_fluxes)):
+            pargs = get_data(gt_flux, gt_wave, cur_flux, recon_wave)
+            sub_dir = plot_and_save(idx, pargs)
 
         if save_spectra_together:
-            fname = join(cur_spectra_dir, name)
-            np.save(fname, recon_spectra)
+            fname = join(spectra_dir, name)
+            np.save(fname, recon_fluxes)
 
         if self.kwargs["plot_spectrum_together"]:
             fname = join(spectra_dir, sub_dir, f"all_spectra_{name}")

@@ -561,7 +561,7 @@ class AstroInferrer(BaseInferrer):
 
         self.dataset.plot_spectrum(
             self.spectra_dir, model_id, self.recon_spectra,
-            spectra_norm_cho=self.extra_args["spectra_norm_cho"],
+            flux_norm_cho=self.extra_args["flux_norm_cho"],
             save_spectra=True, clip=self.extra_args["plot_clipped_spectrum"])
 
         if self.log_pixel_value:
@@ -592,10 +592,10 @@ class AstroInferrer(BaseInferrer):
             fname = f"{prefix}{i}_{model_id}"
             self.dataset.plot_spectrum(
                 self.codebook_spectra_dir, fname, codebook_spectra,
-                spectra_norm_cho=self.extra_args["spectra_norm_cho"],
-                save_spectra_together=True, codebook=True,
-                clip=self.extra_args["plot_clipped_spectrum"]
-            )
+                is_codebook=True,
+                save_spectra_together=True,
+                clip=self.extra_args["plot_clipped_spectrum"],
+                flux_norm_cho=self.extra_args["flux_norm_cho"])
 
     #############
     # Infer logic

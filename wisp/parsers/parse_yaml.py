@@ -358,13 +358,14 @@ def define_cmd_line_args():
     data_group.add_argument("--spectra-patches_r", type=str, nargs='+')
     data_group.add_argument("--spectra-patches_c", type=str, nargs='+')
 
+    data_group.add_argument("--recon-spectra-clip-range", type=int, nargs='+')
     data_group.add_argument("--dummy-spectra-clip-range", type=int, nargs='+')
     data_group.add_argument("--gt-spectra-ids", type=int, nargs='+',
                             help="id of chosen gt spectra for supervision/recon etc.")
     data_group.add_argument("--spectra-markers", type=int, nargs='+',
                             help="marker to plot each spectra.")
     data_group.add_argument("--spectra-smooth-sigma",type=int, default=5)
-    data_group.add_argument("--spectra-norm-cho",type=str,
+    data_group.add_argument("--flux-norm-cho",type=str,
                             choices=["max","sum","scale_gt","scale_recon"],
                             help="0- divide with max, 1-divide with sum")
     data_group.add_argument("--trusted-range-only", action="store_true",
@@ -553,7 +554,7 @@ def define_cmd_line_args():
                              help="list of start (r/c) positions of each cutout for each tile")
 
     infer_group.add_argument("--mark-spectra", action="store_true")
-    infer_group.add_argument("--average-spectra", action="store_true")
+    infer_group.add_argument("--average-neighbour-spectra", action="store_true")
     infer_group.add_argument("--plot-clipped-spectrum", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-gt", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-trans", action="store_true")
