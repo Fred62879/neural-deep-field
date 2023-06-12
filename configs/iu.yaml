@@ -10,6 +10,7 @@ global:
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_pixel_values_during_train','save_soft_qtz_weights_during_train']
     tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights','recon_img']
 
+    tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','recon_gt_spectra']
     #tasks: ['infer','plot_latent_embed']
@@ -26,7 +27,7 @@ global:
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
     #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
-    #tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
+    tasks: ['train','infer','recon_img'] #,'recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
 optimizer:
     optimizer_type: 'adam'
@@ -44,7 +45,7 @@ net:
     #nef_type: 'AstroNerf'
     encode_wave: True
     encode_coords: True
-    coords_encode_method: 'grid' #'positional_encoding'
+    coords_encode_method: 'positional_encoding'
     wave_encode_method: 'positional_encoding'
     mlp_output_norm_method: 'sinh'
 
@@ -56,7 +57,7 @@ embedder:
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 16
+    wave_embed_dim: 1000 #16
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -83,8 +84,8 @@ grid:
     codebook_bitwidth: 20
 
 decoder:
-    decoder_num_layers: 1
-    decoder_hidden_dim: 64
+    decoder_num_layers: 3
+    decoder_hidden_dim: 256
     decoder_layer_type: 'none'
     decoder_activation_type: "relu"
 
@@ -107,7 +108,7 @@ spatial_decod:
     generate_scaler: True
 
     generate_redshift: False # only one of these
-    use_gt_redshift: True    # two can be True
+    use_gt_redshift: False    # two can be True
                              # set redshift_supervision to True
                              # to make these two effective
 
@@ -154,11 +155,11 @@ trainer:
     #masked_pixl_ratio_per_epoch: 1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_fluxes','spectra_sup_pixels','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
-    pretrain_codebook: True
+    pretrain_codebook: False
     codebook_pretrain_pixel_supervision: True
     pixel_supervision: True
     spectra_supervision: False
-    redshift_supervision: True
+    redshift_supervision: False
     spectra_beta: 1
     redshift_beta: 1
     pretrain_pixel_beta: .1
@@ -167,7 +168,7 @@ trainer:
 
     decode_spatial_embedding: False
     quantize_latent: False
-    quantize_spectra: True
+    quantize_spectra: False
     weight_train: False
     train_use_all_wave: False
     resume_train: False

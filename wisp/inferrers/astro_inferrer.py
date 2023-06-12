@@ -44,7 +44,8 @@ class AstroInferrer(BaseInferrer):
         """
         super().__init__(pipelines, dataset, device, mode, **extra_args)
 
-        self.num_sup_spectra = dataset.get_num_supervision_spectra()
+        if mode == "pretrain_infer":
+            self.num_sup_spectra = dataset.get_num_supervision_spectra()
 
         self.set_log_path()
         self.select_models()
