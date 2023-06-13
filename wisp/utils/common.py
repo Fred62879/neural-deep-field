@@ -144,6 +144,7 @@ def forward(
         recon_img=False, # reconstruct img, embed map, redshift heatmap, etc.
         recon_spectra=False,
         recon_codebook_spectra=False,
+        recon_codebook_spectra_individ=False,
         quantize_latent=False,
         quantize_spectra=False,
         quantization_strategy="hard",
@@ -163,8 +164,10 @@ def forward(
     # print(codebook_pretrain, train, recon_all, recon_spectra, recon_codebook_spectra)
     is_valid = reduce(
         lambda x, y: x ^ y,
-        [codebook_pretrain, train, recon_all, recon_spectra, recon_codebook_spectra]
-    )
+        [codebook_pretrain, train, recon_all, recon_spectra,
+         recon_codebook_spectra, recon_codebook_spectra_individ
+        ])
+
     assert(is_valid)
 
     requested_channels = []
@@ -200,9 +203,9 @@ def forward(
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
 
-        if use_gt_redshift:
+        if pretrain_infer and use_gt_redshift and recon_codebook_spectra_individ:
             # assert(codebook_pretrain or pretrain_infer)
-            net_args["specz"] = data["gt_spectra_redshift"]
+            net_args["specz"] = data["spectra_sup_redshift"]
 
         if spectra_supervision_train:
             net_args["full_wave"] = data["full_wave"]

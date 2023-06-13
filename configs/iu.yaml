@@ -8,9 +8,9 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_pixel_values_during_train','save_soft_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ','recon_gt_spectra','log_redshift','log_soft_qtz_weights','recon_img']
+    #tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra','log_redshift','log_soft_qtz_weights','recon_img']
 
-    tasks: ['infer','recon_img']
+    #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','recon_gt_spectra']
     #tasks: ['infer','plot_latent_embed']
@@ -27,7 +27,7 @@ global:
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
     #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
-    tasks: ['train','infer','recon_img'] #,'recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
+    #tasks: ['train','infer','recon_img'] #,'recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
 optimizer:
     optimizer_type: 'adam'
@@ -45,7 +45,7 @@ net:
     #nef_type: 'AstroNerf'
     encode_wave: True
     encode_coords: True
-    coords_encode_method: 'positional_encoding'
+    coords_encode_method: 'grid' #'positional_encoding'
     wave_encode_method: 'positional_encoding'
     mlp_output_norm_method: 'sinh'
 
@@ -57,7 +57,7 @@ embedder:
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 1000 #16
+    wave_embed_dim: 16
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -77,7 +77,7 @@ grid:
     grid_multiscale_type: 'cat'
     grid_feature_dim: 2
     grid_feature_std: 1
-    grid_num_lods: 16  #20 # max / min = b**l
+    grid_num_lods: 16 #20 # max / min = b**l
     tree_type: 'geometric'
     min_grid_res: 6 #16
     max_grid_res: 160 #646 #330 #1443 #1352 #2831 #690 #160
@@ -85,7 +85,7 @@ grid:
 
 decoder:
     decoder_num_layers: 3
-    decoder_hidden_dim: 256
+    decoder_hidden_dim: 128
     decoder_layer_type: 'none'
     decoder_activation_type: "relu"
 
@@ -107,8 +107,8 @@ qtz:
 spatial_decod:
     generate_scaler: True
 
-    generate_redshift: False # only one of these
-    use_gt_redshift: False    # two can be True
+    generate_redshift: True # only one of these
+    use_gt_redshift: False   # two can be True
                              # set redshift_supervision to True
                              # to make these two effective
 
@@ -153,27 +153,27 @@ trainer:
     save_as_new: True
     train_pixel_ratio: .1 # change dataloader sampler
     #masked_pixl_ratio_per_epoch: 1
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_fluxes','spectra_sup_pixels','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_fluxes','spectra_sup_pixels','spectra_sup_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
-    pretrain_codebook: False
-    codebook_pretrain_pixel_supervision: True
+    pretrain_codebook: True
+    codebook_pretrain_pixel_supervision: False
     pixel_supervision: True
     spectra_supervision: False
-    redshift_supervision: False
+    redshift_supervision: True
     spectra_beta: 1
     redshift_beta: 1
-    pretrain_pixel_beta: .1
+    pretrain_pixel_beta: 0.01
     pretrain_redshift_beta: 0.1
     spectra_supervision_start_epoch: 0
 
     decode_spatial_embedding: False
     quantize_latent: False
-    quantize_spectra: False
+    quantize_spectra: True
     weight_train: False
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230529-180531'
-    pretrain_log_dir: '20230526-153147_emd_beta_0.1_20000'
+    #pretrain_log_dir: '20230526-153147_emd_beta_0.1_20000'
     pretrained_model_name: 'model-ep20000-it1.pth'
 
     num_trans_samples: 40
@@ -181,7 +181,7 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 10
+    num_supervision_spectra: 20
     spectra_neighbour_size: 1
 
 infer:

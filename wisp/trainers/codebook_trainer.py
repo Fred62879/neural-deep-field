@@ -73,6 +73,7 @@ class CodebookTrainer(BaseTrainer):
             self.num_sup_spectra,
             self.extra_args["codebook_pretrain_latent_dim"]
         )
+        log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.train_pipeline.parameters()))
         )
@@ -507,7 +508,7 @@ class CodebookTrainer(BaseTrainer):
         # iii) redshift loss
         redshift_loss = 0
         if self.redshift_supervision:
-            gt_redshift = data["gt_spectra_redshift"]
+            gt_redshift = data["spectra_sup_redshift"]
 
             # ids = gt_redshift != -1
             pred_redshift = ret["redshift"]
@@ -570,13 +571,14 @@ class CodebookTrainer(BaseTrainer):
             self._save_soft_qtz_weights()
 
     def _save_pixel_values(self):
-        gt_vals = torch.stack(self.gt_pixel_vals).detach().cpu().numpy()
+        gt_vals = torch.stack(self.gt_pixel_vals).detach().cpu().numpy()[:,0]
         recon_vals = torch.stack(self.recon_pixel_vals).detach().cpu().numpy()
         # fname = join(self.pixel_val_dir, f"model-ep{self.epoch}-it{self.iteration}.pth")
         # np.save(fname, vals)
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
         # log.info(f"Pixel vals gt/recon {gt_vals} / {recon_vals}")
+        print(gt_vals.shape, recon_vals.shape)
         ratio = gt_vals / recon_vals
         log.info(f"gt/recon ratio: {ratio}")
 

@@ -421,7 +421,7 @@ class AstroInferrer(BaseInferrer):
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
             # log.info(f"Recon vals {vals}")
-            gt_vals = self.dataset.get_supervision_spectra_pixels()
+            gt_vals = self.dataset.get_supervision_spectra_pixels()[:,0]
             # log.info(f"GT vals {gt_vals}")
             ratio = gt_vals / vals
             log.info(f"gt/recon ratio: {ratio}")
@@ -713,11 +713,13 @@ class AstroInferrer(BaseInferrer):
                         iterations,
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
+                        pretrain_infer=self.pretrain_infer,
                         use_gt_redshift=self.extra_args["use_gt_redshift"],
                         quantize_latent=self.quantize_latent,
                         quantize_spectra=self.quantize_spectra,
                         quantization_strategy=self.extra_args["quantization_strategy"],
-                        recon_codebook_spectra=True,
+                        recon_codebook_spectra=self.recon_codebook_spectra,
+                        recon_codebook_spectra_individ=self.recon_codebook_spectra_individ,
                         save_codebook=self.recon_codebook_spectra_individ
                     )
 
