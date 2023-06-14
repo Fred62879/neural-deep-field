@@ -27,7 +27,7 @@ global:
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
     #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
-    #tasks: ['train','infer','recon_img'] #,'recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
+    tasks: ['train','infer','recon_img'] #,'recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
 optimizer:
     optimizer_type: 'adam'
@@ -157,6 +157,8 @@ trainer:
 
     pretrain_codebook: True
     codebook_pretrain_pixel_supervision: False
+
+    train_spectra_pixel_only: True
     pixel_supervision: True
     spectra_supervision: False
     redshift_supervision: True

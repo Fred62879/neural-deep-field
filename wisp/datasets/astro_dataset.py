@@ -113,6 +113,15 @@ class AstroDataset(Dataset):
     def get_spectra_img_coords(self):
         return self.spectra_dataset.get_spectra_img_coords()
 
+    def get_validation_spectra_coords(self):
+        return self.spectra_dataset.get_validation_coords()
+
+    def get_validation_spectra_fluxes(self):
+        return self.spectra_dataset.get_validation_fluxes()
+
+    def get_validation_spectra_pixels(self):
+        return self.spectra_dataset.get_validation_pixels()
+
     def get_supervision_spectra_pixels(self):
         return self.spectra_dataset.get_supervision_pixels()
 

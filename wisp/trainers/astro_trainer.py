@@ -96,7 +96,7 @@ class AstroTrainer(BaseTrainer):
         self.dataset.set_mode("train")
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
-        self.dataset.set_coords_source("fits")
+        self.set_coords()
 
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
@@ -107,30 +107,39 @@ class AstroTrainer(BaseTrainer):
         assert not (self.quantize_latent and self.quantize_spectra)
 
         self.pixel_supervision = self.extra_args["pixel_supervision"]
+        self.spectral_inpaint = self.pixel_supervision and \
+            self.space_dim == 3 and "spectral_inpaint" in tasks
+        self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
+        self.redshift_supervision = \
+            self.space_dim == 3 and self.quantize and \
+            self.extra_args["generate_redshift"] and \
+            self.extra_args["redshift_supervision"] and \
+            not self.extra_args["use_gt_redshift"] and \
+            not self.extra_args["pretrain_codebook"]  # we don't do redshift sup if we do
+                                                      #  codebook pretraining
         self.save_recon = self.pixel_supervision and \
             "save_recon_during_train" in tasks
         self.save_cropped_recon = self.pixel_supervision and \
             "save_cropped_recon_during_train" in tasks
-        self.spectral_inpaint = self.pixel_supervision and self.space_dim == 3 and \
-            "spectral_inpaint" in tasks
-        self.plot_embed_map = self.pixel_supervision and self.quantize and \
-            "plot_embed_map_during_train" in tasks
-        self.plot_codebook_spectra = self.pixel_supervision and self.quantize and \
-            "recon_codebook_spectra_during_train" in tasks
+        self.save_codebook = self.pixel_supervision and self.quantize and \
+            "save_codebook" in tasks
         self.save_latents = self.pixel_supervision and self.quantize and \
             ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
         self.save_scaler = self.pixel_supervision and self.quantize and \
             self.extra_args["generate_scaler"] and "plot_save_scaler" in tasks
-        self.save_codebook = self.pixel_supervision and self.quantize and \
-            "save_codebook" in tasks
+        self.save_redshift =  self.quantize and \
+            self.extra_args["generate_redshift"] and \
+            "save_redshift_during_train" in tasks
 
-        self.save_redshift =  self.quantize and self.extra_args["generate_redshift"] \
-            and "save_redshift_during_train" in tasks
+        self.plot_spectra = self.space_dim == 3 and \
+            "recon_gt_spectra_during_train" in tasks
+        self.plot_embed_map = self.pixel_supervision and \
+            self.quantize and "plot_embed_map_during_train" in tasks
+        self.plot_codebook_spectra = self.pixel_supervision and self.quantize and \
+            "recon_codebook_spectra_during_train" in tasks
 
-        self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
-        self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
-        self.redshift_supervision = self.space_dim == 3 and self.quantize and self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"] and not self.extra_args["use_gt_redshift"]
-        assert not self.extra_args["use_gt_redshift"] # don't use gt redshift during main train
+        # don't use gt redshift during main train
+        assert not self.extra_args["use_gt_redshift"]
 
         if self.save_cropped_recon:
             # save selected-cropped train image reconstruction
@@ -460,6 +469,14 @@ class AstroTrainer(BaseTrainer):
         self.optimizer = self.optim_cls(params, **self.optim_params)
         if self.verbose:
             log.info(self.optimizer)
+
+    def set_coords(self):
+        if self.extra_args["train_spectra_pixel_only"]:
+            self.dataset.set_coords_source("spectra_coords")
+            self.dataset.set_hardcode_data(
+                "spectra_coords", self.dataset.get_validation_spectra_coords())
+        else:
+            self.dataset.set_coords_source("fits")
 
     def set_num_batches(self):
         """ Set number of batches/iterations and batch size for each epoch.

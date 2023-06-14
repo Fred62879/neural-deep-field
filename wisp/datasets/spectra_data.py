@@ -77,12 +77,15 @@ class SpectraData:
         self.recon_spectra = self.recon_gt_spectra or self.recon_dummy_spectra or \
             self.recon_codebook_spectra
         self.spectra_supervision_train = self.kwargs["spectra_supervision"] and "train" in tasks
+        self.spectra_validation = self.kwargs["train_spectra_pixel_only"] and "train" in tasks
 
-        return self.kwargs["space_dim"] == 3 and (
-            self.codebook_pretrain or \
-            self.pretrain_infer or \
-            self.spectra_supervision_train or \
-            self.recon_spectra or self.require_spectra_coords)
+        # return self.kwargs["space_dim"] == 3 and (
+        #     self.codebook_pretrain or \
+        #     self.pretrain_infer or \
+        #     self.spectra_supervision_train or \
+        #     self.spectra_validation or \
+        #     self.recon_spectra or self.require_spectra_coords)
+        return True
 
     def set_path(self, dataset_path):
         """ Create path and filename of required files.
@@ -136,12 +139,12 @@ class SpectraData:
         """
         self.data = defaultdict(lambda: [])
 
-        if self.recon_gt_spectra or \
-           self.codebook_pretrain or \
-           self.pretrain_infer or \
-           self.require_spectra_coords or \
-           self.spectra_supervision_train:
-            self.load_gt_spectra_data()
+        # if self.recon_gt_spectra or \
+        #    self.codebook_pretrain or \
+        #    self.pretrain_infer or \
+        #    self.require_spectra_coords or \
+        #    self.spectra_supervision_train:
+        self.load_gt_spectra_data()
 
         if self.recon_dummy_spectra:
             self.load_dummy_spectra_data()
@@ -234,6 +237,15 @@ class SpectraData:
             return self.data["supervision_redshift"]
         return self.data["supervision_redshift"][idx]
 
+    def get_validation_coords(self):
+        return self.data["validation_coords"]
+
+    def get_validation_fluxes(self):
+        return self.data["validation_fluxes"]
+
+    def get_validation_pixels(self):
+        return self.data["validation_pixels"]
+
     #############
     # Helpers
     #############
@@ -317,7 +329,7 @@ class SpectraData:
         self.find_full_wave_bound_ids()
         if not (self.codebook_pretrain or self.pretrain_infer):
             # norm world to grid coords
-            self.coords_range = np.load(self.coords_range_fname)
+            self.coords_range = np.load(self.coords_range_fname + ".npy")
 
         if not self.load_spectra_data_from_cache or \
            not exists(self.gt_spectra_fluxes_fname) or \
@@ -359,11 +371,20 @@ class SpectraData:
                 len(self.data["gt_spectra_fluxes"]))
         self.num_supervision_spectra = n
 
+        # supervision spectra data (used during pretraining)
         self.data["supervision_fluxes"] = self.data["gt_spectra_fluxes"][:n]
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][:n]
         if self.kwargs["redshift_supervision"]:
             self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][:n]
+
+        # valiation spectra data (used during main training)
+        self.data["validation_coords"] = self.data["gt_spectra_grid_coords"][n:]
+        self.data["validation_fluxes"] = self.data["gt_spectra_fluxes"][n:]
+        if self.kwargs["codebook_pretrain_pixel_supervision"]:
+            self.data["validation_pixels"] = self.data["gt_spectra_pixels"][n:]
+        if self.kwargs["redshift_supervision"]:
+            self.data["validation_redshift"] = self.data["gt_spectra_redshift"][n:]
 
     def load_cached_spectra_data(self):
         """ Load spectra data (which are saved together).

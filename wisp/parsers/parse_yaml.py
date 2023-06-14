@@ -449,6 +449,7 @@ def define_cmd_line_args():
     train_group.add_argument("--weight-train", action="store_true")
     train_group.add_argument("--train-use-all-wave", action="store_true")
     train_group.add_argument("--infer-during-train", action="store_true")
+    train_group.add_argument("--train-spectra-pixel-only", action="store_true")
     train_group.add_argument("--pixel-supervision", action="store_true",
                              help="whether training supervised by pixel values or not.")
     train_group.add_argument("--spectra-supervision", action="store_true",
