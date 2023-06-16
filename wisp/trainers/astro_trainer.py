@@ -40,7 +40,7 @@ class AstroTrainer(BaseTrainer):
         self.spectra_beta = self.extra_args["spectra_beta"]
         self.redshift_beta = self.extra_args["redshift_beta"]
 
-        self.use_all_pixels = False
+        self.use_all_pixels = extra_args["train_with_all_pixels"]
         self.save_data_to_local = False
         self.shuffle_dataloader = True
         self.dataloader_drop_last = extra_args["dataloader_drop_last"]
@@ -66,7 +66,7 @@ class AstroTrainer(BaseTrainer):
         if self.extra_args["pretrain_codebook"]:
             self.load_pretrained_model()
 
-        log.info(self.pipeline)
+        # log.info(self.pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.pipeline.parameters()))
         )
@@ -76,7 +76,7 @@ class AstroTrainer(BaseTrainer):
         """
         fields = []
 
-        if self.pixel_supervision:
+        if self.pixel_supervision or self.train_spectra_pixels_only:
             fields.extend(["coords","pixels"])
             if self.weight_train:
                 fields.append("weights")
@@ -117,6 +117,9 @@ class AstroTrainer(BaseTrainer):
             not self.extra_args["use_gt_redshift"] and \
             not self.extra_args["pretrain_codebook"]  # we don't do redshift sup if we do
                                                       #  codebook pretraining
+        self.train_spectra_pixels_only = self.extra_args["train_spectra_pixels_only"]
+        assert(self.pixel_supervision ^ self.spectra_supervision ^ self.train_spectra_pixels_only)
+
         self.save_recon = self.pixel_supervision and \
             "save_recon_during_train" in tasks
         self.save_cropped_recon = self.pixel_supervision and \
@@ -186,7 +189,7 @@ class AstroTrainer(BaseTrainer):
             loss = self.get_loss(self.extra_args["redshift_loss_cho"])
             self.redshift_loss = partial(redshift_supervision_loss, loss)
 
-        if self.pixel_supervision:
+        if self.pixel_supervision or self.train_spectra_pixels_only:
             loss = self.get_loss(self.extra_args["pixel_loss_cho"])
             if self.spectral_inpaint:
                 loss = partial(spectral_masking_loss, loss,
@@ -348,7 +351,7 @@ class AstroTrainer(BaseTrainer):
         # save data locally and restore trainer state
         if self.save_data_to_local:
             self.save_local()
-            self.use_all_pixels = False
+            self.use_all_pixels = self.extra_args["train_with_all_pixels"]
             self.shuffle_dataloader = True
             self.save_data_to_local = False
             self.set_num_batches()
@@ -471,7 +474,7 @@ class AstroTrainer(BaseTrainer):
             log.info(self.optimizer)
 
     def set_coords(self):
-        if self.extra_args["train_spectra_pixel_only"]:
+        if self.extra_args["train_spectra_pixels_only"]:
             self.dataset.set_coords_source("spectra_coords")
             self.dataset.set_hardcode_data(
                 "spectra_coords", self.dataset.get_validation_spectra_coords())
@@ -507,6 +510,8 @@ class AstroTrainer(BaseTrainer):
             length = self.dataset.get_num_coords()
         elif self.spectra_supervision:
             length = self.dataset.get_num_spectra_coords()
+        elif self.train_spectra_pixels_only:
+            length = self.dataset.get_num_validation_spectra()
         else:
             raise ValueError("No training tasks to perform.")
         return length
@@ -570,7 +575,8 @@ class AstroTrainer(BaseTrainer):
                       self.total_steps,
                       self.space_dim,
                       self.extra_args["trans_sample_method"],
-                      pixel_supervision_train=self.pixel_supervision,
+                      pixel_supervision_train=self.pixel_supervision or \
+                                              self.train_spectra_pixels_only,
                       spectra_supervision_train=self.spectra_supervision,
                       redshift_supervision_train=self.redshift_supervision,
                       quantize_latent=self.quantize_latent,
@@ -590,7 +596,7 @@ class AstroTrainer(BaseTrainer):
 
         # i) reconstruction loss (taking inpaint into account)
         recon_loss, recon_pixels = 0, None
-        if self.pixel_supervision:
+        if self.pixel_supervision or self.train_spectra_pixels_only:
             recon_pixels = ret["intensity"]
             gt_pixels = data["pixels"]
 

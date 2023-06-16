@@ -3,14 +3,14 @@ global:
     verbose: False
     print_shape: False
     activate_timer: False
-    dataloader_drop_last: True
+    dataloader_drop_last: False
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_pixel_values_during_train','save_soft_qtz_weights_during_train']
-    #tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra','log_redshift','log_soft_qtz_weights','recon_img']
+    tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ','log_redshift','log_soft_qtz_weights','recon_img']
 
-    #tasks: ['infer','recon_img']
+    tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','recon_gt_spectra']
     #tasks: ['infer','plot_latent_embed']
@@ -27,7 +27,7 @@ global:
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
     #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
-    tasks: ['train','infer','recon_img'] #,'recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
+    #tasks: ['train','infer','recon_img'] #,'recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
 optimizer:
     optimizer_type: 'adam'
@@ -151,15 +151,16 @@ trainer:
     plot_grad_every: -1
     save_local_every: 400
     save_as_new: True
-    train_pixel_ratio: .1 # change dataloader sampler
-    #masked_pixl_ratio_per_epoch: 1
+
+    train_with_all_pixels: True
+    train_pixel_ratio: .1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_fluxes','spectra_sup_pixels','spectra_sup_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
     pretrain_codebook: True
     codebook_pretrain_pixel_supervision: False
 
-    train_spectra_pixel_only: True
-    pixel_supervision: True
+    train_spectra_pixels_only: True
+    pixel_supervision: False
     spectra_supervision: False
     redshift_supervision: True
     spectra_beta: 1
@@ -175,8 +176,8 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230529-180531'
-    #pretrain_log_dir: '20230526-153147_emd_beta_0.1_20000'
-    pretrained_model_name: 'model-ep20000-it1.pth'
+    pretrain_log_dir: '20230615-130032'
+    pretrained_model_name: 'model-ep4000-it1.pth'
 
     num_trans_samples: 40
     uniform_sample_trans: True
@@ -287,11 +288,11 @@ dataset:
     spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
-    num_gt_spectra: 20
+    num_gt_spectra: 40
     processed_spectra_cho: "test"
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
-    load_spectra_data_from_cache: False
+    load_spectra_data_from_cache: True
 
 inpaint:
     inpaint_cho: 'no_inpaint' #'spectral_inpaint'

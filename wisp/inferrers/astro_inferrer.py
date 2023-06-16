@@ -112,13 +112,21 @@ class AstroInferrer(BaseInferrer):
 
         # infer all coords using original model
         self.pretrain_infer = self.mode == "pretrain_infer"
-        self.recon_HSI = "recon_HSI" in tasks
-        self.plot_pixel_distrib = "plot_pixel_distrib" in tasks
-        self.recon_img = "recon_img" in tasks and "infer" in tasks
-        self.recon_synthetic_band = "recon_synthetic_band" in tasks
-        self.recon_img_pretrain = "recon_img" in tasks and "pretrain_infer" in tasks and \
-            self.extra_args["codebook_pretrain_pixel_supervision"]
+        self.infer_spectra_pixels_only = self.extra_args["train_spectra_pixels_only"]
 
+        self.recon_HSI = "recon_HSI" in tasks
+        self.recon_synthetic_band = "recon_synthetic_band" in tasks
+
+        self.recon_img, self.recon_img_pretrain, self.recon_img_valid_spectra = False,False,False
+        if "recon_img" in tasks:
+            if self.mode == "pretrain_infer":
+                self.recon_img_pretrain = self.extra_args["codebook_pretrain_pixel_supervision"]
+            else: # mode == "infer"
+                if self.infer_spectra_pixels_only:
+                    self.recon_img_valid_spectra = True
+                else: self.recon_img = True
+
+        self.plot_pixel_distrib = "plot_pixel_distrib" in tasks
         self.plot_embed_map = "plot_embed_map" in tasks \
             and (self.quantize_latent or self.quantize_spectra) \
             and self.space_dim == 3
@@ -167,11 +175,11 @@ class AstroInferrer(BaseInferrer):
         # keep only tasks required to perform
         self.group_tasks = []
 
-        if self.recon_img or self.recon_img_pretrain or \
-           self.recon_synthetic_band or \
+        if self.recon_HSI or self.recon_synthetic_band or \
            self.plot_embed_map or self.plot_latent_embed or \
+           self.save_soft_qtz_weights or self.log_soft_qtz_weights or \
            self.plot_redshift or self.log_redshift  or self.plot_scaler or \
-           self.save_soft_qtz_weights or self.log_soft_qtz_weights:
+           self.recon_img or self.recon_img_pretrain or self.recon_img_valid_spectra:
             self.group_tasks.append("infer_all_coords_full_model")
 
         if self.recon_dummy_spectra or self.recon_gt_spectra:
@@ -247,8 +255,11 @@ class AstroInferrer(BaseInferrer):
 
         if self.pretrain_infer:
             self.dataset_length = self.num_sup_spectra
+        elif self.infer_spectra_pixels_only:
+            self.dataset_length = self.dataset.get_num_validation_spectra()
         else:
             self.dataset_length = self.dataset.get_num_coords()
+
         self.batch_size = min(self.extra_args["infer_batch_size"], self.dataset_length)
 
         self.reset_dataloader(drop_last=False)
@@ -284,17 +295,24 @@ class AstroInferrer(BaseInferrer):
         """
         self.use_full_wave = True
         self.perform_integration = False
-        self.coords_source = "spectra"
-        self.requested_fields = ["coords"]
+        if self.mode == "pretrain_infer":
+            self.coords_source = "spectra_train"
+            # pretrain coords set using checkpoint
+            self.dataset_length = self.dataset.get_num_supervision_spectra()
+        else:
+            self.coords_source = "spectra_valid"
+            self.dataset.set_hardcode_data(
+                "spectra_valid", self.dataset.get_validation_spectra_coords())
+            self.dataset_length = self.dataset.get_num_validation_spectra()
 
+        self.requested_fields = ["coords"]
         if self.pretrain_infer:
             if self.extra_args["use_gt_redshift"]:
                 self.requested_fields.append("redshift_data")
             self.dataset_length = self.num_sup_spectra
         else:
-            self.dataset_length = self.dataset.get_num_spectra_coords()
+            self.dataset_length = self.dataset.get_num_validation_spectra()
 
-        #self.num_spectra = self.dataset.get_num_spectra_coords()
         if not self.extra_args["infer_spectra_individually"]:
             # self.num_batches = int(np.ceil(num_coords / self.batch_size))
             self.batch_size = min(
@@ -413,7 +431,7 @@ class AstroInferrer(BaseInferrer):
                 self.metrics_zscale = np.concatenate((
                     self.metrics_zscale, cur_metrics_zscale[:,None]), axis=1)
 
-        if self.recon_img_pretrain:
+        elif self.recon_img_pretrain:
             assert(self.mode == "pretrain_infer")
             vals = torch.stack(self.recon_pixels).detach().cpu().numpy()
             fname = join(self.recon_dir, f"{model_id}.pth")
@@ -425,6 +443,16 @@ class AstroInferrer(BaseInferrer):
             # log.info(f"GT vals {gt_vals}")
             ratio = gt_vals / vals
             log.info(f"gt/recon ratio: {ratio}")
+
+        elif self.recon_img_valid_spectra:
+            vals = torch.stack(self.recon_pixels).detach().cpu().numpy()
+            fname = join(self.recon_dir, f"{model_id}.pth")
+            np.save(fname, vals)
+            np.set_printoptions(suppress=True)
+            np.set_printoptions(precision=3)
+            log.info(f"Recon vals {vals}")
+            gt_vals = self.dataset.get_supervision_spectra_pixels()[:,0]
+            log.info(f"GT vals {gt_vals}")
 
         if self.recon_synthetic_band:
             re_args = {
@@ -563,7 +591,8 @@ class AstroInferrer(BaseInferrer):
         self.dataset.plot_spectrum(
             self.spectra_dir, model_id, self.recon_spectra,
             flux_norm_cho=self.extra_args["flux_norm_cho"],
-            save_spectra=True, clip=self.extra_args["plot_clipped_spectrum"])
+            save_spectra=True, clip=self.extra_args["plot_clipped_spectrum"],
+            mode=self.mode)
 
         if self.log_pixel_value:
             self.dataset.log_spectra_pixel_values(self.recon_spectra)
@@ -630,7 +659,8 @@ class AstroInferrer(BaseInferrer):
                         quantize_spectra=self.quantize_spectra,
                         quantization_strategy=self.extra_args["quantization_strategy"],
                         save_soft_qtz_weights=self.save_soft_qtz_weights or self.log_soft_qtz_weights,
-                        recon_img=self.recon_img or self.recon_img_pretrain,
+                        recon_img=self.recon_img or self.recon_img_pretrain or \
+                                  self.recon_img_valid_spectra,
                         save_scaler=self.plot_scaler,
                         save_embed_ids=self.plot_embed_map,
                         save_latents=self.plot_latent_embed,
@@ -744,6 +774,7 @@ class AstroInferrer(BaseInferrer):
         """
         if self.space_dim == 3:
             self.requested_fields.extend(["trans_data"])
+        print(self.requested_fields)
 
         self.dataset.set_mode(self.mode)
         self.dataset.set_length(self.dataset_length)

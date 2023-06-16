@@ -27,7 +27,7 @@ from multiprocessing.pool import ThreadPool
 class SpectraData:
     def __init__(self, fits_obj, trans_obj, dataset_path, device, **kwargs):
         self.kwargs = kwargs
-        if not self.require_any_data(kwargs["tasks"]): return
+        self.summarize_tasks(kwargs["tasks"])
 
         self.device = device
         self.fits_obj = fits_obj
@@ -36,7 +36,6 @@ class SpectraData:
 
         self.num_bands = kwargs["num_bands"]
         self.space_dim = kwargs["space_dim"]
-        self.num_gt_spectra = kwargs["num_gt_spectra"]
         self.all_tracts = kwargs["spectra_tracts"]
         self.all_patches_r = kwargs["spectra_patches_r"]
         self.all_patches_c = kwargs["spectra_patches_c"]
@@ -58,7 +57,7 @@ class SpectraData:
         self.load_accessory_data()
         self.load_spectra()
 
-    def require_any_data(self, tasks):
+    def summarize_tasks(self, tasks):
         tasks = set(tasks)
 
         self.recon_gt_spectra = "recon_gt_spectra" in tasks or \
@@ -76,16 +75,11 @@ class SpectraData:
             ("plot_redshift" in tasks or "plot_embed_map" in tasks)
         self.recon_spectra = self.recon_gt_spectra or self.recon_dummy_spectra or \
             self.recon_codebook_spectra
-        self.spectra_supervision_train = self.kwargs["spectra_supervision"] and "train" in tasks
-        self.spectra_validation = self.kwargs["train_spectra_pixel_only"] and "train" in tasks
+        self.spectra_supervision_train = "train" in tasks and self.kwargs["spectra_supervision"]
+        self.spectra_valid_train = self.kwargs["train_spectra_pixels_only"] and "train" in tasks
+        self.spectra_valid_infer = self.kwargs["train_spectra_pixels_only"] and "infer" in tasks
 
-        # return self.kwargs["space_dim"] == 3 and (
-        #     self.codebook_pretrain or \
-        #     self.pretrain_infer or \
-        #     self.spectra_supervision_train or \
-        #     self.spectra_validation or \
-        #     self.recon_spectra or self.require_spectra_coords)
-        return True
+        # self.kwargs["space_dim"] == 3 and (self.codebook_pretrain or self.pretrain_infer or self.spectra_supervision_train or self.spectra_validation or self.recon_spectra or self.require_spectra_coords)
 
     def set_path(self, dataset_path):
         """ Create path and filename of required files.
@@ -139,11 +133,6 @@ class SpectraData:
         """
         self.data = defaultdict(lambda: [])
 
-        # if self.recon_gt_spectra or \
-        #    self.codebook_pretrain or \
-        #    self.pretrain_infer or \
-        #    self.require_spectra_coords or \
-        #    self.spectra_supervision_train:
         self.load_gt_spectra_data()
 
         if self.recon_dummy_spectra:
@@ -161,21 +150,25 @@ class SpectraData:
     def get_full_wave(self):
         return self.full_wave
 
-    def get_num_spectra_to_plot(self):
-        return len(self.data["spectra_grid_coords"])
+    #def get_num_spectra_to_plot(self):
+    #    return len(self.data["spectra_grid_coords"])
 
     def get_num_gt_spectra(self):
         """ Get #gt spectra (doesn't count neighbours). """
-        return len(self.data["gt_spectra_fluxes"])
+        return self.num_gt_spectra
 
     def get_num_supervision_spectra(self):
         """ Get #supervision spectra (doesn't count neighbours). """
         return self.num_supervision_spectra
 
-    def get_spectra_grid_coords(self):
-        """ Get grid (training) coords of all selected spectra (gt & dummy, incl. neighbours).
-        """
-        return self.data["spectra_grid_coords"]
+    def get_num_validation_spectra(self):
+        """ Get #validation spectra (doesn't count neighbours). """
+        return self.num_validation_spectra
+
+    # def get_spectra_grid_coords(self):
+    #     """ Get grid (training) coords of all selected spectra (gt & dummy, incl. neighbours).
+    #     """
+    #     return self.data["spectra_grid_coords"]
 
     def get_spectra_img_coords(self):
         """ Get image coords of all selected spectra (gt & dummy, incl. neighbours). """
@@ -341,8 +334,8 @@ class SpectraData:
             if not exists(self.processed_metadata_table_fname):
                 self.process_spectra()
             # load data for each individual spectra and save together
-            self.load_processed_spectra()
-            self.generate_supervision_data()
+            self.gather_processed_spectra()
+            self.process_save_gt_spectra_data()
         else:
             # data for all spectra are saved together (small amount of spectra)
             self.load_cached_spectra_data()
@@ -368,8 +361,9 @@ class SpectraData:
 
     def train_valid_split(self):
         n = min(self.kwargs["num_supervision_spectra"],
-                len(self.data["gt_spectra_fluxes"]))
+                self.num_gt_spectra)
         self.num_supervision_spectra = n
+        self.num_validation_spectra = self.num_gt_spectra - n
 
         # supervision spectra data (used during pretraining)
         self.data["supervision_fluxes"] = self.data["gt_spectra_fluxes"][:n]
@@ -394,6 +388,7 @@ class SpectraData:
         self.data["gt_spectra_pixels"] = np.load(self.gt_spectra_pixels_fname)
         self.data["gt_spectra_redshift"] = np.load(self.gt_spectra_redshift_fname)
         self.data["gt_spectra_grid_coords"] = np.load(self.gt_spectra_coords_fname)
+        self.num_gt_spectra = len(self.data["gt_spectra_fluxes"])
 
         # print(self.data["gt_spectra_wave"].shape)
         # print(self.data["gt_spectra_fluxes"].shape)
@@ -401,14 +396,9 @@ class SpectraData:
         # print(self.data["gt_spectra_redshift"].shape)
         # print(self.data["gt_spectra_grid_coords"].shape)
 
-    def generate_supervision_data(self):
+    def process_save_gt_spectra_data(self):
         """ Clip supervision spectra to trusted range.
         """
-        if not self.pretrain_infer and \
-           not self.codebook_pretrain and \
-           not self.spectra_supervision_train:
-            return
-
         # clip all spectra to trusted range
         clipped_wave, clipped_flux = None, []
         for (flux, wave) in self.data["gt_spectra"]:
@@ -429,14 +419,14 @@ class SpectraData:
         np.save(self.gt_spectra_redshift_fname, self.data["gt_spectra_redshift"])
         np.save(self.gt_spectra_coords_fname, self.data["gt_spectra_grid_coords"])
 
-    def load_processed_spectra(self):
+    def gather_processed_spectra(self):
         """ Load processed data for each spectra and save together.
         """
         df = pandas.read_pickle(self.processed_metadata_table_fname)
-        num_gt_spectra = len(df)
+        self.num_gt_spectra = len(df)
         redshift, pixels, coords, spectra = [], [], [], []
 
-        for i in range(num_gt_spectra):
+        for i in range(self.num_gt_spectra):
             redshift.append(df.iloc[i]["zspec"])
             pixels.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["pix_fname"])))
@@ -451,7 +441,7 @@ class SpectraData:
         self.data["gt_spectra_redshift"] = np.array(redshift).astype(np.float32)
 
     def process_spectra(self):
-        df = self.load_source_metadata().iloc[:self.num_gt_spectra]
+        df = self.load_source_metadata().iloc[:self.kwargs["num_gt_spectra"]]
         num_gt_spectra = len(df)
         df["tract"] = ""
         df["patch"] = ""
@@ -572,7 +562,7 @@ class SpectraData:
 
         coords = patch.get_coords(pixel_ids)[None,:] # world coords [n,]
         if not (self.codebook_pretrain or self.pretrain_infer): # normed (grid) coords
-            coords = normalize_coords(coords, coords_range=self.coords_range)
+            coords, _ = normalize_coords(coords, coords_range=self.coords_range)
         np.save(join(self.processed_spectra_path, coord_fname), coords)
 
         # process source spectra and save locally
@@ -632,7 +622,7 @@ class SpectraData:
 
         if plot_gt_spectrum:
             sub_dir += "with_gt_"
-            assert(np.max(gt_flux) > 0)
+            # assert(np.max(gt_flux) > 0)
             if flux_norm_cho == "max":
                 gt_flux = gt_flux / np.max(gt_flux)
             elif flux_norm_cho == "sum":
@@ -715,10 +705,13 @@ class SpectraData:
 
         return sub_dir
 
-    def gather_spectrum_plotting_data(self, clip, is_codebook):
+    def gather_spectrum_plotting_data(self, clip, is_codebook, mode):
         full_wave = self.get_full_wave()     # [full_nsmpl]
         gt_wave = self.get_gt_spectra_wave() # [nsmpl]
-        gt_fluxes = self.get_gt_spectra_fluxes().numpy() # [n,nsmpl]
+        if mode == "pretrain_infer":
+            gt_fluxes = self.get_supervision_fluxes() # [n,nsmpl]
+        elif mode == "infer":
+            gt_fluxes = self.get_validation_fluxes() # [n,nsmpl]
 
         if clip:
             if is_codebook: clip_range = self.kwargs["codebook_spectra_clip_range"]
@@ -733,7 +726,7 @@ class SpectraData:
 
     def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
                       clip=True, is_codebook=False, save_spectra=False,
-                      save_spectra_together=False
+                      save_spectra_together=False, mode="pretrain_infer"
     ):
         """ Plot all given spectra.
             @Param
@@ -741,7 +734,7 @@ class SpectraData:
                           in same lambda range as `full_wave`
         """
         full_wave, gt_fluxes, gt_wave, recon_wave, bound_ids = \
-            self.gather_spectrum_plotting_data(clip, is_codebook)
+            self.gather_spectrum_plotting_data(clip, is_codebook, mode)
 
         if self.kwargs["plot_spectrum_together"]:
             ncols = min(len(recon_fluxes), self.kwargs["num_spectra_plot_per_row"])
@@ -752,6 +745,7 @@ class SpectraData:
                            full_wave, flux_norm_cho, clip, is_codebook, bound_ids)
         plot_and_save = partial(self.plot_and_save_one_spectrum,
                                 name, spectra_dir, fig, axs, nrows, ncols, save_spectra)
+
         for idx, (gt_flux, cur_flux) in enumerate(zip(gt_fluxes, recon_fluxes)):
             pargs = get_data(gt_flux, gt_wave, cur_flux, recon_wave)
             sub_dir = plot_and_save(idx, pargs)

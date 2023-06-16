@@ -140,6 +140,9 @@ class AstroDataset(Dataset):
     def get_num_supervision_spectra(self):
         return self.spectra_dataset.get_num_supervision_spectra()
 
+    def get_num_validation_spectra(self):
+        return self.spectra_dataset.get_num_validation_spectra()
+
 
     def get_full_wave(self):
         return self.trans_dataset.get_full_wave()
@@ -152,8 +155,8 @@ class AstroDataset(Dataset):
         if field == "coords":
             if self.coords_source == "fits":
                 data = self.fits_dataset.get_coords(idx)
-            elif self.coords_source == "spectra":
-                data = self.spectra_dataset.get_spectra_grid_coords()
+            #elif self.coords_source == "spectra":
+            #    data = self.spectra_dataset.get_spectra_grid_coords()
             else:
                 data = self.data[self.coords_source][idx]
         elif field == "pixels":
@@ -279,13 +282,14 @@ class AstroDataset(Dataset):
 
     def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
                       clip=True, is_codebook=False, save_spectra=False,
-                      save_spectra_together=False
+                      save_spectra_together=False, mode="pretrain_infer"
     ):
         self.spectra_dataset.plot_spectrum(
             spectra_dir, name, recon_fluxes, flux_norm_cho,
             clip=clip, is_codebook=is_codebook,
             save_spectra=save_spectra,
-            save_spectra_together=save_spectra_together)
+            save_spectra_together=save_spectra_together,
+            mode=mode)
 
     def log_spectra_pixel_values(self, spectra):
         return self.spectra_dataset.log_spectra_pixel_values(spectra)
