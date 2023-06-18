@@ -128,6 +128,9 @@ def define_cmd_line_args():
     net_group.add_argument("--mlp-output-norm-method", type=str,
                            choices=["identity","arcsinh","sinh"])
 
+    net_group.add_argument("--model-redshift", action="store_true",
+                           help="whether the arch model redshift or not.")
+
     net_group.add_argument("--encode-coords", action="store_true")
     net_group.add_argument("--coords-encode-method", type=str,
                            choices=["positional","grid"],
@@ -250,7 +253,7 @@ def define_cmd_line_args():
     spatial_decod_group = parser.add_argument_group("quantization")
 
     spatial_decod_group.add_argument("--generate-scaler", action="store_true")
-    spatial_decod_group.add_argument("--generate-redshift", action="store_true")
+    # spatial_decod_group.add_argument("--generate-redshift", action="store_true")
 
     spatial_decod_group.add_argument("--spatial-decod-hidden-dim", type=int)
     spatial_decod_group.add_argument("--spatial-decod-num-hidden-layers", type=int)
@@ -458,7 +461,8 @@ def define_cmd_line_args():
                              help="whether training supervised by spectra or not.")
     train_group.add_argument("--redshift-supervision", action="store_true",
                              help="whether training supervised by redshift or not.")
-    train_group.add_argument("--use-gt-redshift", action="store_true")
+    train_group.add_argument("--apply-gt-redshift", action="store_true",
+                             help="whether apply gt redshift directly to spectra or not.")
 
     train_group.add_argument("--spectra-supervision-start-epoch", type=int)
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")

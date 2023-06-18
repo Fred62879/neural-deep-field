@@ -12,7 +12,9 @@ class SpatialDecoder(nn.Module):
     """ Accept as input latent variables and quantize based on
           a codebook which is optimizaed simultaneously during training
     """
-    def __init__(self, output_scaler, output_redshift, apply_gt_redshift, qtz_calculate_loss, **kwargs):
+    def __init__(self, output_scaler, output_redshift, apply_redshift,
+                 qtz_calculate_loss, **kwargs
+    ):
         super(SpatialDecoder, self).__init__()
 
         self.kwargs = kwargs
@@ -29,9 +31,9 @@ class SpatialDecoder(nn.Module):
         self.output_scaler = self.qtz and output_scaler
 
         # we either pred redshift and supervise or apply gt redshift directly
-        assert not (output_redshift and apply_gt_redshift)
+        assert not (output_redshift and apply_redshift)
         self.output_redshift = self.qtz and output_redshift
-        self.apply_gt_redshift = self.qtz and apply_gt_redshift
+        self.apply_gt_redshift = self.qtz and apply_redshift
 
         self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
 

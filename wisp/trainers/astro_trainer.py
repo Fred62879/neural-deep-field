@@ -107,18 +107,21 @@ class AstroTrainer(BaseTrainer):
         assert not (self.quantize_latent and self.quantize_spectra)
 
         self.pixel_supervision = self.extra_args["pixel_supervision"]
+        self.train_spectra_pixels_only = self.extra_args["train_spectra_pixels_only"]
+        assert(self.pixel_supervision ^ self.train_spectra_pixels_only)
+
+        self.spectra_supervision = self.space_dim == 3 and \
+            self.extra_args["spectra_supervision"]
+
         self.spectral_inpaint = self.pixel_supervision and \
             self.space_dim == 3 and "spectral_inpaint" in tasks
-        self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
-        self.redshift_supervision = \
-            self.space_dim == 3 and self.quantize and \
-            self.extra_args["generate_redshift"] and \
-            self.extra_args["redshift_supervision"] and \
-            not self.extra_args["use_gt_redshift"] and \
-            not self.extra_args["pretrain_codebook"]  # we don't do redshift sup if we do
-                                                      #  codebook pretraining
-        self.train_spectra_pixels_only = self.extra_args["train_spectra_pixels_only"]
-        assert(self.pixel_supervision ^ self.spectra_supervision ^ self.train_spectra_pixels_only)
+
+        self.apply_gt_redshift, self.redshift_supervision = False, False
+        if self.space_dim == 3 and self.quantize and self.extra_args["model_redshift"]:
+            self.apply_gt_redshift = self.extra_args["apply_gt_redshift"]
+            self.redshift_supervision = self.extra_args["redshift_supervision"]
+            assert not (self.redshift_supervision and self.apply_gt_redshift)
+            assert not self.apply_gt_redshift
 
         self.save_recon = self.pixel_supervision and \
             "save_recon_during_train" in tasks
@@ -131,7 +134,7 @@ class AstroTrainer(BaseTrainer):
         self.save_scaler = self.pixel_supervision and self.quantize and \
             self.extra_args["generate_scaler"] and "plot_save_scaler" in tasks
         self.save_redshift =  self.quantize and \
-            self.extra_args["generate_redshift"] and \
+            self.extra_args["model_redshift"] and \
             "save_redshift_during_train" in tasks
 
         self.plot_spectra = self.space_dim == 3 and \
@@ -140,9 +143,6 @@ class AstroTrainer(BaseTrainer):
             self.quantize and "plot_embed_map_during_train" in tasks
         self.plot_codebook_spectra = self.pixel_supervision and self.quantize and \
             "recon_codebook_spectra_during_train" in tasks
-
-        # don't use gt redshift during main train
-        assert not self.extra_args["use_gt_redshift"]
 
         if self.save_cropped_recon:
             # save selected-cropped train image reconstruction
@@ -209,7 +209,10 @@ class AstroTrainer(BaseTrainer):
             self.dataset,
             batch_size=None,
             sampler=BatchSampler(
-                sampler_cls(self.dataset), batch_size=self.batch_size, drop_last=self.dataloader_drop_last),
+                sampler_cls(self.dataset),
+                batch_size=self.batch_size,
+                drop_last=self.dataloader_drop_last
+            ),
             pin_memory=True,
             num_workers=self.extra_args["dataset_num_workers"]
         )
@@ -633,13 +636,15 @@ class AstroTrainer(BaseTrainer):
         # iii) redshift loss
         redshift_loss = 0
         if self.redshift_supervision:
-            gt_redshift = data["redshift"]
-            ids = gt_redshift != -1
-
             pred_redshift = ret["redshift"]
-            if torch.count_nonzero(ids) != 0:
-                redshift_loss = self.redshift_loss(gt_redshift[ids], pred_redshift[ids]) * self.redshift_beta
-                self.log_dict["redshift_loss"] += redshift_loss.item()
+            gt_redshift = data["spectra_sup_redshift"]
+            # ids = gt_redshift != -1
+            # if torch.count_nonzero(ids) != 0:
+            # print(gt_redshift.shape, pred_redshift.shape, ids.shape)
+            redshift_loss = self.redshift_loss(
+                gt_redshift, pred_redshift) * self.redshift_beta
+            # gt_redshift[ids], pred_redshift[ids]) * self.redshift_beta
+            self.log_dict["redshift_loss"] += redshift_loss.item()
 
         # iv) latent quantization codebook loss
         codebook_loss = 0

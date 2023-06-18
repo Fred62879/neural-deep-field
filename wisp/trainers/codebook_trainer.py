@@ -16,8 +16,7 @@ from torch.utils.data import BatchSampler, \
 
 from wisp.trainers import BaseTrainer
 from wisp.utils.plot import plot_grad_flow
-from wisp.loss import spectra_supervision_loss, pretrain_pixel_loss, \
-    redshift_supervision_loss
+from wisp.loss import spectra_supervision_loss, pretrain_pixel_loss
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     load_embed, load_model_weights, forward
 
@@ -42,7 +41,7 @@ class CodebookTrainer(BaseTrainer):
         self.verbose = extra_args["verbose"]
         self.space_dim = extra_args["space_dim"]
         self.gpu_fields = extra_args["gpu_data"]
-        self.z_beta = extra_args["pretrain_redshift_beta"]
+        # self.z_beta = extra_args["pretrain_redshift_beta"]
         self.recon_beta = extra_args["pretrain_pixel_beta"]
         self.num_sup_spectra = dataset.get_num_supervision_spectra()
 
@@ -99,12 +98,16 @@ class CodebookTrainer(BaseTrainer):
         tasks = set(self.extra_args["tasks"])
 
         self.pixel_supervision = self.extra_args["codebook_pretrain_pixel_supervision"]
-        self.redshift_supervision = self.extra_args["generate_redshift"] and self.extra_args["redshift_supervision"] and not self.extra_args["use_gt_redshift"]
+
+        # as long as we model redshift, we should apply gt redshift to spectra during pretrain
+        #  and we should never do redshift supervision during pretrain
+        # self.redshift_supervision = False
+        self.apply_gt_redshift = self.extra_args["model_redshift"]
 
         self.save_soft_qtz_weights = "save_soft_qtz_weights_during_train" in tasks
         self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
-        self.save_redshift =  "save_redshift_during_train" in tasks and \
-            self.extra_args["generate_redshift"]
+        # self.save_redshift =  "save_redshift_during_train" in tasks and \
+        #     self.extra_args["model_redshift"]
         self.save_pixel_values = "save_pixel_values_during_train" in tasks and \
             self.extra_args["codebook_pretrain_pixel_supervision"]
 
@@ -113,11 +116,8 @@ class CodebookTrainer(BaseTrainer):
         log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
-                ["model_dir","spectra_dir","codebook_spectra_dir",
-                 "redshift_dir","soft_qtz_weight_dir"],
-                ["models","train_spectra","codebook_spectra",
-                 "redshift","soft_qtz_weights"]
-        ):
+                ["model_dir","spectra_dir","codebook_spectra_dir","soft_qtz_weight_dir"],
+                ["models","train_spectra","codebook_spectra","soft_qtz_weights"]):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -161,9 +161,9 @@ class CodebookTrainer(BaseTrainer):
             loss = self.get_loss(self.extra_args["pixel_loss_cho"])
             self.pixel_loss = partial(pretrain_pixel_loss, loss)
 
-        if self.redshift_supervision:
-            loss = self.get_loss(self.extra_args["redshift_loss_cho"])
-            self.redshift_loss = partial(redshift_supervision_loss, loss)
+        # if self.redshift_supervision:
+        #     loss = self.get_loss(self.extra_args["redshift_loss_cho"])
+        #     self.redshift_loss = partial(redshift_supervision_loss, loss)
 
     def init_dataloader(self):
         """ (Re-)Initialize dataloader.
@@ -283,7 +283,7 @@ class CodebookTrainer(BaseTrainer):
         if self.save_local_every > -1 and self.epoch % self.save_local_every == 0:
             self.save_data_to_local = True
 
-            if self.save_redshift: self.redshifts = []
+            # if self.save_redshift: self.redshifts = []
             if self.plot_spectra: self.smpl_spectra = []
             if self.save_soft_qtz_weights: self.qtz_weights = []
             if self.save_pixel_values:
@@ -345,7 +345,7 @@ class CodebookTrainer(BaseTrainer):
         super().init_log_dict()
         self.log_dict["pixel_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
-        self.log_dict["redshift_loss"] = 0.0
+        # self.log_dict["redshift_loss"] = 0.0
 
     def pre_step(self):
         self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
@@ -368,7 +368,7 @@ class CodebookTrainer(BaseTrainer):
         self.timer.check("backward and step")
 
         if self.save_data_to_local:
-            if self.save_redshift: self.redshifts.extend(ret["redshift"])
+            # if self.save_redshift: self.redshifts.extend(ret["redshift"])
             if self.plot_spectra: self.smpl_spectra.append(ret["spectra"])
             if self.save_soft_qtz_weights: self.qtz_weights.extend(ret["soft_qtz_weights"])
             if self.save_pixel_values:
@@ -475,12 +475,12 @@ class CodebookTrainer(BaseTrainer):
                       self.extra_args["trans_sample_method"],
                       codebook_pretrain=True,
                       pixel_supervision_train=self.pixel_supervision,
-                      redshift_supervision_train=self.redshift_supervision,
-                      use_gt_redshift=self.extra_args["use_gt_redshift"],
+                      apply_gt_redshift=self.apply_gt_redshift,
+                      redshift_supervision_train=False, #self.redshift_supervision,
                       quantize_spectra=True,
                       quantization_strategy="soft",
                       save_spectra=self.plot_spectra,
-                      save_redshift=self.save_redshift,
+                      # save_redshift=self.save_redshift,
                       save_soft_qtz_weights=self.save_soft_qtz_weights)
 
         # i) spectra supervision loss
@@ -506,20 +506,19 @@ class CodebookTrainer(BaseTrainer):
             self.log_dict["pixel_loss"] += recon_loss.item()
 
         # iii) redshift loss
-        redshift_loss = 0
-        if self.redshift_supervision:
-            gt_redshift = data["spectra_sup_redshift"]
+        # redshift_loss = 0
+        # if self.redshift_supervision:
+        #     gt_redshift = data["spectra_sup_redshift"]
 
-            # ids = gt_redshift != -1
-            pred_redshift = ret["redshift"]
-            # if torch.count_nonzero(ids) != 0:
-            # redshift_loss = self.redshift_loss(gt_redshift[ids], pred_redshift[ids]) * self.redshift_beta
-            redshift_loss = self.redshift_loss(gt_redshift, pred_redshift) \
-                * self.extra_args["redshift_beta"]
-            self.log_dict["redshift_loss"] += redshift_loss.item()
+        #     # ids = gt_redshift != -1
+        #     pred_redshift = ret["redshift"]
+        #     # if torch.count_nonzero(ids) != 0:
+        #     # redshift_loss = self.redshift_loss(gt_redshift[ids], pred_redshift[ids]) * self.redshift_beta
+        #     redshift_loss = self.redshift_loss(gt_redshift, pred_redshift) \
+        #         * self.extra_args["redshift_beta"]
+        #     self.log_dict["redshift_loss"] += redshift_loss.item()
 
-        # total_loss = recon_loss*self.recon_beta + redshift_loss*self.z_beta
-        total_loss = spectra_loss + recon_loss*self.recon_beta + redshift_loss*self.z_beta
+        total_loss = spectra_loss + recon_loss*self.recon_beta # + redshift_loss*self.z_beta
 
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss")
@@ -537,8 +536,8 @@ class CodebookTrainer(BaseTrainer):
         log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
         if self.pixel_supervision:
             log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / n)
-        if self.redshift_supervision:
-            log_text += " | redshift loss: {:>.3E}".format(self.log_dict["redshift_loss"] / n)
+        # if self.redshift_supervision:
+        #     log_text += " | redshift loss: {:>.3E}".format(self.log_dict["redshift_loss"] / n)
         log.info(log_text)
 
     def save_model(self):
@@ -561,8 +560,8 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_spectra:
             self._plot_spectrum()
 
-        if self.save_redshift:
-            self._save_redshift()
+        # if self.save_redshift:
+        #     self._save_redshift()
 
         if self.save_pixel_values:
             self._save_pixel_values()
@@ -582,15 +581,15 @@ class CodebookTrainer(BaseTrainer):
         ratio = gt_vals / recon_vals
         log.info(f"gt/recon ratio: {ratio}")
 
-    def _save_redshift(self):
-        redshifts = torch.stack(self.redshifts).detach().cpu().numpy()
-        fname = join(self.redshift_dir, f"model-ep{self.epoch}-it{self.iteration}.pth")
-        np.save(fname, redshifts)
-        np.set_printoptions(precision=3)
-        log.info(f"Est. redshift {redshifts}")
+    # def _save_redshift(self):
+    #     redshifts = torch.stack(self.redshifts).detach().cpu().numpy()
+    #     fname = join(self.redshift_dir, f"model-ep{self.epoch}-it{self.iteration}.pth")
+    #     np.save(fname, redshifts)
+    #     np.set_printoptions(precision=3)
+    #     log.info(f"Est. redshift {redshifts}")
 
-        gt_redshift = self.dataset.get_supervision_spectra_redshift()
-        log.info(f"GT redshift {gt_redshift}")
+    #     gt_redshift = self.dataset.get_supervision_spectra_redshift()
+    #     log.info(f"GT redshift {gt_redshift}")
 
     def _save_soft_qtz_weights(self):
         weights = torch.stack(self.qtz_weights).detach().cpu().numpy()

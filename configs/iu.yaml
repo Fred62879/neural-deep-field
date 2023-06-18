@@ -10,7 +10,7 @@ global:
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_pixel_values_during_train','save_soft_qtz_weights_during_train']
     tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ','log_redshift','log_soft_qtz_weights','recon_img']
 
-    tasks: ['infer','recon_img']
+    #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
     #tasks: ['infer','recon_gt_spectra']
     #tasks: ['infer','plot_latent_embed']
@@ -26,7 +26,7 @@ global:
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
-    #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
+    tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['train','infer','recon_img'] #,'recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
 optimizer:
@@ -43,6 +43,7 @@ optimizer:
 net:
     nef_type: 'AstroHyperSpectralNerf'
     #nef_type: 'AstroNerf'
+    model_redshift: True
     encode_wave: True
     encode_coords: True
     coords_encode_method: 'grid' #'positional_encoding'
@@ -106,12 +107,7 @@ qtz:
 
 spatial_decod:
     generate_scaler: True
-
-    generate_redshift: True # only one of these
-    use_gt_redshift: False   # two can be True
-                             # set redshift_supervision to True
-                             # to make these two effective
-
+    apply_gt_redshift: False
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1
     spatial_decod_output_dim: 16
@@ -162,7 +158,7 @@ trainer:
     train_spectra_pixels_only: True
     pixel_supervision: False
     spectra_supervision: False
-    redshift_supervision: True
+    redshift_supervision: False
     spectra_beta: 1
     redshift_beta: 1
     pretrain_pixel_beta: 0.01
@@ -176,7 +172,7 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230529-180531'
-    pretrain_log_dir: '20230615-130032'
+    pretrain_log_dir: '20230617-213329'
     pretrained_model_name: 'model-ep4000-it1.pth'
 
     num_trans_samples: 40

@@ -307,8 +307,8 @@ class AstroInferrer(BaseInferrer):
 
         self.requested_fields = ["coords"]
         if self.pretrain_infer:
-            if self.extra_args["use_gt_redshift"]:
-                self.requested_fields.append("redshift_data")
+            # if self.extra_args["apply_gt_redshift"]:
+            self.requested_fields.append("redshift_data")
             self.dataset_length = self.num_sup_spectra
         else:
             self.dataset_length = self.dataset.get_num_validation_spectra()
@@ -338,7 +338,7 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             self.dataset_length = self.extra_args["qtz_num_embed"]
         elif self.recon_codebook_spectra_individ:
-            if self.pretrain_infer and self.extra_args["use_gt_redshift"]:
+            if self.pretrain_infer: # and self.extra_args["apply_gt_redshift"]:
                 self.requested_fields.append("redshift_data")
             self.dataset_length = self.num_sup_spectra
 
@@ -708,7 +708,7 @@ class AstroInferrer(BaseInferrer):
                         # self.extra_args["num_epochs"],
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
-                        use_gt_redshift=self.extra_args["use_gt_redshift"],
+                        apply_gt_redshift=self.extra_args["apply_gt_redshift"],
                         pretrain_infer=self.pretrain_infer,
                         quantize_latent=self.quantize_latent,
                         quantize_spectra=self.quantize_spectra,
@@ -744,7 +744,7 @@ class AstroInferrer(BaseInferrer):
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
                         pretrain_infer=self.pretrain_infer,
-                        use_gt_redshift=self.extra_args["use_gt_redshift"],
+                        apply_gt_redshift=self.extra_args["apply_gt_redshift"],
                         quantize_latent=self.quantize_latent,
                         quantize_spectra=self.quantize_spectra,
                         quantization_strategy=self.extra_args["quantization_strategy"],
