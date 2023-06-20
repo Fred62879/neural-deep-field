@@ -11,14 +11,16 @@ from wisp.models.layers import Normalization, Quantization
 
 class HyperSpectralDecoder(nn.Module):
 
-    def __init__(self, integrate=True, scale=True, **kwargs):
+    def __init__(self, integrate=True, scale=True, _model_redshift=True, **kwargs):
 
         super(HyperSpectralDecoder, self).__init__()
 
         self.kwargs = kwargs
         self.scale = scale
 
-        self.convert = HyperSpectralConverter(**kwargs)
+        self.convert = HyperSpectralConverter(
+            _model_redshift=_model_redshift, **kwargs
+        )
         self.spectra_decoder = Decoder(**kwargs)
         self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
@@ -30,6 +32,7 @@ class HyperSpectralDecoder(nn.Module):
         if quantize_spectra:
             bsz = wave.shape[0]
             # each input coord has #num_code spectra generated
+
             latents = torch.stack([
                 self.convert(wave, code.tile(bsz,1,1), redshift, wave_bound)
                 for code in codebook.weight

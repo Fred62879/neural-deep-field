@@ -134,11 +134,7 @@ class AstroInferrer(BaseInferrer):
             and (self.quantize_latent or self.quantize_spectra) \
             and self.space_dim == 3
         self.plot_redshift = "plot_redshift" in tasks \
-            and self.extra_args["generate_redshift"] \
-            and (self.quantize_latent or self.quantize_spectra) \
-            and self.space_dim == 3
-        self.log_redshift = "log_redshift" in tasks \
-            and self.extra_args["generate_redshift"] \
+            and self.extra_args["redshift_supervision"] \
             and (self.quantize_latent or self.quantize_spectra) \
             and self.space_dim == 3
         self.plot_scaler =  "plot_save_scaler" in tasks \
@@ -147,13 +143,17 @@ class AstroInferrer(BaseInferrer):
             and self.space_dim == 3
 
         self.save_soft_qtz_weights = "save_soft_qtz_weights" in tasks \
-            and ((self.quantize_latent and self.extra_args["quantization_strategy"] == "soft") \
-                 or self.quantize_spectra) \
-            and self.space_dim == 3
-
+            and ((self.quantize_latent and \
+                  self.extra_args["quantization_strategy"] == "soft"
+            ) or self.quantize_spectra) and self.space_dim == 3
         self.log_soft_qtz_weights = "log_soft_qtz_weights" in tasks \
-            and ((self.quantize_latent and self.extra_args["quantization_strategy"] == "soft") \
-                 or self.quantize_spectra) \
+            and ((self.quantize_latent and \
+                  self.extra_args["quantization_strategy"] == "soft"
+            ) or self.quantize_spectra) and self.space_dim == 3
+        self.log_redshift = "log_redshift" in tasks \
+            and (self.extra_args["apply_gt_redshift"] or \
+                 self.extra_args["redshift_supervision"]) \
+            and (self.quantize_latent or self.quantize_spectra) \
             and self.space_dim == 3
 
         # infer all coords using modified model (recon codebook spectra)
@@ -252,16 +252,15 @@ class AstroInferrer(BaseInferrer):
             self.requested_fields.append("pixels")
         if self.pretrain_infer:
             self.requested_fields.append("spectra_data")
+            self.requested_fields.append("redshift_data")
 
-        if self.pretrain_infer:
+        if self.pretrain_infer:              # inferrence after pre-train
             self.dataset_length = self.num_sup_spectra
-        elif self.infer_spectra_pixels_only:
+        elif self.infer_spectra_pixels_only: # inferrence after main train
             self.dataset_length = self.dataset.get_num_validation_spectra()
-        else:
+        else:                                # inferrence after main train
             self.dataset_length = self.dataset.get_num_coords()
-
         self.batch_size = min(self.extra_args["infer_batch_size"], self.dataset_length)
-
         self.reset_dataloader(drop_last=False)
 
         if self.recon_img:
@@ -338,7 +337,8 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             self.dataset_length = self.extra_args["qtz_num_embed"]
         elif self.recon_codebook_spectra_individ:
-            if self.pretrain_infer: # and self.extra_args["apply_gt_redshift"]:
+            assert self.extra_args["apply_gt_redshift"]
+            if self.pretrain_infer:
                 self.requested_fields.append("redshift_data")
             self.dataset_length = self.num_sup_spectra
 
@@ -658,7 +658,8 @@ class AstroInferrer(BaseInferrer):
                         quantize_latent=self.quantize_latent,
                         quantize_spectra=self.quantize_spectra,
                         quantization_strategy=self.extra_args["quantization_strategy"],
-                        save_soft_qtz_weights=self.save_soft_qtz_weights or self.log_soft_qtz_weights,
+                        save_soft_qtz_weights=self.save_soft_qtz_weights or \
+                                              self.log_soft_qtz_weights,
                         recon_img=self.recon_img or self.recon_img_pretrain or \
                                   self.recon_img_valid_spectra,
                         save_scaler=self.plot_scaler,
@@ -774,7 +775,6 @@ class AstroInferrer(BaseInferrer):
         """
         if self.space_dim == 3:
             self.requested_fields.extend(["trans_data"])
-        print(self.requested_fields)
 
         self.dataset.set_mode(self.mode)
         self.dataset.set_length(self.dataset_length)

@@ -139,8 +139,8 @@ def forward(
         pretrain_infer=False,
         pixel_supervision_train=False,
         spectra_supervision_train=False,
-        redshift_supervision_train=False,
-        apply_gt_redshift=False,
+        redshift_supervision_train=False, # these two conflicts
+        apply_gt_redshift=False,          #   each other
         recon_img=False, # reconstruct img, embed map, redshift heatmap, etc.
         recon_spectra=False,
         recon_codebook_spectra=False,
@@ -203,8 +203,7 @@ def forward(
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
 
-        if pretrain_infer and apply_gt_redshift and recon_codebook_spectra_individ:
-            # assert(codebook_pretrain or pretrain_infer)
+        if codebook_pretrain or pretrain_infer:
             net_args["specz"] = data["spectra_sup_redshift"]
 
         if spectra_supervision_train:

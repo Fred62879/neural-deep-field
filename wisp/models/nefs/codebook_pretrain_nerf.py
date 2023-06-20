@@ -10,10 +10,11 @@ from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
 class CodebookPretrainNerf(BaseNeuralField):
-    def __init__(self, pretrain_pixel_supervision, **kwargs):
+    def __init__(self, pretrain_pixel_supervision, _model_redshift=True, **kwargs):
         super(CodebookPretrainNerf, self).__init__()
 
         self.kwargs = kwargs
+        self.model_redshift = _model_redshift
         self.pixel_supervision = pretrain_pixel_supervision
         self.init_model()
 
@@ -38,7 +39,10 @@ class CodebookPretrainNerf(BaseNeuralField):
             **self.kwargs)
 
         self.hps_decoder = HyperSpectralDecoder(
-            integrate=self.pixel_supervision, scale=self.pixel_supervision, **self.kwargs)
+            integrate=self.pixel_supervision,
+            scale=self.pixel_supervision,
+            _model_redshift=self.model_redshift,
+            **self.kwargs)
 
     def pretrain(self, coords, wave, full_wave_bound, trans=None, nsmpl=None, qtz_args=None, specz=None):
         """ Pretrain codebook.

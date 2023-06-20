@@ -26,7 +26,7 @@ global:
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
-    tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
+    #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['train','infer','recon_img'] #,'recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
 optimizer:
@@ -107,7 +107,7 @@ qtz:
 
 spatial_decod:
     generate_scaler: True
-    apply_gt_redshift: False
+    apply_gt_redshift: True
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1
     spatial_decod_output_dim: 16
@@ -158,7 +158,7 @@ trainer:
     train_spectra_pixels_only: True
     pixel_supervision: False
     spectra_supervision: False
-    redshift_supervision: False
+    redshift_supervision: False # contradict with apply_gt_redshift
     spectra_beta: 1
     redshift_beta: 1
     pretrain_pixel_beta: 0.01
@@ -180,7 +180,7 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 20
+    num_supervision_spectra: 5
     spectra_neighbour_size: 1
 
 infer:

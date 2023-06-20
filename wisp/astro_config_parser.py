@@ -63,8 +63,13 @@ def get_pipelines_from_config(args, tasks={}):
         if "codebook_pretrain" in tasks and args.pretrain_codebook:
             assert(args.quantize_latent or args.quantize_spectra)
             pretrain_nef = CodebookPretrainNerf(
-                args.codebook_pretrain_pixel_supervision, **vars(args))
-            codebook_nef = CodebookNef(integrate=False, **vars(args))
+                args.codebook_pretrain_pixel_supervision,
+                _model_redshift=args.model_redshift,
+                **vars(args)
+            )
+            codebook_nef = CodebookNef(
+                integrate=False, _model_redshift=False, **vars(args)
+            )
             pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
             pipelines["codebook"] = AstroPipeline(codebook_nef)
 
@@ -78,7 +83,7 @@ def get_pipelines_from_config(args, tasks={}):
                 spectra_nef = CodebookPretrainNerf(False, **vars(args))
                 pipelines["spectra_infer"] = AstroPipeline(spectra_nef)
 
-            if "recon_codebook_spectra_individ" in tasks and args.redshift_supervision:
+            if "recon_codebook_spectra_individ" in tasks:
                 pretrain_nef = CodebookPretrainNerf(False, **vars(args))
                 pipelines["codebook_individ"] = AstroPipeline(pretrain_nef)
 

@@ -236,8 +236,8 @@ class AstroDataset(Dataset):
             out["num_spectra_coords"] = len(spectra_coords)
 
     def get_redshift_data(self, out):
-        if self.kwargs["redshift_supervision"]:
-            out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
+        # if self.kwargs["redshift_supervision"]:
+        out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
 
     def __len__(self):
         """ Length of the dataset in number of coords.

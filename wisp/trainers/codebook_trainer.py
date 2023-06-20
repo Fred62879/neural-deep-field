@@ -66,6 +66,7 @@ class CodebookTrainer(BaseTrainer):
     #############
 
     def init_net(self):
+        print('**', type(self.pipeline))
         self.train_pipeline = self.pipeline[0]
         self.infer_pipeline = self.pipeline[1]
         self.latents = nn.Embedding(
@@ -384,6 +385,9 @@ class CodebookTrainer(BaseTrainer):
 
     def validate(self):
         """ Perform validation (recon gt spectra, codebook spectra etc.).
+            Codebook spectra reconstruced here don't involve redshift,
+              to see the codebook spectra under each individual redshift,
+              use astro_inferrer.
         """
         load_model_weights(self.infer_pipeline, self.train_pipeline.state_dict())
         self.infer_pipeline.eval()

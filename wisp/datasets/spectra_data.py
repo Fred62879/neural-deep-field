@@ -369,8 +369,8 @@ class SpectraData:
         self.data["supervision_fluxes"] = self.data["gt_spectra_fluxes"][:n]
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][:n]
-        if self.kwargs["redshift_supervision"]:
-            self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][:n]
+        # if self.kwargs["redshift_supervision"]:
+        self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][:n]
 
         # valiation spectra data (used during main training)
         self.data["validation_coords"] = self.data["gt_spectra_grid_coords"][n:]
