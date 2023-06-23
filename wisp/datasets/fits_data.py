@@ -23,13 +23,14 @@ from wisp.utils.numerical import normalize_coords, normalize, \
 
 class FitsData:
     """ Data class for all selected patches. """
-    def __init__(self, dataset_path, device, **kwargs):
+    def __init__(self, dataset_path, device, spectra_obj=None, **kwargs):
         self.kwargs = kwargs
         self.qtz = kwargs["quantize_latent"] or kwargs["quantize_spectra"]
 
         if not self.require_any_data(kwargs["tasks"]): return
 
         self.device = device
+        self.spectra_obj = spectra_obj
         self.dataset_path = dataset_path
         self.verbose = kwargs["verbose"]
         self.num_bands = kwargs["num_bands"]
@@ -520,6 +521,7 @@ class FitsData:
             cutout_start_pos=cutout_start_pos,
             pixel_norm_cho=self.kwargs["train_pixels_norm"],
             full_patch=self.kwargs["use_full_patch"],
+            spectra_obj=self.spectra_obj,
             **self.kwargs)
 
         patch_uid = cur_patch.get_patch_uid()

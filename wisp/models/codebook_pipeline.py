@@ -20,8 +20,8 @@ class CodebookPipeline(nn.Module):
 
         self.spatial_decoder = SpatialDecoder(
             output_scaler=False,
-            output_redshift=self.kwargs["generate_redshift"],
             qtz_calculate_loss=False,
+            output_redshift=self.kwargs["model_redshift"],
             **self.kwargs)
 
         self.hps_decoder = HyperSpectralDecoder(

@@ -184,11 +184,11 @@ class Quantization(nn.Module):
             else: min_embed_ids = None
 
             weights = z * temperature * self.kwargs["qtz_temperature_scale"]
-            weights = nn.functional.softmax(weights, dim=-1) # [bsz,1,num_embeds]
+            # weights = nn.functional.softmax(weights, dim=-1) # [bsz,1,num_embeds]
 
             # regularize s.t. l2 norm of weights sum to 1
-            #regu = torch.pow(torch.sum(weights**2, dim=-1, keepdim=True), 0.5)
-            #weights = weights / (regu + 1e-10)
+            regu = torch.pow(torch.sum(weights**2, dim=-1, keepdim=True), 0.5)
+            weights = weights / (regu + 1e-10)
 
             if self.kwargs["quantize_spectra"]:
                 codebook = codebook.permute(1,0,2) # [bsz,num_embeds,full_nsmpl]

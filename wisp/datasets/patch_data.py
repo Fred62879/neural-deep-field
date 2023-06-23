@@ -23,7 +23,7 @@ class PatchData:
     def __init__(self, dataset_path, tract, patch,
                  load_pixels=False, load_coords=False, load_weights=False,
                  cutout_num_rows=None, cutout_num_cols=None, cutout_start_pos=None,
-                 pixel_norm_cho=None, full_patch=True, **kwargs
+                 pixel_norm_cho=None, full_patch=True, spectra_obj=None, **kwargs
     ):
         """ @Param
                dataset_path: path of local data directory.
@@ -42,6 +42,7 @@ class PatchData:
         self.cutout_num_cols = cutout_num_cols
         self.cutout_start_pos = cutout_start_pos
         self.pixel_norm_cho = pixel_norm_cho
+        self.spectra_obj = spectra_obj
 
         self.verbose = kwargs["verbose"]
         self.num_bands = kwargs["num_bands"]
@@ -167,6 +168,16 @@ class PatchData:
             return self.data["coords"][idx]
         return self.data["coords"]
 
+    def get_spectra_pixel_ids(self):
+        """ Get id of pixels with gt spectra data. """
+        return self.spectra_pixel_ids
+
+    def get_spectra_pixel_fluxes(self):
+        return self.data["spectra_pixel_fluxes"]
+
+    def get_spectra_pixel_redshifts(self):
+        return self.data["spectra_pixel_redshifts"]
+
     ############
     # Utilities
     ############
@@ -174,6 +185,11 @@ class PatchData:
     def calculate_local_id(self, r, c):
         """ Count number of pixels before given position in current patch.
         """
+        # return self.cur_num_cols * r + c
+        if not self.use_full_patch:
+            start_r, start_c = self.cutout_start_pos
+            r = r - start_r
+            c = c - start_c
         return self.cur_num_cols * r + c
 
     def calculate_neighbour_ids(self, r, c, neighbour_size):
@@ -196,6 +212,7 @@ class PatchData:
     def get_pixel_ids(self, r, c, neighbour_size=1):
         """ Get id of given position in current patch.
             If neighbour_size is > 1, also find id of neighbour pixels within neighbour_size.
+            @Param: r/c, img coord in terms of the full patch
             @Return: ids [n,]
         """
         if neighbour_size <= 1:
@@ -251,6 +268,22 @@ class PatchData:
 
         if self.load_weights:
             self.data["weights"] = weights
+
+    def load_spectra_data(self):
+        """ Load spectra fluxes and redshift values for all pixels with gt spectra.
+        """
+        path = self.spectra_obj.get_processed_spectra_path()
+        cur_patch_coords_fname = join(path, f"{self.patch_uid}_coords.npy")
+        cur_patch_spectra_fname = join(path, f"{self.patch_uid}_spectra.npy")
+        cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
+        coords = np.load(cur_patch_coords_fname)
+        spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]
+        redshifts = np.load(cur_patch_redshift_fname)
+
+        self.spectra_pixel_ids = self.get_pixel_ids(coords[:,0], coords[:,1])
+        self.data["spectra_pixel_wave"] = spectra[:,0]
+        self.data["spectra_pixel_fluxes"] = spectra[:,1]
+        self.data["spectra_pixel_redshifts"] = redshifts
 
     def get_world_coords(self):
         """ Get ra/dec coords from current patch and normalize.

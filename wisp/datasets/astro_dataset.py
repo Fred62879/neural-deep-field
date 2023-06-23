@@ -48,10 +48,10 @@ class AstroDataset(Dataset):
             Load only needed data based on given tasks (in kwargs).
         """
         self.data = {}
-        self.fits_dataset = FitsData(self.root, self.device, **self.kwargs)
         self.trans_dataset = TransData(self.root, self.device, **self.kwargs)
-        self.spectra_dataset = SpectraData(self.fits_dataset, self.trans_dataset,
+        self.spectra_dataset = SpectraData(self.trans_dataset,
                                            self.root, self.device, **self.kwargs)
+        self.fits_dataset = FitsData(self.root, self.device, self.spectra_dataset, **self.kwargs)
         self.mask_dataset = MaskData(self.fits_dataset, self.root, self.device, **self.kwargs)
 
         # randomly initialize
