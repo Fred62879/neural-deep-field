@@ -139,8 +139,9 @@ def forward(
         pretrain_infer=False,
         pixel_supervision_train=False,
         spectra_supervision_train=False,
-        redshift_supervision_train=False,  #  |- these three conflict each other
-        apply_gt_redshift=False,          # -
+        apply_gt_redshift=False,      # -
+        redshift_unsupervision=False, #  |- these three conflict each other
+        redshift_semi_supervision=False,   # -
         recon_img=False, # reconstruct img, embed map, redshift heatmap, etc.
         recon_spectra=False,
         recon_codebook_spectra=False,
@@ -182,11 +183,10 @@ def forward(
         if save_spectra: requested_channels.append("spectra")
         if save_latents: requested_channels.append("latents")
         if save_codebook: requested_channels.append("codebook")
+        if save_redshift: requested_channels.append("redshift")
         if codebook_pretrain: requested_channels.append("spectra")
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if spectra_supervision_train: requested_channels.append("spectra")
-        if save_redshift or redshift_supervision_train:
-            requested_channels.append("redshift")
         if train and quantize_latent and quantization_strategy == "hard" \
            and calculate_codebook_loss:
             requested_channels.append("codebook_loss")
@@ -203,7 +203,8 @@ def forward(
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
 
-        if codebook_pretrain or pretrain_infer or redshift_supervision:
+        if codebook_pretrain or pretrain_infer or \
+           apply_gt_redshift or redshift_semi_supervision:
             net_args["specz"] = data["spectra_sup_redshift"]
 
         if spectra_supervision_train:

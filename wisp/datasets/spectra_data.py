@@ -373,7 +373,6 @@ class SpectraData:
         self.data["supervision_fluxes"] = self.data["gt_spectra_fluxes"][:n]
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][:n]
-        # if self.kwargs["redshift_supervision"]:
         self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][:n]
 
         # valiation spectra data (used during main training)
@@ -381,7 +380,7 @@ class SpectraData:
         self.data["validation_fluxes"] = self.data["gt_spectra_fluxes"][n:]
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["validation_pixels"] = self.data["gt_spectra_pixels"][n:]
-        if self.kwargs["redshift_supervision"]:
+        if self.kwargs["redshift_semi_supervision"]:
             self.data["validation_redshift"] = self.data["gt_spectra_redshift"][n:]
 
     def load_cached_spectra_data(self):

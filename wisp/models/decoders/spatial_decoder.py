@@ -13,7 +13,7 @@ class SpatialDecoder(nn.Module):
           a codebook which is optimizaed simultaneously during training
     """
     def __init__(self, output_scaler,
-                 output_redshift, apply_redshift, semi_redshift_sup,
+                 apply_redshift, redshift_unsup, redshift_semisup,
                  qtz_calculate_loss, **kwargs
     ):
         super(SpatialDecoder, self).__init__()
@@ -31,11 +31,11 @@ class SpatialDecoder(nn.Module):
 
         self.output_scaler = self.qtz and output_scaler
 
-        # we either pred redshift and supervise or apply gt redshift directly
-        assert sum([output_redshift, apply_redshift, semi_redshift_sup]) <= 1
-        self.output_redshift = self.qtz and output_redshift
+        # we either pred redshift and supervise or apply gt redshift directly or semi-sup
+        assert sum([apply_redshift, redshift_unsup, redshift_semisup]) <= 1
         self.apply_gt_redshift = self.qtz and apply_redshift
-        self.semi_redshift_sup = self.qtz and semi_redshift_sup
+        self.redshift_unsup = self.qtz and redshift_unsup
+        self.redshift_semisup = self.qtz and redshift_semisup
 
         self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
 
@@ -52,7 +52,7 @@ class SpatialDecoder(nn.Module):
         if self.output_scaler:
             self.init_scaler_decoder()
 
-        if self.output_redshift or self.semi_redshift_sup:
+        if self.redshift_unsup or self.redshift_semisup:
             self.init_redshift_decoder()
 
     def init_scaler_decoder(self):
@@ -98,21 +98,24 @@ class SpatialDecoder(nn.Module):
         """ Decode latent variables
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
+              specz: spectroscopic (gt) redshift
+              sup_id: id of pixels to supervise with gt redshift
         """
         if self.output_scaler:
             scaler = self.scaler_decoder(z[:,0])[...,0]
         else: scaler = None
 
-        if self.semi_redshift_sup:
+        if self.apply_gt_redshift:   # dont generate redshift
+            assert specz is not None
+            redshift = specz
+        elif self.redshift_unsup:    # generate redshift w/o supervision
+            redshift = self.redshift_decoder(z[:,0])[...,0]
+            redshift = self.redshift_adjust(redshift + 0.5)
+        elif self.redshift_semisup:   # generate redshift, semi-supervise
+            assert specz is not None and sup_id is not None
             redshift = self.redshift_decoder(z[:,0])[...,0]
             redshift = self.redshift_adjust(redshift + 0.5)
             redshift[sup_id] = specz
-        elif self.apply_gt_redshift:
-            assert specz is not None
-            redshift = specz
-        elif self.output_redshift:
-            redshift = self.redshift_decoder(z[:,0])[...,0]
-            redshift = self.redshift_adjust(redshift + 0.5)
         else: redshift = None
 
         if self.quantize_spectra:

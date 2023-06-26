@@ -459,12 +459,12 @@ def define_cmd_line_args():
                              help="whether training supervised by pixel values or not.")
     train_group.add_argument("--spectra-supervision", action="store_true",
                              help="whether training supervised by spectra or not.")
-    train_group.add_argument("--redshift-supervision", action="store_true",
-                             help="whether training supervised by redshift or not.")
-    train_group.add_argument("--semi-redshift-supervision", action="store_true",
-                             help="used during main train after codebook pretrain.")
     train_group.add_argument("--apply-gt-redshift", action="store_true",
-                             help="whether apply gt redshift directly to spectra or not.")
+                             help="apply gt redshift instead of generating redshift.")
+    train_group.add_argument("--redshift-unsupervision", action="store_true",
+                             help="generate redshift w/o supervision.")
+    train_group.add_argument("--redshift-semi-supervision", action="store_true",
+                             help="generate redshift w. semi supervision.")
 
     train_group.add_argument("--spectra-supervision-start-epoch", type=int)
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")

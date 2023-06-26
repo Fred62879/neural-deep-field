@@ -97,7 +97,7 @@ class AstroTrainer(BaseTrainer):
         if self.spectra_supervision:
             fields.append("spectra_data")
 
-        if self.redshift_supervision:
+        if self.redshift_semi_supervision:
             fields.append("redshift_data")
 
         length = self.get_dataset_length()
@@ -121,16 +121,19 @@ class AstroTrainer(BaseTrainer):
 
         self.spectra_supervision = self.space_dim == 3 and \
             self.extra_args["spectra_supervision"]
-
         self.spectral_inpaint = self.pixel_supervision and \
             self.space_dim == 3 and "spectral_inpaint" in tasks
 
-        self.apply_gt_redshift, self.redshift_supervision = False, False
         if self.space_dim == 3 and self.quantize and self.extra_args["model_redshift"]:
             self.apply_gt_redshift = self.extra_args["apply_gt_redshift"]
-            self.redshift_supervision = self.extra_args["redshift_supervision"]
-            assert not (self.redshift_supervision and self.apply_gt_redshift)
-            #assert not self.apply_gt_redshift
+            self.redshift_unsupervision = self.extra_args["redshift_unsupervision"]
+            self.redshift_semi_supervision = self.extra_args["redshift_semi_supervision"]
+            assert sum([
+                self.apply_gt_redshift, self.redshift_unsupervision,
+                self.redshift_semi_supervision]) <= 1 # at most one of these three can be True
+        else:
+            self.apply_gt_redshift, self.redshift_unsupervision, \
+                self.redshift_semi_supervision = False, False, False
 
         self.save_recon = self.pixel_supervision and \
             "save_recon_during_train" in tasks
@@ -194,7 +197,7 @@ class AstroTrainer(BaseTrainer):
             loss = self.get_loss(self.extra_args["spectra_loss_cho"])
             self.spectra_loss = partial(spectra_supervision_loss, loss)
 
-        if self.redshift_supervision:
+        if self.redshift_semi_supervision:
             loss = self.get_loss(self.extra_args["redshift_loss_cho"])
             self.redshift_loss = partial(redshift_supervision_loss, loss)
 
@@ -590,15 +593,17 @@ class AstroTrainer(BaseTrainer):
                       pixel_supervision_train=self.pixel_supervision or \
                                               self.train_spectra_pixels_only,
                       spectra_supervision_train=self.spectra_supervision,
-                      redshift_supervision_train=self.redshift_supervision,
+                      apply_gt_redshift=self.apply_gt_redshift,
+                      redshift_unsupervision=self.redshift_unsupervision,
+                      redshift_semi_supervision=self.redshift_semi_supervision,
+                      recon_img=False,
+                      recon_spectra=False,
+                      recon_codebook_spectra=False,
                       quantize_latent=self.quantize_latent,
                       quantize_spectra=self.quantize_spectra,
                       quantization_strategy=self.extra_args["quantization_strategy"],
                       save_soft_qtz_weights=True,
                       calculate_codebook_loss=self.quantize_latent,
-                      recon_img=False,
-                      recon_spectra=False,
-                      recon_codebook_spectra=False,
                       save_scaler=self.save_data_to_local and self.save_scaler,
                       save_spectra=self.save_data_to_local and self.plot_spectra,
                       save_latents=self.save_data_to_local and self.save_latents,
@@ -644,7 +649,7 @@ class AstroTrainer(BaseTrainer):
 
         # iii) redshift loss
         redshift_loss = 0
-        if self.redshift_supervision:
+        if self.redshift_semi_supervision:
             pred_redshift = ret["redshift"]
             gt_redshift = data["spectra_sup_redshift"]
             if self.extra_args["codebook_pretrain"]:
@@ -683,7 +688,7 @@ class AstroTrainer(BaseTrainer):
            self.epoch >= self.extra_args["spectra_supervision_start_epoch"]:
             log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
 
-        if self.redshift_supervision:
+        if self.redshift_semi_supervision:
             log_text += " | redshift loss: {:>.3E}".format(self.log_dict["redshift_loss"] / n)
         log.info(log_text)
 
@@ -723,8 +728,12 @@ class AstroTrainer(BaseTrainer):
         if self.save_scaler:
             self.plot_save_scaler()
 
-        if self.plot_embed_map:
-            self.plot_save_embed_map()
+        if self.save_redshift:
+            self.log.info(self.redshifts)
+
+        if self.save_codebook:
+            log.info(self.codebook_to_save)
+            # np.save(join(self.codebook_dir, f"{self.epoch}"), self.codebook_to_save)
 
         if self.save_recon or self.save_cropped_recon:
             self.restore_evaluate_tiles()
@@ -732,9 +741,8 @@ class AstroTrainer(BaseTrainer):
         if self.plot_spectra:
             self.plot_spectrum()
 
-        if self.save_codebook:
-            log.info(self.codebook_to_save)
-            # np.save(join(self.codebook_dir, f"{self.epoch}"), self.codebook_to_save)
+        if self.plot_embed_map:
+            self.plot_save_embed_map()
 
     def plot_save_scaler(self):
         """ Plot scaler values generated by the decoder before qtz for each pixel.

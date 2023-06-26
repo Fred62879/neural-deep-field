@@ -62,8 +62,8 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         self.spatial_decoder = SpatialDecoder(
             output_scaler=self.kwargs["generate_scaler"],
             apply_redshift=self.kwargs["apply_gt_redshift"],
-            output_redshift=self.kwargs["redshift_supervision"],
-            semi_redshift_sup=self.kwargs["semi_redshift_supervision"],
+            redshift_unsup=self.kwargs["redshift_unsupervision"],
+            redshift_semisup=self.kwargs["redshift_semi_supervision"],
             qtz_calculate_loss=calculate_loss, **self.kwargs)
 
         self.hps_decoder = HyperSpectralDecoder(

@@ -134,7 +134,7 @@ class AstroInferrer(BaseInferrer):
             and (self.quantize_latent or self.quantize_spectra) \
             and self.space_dim == 3
         self.plot_redshift = "plot_redshift" in tasks \
-            and self.extra_args["redshift_supervision"] \
+            and self.extra_args["model_redshift"] \
             and (self.quantize_latent or self.quantize_spectra) \
             and self.space_dim == 3
         self.plot_scaler =  "plot_save_scaler" in tasks \
@@ -151,8 +151,7 @@ class AstroInferrer(BaseInferrer):
                   self.extra_args["quantization_strategy"] == "soft"
             ) or self.quantize_spectra) and self.space_dim == 3
         self.log_redshift = "log_redshift" in tasks \
-            and (self.extra_args["apply_gt_redshift"] or \
-                 self.extra_args["redshift_supervision"]) \
+            and self.extra_args["model_redshift"] \
             and (self.quantize_latent or self.quantize_spectra) \
             and self.space_dim == 3
 
@@ -306,7 +305,6 @@ class AstroInferrer(BaseInferrer):
 
         self.requested_fields = ["coords"]
         if self.pretrain_infer:
-            # if self.extra_args["apply_gt_redshift"]:
             self.requested_fields.append("redshift_data")
             self.dataset_length = self.num_sup_spectra
         else:
@@ -388,6 +386,7 @@ class AstroInferrer(BaseInferrer):
 
         if self.plot_redshift or self.log_redshift:
             self.redshifts = []
+            if self.mode == "infer": self.redshift_mask = []
 
         if self.save_soft_qtz_weights or self.log_soft_qtz_weights:
             self.soft_qtz_weights = []
@@ -526,7 +525,11 @@ class AstroInferrer(BaseInferrer):
 
         if self.log_redshift:
             assert(self.mode == "pretrain_infer")
+
             redshifts = torch.stack(self.redshifts).detach().cpu().numpy()
+            if self.mode == "infer":
+                redshifts = redshifts[self.redshift_mask]
+
             fname = join(self.redshift_dir, f"{model_id}.pth")
             np.save(fname, redshifts)
             np.set_printoptions(precision=3)
@@ -683,6 +686,8 @@ class AstroInferrer(BaseInferrer):
                     self.embed_ids.extend(ret["min_embed_ids"])
                 if self.plot_redshift or self.log_redshift:
                     self.redshifts.extend(ret["redshift"])
+                    if self.mode == "infer":
+                        self.redshift_mask.extend(data["spectra_bin_map"])
                 if self.save_soft_qtz_weights or self.log_soft_qtz_weights:
                     self.soft_qtz_weights.extend(ret["soft_qtz_weights"])
 
