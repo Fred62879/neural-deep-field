@@ -24,6 +24,10 @@ from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_
 
 class AstroTrainer(BaseTrainer):
     """ Trainer class for astro dataset.
+        This trainer is used only in three cases:
+          i)   main train (without pretrain)
+          ii)  main train (following pretrain) supervised with only test spectra pixels
+          iii) main train (following pretrain) supervised with all pixels
     """
     def __init__(self, pipeline, dataset, optim_cls, optim_params, device, **extra_args):
         super().__init__(pipeline, dataset, optim_cls, optim_params, device, **extra_args)
@@ -85,6 +89,11 @@ class AstroTrainer(BaseTrainer):
             if self.spectral_inpaint:
                 pass
 
+        if self.extra_args["pretrain_codebook"]:
+            fields.extend(["spectra_id_map",
+                           "spectra_bin_map",
+                           "spectra_data"])
+
         if self.spectra_supervision:
             fields.append("spectra_data")
 
@@ -93,9 +102,9 @@ class AstroTrainer(BaseTrainer):
 
         length = self.get_dataset_length()
 
-        self.dataset.set_mode("train")
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
+        self.dataset.set_mode("main_train")
         self.set_coords()
 
     def summarize_training_tasks(self):
@@ -121,7 +130,7 @@ class AstroTrainer(BaseTrainer):
             self.apply_gt_redshift = self.extra_args["apply_gt_redshift"]
             self.redshift_supervision = self.extra_args["redshift_supervision"]
             assert not (self.redshift_supervision and self.apply_gt_redshift)
-            assert not self.apply_gt_redshift
+            #assert not self.apply_gt_redshift
 
         self.save_recon = self.pixel_supervision and \
             "save_recon_during_train" in tasks
@@ -618,8 +627,8 @@ class AstroTrainer(BaseTrainer):
 
         # ii) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
-        if self.spectra_supervision and \
-           self.epoch >= self.extra_args["spectra_supervision_start_epoch"]:
+        if self.spectra_supervision:
+            # and \self.epoch >= self.extra_args["spectra_supervision_start_epoch"]:
 
             gt_spectra = data["gt_spectra"]
 
@@ -638,12 +647,12 @@ class AstroTrainer(BaseTrainer):
         if self.redshift_supervision:
             pred_redshift = ret["redshift"]
             gt_redshift = data["spectra_sup_redshift"]
-            # ids = gt_redshift != -1
-            # if torch.count_nonzero(ids) != 0:
-            # print(gt_redshift.shape, pred_redshift.shape, ids.shape)
+            if self.extra_args["codebook_pretrain"]:
+                mask= data["spectra_bin_map"]
+            else: mask = None
+
             redshift_loss = self.redshift_loss(
-                gt_redshift, pred_redshift) * self.redshift_beta
-            # gt_redshift[ids], pred_redshift[ids]) * self.redshift_beta
+                gt_redshift, pred_redshift, mask=mask) * self.redshift_beta
             self.log_dict["redshift_loss"] += redshift_loss.item()
 
         # iv) latent quantization codebook loss

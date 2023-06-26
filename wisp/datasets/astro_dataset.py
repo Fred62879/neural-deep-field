@@ -56,7 +56,7 @@ class AstroDataset(Dataset):
 
         # randomly initialize
         self.set_length(0)
-        self.mode = "train"
+        self.mode = "main_train"
         self.coords_source = "fits"
         self.use_full_wave = False
         self.perform_integration = True
@@ -66,6 +66,8 @@ class AstroDataset(Dataset):
     ############
 
     def set_mode(self, mode):
+        """ Possible modes: ["pre_train","infer","main_train"]
+        """
         self.mode = mode
 
     def toggle_wave_sampling(self, use_full_wave: bool):
@@ -163,6 +165,10 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_pixels(idx)
         elif field == "weights":
             data = self.fits_dataset.get_weights(idx)
+        elif field == "spectra_id_map":
+            data = self.fits_dataset.get_spectra_id_map(idx)
+        elif field == "spectra_bin_map":
+            data = self.fits_dataset.get_spectra_bin_map(idx)
         elif field == "spectra":
             data = self.spectra_dataset.get_supervision_spectra(idx)
         elif field == "spectra_pixels":
@@ -203,37 +209,50 @@ class AstroDataset(Dataset):
             out["wave"] = out["wave"][None,:,None].tile(batch_size,1,1)
 
     def get_spectra_data(self, out):
-        """ Get unbatched spectra data
-            For either spectra supervision training or codebook pretrain.
+        """ Get unbatched spectra data during
+              i)   codebook pretrain or
+              ii)  main train after pretrain or
+              iii) spectra supervision training (without pretrain)
             Used only with very small amount of spectra.
             If we train on large amount of spectra, use batched data instead.
         """
         assert(self.kwargs["pretrain_codebook"] ^ self.kwargs["spectra_supervision"])
 
-        # get only supervision spectra (not all gt spectra) for loss calculation
-        out["spectra_sup_fluxes"] = self.spectra_dataset.get_supervision_fluxes()
-        out["spectra_sup_wave_bound_ids"] = self.spectra_dataset.get_supervision_wave_bound_ids()
-        if self.kwargs["codebook_pretrain_pixel_supervision"]:
-            out["spectra_sup_pixels"] = self.spectra_dataset.get_supervision_pixels()
-        if self.kwargs["redshift_supervision"]:
-            out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
-
-        n = self.spectra_dataset.get_num_gt_spectra()
         if self.kwargs["pretrain_codebook"]:
-            out["coords"] = self.data["spectra_latents"][:n]
-        else:
+            if self.mode == "pre_train":
+                n = self.spectra_dataset.get_num_gt_spectra()
+                out["coords"] = self.data["spectra_latents"][:n]
+                if self.kwargs["codebook_pretrain_pixel_supervision"]:
+                    out["spectra_sup_pixels"] = self.spectra_dataset.get_supervision_pixels()
+
+                # get only supervision spectra (not all gt spectra) for loss calculation
+                out["spectra_sup_fluxes"] = self.spectra_dataset.get_supervision_fluxes()
+                out["spectra_sup_wave_bound_ids"] = self.spectra_dataset.get_supervision_wave_bound_ids()
+
+            elif self.mode == "main_train":
+                bin_map = out["spectra_bin_map"]
+                ids = out["spectra_id_map"][bin_map]
+                # out["spectra_sup_fluxes"] = self.fits_dataset.get_spectra_pixel_fluxes(ids)
+                out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
+                del out["spectra_id_map"]
+                # del out["spectra_bin_map"]
+
+        elif self.kwargs["spectra_supervision"]:
+            assert self.mode == "main_train"
             out["full_wave"] = self.get_full_wave()
 
             # get all coords to plot all spectra (gt, dummy, incl. neighbours)
             spectra_coords = self.spectra_dataset.get_spectra_grid_coords()
             if "coords" in out:
                 out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
-            else:
-                out["coords"] = spectra_coords
+            else: out["coords"] = spectra_coords
 
             # the first #num_supervision_spectra are gt coords for supervision
             # the others are forwarded only for spectrum plotting
             out["num_spectra_coords"] = len(spectra_coords)
+
+            if self.kwargs["redshift_supervision"]:
+                out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
 
     def get_redshift_data(self, out):
         # if self.kwargs["redshift_supervision"]:

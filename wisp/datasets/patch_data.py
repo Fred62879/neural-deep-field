@@ -21,7 +21,7 @@ class PatchData:
     """ Data class for each patch. """
 
     def __init__(self, dataset_path, tract, patch,
-                 load_pixels=False, load_coords=False, load_weights=False,
+                 load_pixels=False, load_coords=False, load_weights=False, load_spectra=False,
                  cutout_num_rows=None, cutout_num_cols=None, cutout_start_pos=None,
                  pixel_norm_cho=None, full_patch=True, spectra_obj=None, **kwargs
     ):
@@ -37,6 +37,7 @@ class PatchData:
         self.load_pixels = load_pixels
         self.load_coords = load_coords
         self.load_weights = load_weights
+        self.load_spectra = load_spectra
         self.use_full_patch = full_patch
         self.cutout_num_rows = cutout_num_rows
         self.cutout_num_cols = cutout_num_cols
@@ -120,6 +121,9 @@ class PatchData:
         if self.load_pixels or self.load_weights:
             self.load_patch()
 
+        if self.load_spectra:
+            self.load_spectra_data()
+
     #############
     # Getters
     #############
@@ -168,15 +172,29 @@ class PatchData:
             return self.data["coords"][idx]
         return self.data["coords"]
 
+    def get_spectra_id_map(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_id_map"][idx]
+        return self.data["spectra_id_map"]
+
+    def get_spectra_bin_map(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_bin_map"][idx]
+        return self.data["spectra_bin_map"]
+
     def get_spectra_pixel_ids(self):
         """ Get id of pixels with gt spectra data. """
         return self.spectra_pixel_ids
 
-    def get_spectra_pixel_fluxes(self):
+    def get_spectra_pixel_fluxes(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_pixel_fluxes"][idx]
         return self.data["spectra_pixel_fluxes"]
 
-    def get_spectra_pixel_redshifts(self):
-        return self.data["spectra_pixel_redshifts"]
+    def get_spectra_pixel_redshift(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_pixel_redshift"][idx]
+        return self.data["spectra_pixel_redshift"]
 
     ############
     # Utilities
@@ -269,6 +287,20 @@ class PatchData:
         if self.load_weights:
             self.data["weights"] = weights
 
+    def filter_spectra(self, coords):
+        """ Filter out coords not present in current patch (out of range).
+            Only useful if we only use part of the current patch.
+            @Param
+              coords: [n,2] img coords of all spectra pixels in current patch.
+        """
+        ids = np.arange(len(coords))
+        if not self.use_full_patch:
+            r, c = self.cutout_start_pos
+            valid = (coords[:,0] >= r) & (coords[:,0] < r + self.cur_num_rows) & \
+                (coords[:,1] >= c) & (coords[:,1] < c + self.cur_num_cols)
+            ids = ids[valid]
+        return ids
+
     def load_spectra_data(self):
         """ Load spectra fluxes and redshift values for all pixels with gt spectra.
         """
@@ -278,12 +310,30 @@ class PatchData:
         cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
         coords = np.load(cur_patch_coords_fname)
         spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]
-        redshifts = np.load(cur_patch_redshift_fname)
+        redshift = np.load(cur_patch_redshift_fname)
+
+        valid_spectra_ids = self.filter_spectra(coords)
+        coords = coords[valid_spectra_ids]
+        spectra = spectra[valid_spectra_ids]
+        redshift = redshift[valid_spectra_ids]
+
+        self.num_spectra = len(coords)
+
+        spectra_bin_map = np.zeros((self.cur_num_rows, self.cur_num_cols)).astype(bool)
+        spectra_bin_map[coords[:,0],coords[:,1]] = 1
+        spectra_bin_map = spectra_bin_map.flatten()
+
+        ids = np.arange(self.num_spectra)
+        spectra_id_map = np.full((self.cur_num_rows, self.cur_num_cols), -1).astype(int)
+        spectra_id_map[coords[:,0],coords[:,1]] = ids
+        spectra_id_map = spectra_id_map.flatten()
 
         self.spectra_pixel_ids = self.get_pixel_ids(coords[:,0], coords[:,1])
+        self.data["spectra_id_map"] = spectra_id_map
+        self.data["spectra_bin_map"] = spectra_bin_map
         self.data["spectra_pixel_wave"] = spectra[:,0]
         self.data["spectra_pixel_fluxes"] = spectra[:,1]
-        self.data["spectra_pixel_redshifts"] = redshifts
+        self.data["spectra_pixel_redshift"] = redshift
 
     def get_world_coords(self):
         """ Get ra/dec coords from current patch and normalize.

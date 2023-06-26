@@ -12,7 +12,8 @@ class SpatialDecoder(nn.Module):
     """ Accept as input latent variables and quantize based on
           a codebook which is optimizaed simultaneously during training
     """
-    def __init__(self, output_scaler, output_redshift, apply_redshift,
+    def __init__(self, output_scaler,
+                 output_redshift, apply_redshift, semi_redshift_sup,
                  qtz_calculate_loss, **kwargs
     ):
         super(SpatialDecoder, self).__init__()
@@ -31,9 +32,10 @@ class SpatialDecoder(nn.Module):
         self.output_scaler = self.qtz and output_scaler
 
         # we either pred redshift and supervise or apply gt redshift directly
-        assert not (output_redshift and apply_redshift)
+        assert sum([output_redshift, apply_redshift, semi_redshift_sup]) <= 1
         self.output_redshift = self.qtz and output_redshift
         self.apply_gt_redshift = self.qtz and apply_redshift
+        self.semi_redshift_sup = self.qtz and semi_redshift_sup
 
         self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
 
@@ -50,7 +52,7 @@ class SpatialDecoder(nn.Module):
         if self.output_scaler:
             self.init_scaler_decoder()
 
-        if self.output_redshift:
+        if self.output_redshift or self.semi_redshift_sup:
             self.init_redshift_decoder()
 
     def init_scaler_decoder(self):
@@ -92,7 +94,7 @@ class SpatialDecoder(nn.Module):
             num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["spatial_decod_hidden_dim"], skip=[])
 
-    def forward(self, z, codebook, qtz_args, ret, specz=None):
+    def forward(self, z, codebook, qtz_args, ret, specz=None, sup_id=None):
         """ Decode latent variables
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
@@ -101,7 +103,12 @@ class SpatialDecoder(nn.Module):
             scaler = self.scaler_decoder(z[:,0])[...,0]
         else: scaler = None
 
-        if self.apply_gt_redshift:
+        if self.semi_redshift_sup:
+            redshift = self.redshift_decoder(z[:,0])[...,0]
+            redshift = self.redshift_adjust(redshift + 0.5)
+            redshift[sup_id] = specz
+        elif self.apply_gt_redshift:
+            assert specz is not None
             redshift = specz
         elif self.output_redshift:
             redshift = self.redshift_decoder(z[:,0])[...,0]

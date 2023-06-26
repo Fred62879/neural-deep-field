@@ -26,7 +26,7 @@ def spectra_supervision_loss(loss, gt_spectra, recon_spectra):
     emd = torch.mean(torch.abs(emd))
     return emd
 
-def redshift_supervision_loss(loss, gt_redshift, recon_redshift):
+def redshift_supervision_loss(loss, gt_redshift, recon_redshift, mask=None):
     ''' Loss function for few-shot redshift supervision
         @Param
           loss: l1/l2 as specified in config
@@ -34,7 +34,9 @@ def redshift_supervision_loss(loss, gt_redshift, recon_redshift):
           redshift_ids: ids of redshift to supervise
           redshift: [bsz, num_smpls]
     '''
-    return loss(gt_redshift, recon_redshift)
+    if bin_map is None:
+        return loss(gt_redshift, recon_redshift)
+    return loss(gt_redshift[mask], recon_redshift[mask])
 
 def spectral_masking_loss(loss, relative_train_bands, relative_inpaint_bands,
                           gt_pixels, recon_pixels, mask):

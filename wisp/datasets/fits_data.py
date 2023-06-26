@@ -60,12 +60,10 @@ class FitsData:
         self.load_weights = "train" in tasks and self.kwargs["weight_train"]
         self.load_pixels = len(tasks.intersection({"train","recon_img","log_pixel_value"}))
         self.load_coords = len(tasks.intersection({"train","recon_img","recon_synthetic_band","recon_gt_spectra"})) or self.kwargs["spectra_supervision"]
-        # self.load_redshift = self.kwargs["space_dim"] == 3 and self.qtz \
-        #     and self.kwargs["generate_redshift"] and self.kwargs["redshift_supervision"]
-        self.load_redshift = False
+        self.load_spectra = "train" in tasks and self.kwargs["pretrain_codebook"]
 
         return self.load_pixels or self.load_coords or \
-            self.load_weights or self.load_redshift or \
+            self.load_weights or self.load_spectra or \
             "recon_codebook_spectra" in tasks
 
     def compile_patch_fnames(self):
@@ -91,16 +89,22 @@ class FitsData:
             # use only with small number of selections
             suffix = create_selected_patches_uid(self, **self.kwargs)
         else:
-            suffix = self.kwargs["patch_selection_cho"]
+            suffix = "_" + self.kwargs["patch_selection_cho"]
 
         norm_str = self.kwargs["train_pixels_norm"]
         self.meta_data_fname = join(img_data_path, f"meta_data{suffix}.txt")
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.coords_fname = join(img_data_path, f"coords{suffix}.npy")
-        # self.coords_range_fname = join(img_data_path, f"coords_range{suffix}.npy")
-        self.coords_range_fname = join(img_data_path, self.kwargs["coords_range_fname"])
         self.pixels_fname = join(img_data_path, f"pixels_{norm_str}{suffix}.npy")
+        self.coords_range_fname = join(img_data_path, self.kwargs["coords_range_fname"])
         self.zscale_ranges_fname = join(img_data_path, f"zscale_ranges_{norm_str}{suffix}.npy")
+        self.spectra_id_map_fname = join(img_data_path, f"spectra_id_map_{norm_str}{suffix}.npy")
+        self.spectra_bin_map_fname = join(
+            img_data_path, f"spectra_bin_map_{norm_str}{suffix}.npy")
+        self.spectra_pixel_fluxes_fname = join(
+            img_data_path, f"spectra_pixel_fluxes_{norm_str}{suffix}.npy")
+        self.spectra_pixel_redshift_fname = join(
+            img_data_path, f"spectra_pixel_redshift_{norm_str}{suffix}.npy")
 
         # create path
         for path in paths:
@@ -115,10 +119,12 @@ class FitsData:
             (not self.load_pixels or (exists(self.pixels_fname) and \
                                       exists(self.zscale_ranges_fname))) and \
             (not self.load_coords or (exists(self.coords_fname) and \
-                                      exists(self.coords_range_fname)))
+                                      exists(self.coords_range_fname))) and \
+            (not self.load_spectra or (exists(self.spectra_id_map_fname) and \
+                                       exists(self.spectra_bin_map_fname)))
 
-        if cached: pixels, coords, weights = self.load_cache()
-        else:      pixels, coords, weights = self.process_data()
+        if cached: pixels, coords, weights, spectra_data  = self.load_cache()
+        else:      pixels, coords, weights, spectra_data = self.process_data()
 
         if self.load_pixels:
             pixel_max = np.round(np.max(pixels, axis=0), 3)
@@ -133,6 +139,14 @@ class FitsData:
 
         if self.load_weights:
             self.data["weights"] = torch.FloatTensor(weights)
+
+        if self.load_spectra:
+            spectra_id_map, spectra_bin_map, spectra_pixel_fluxes, \
+                spectra_pixel_redshift = spectra_data
+            self.data["spectra_id_map"] = spectra_id_map
+            self.data["spectra_bin_map"] = spectra_bin_map
+            self.data["spectra_pixel_fluxes"] = spectra_pixel_fluxes
+            self.data["spectra_pixel_redshift"] = spectra_pixel_redshift
 
     #############
     # Getters
@@ -172,6 +186,26 @@ class FitsData:
             return self.data["weights"][idx]
         return self.data["weights"]
 
+    def get_spectra_id_map(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_id_map"][idx]
+        return self.data["spectra_id_map"]
+
+    def get_spectra_bin_map(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_bin_map"][idx]
+        return self.data["spectra_bin_map"]
+
+    def get_spectra_pixel_fluxes(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_pixel_fluxes"][idx]
+        return self.data["spectra_pixel_fluxes"]
+
+    def get_spectra_pixel_redshift(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_pixel_redshift"][idx]
+        return self.data["spectra_pixel_redshift"]
+
     def get_zscale_ranges(self, patch_uid=None):
         zscale_ranges = np.load(self.zscale_ranges_fname)
         if patch_uid is not None:
@@ -179,7 +213,7 @@ class FitsData:
             zscale_ranges = zscale_ranges[id]
         return zscale_ranges
 
-    # def get_redshifts(self, idx=None):
+    # def get_redshift(self, idx=None):
     #     if idx is not None:
     #         return self.data["redshift"][idx]
     #     return self.data["redshift"]
@@ -446,7 +480,7 @@ class FitsData:
 
     def load_cache(self):
         if self.verbose: log.info("PATCH data cached.")
-        pixels, coords, weights = [None]*3
+        pixels, coords, weights, spectra_data = [None]*4
 
         with open(self.meta_data_fname, "rb") as fp:
             meta_data = pickle.load(fp)
@@ -462,10 +496,19 @@ class FitsData:
             coords, _ = normalize_coords(coords, coords_range=coords_range)
         if self.load_weights:
             weights = np.load(self.weights_fname)
-        return pixels, coords, weights
+        if self.load_spectra:
+            spectra_id_map = np.load(self.spectra_id_map_fname)
+            spectra_bin_map = np.load(self.spectra_bin_map_fname)
+            spectra_pixel_fluxes = np.load(self.spectra_pixel_fluxes_fname)
+            spectra_pixel_redshift = np.load(self.spectra_pixel_redshift_fname)
+            spectra_data = (spectra_id_map, spectra_bin_map,
+                            spectra_pixel_fluxes, spectra_pixel_redshift)
+        return pixels, coords, weights, spectra_data
 
     def process_data(self):
         pixels, coords, weights = [], [], []
+        spectra_id_map, spectra_bin_map = [], []
+        spectra_pixel_fluxes, spectra_pixel_redshift = [], []
         self.gt_paths, self.gt_img_fnames = {}, {}
         self.headers, self.num_rows, self.num_cols = {}, {}, {}
 
@@ -474,7 +517,8 @@ class FitsData:
                 self.patch_cutout_num_cols, self.patch_cutout_start_pos
         ):
             self.load_one_patch(
-                pixels, coords, weights,
+                pixels, coords, weights, spectra_id_map,
+                spectra_bin_map, spectra_pixel_fluxes, spectra_pixel_redshift,
                 tract, patch, cutout_num_rows, cutout_num_cols, cutout_start_pos)
 
         meta_data = (self.headers, self.num_rows, self.num_cols,
@@ -506,9 +550,22 @@ class FitsData:
             weights = np.concatenate(weights)
             np.save(self.weights_fname, weights)
 
-        return pixels, coords, weights
+        if self.load_spectra:
+            spectra_id_map = np.concatenate(spectra_id_map)
+            spectra_bin_map = np.concatenate(spectra_bin_map)
+            spectra_pixel_fluxes = np.concatenate(spectra_pixel_fluxes)
+            spectra_pixel_redshift = np.concatenate(spectra_pixel_redshift)
+            np.save(self.spectra_id_map_fname, spectra_id_map)
+            np.save(self.spectra_bin_map_fname, spectra_bin_map)
+            np.save(self.spectra_pixel_fluxes_fname, spectra_pixel_fluxes)
+            np.save(self.spectra_pixel_redshift_fname, spectra_pixel_redshift)
+            spectra_data = (spectra_id_map, spectra_bin_map,
+                            spectra_pixel_fluxes, spectra_pixel_redshift)
 
-    def load_one_patch(self, pixels, coords, weights,
+        return pixels, coords, weights, spectra_data
+
+    def load_one_patch(self, pixels, coords, weights, spectra_id_map,
+                       spectra_bin_map, spectra_pixel_fluxes, spectra_pixel_redshift,
                        tract, patch, cutout_num_rows, cutout_num_cols, cutout_start_pos
     ):
         cur_patch = PatchData(
@@ -516,6 +573,7 @@ class FitsData:
             load_pixels=self.load_pixels,
             load_coords=self.load_coords,
             load_weights=self.load_weights,
+            load_spectra=self.load_spectra,
             cutout_num_rows=cutout_num_rows,
             cutout_num_cols=cutout_num_cols,
             cutout_start_pos=cutout_start_pos,
@@ -537,21 +595,26 @@ class FitsData:
             coords.append(cur_patch.get_coords())
         if self.load_weights:
             weights.append(cur_patch.get_weights())
+        if self.load_spectra:
+            spectra_id_map.append(cur_patch.get_spectra_id_map())
+            spectra_bin_map.append(cur_patch.get_spectra_bin_map())
+            spectra_pixel_fluxes.append(cur_patch.get_spectra_pixel_fluxes())
+            spectra_pixel_redshift.append(cur_patch.get_spectra_pixel_redshift())
 
     ##############
-    # Load redshifts
+    # Load redshift
     ##############
 
     # def get_redshift_one_patch(self, id, patch_uid):
     #     if self.use_full_patch:
     #         num_rows, num_cols = self.num_rows[patch_uid], self.num_cols[patch_uid]
-    #         redshifts = -1 * np.ones((num_rows, num_cols))
+    #         redshift = -1 * np.ones((num_rows, num_cols))
     #     else:
     #         num_rows = self.patch_cutout_num_rows[index]
     #         num_cols = self.patch_cutout_num_cols[index]
-    #         redshifts = -1 * np.ones((num_rows, num_cols))
+    #         redshift = -1 * np.ones((num_rows, num_cols))
 
-    #     return redshifts
+    #     return redshift
 
     # def get_redshift_all_patch(self):
     #     """ Load dummy redshift values for now.

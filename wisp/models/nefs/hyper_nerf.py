@@ -61,8 +61,9 @@ class AstroHyperSpectralNerf(BaseNeuralField):
     def init_decoder(self, integrate, scale, calculate_loss):
         self.spatial_decoder = SpatialDecoder(
             output_scaler=self.kwargs["generate_scaler"],
-            output_redshift=self.kwargs["redshift_supervision"],
             apply_redshift=self.kwargs["apply_gt_redshift"],
+            output_redshift=self.kwargs["redshift_supervision"],
+            semi_redshift_sup=self.kwargs["semi_redshift_supervision"],
             qtz_calculate_loss=calculate_loss, **self.kwargs)
 
         self.hps_decoder = HyperSpectralDecoder(
@@ -83,6 +84,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
 
     def hyperspectral(self, coords, wave, full_wave_bound,
                       trans=None, nsmpl=None,
+                      specz=None, sup_id=None,
                       full_wave=None, num_spectra_coords=-1,
                       qtz_args=None, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
@@ -113,7 +115,9 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         if self.kwargs["encode_coords"]:
             latents = self.spatial_encoder(coords, lod_idx=lod_idx)
         else: latents = coords
-        latents = self.spatial_decoder(latents, self.codebook, qtz_args, ret)
+
+        latents = self.spatial_decoder(
+            latents, self.codebook, qtz_args, ret, specz=specz, sup_id=sup_id)
 
         self.hps_decoder(latents, wave, trans, nsmpl, full_wave_bound,
                          full_wave, num_spectra_coords,

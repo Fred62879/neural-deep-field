@@ -107,7 +107,7 @@ qtz:
 
 spatial_decod:
     generate_scaler: True
-    apply_gt_redshift: True
+    apply_gt_redshift: False
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1
     spatial_decod_output_dim: 16
@@ -156,9 +156,10 @@ trainer:
     codebook_pretrain_pixel_supervision: False
 
     train_spectra_pixels_only: False
-    pixel_supervision: False
+    pixel_supervision: True
     spectra_supervision: False
     redshift_supervision: False # contradict with apply_gt_redshift
+    semi_redshift_supervision: True # contradict with apply_gt_redshift
     spectra_beta: 1
     redshift_beta: 1
     pretrain_pixel_beta: 0.01
@@ -240,9 +241,9 @@ dataset:
     tracts: ['9812']
     patches: ['1,5']
     patch_selection_cho: "test"
-    patch_cutout_num_rows: [64]
-    patch_cutout_num_cols: [64]
-    patch_cutout_start_pos: [[86,188]] #[[1750,550]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    patch_cutout_num_rows: [1024]
+    patch_cutout_num_cols: [1024]
+    patch_cutout_start_pos: [[0,0]] #[[1750,550]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
     #num_bands: 1
     #sensor_collection_name: '1_i'

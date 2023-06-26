@@ -461,6 +461,8 @@ def define_cmd_line_args():
                              help="whether training supervised by spectra or not.")
     train_group.add_argument("--redshift-supervision", action="store_true",
                              help="whether training supervised by redshift or not.")
+    train_group.add_argument("--semi-redshift-supervision", action="store_true",
+                             help="used during main train after codebook pretrain.")
     train_group.add_argument("--apply-gt-redshift", action="store_true",
                              help="whether apply gt redshift directly to spectra or not.")
 
