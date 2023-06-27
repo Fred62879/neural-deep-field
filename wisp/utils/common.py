@@ -13,6 +13,14 @@ from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
+def print_shape(data):
+    for n,p in data.items():
+        if p is None:
+            print(f"{n} is None")
+        elif type(p) == tuple or type(p) == list:
+            print(n, len(p))
+        else: print(n, p.shape)
+
 def get_input_latents_dim(**kwargs):
     """ Infer the dimension of the input RA/DEC coordinate for MLP.
     """
@@ -187,6 +195,7 @@ def forward(
         if codebook_pretrain: requested_channels.append("spectra")
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if spectra_supervision_train: requested_channels.append("spectra")
+        if redshift_semi_supervision: requested_channels.append("redshift")
         if train and quantize_latent and quantization_strategy == "hard" \
            and calculate_codebook_loss:
             requested_channels.append("codebook_loss")
@@ -206,6 +215,8 @@ def forward(
         if codebook_pretrain or pretrain_infer or \
            apply_gt_redshift or redshift_semi_supervision:
             net_args["specz"] = data["spectra_sup_redshift"]
+            if redshift_semi_supervision:
+                net_args["sup_id"] = data["spectra_bin_map"]
 
         if spectra_supervision_train:
             net_args["full_wave"] = data["full_wave"]

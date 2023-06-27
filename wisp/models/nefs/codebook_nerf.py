@@ -14,7 +14,8 @@ class CodebookNef(BaseNeuralField):
         super(CodebookNef, self).__init__()
 
         self.hps_decoder = HyperSpectralDecoder(
-            integrate=integrate, scale=False, **kwargs)
+            integrate=integrate, scale=False,
+            _model_redshift=False, **kwargs)
 
         torch.cuda.empty_cache()
 

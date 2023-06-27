@@ -67,9 +67,7 @@ def get_pipelines_from_config(args, tasks={}):
                 _model_redshift=args.model_redshift,
                 **vars(args)
             )
-            codebook_nef = CodebookNef(
-                integrate=False, _model_redshift=False, **vars(args)
-            )
+            codebook_nef = CodebookNef(integrate=False, **vars(args))
             pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
             pipelines["codebook"] = AstroPipeline(codebook_nef)
 

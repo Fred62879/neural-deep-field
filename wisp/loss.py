@@ -34,9 +34,9 @@ def redshift_supervision_loss(loss, gt_redshift, recon_redshift, mask=None):
           redshift_ids: ids of redshift to supervise
           redshift: [bsz, num_smpls]
     '''
-    if bin_map is None:
+    if mask is None:
         return loss(gt_redshift, recon_redshift)
-    return loss(gt_redshift[mask], recon_redshift[mask])
+    return loss(gt_redshift, recon_redshift[mask])
 
 def spectral_masking_loss(loss, relative_train_bands, relative_inpaint_bands,
                           gt_pixels, recon_pixels, mask):

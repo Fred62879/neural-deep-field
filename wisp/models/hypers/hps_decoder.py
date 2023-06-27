@@ -3,10 +3,11 @@ import torch
 import torch.nn as nn
 
 from wisp.utils import PerfTimer
+from wisp.utils.common import print_shape
 from wisp.models.decoders import Decoder
+from wisp.models.layers import Normalization, Quantization
 from wisp.models.hypers.hps_converter import HyperSpectralConverter
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
-from wisp.models.layers import Normalization, Quantization
 
 
 class HyperSpectralDecoder(nn.Module):

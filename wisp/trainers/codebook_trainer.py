@@ -66,7 +66,6 @@ class CodebookTrainer(BaseTrainer):
     #############
 
     def init_net(self):
-        print('**', type(self.pipeline))
         self.train_pipeline = self.pipeline[0]
         self.infer_pipeline = self.pipeline[1]
         self.latents = nn.Embedding(
@@ -81,10 +80,10 @@ class CodebookTrainer(BaseTrainer):
     def configure_dataset(self):
         """ Configure dataset with selected fields and set length accordingly.
         """
-        self.dataset.set_mode("codebook_pretrain")
+        self.dataset.set_mode("pre_train")
 
         # set required fields from dataset
-        fields = ["trans_data","spectra_data","redshift_data"]
+        fields = ["coords","trans_data","spectra_data"] #,"redshift_data"]
         self.dataset.set_fields(fields)
 
         # set input latents for codebook net
@@ -480,7 +479,6 @@ class CodebookTrainer(BaseTrainer):
                       codebook_pretrain=True,
                       pixel_supervision_train=self.pixel_supervision,
                       apply_gt_redshift=self.apply_gt_redshift,
-                      redshift_supervision_train=False, #self.redshift_supervision,
                       quantize_spectra=True,
                       quantization_strategy="soft",
                       save_spectra=self.plot_spectra,

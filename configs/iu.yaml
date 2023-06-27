@@ -8,7 +8,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train','save_pixel_values_during_train','save_soft_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ','log_redshift','log_soft_qtz_weights','recon_img']
+    #tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ','log_redshift','log_soft_qtz_weights','recon_img']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -24,10 +24,10 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
-    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
+    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','log_redshift','plot_save_scaler','save_soft_qtz_weights']
 
-    tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
-    #tasks: ['train','infer','recon_img'] #,'recon_gt_spectra','plot_embed_map','recon_codebook_spectra','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
+    #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
+    tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','log_redshift','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
 
 optimizer:
     optimizer_type: 'adam'
@@ -85,8 +85,8 @@ grid:
     codebook_bitwidth: 20
 
 decoder:
-    decoder_num_layers: 3
-    decoder_hidden_dim: 128
+    decoder_num_layers: 1
+    decoder_hidden_dim: 64
     decoder_layer_type: 'none'
     decoder_activation_type: "relu"
 
@@ -136,7 +136,7 @@ trainer:
     spectra_loss_cho: l2
     redshift_loss_cho: l2
     num_epochs: 4000
-    batch_size: 65536 #262144
+    batch_size: 40960 #65536 #262144
     save_every: 400
     valid_every: 400
     render_tb_every: -1
@@ -175,8 +175,8 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230529-180531'
-    pretrain_log_dir: '20230617-213329'
-    pretrained_model_name: 'model-ep4000-it1.pth'
+    pretrain_log_dir: '20230626-203639'
+    pretrained_model_name: 'model-ep3200-it1.pth'
 
     num_trans_samples: 40
     uniform_sample_trans: True
@@ -243,9 +243,9 @@ dataset:
     tracts: ['9812']
     patches: ['1,5']
     patch_selection_cho: "test"
-    patch_cutout_num_rows: [1024]
-    patch_cutout_num_cols: [1024]
-    patch_cutout_start_pos: [[0,0]] #[[1750,550]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    patch_cutout_num_rows: [64]
+    patch_cutout_num_cols: [64]
+    patch_cutout_start_pos: [[754,1917]] #[[1750,550]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
     #num_bands: 1
     #sensor_collection_name: '1_i'
@@ -281,15 +281,15 @@ dataset:
     trans_sample_interval: 10
 
     spectra_data_source: "deimos"
-    gt_spectra_ids: [0] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
+    #gt_spectra_ids: [0] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
 
-    spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
-    spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
+    spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
+    spectra_patches_r: ['1'] #['0','1','2','3','4','5','6','7','8']
+    spectra_patches_c: ['5'] #['0','1','2','3','4','5','6','7','8']
 
-    num_gt_spectra: 40
+    num_gt_spectra: 100
     processed_spectra_cho: "test"
-    spectra_supervision_wave_lo: 6000
+    spectra_supervision_wave_lo: 6050
     spectra_supervision_wave_hi: 8000
     load_spectra_data_from_cache: True
 

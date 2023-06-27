@@ -294,11 +294,13 @@ class PatchData:
               coords: [n,2] img coords of all spectra pixels in current patch.
         """
         ids = np.arange(len(coords))
+        # print(self.use_full_patch, self.cur_num_rows, self.cutout_start_pos)
         if not self.use_full_patch:
             r, c = self.cutout_start_pos
             valid = (coords[:,0] >= r) & (coords[:,0] < r + self.cur_num_rows) & \
                 (coords[:,1] >= c) & (coords[:,1] < c + self.cur_num_cols)
             ids = ids[valid]
+        # print(ids, valid)
         return ids
 
     def load_spectra_data(self):
@@ -309,6 +311,7 @@ class PatchData:
         cur_patch_spectra_fname = join(path, f"{self.patch_uid}_spectra.npy")
         cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
         coords = np.load(cur_patch_coords_fname)
+        # print(coords)
         spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]
         redshift = np.load(cur_patch_redshift_fname)
 
@@ -319,13 +322,17 @@ class PatchData:
 
         self.num_spectra = len(coords)
 
+        if not self.use_full_patch:
+            r, c = self.cutout_start_pos
+        else: r, c = 0, 0
+
         spectra_bin_map = np.zeros((self.cur_num_rows, self.cur_num_cols)).astype(bool)
-        spectra_bin_map[coords[:,0],coords[:,1]] = 1
+        spectra_bin_map[coords[:,0]-r,coords[:,1]-c] = 1
         spectra_bin_map = spectra_bin_map.flatten()
 
         ids = np.arange(self.num_spectra)
         spectra_id_map = np.full((self.cur_num_rows, self.cur_num_cols), -1).astype(int)
-        spectra_id_map[coords[:,0],coords[:,1]] = ids
+        spectra_id_map[coords[:,0]-r,coords[:,1]-c] = ids
         spectra_id_map = spectra_id_map.flatten()
 
         self.spectra_pixel_ids = self.get_pixel_ids(coords[:,0], coords[:,1])

@@ -6,6 +6,7 @@ import numpy as np
 from collections import defaultdict
 
 from wisp.utils import PerfTimer
+from wisp.utils.common import print_shape
 from wisp.models.embedders import Encoder
 from wisp.models.layers import init_codebook
 from wisp.models.nefs import BaseNeuralField
@@ -20,14 +21,16 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         Different from how the base_nef works,
           here we use either the positional encoding or the grid for encoding.
     """
-    def __init__(self, integrate=True, scale=True, qtz_calculate_loss=True, **kwargs):
+    def __init__(self, integrate=True, scale=True,
+                 qtz_calculate_loss=True, _model_redshfit=True, **kwargs):
         self.kwargs = kwargs
 
         super(AstroHyperSpectralNerf, self).__init__()
 
         self.init_codebook()
         self.init_encoder()
-        self.init_decoder(integrate, scale, qtz_calculate_loss)
+        self.init_decoder(
+            integrate, scale, qtz_calculate_loss, _model_redshfit)
         torch.cuda.empty_cache()
 
     def init_codebook(self):
@@ -58,16 +61,18 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             **self.kwargs
         )
 
-    def init_decoder(self, integrate, scale, calculate_loss):
+    def init_decoder(self, integrate, scale, calculate_loss, _model_redshift):
         self.spatial_decoder = SpatialDecoder(
             output_scaler=self.kwargs["generate_scaler"],
             apply_redshift=self.kwargs["apply_gt_redshift"],
             redshift_unsup=self.kwargs["redshift_unsupervision"],
             redshift_semisup=self.kwargs["redshift_semi_supervision"],
-            qtz_calculate_loss=calculate_loss, **self.kwargs)
-
+            qtz_calculate_loss=calculate_loss, **self.kwargs
+        )
         self.hps_decoder = HyperSpectralDecoder(
-            integrate=integrate, scale=scale, **self.kwargs)
+            integrate=integrate, scale=scale,
+            _model_redshift=_model_redshift, **self.kwargs
+        )
 
     def get_nef_type(self):
         return 'hyperspectral'

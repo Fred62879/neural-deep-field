@@ -249,9 +249,11 @@ class AstroInferrer(BaseInferrer):
         self.requested_fields = ["coords"]
         if self.recon_img or self.recon_img_pretrain:
             self.requested_fields.append("pixels")
+        if self.log_redshift:
+            self.requested_fields.append("spectra_bin_map")
+            self.requested_fields.append("redshift_data")
         if self.pretrain_infer:
             self.requested_fields.append("spectra_data")
-            self.requested_fields.append("redshift_data")
 
         if self.pretrain_infer:              # inferrence after pre-train
             self.dataset_length = self.num_sup_spectra
@@ -303,9 +305,8 @@ class AstroInferrer(BaseInferrer):
                 "spectra_valid", self.dataset.get_validation_spectra_coords())
             self.dataset_length = self.dataset.get_num_validation_spectra()
 
-        self.requested_fields = ["coords"]
+        self.requested_fields = ["coords","spectra_data"]
         if self.pretrain_infer:
-            self.requested_fields.append("redshift_data")
             self.dataset_length = self.num_sup_spectra
         else:
             self.dataset_length = self.dataset.get_num_validation_spectra()
@@ -337,7 +338,7 @@ class AstroInferrer(BaseInferrer):
         elif self.recon_codebook_spectra_individ:
             assert self.extra_args["apply_gt_redshift"]
             if self.pretrain_infer:
-                self.requested_fields.append("redshift_data")
+                self.requested_fields.append("spectra_data")
             self.dataset_length = self.num_sup_spectra
 
         self.batch_size = min(self.extra_args["infer_batch_size"], self.dataset_length)
@@ -385,8 +386,9 @@ class AstroInferrer(BaseInferrer):
             self.embed_ids = []
 
         if self.plot_redshift or self.log_redshift:
-            self.redshifts = []
-            if self.mode == "infer": self.redshift_mask = []
+            self.redshift = []
+            if self.mode == "infer" and self.extra_args["pretrain_codebook"]:
+                self.redshift_mask = []
 
         if self.save_soft_qtz_weights or self.log_soft_qtz_weights:
             self.soft_qtz_weights = []
@@ -521,19 +523,23 @@ class AstroInferrer(BaseInferrer):
                 "zscale": False,
                 "calculate_metrics": False,
             }
-            _, _ = self.dataset.restore_evaluate_tiles(self.redshifts, **re_args)
+            _, _ = self.dataset.restore_evaluate_tiles(self.redshift, **re_args)
 
         if self.log_redshift:
-            assert(self.mode == "pretrain_infer")
+            redshift = torch.stack(self.redshift).detach().cpu().numpy()
 
-            redshifts = torch.stack(self.redshifts).detach().cpu().numpy()
-            if self.mode == "infer":
-                redshifts = redshifts[self.redshift_mask]
+            # during main inferrence, we have redshift for all pixels predicted
+            #   and we only log pixels with gt redshift & in validation set
+            if self.mode == "infer" and self.extra_args["pretrain_codebook"]:
+                redshift_mask = np.array(self.redshift_mask)
+                redshift = redshift[redshift_mask]
+                # self.gt_redshift = self.gt_redshift[redshift_mask]
 
             fname = join(self.redshift_dir, f"{model_id}.pth")
-            np.save(fname, redshifts)
+            np.save(fname, redshift)
             np.set_printoptions(precision=3)
-            log.info(f"Est. redshift {redshifts}")
+            log.info(f"Est. redshift {redshift}")
+            log.info(f"G.T. redshift {self.gt_redshift}")
 
         if self.plot_scaler:
             re_args = {
@@ -684,12 +690,15 @@ class AstroInferrer(BaseInferrer):
                     self.latents.extend(ret["latents"])
                 if self.plot_embed_map:
                     self.embed_ids.extend(ret["min_embed_ids"])
-                if self.plot_redshift or self.log_redshift:
-                    self.redshifts.extend(ret["redshift"])
-                    if self.mode == "infer":
-                        self.redshift_mask.extend(data["spectra_bin_map"])
                 if self.save_soft_qtz_weights or self.log_soft_qtz_weights:
                     self.soft_qtz_weights.extend(ret["soft_qtz_weights"])
+
+                if self.plot_redshift or self.log_redshift:
+                    if self.log_redshift:
+                        self.gt_redshift = data["spectra_valid_redshift"]
+                        if self.mode == "infer" and self.extra_args["pretrain_codebook"]:
+                            self.redshift_mask.extend(data["spectra_bin_map"])
+                    self.redshift.extend(ret["redshift"])
 
             except StopIteration:
                 if self.verbose: log.info("all coords inferrence done")

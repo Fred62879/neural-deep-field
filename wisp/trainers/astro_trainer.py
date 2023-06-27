@@ -18,7 +18,7 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
 from wisp.datasets import default_collate
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
-from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, load_pretrained_model_weights, forward
+from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, load_pretrained_model_weights, forward, print_shape
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
 
@@ -97,8 +97,8 @@ class AstroTrainer(BaseTrainer):
         if self.spectra_supervision:
             fields.append("spectra_data")
 
-        if self.redshift_semi_supervision:
-            fields.append("redshift_data")
+        # if self.redshift_semi_supervision:
+        #    fields.append("redshift_data")
 
         length = self.get_dataset_length()
 
@@ -614,8 +614,8 @@ class AstroTrainer(BaseTrainer):
         # i) reconstruction loss (taking inpaint into account)
         recon_loss, recon_pixels = 0, None
         if self.pixel_supervision or self.train_spectra_pixels_only:
-            recon_pixels = ret["intensity"]
             gt_pixels = data["pixels"]
+            recon_pixels = ret["intensity"]
 
             if self.extra_args["weight_train"]:
                 weights = data["weights"]
@@ -634,7 +634,6 @@ class AstroTrainer(BaseTrainer):
         spectra_loss, recon_spectra = 0, None
         if self.spectra_supervision:
             # and \self.epoch >= self.extra_args["spectra_supervision_start_epoch"]:
-
             gt_spectra = data["gt_spectra"]
 
             # todo: efficiently slice spectra with different bound
@@ -650,15 +649,17 @@ class AstroTrainer(BaseTrainer):
         # iii) redshift loss
         redshift_loss = 0
         if self.redshift_semi_supervision:
-            pred_redshift = ret["redshift"]
             gt_redshift = data["spectra_sup_redshift"]
-            if self.extra_args["codebook_pretrain"]:
-                mask= data["spectra_bin_map"]
-            else: mask = None
 
-            redshift_loss = self.redshift_loss(
-                gt_redshift, pred_redshift, mask=mask) * self.redshift_beta
-            self.log_dict["redshift_loss"] += redshift_loss.item()
+            if len(gt_redshift) > 0:
+                pred_redshift = ret["redshift"]
+                if self.extra_args["pretrain_codebook"]:
+                    mask= data["spectra_bin_map"]
+                else: mask = None
+
+                redshift_loss = self.redshift_loss(
+                    gt_redshift, pred_redshift, mask=mask) * self.redshift_beta
+                self.log_dict["redshift_loss"] += redshift_loss.item()
 
         # iv) latent quantization codebook loss
         codebook_loss = 0
@@ -666,7 +667,8 @@ class AstroTrainer(BaseTrainer):
             codebook_loss = ret["codebook_loss"]
             self.log_dict["codebook_loss"] += codebook_loss.item()
 
-        total_loss = recon_loss + spectra_loss + codebook_loss
+        torch.autograd.set_detect_anomaly(True)
+        total_loss = redshift_loss + recon_loss + spectra_loss + codebook_loss
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss")
         return total_loss, recon_pixels, ret

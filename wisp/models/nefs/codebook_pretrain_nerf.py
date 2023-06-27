@@ -33,8 +33,9 @@ class CodebookPretrainNerf(BaseNeuralField):
 
         self.spatial_decoder = SpatialDecoder(
             output_scaler=False,
-            output_redshift=False,  #self.kwargs["generate_redshift"],
-            apply_redshift=True, #self.kwargs["apply_gt_redshift"],
+            apply_redshift=True,
+            redshift_unsup=False,
+            redshift_semisup=False,
             qtz_calculate_loss=False,
             **self.kwargs)
 

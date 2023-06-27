@@ -243,6 +243,9 @@ class SpectraData:
     def get_validation_pixels(self):
         return self.data["validation_pixels"]
 
+    def get_validation_redshift(self):
+        return self.data["validation_redshift"]
+
     #############
     # Helpers
     #############
@@ -366,16 +369,21 @@ class SpectraData:
     def train_valid_split(self):
         n = min(self.kwargs["num_supervision_spectra"],
                 self.num_gt_spectra)
+        ids = np.arange(n)
+        np.random.shuffle(ids)
         self.num_supervision_spectra = n
         self.num_validation_spectra = self.num_gt_spectra - n
 
-        # supervision spectra data (used during pretraining)
+        self.supervision_ids = ids[:n]
+        self.validation_ids = ids[n:]
+
+        # supervision spectra data (used during pretrain)
         self.data["supervision_fluxes"] = self.data["gt_spectra_fluxes"][:n]
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][:n]
         self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][:n]
 
-        # valiation spectra data (used during main training)
+        # valiation spectra data (used during main train)
         self.data["validation_coords"] = self.data["gt_spectra_grid_coords"][n:]
         self.data["validation_fluxes"] = self.data["gt_spectra_fluxes"][n:]
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
@@ -530,9 +538,11 @@ class SpectraData:
         """
         if len(spectra_ids) == 0: return
 
+        log.info(f"processing {patch_uid}")
+
         ras = np.array(list(df.iloc[spectra_ids]["ra"]))
         decs = np.array(list(df.iloc[spectra_ids]["dec"]))
-        redshift = np.array(list(df.iloc[spectra_ids]["zspec"]))
+        redshift = np.array(list(df.iloc[spectra_ids]["zspec"])).astype(np.float32)
 
         # get img coords for all spectra within current patch
         wcs = WCS(patch.get_header())
@@ -550,7 +560,7 @@ class SpectraData:
         cur_patch_redshift_fname = join(self.processed_spectra_path, f"{patch_uid}_redshift.npy")
         np.save(cur_patch_redshift_fname, redshift)
         np.save(cur_patch_coords_fname, img_coords)
-        np.save(cur_patch_spectra_fname, cur_patch_spectra)
+        np.save(cur_patch_spectra_fname, np.array(cur_patch_spectra))
 
     def process_one_spectra(self, cur_patch_spectra, df, patch, idx, coord):
         """ Get pixel and normalized coord and

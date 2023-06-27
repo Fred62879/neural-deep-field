@@ -112,10 +112,10 @@ class SpatialDecoder(nn.Module):
             redshift = self.redshift_decoder(z[:,0])[...,0]
             redshift = self.redshift_adjust(redshift + 0.5)
         elif self.redshift_semisup:   # generate redshift, semi-supervise
-            assert specz is not None and sup_id is not None
+            #assert specz is not None and sup_id is not None
             redshift = self.redshift_decoder(z[:,0])[...,0]
             redshift = self.redshift_adjust(redshift + 0.5)
-            redshift[sup_id] = specz
+            #redshift[sup_id] = specz
         else: redshift = None
 
         if self.quantize_spectra:

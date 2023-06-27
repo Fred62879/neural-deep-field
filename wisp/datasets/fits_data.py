@@ -60,7 +60,7 @@ class FitsData:
         self.load_weights = "train" in tasks and self.kwargs["weight_train"]
         self.load_pixels = len(tasks.intersection({"train","recon_img","log_pixel_value"}))
         self.load_coords = len(tasks.intersection({"train","recon_img","recon_synthetic_band","recon_gt_spectra"})) or self.kwargs["spectra_supervision"]
-        self.load_spectra = "train" in tasks and self.kwargs["pretrain_codebook"]
+        self.load_spectra = self.kwargs["pretrain_codebook"]
 
         return self.load_pixels or self.load_coords or \
             self.load_weights or self.load_spectra or \
@@ -506,7 +506,7 @@ class FitsData:
         return pixels, coords, weights, spectra_data
 
     def process_data(self):
-        pixels, coords, weights = [], [], []
+        pixels, coords, weights, spectra_data = [], [], [], []
         spectra_id_map, spectra_bin_map = [], []
         spectra_pixel_fluxes, spectra_pixel_redshift = [], []
         self.gt_paths, self.gt_img_fnames = {}, {}

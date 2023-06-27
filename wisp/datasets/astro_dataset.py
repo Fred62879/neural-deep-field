@@ -4,6 +4,7 @@ import numpy as np
 
 from typing import Callable
 from torch.utils.data import Dataset
+from wisp.utils.common import print_shape
 from wisp.datasets.fits_data import FitsData
 from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
@@ -66,7 +67,7 @@ class AstroDataset(Dataset):
     ############
 
     def set_mode(self, mode):
-        """ Possible modes: ["pre_train","infer","main_train"]
+        """ Possible modes: ["pre_train","pretrain_infer","infer","main_train"]
         """
         self.mode = mode
 
@@ -157,8 +158,6 @@ class AstroDataset(Dataset):
         if field == "coords":
             if self.coords_source == "fits":
                 data = self.fits_dataset.get_coords(idx)
-            #elif self.coords_source == "spectra":
-            #    data = self.spectra_dataset.get_spectra_grid_coords()
             else:
                 data = self.data[self.coords_source][idx]
         elif field == "pixels":
@@ -169,12 +168,12 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_spectra_id_map(idx)
         elif field == "spectra_bin_map":
             data = self.fits_dataset.get_spectra_bin_map(idx)
-        elif field == "spectra":
-            data = self.spectra_dataset.get_supervision_spectra(idx)
-        elif field == "spectra_pixels":
-            data = self.spectra_dataset.get_supervision_pxiels(idx)
-        elif field == "spectra_redshift":
-            data = self.spectra_dataset.get_supervision_redshift(idx)
+        # elif field == "spectra":
+        #     data = self.spectra_dataset.get_supervision_spectra(idx)
+        # elif field == "spectra_pixels":
+        #     data = self.spectra_dataset.get_supervision_pxiels(idx)
+        # elif field == "spectra_redshift":
+        #     data = self.spectra_dataset.get_supervision_redshift(idx)
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
         else:
@@ -226,8 +225,12 @@ class AstroDataset(Dataset):
                     out["spectra_sup_pixels"] = self.spectra_dataset.get_supervision_pixels()
 
                 # get only supervision spectra (not all gt spectra) for loss calculation
-                out["spectra_sup_fluxes"] = self.spectra_dataset.get_supervision_fluxes()
-                out["spectra_sup_wave_bound_ids"] = self.spectra_dataset.get_supervision_wave_bound_ids()
+                out["spectra_sup_fluxes"] = \
+                    self.spectra_dataset.get_supervision_fluxes()
+                out["spectra_sup_redshift"] = \
+                    self.spectra_dataset.get_supervision_redshift()
+                out["spectra_sup_wave_bound_ids"] = \
+                    self.spectra_dataset.get_supervision_wave_bound_ids()
 
             elif self.mode == "main_train":
                 bin_map = out["spectra_bin_map"]
@@ -235,7 +238,10 @@ class AstroDataset(Dataset):
                 # out["spectra_sup_fluxes"] = self.fits_dataset.get_spectra_pixel_fluxes(ids)
                 out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
                 del out["spectra_id_map"]
-                # del out["spectra_bin_map"]
+
+            elif self.mode == "pretrain_infer" or self.mode == "infer":
+                out["spectra_sup_redshift"] = \
+                    self.spectra_dataset.get_supervision_redshift()
 
         elif self.kwargs["spectra_supervision"]:
             assert self.mode == "main_train"
@@ -255,7 +261,9 @@ class AstroDataset(Dataset):
                 out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
 
     def get_redshift_data(self, out):
-        out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
+        """ Get validation redshift values (only when apply gt redshift directly).
+        """
+        out["spectra_valid_redshift"] = self.spectra_dataset.get_validation_redshift()
 
     def __len__(self):
         """ Length of the dataset in number of coords.
@@ -269,6 +277,7 @@ class AstroDataset(Dataset):
         out = {}
         batch_size = len(idx)
         batched_fields = self.requested_fields - self.unbatched_fields
+        # print(batched_fields, self.requested_fields)
 
         for field in batched_fields:
             out[field] = self.get_batched_data(field, idx)
@@ -280,9 +289,9 @@ class AstroDataset(Dataset):
             self.get_spectra_data(out)
 
         if "redshift_data" in self.requested_fields:
-            self.get_redshift_data(out)
+           self.get_redshift_data(out)
 
-        self.print_shape(out)
+        # print_shape(out)
         if self.transform is not None:
             out = self.transform(out)
         return out
@@ -311,11 +320,3 @@ class AstroDataset(Dataset):
 
     def log_spectra_pixel_values(self, spectra):
         return self.spectra_dataset.log_spectra_pixel_values(spectra)
-
-    def print_shape(self, out):
-        for n,p in out.items():
-            if p is None:
-                print(f"{n} is None")
-            elif type(p) == tuple or type(p) == list:
-                print(n, len(p))
-            else: print(n, p.shape)
