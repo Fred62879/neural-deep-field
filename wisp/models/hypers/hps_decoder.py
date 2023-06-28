@@ -76,7 +76,7 @@ class HyperSpectralDecoder(nn.Module):
 
     def forward(self, latents,
                 wave, trans, nsmpl, full_wave_bound,
-                full_wave=None, num_spectra_coords=-1,
+                full_wave=None, num_spectra_coords=-1, redshift_apply=None,
                 codebook=None, qtz_args=None, quantize_spectra=False, ret=None):
         """ @Param
               latents:   (encoded or original) coords or logits for quantization.
@@ -88,7 +88,9 @@ class HyperSpectralDecoder(nn.Module):
               trans:     corresponding transmission values of lambda. [(bsz,)nbands,num_samples]
               nsmpl:     average number of lambda samples falling within each band. [num_bands]
               full_wave_bound: min and max value of lambda
-
+              redshift_apply:  redshift to apply on wave
+                               (don't use redshift stored in ret, which is ro be returned
+                                for redshift loss calculation)
             - spectra supervision
               full_wave: not None if do spectra supervision.
                            [num_spectra_coords,full_num_samples]
@@ -121,7 +123,7 @@ class HyperSpectralDecoder(nn.Module):
             if latents.shape[0] == 0: return
 
         self.reconstruct_spectra(
-            latents, wave, ret["scaler"], ret["redshift"], full_wave_bound, ret,
+            latents, wave, ret["scaler"], redshift_apply, full_wave_bound, ret,
             codebook, qtz_args, quantize_spectra)
 
         intensity = self.inte(ret["spectra"], trans, nsmpl)

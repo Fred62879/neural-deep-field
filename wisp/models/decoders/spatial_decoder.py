@@ -94,6 +94,29 @@ class SpatialDecoder(nn.Module):
             num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["spatial_decod_hidden_dim"], skip=[])
 
+    def forward_redshift(self, z, ret, specz, sup_id):
+        redshift = None
+        if self.apply_gt_redshift:   # dont generate redshift
+            assert specz is not None
+            redshift = specz
+            ret["redshift"] = redshift
+        elif self.redshift_unsup:    # generate redshift w/o supervision
+            redshift = self.redshift_decoder(z[:,0])[...,0]
+            redshift = self.redshift_adjust(redshift + 0.5)
+            ret["redshift"] = redshift
+        elif self.redshift_semisup:   # generate redshift, semi-supervise
+            #assert specz is not None and sup_id is not None
+            redshift = self.redshift_decoder(z[:,0])[...,0]
+            redshift = self.redshift_adjust(redshift + 0.5)
+            ret["redshift"] = redshift
+
+            # in case of semi-supervision, we apply gt redshift while
+            # calculating loss using predicted redshift
+            redshift = redshift.clone()
+            redshift[sup_id] = specz # update prediction with gt for applied redshift
+
+        return redshift
+
     def forward(self, z, codebook, qtz_args, ret, specz=None, sup_id=None):
         """ Decode latent variables
             @Param
@@ -104,19 +127,9 @@ class SpatialDecoder(nn.Module):
         if self.output_scaler:
             scaler = self.scaler_decoder(z[:,0])[...,0]
         else: scaler = None
+        ret["scaler"] = scaler
 
-        if self.apply_gt_redshift:   # dont generate redshift
-            assert specz is not None
-            redshift = specz
-        elif self.redshift_unsup:    # generate redshift w/o supervision
-            redshift = self.redshift_decoder(z[:,0])[...,0]
-            redshift = self.redshift_adjust(redshift + 0.5)
-        elif self.redshift_semisup:   # generate redshift, semi-supervise
-            #assert specz is not None and sup_id is not None
-            redshift = self.redshift_decoder(z[:,0])[...,0]
-            redshift = self.redshift_adjust(redshift + 0.5)
-            #redshift[sup_id] = specz
-        else: redshift = None
+        redshift = self.forward_redshift(z, ret, specz, sup_id)
 
         if self.quantize_spectra:
             logits = self.decode(z)
@@ -125,11 +138,8 @@ class SpatialDecoder(nn.Module):
                 z = self.decode(z)
             if self.quantize_z:
                 z, z_q = self.qtz(z, codebook.weight, ret, qtz_args)
-
         ret["latents"] = z
-        ret["scaler"] = scaler
-        ret["redshift"] = redshift
 
-        if self.quantize_spectra: return logits
-        if self.quantize_z:       return z_q
-        return z
+        if self.quantize_spectra: return logits, redshift
+        if self.quantize_z:       return z_q, redshift
+        return z, redshift

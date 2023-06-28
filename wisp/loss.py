@@ -36,6 +36,7 @@ def redshift_supervision_loss(loss, gt_redshift, recon_redshift, mask=None):
     '''
     if mask is None:
         return loss(gt_redshift, recon_redshift)
+    # print(gt_redshift, recon_redshift[mask])
     return loss(gt_redshift, recon_redshift[mask])
 
 def spectral_masking_loss(loss, relative_train_bands, relative_inpaint_bands,

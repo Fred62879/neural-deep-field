@@ -167,8 +167,8 @@ def forward(
         save_soft_qtz_weights=False
 ):
     # forward should only be called under one and only one of the following states
-    train = spectra_supervision_train
-    recon_all = not train and not codebook_pretrain and (recon_img or save_scaler or save_latents or save_redshift or save_embed_ids or save_soft_qtz_weights)
+    train = pixel_supervision_train or spectra_supervision_train
+    recon_all = not train and not codebook_pretrain and (recon_img or save_scaler or save_latents or save_redshift or save_embed_ids)
 
     # print(codebook_pretrain, train, recon_all, recon_spectra, recon_codebook_spectra)
     is_valid = reduce(
@@ -212,11 +212,12 @@ def forward(
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
 
-        if codebook_pretrain or pretrain_infer or \
-           apply_gt_redshift or redshift_semi_supervision:
+        if codebook_pretrain or pretrain_infer or apply_gt_redshift:
             net_args["specz"] = data["spectra_sup_redshift"]
-            if redshift_semi_supervision:
-                net_args["sup_id"] = data["spectra_bin_map"]
+
+        if redshift_semi_supervision:
+            net_args["sup_id"] = data["spectra_bin_map"]
+            net_args["specz"] = data["spectra_val_redshift"]
 
         if spectra_supervision_train:
             net_args["full_wave"] = data["full_wave"]

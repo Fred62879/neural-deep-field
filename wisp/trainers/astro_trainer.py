@@ -649,7 +649,7 @@ class AstroTrainer(BaseTrainer):
         # iii) redshift loss
         redshift_loss = 0
         if self.redshift_semi_supervision:
-            gt_redshift = data["spectra_sup_redshift"]
+            gt_redshift = data["spectra_val_redshift"]
 
             if len(gt_redshift) > 0:
                 pred_redshift = ret["redshift"]

@@ -232,16 +232,17 @@ class AstroDataset(Dataset):
                 out["spectra_sup_wave_bound_ids"] = \
                     self.spectra_dataset.get_supervision_wave_bound_ids()
 
-            elif self.mode == "main_train":
-                bin_map = out["spectra_bin_map"]
-                ids = out["spectra_id_map"][bin_map]
-                # out["spectra_sup_fluxes"] = self.fits_dataset.get_spectra_pixel_fluxes(ids)
-                out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
-                del out["spectra_id_map"]
-
-            elif self.mode == "pretrain_infer" or self.mode == "infer":
+            elif self.mode == "pretrain_infer":
                 out["spectra_sup_redshift"] = \
                     self.spectra_dataset.get_supervision_redshift()
+
+            elif self.mode == "main_train" or self.mode == "infer":
+                bin_map = out["spectra_bin_map"]
+                ids = out["spectra_id_map"][bin_map]
+                out["spectra_val_ids"] = ids
+                # out["spectra_val_fluxes"] = self.fits_dataset.get_spectra_pixel_fluxes(ids)
+                out["spectra_val_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
+                del out["spectra_id_map"]
 
         elif self.kwargs["spectra_supervision"]:
             assert self.mode == "main_train"
