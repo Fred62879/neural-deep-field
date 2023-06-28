@@ -121,11 +121,11 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             latents = self.spatial_encoder(coords, lod_idx=lod_idx)
         else: latents = coords
 
-        latents, redshift_apply = self.spatial_decoder(
+        latents = self.spatial_decoder(
             latents, self.codebook, qtz_args, ret, specz=specz, sup_id=sup_id)
 
         self.hps_decoder(latents, wave, trans, nsmpl, full_wave_bound,
-                         full_wave, num_spectra_coords, redshift_apply,
+                         full_wave, num_spectra_coords,
                          self.codebook, qtz_args, self.kwargs["quantize_spectra"], ret)
 
         if self.codebook is not None:
