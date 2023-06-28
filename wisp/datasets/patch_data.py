@@ -311,6 +311,7 @@ class PatchData:
         cur_patch_spectra_fname = join(path, f"{self.patch_uid}_spectra.npy")
         cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
         coords = np.load(cur_patch_coords_fname)
+        # num_spectra_full_patch = len(coords)
         # print(coords)
         spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]
         redshift = np.load(cur_patch_redshift_fname)

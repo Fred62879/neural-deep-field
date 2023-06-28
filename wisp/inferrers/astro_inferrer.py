@@ -399,7 +399,7 @@ class AstroInferrer(BaseInferrer):
             self.redshift = []
             if self.mode == "infer" and self.extra_args["pretrain_codebook"]:
                 self.redshift_mask = []
-                self.redshift_val_ids = []
+                # self.redshift_val_ids = []
 
         if self.save_soft_qtz_weights or self.log_qtz_w_pre:
             self.soft_qtz_weights = []
@@ -538,21 +538,19 @@ class AstroInferrer(BaseInferrer):
 
         if self.log_redshift:
             redshift = torch.stack(self.redshift).detach().cpu().numpy()
+            gt_redshift = self.gt_redshift.detach().cpu().numpy()
 
             # during main inferrence, we have redshift for all pixels predicted
             #   and we only log pixels with gt redshift & in validation set
             if self.mode == "infer" and self.extra_args["pretrain_codebook"]:
                 redshift_mask = np.array(self.redshift_mask)
                 redshift = redshift[redshift_mask]
-                redshift_val_ids = torch.stack(self.redshift_val_ids).detach().cpu().numpy()
-                print(redshift, self.gt_redshift.shape, redshift_val_ids)
-                self.gt_redshift = self.gt_redshift[redshift_val_ids]
+                # redshift_val_ids = torch.stack(self.redshift_val_ids).detach().cpu().numpy()
+                # self.gt_redshift = self.gt_redshift[redshift_val_ids]
 
-            fname = join(self.redshift_dir, f"{model_id}.pth")
-            np.save(fname, redshift)
             np.set_printoptions(precision=3)
             log.info(f"Est. redshift {redshift}")
-            log.info(f"G.T. redshift {self.gt_redshift}")
+            log.info(f"G.T. redshift {gt_redshift}")
 
         if self.plot_scaler:
             re_args = {
@@ -685,8 +683,6 @@ class AstroInferrer(BaseInferrer):
                         self.extra_args["trans_sample_method"],
                         pretrain_infer=self.pretrain_infer,
                         apply_gt_redshift=self.apply_gt_redshift,
-                        redshift_unsupervision=self.redshift_unsupervision,
-                        redshift_semi_supervision=self.redshift_semi_supervision,
                         quantize_latent=self.quantize_latent,
                         quantize_spectra=self.quantize_spectra,
                         quantization_strategy=self.extra_args["quantization_strategy"],
@@ -723,7 +719,7 @@ class AstroInferrer(BaseInferrer):
                         self.gt_redshift = data["spectra_valid_redshift"]
                         if self.mode == "infer" and self.extra_args["pretrain_codebook"]:
                             self.redshift_mask.extend(data["spectra_bin_map"])
-                            self.redshift_val_ids.extend(data["spectra_val_ids"])
+                            # self.redshift_val_ids.extend(data["spectra_val_ids"])
 
             except StopIteration:
                 if self.verbose: log.info("all coords inferrence done")
@@ -749,8 +745,6 @@ class AstroInferrer(BaseInferrer):
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
                         apply_gt_redshift=self.apply_gt_redshift,
-                        redshift_unsupervision=self.redshift_unsupervision,
-                        redshift_semi_supervision=self.redshift_semi_supervision,
                         pretrain_infer=self.pretrain_infer,
                         quantize_latent=self.quantize_latent,
                         quantize_spectra=self.quantize_spectra,
@@ -792,8 +786,6 @@ class AstroInferrer(BaseInferrer):
                         self.extra_args["trans_sample_method"],
                         pretrain_infer=self.pretrain_infer,
                         apply_gt_redshift=self.apply_gt_redshift,
-                        redshift_unsupervision=self.redshift_unsupervision,
-                        redshift_semi_supervision=self.redshift_semi_supervision,
                         quantize_latent=self.quantize_latent,
                         quantize_spectra=self.quantize_spectra,
                         quantization_strategy=self.extra_args["quantization_strategy"],

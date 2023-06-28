@@ -94,9 +94,6 @@ class SpatialDecoder(nn.Module):
             num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["spatial_decod_hidden_dim"], skip=[])
 
-    def forward_redshift(self, z, ret, specz, sup_id):
-
-
     def forward(self, z, codebook, qtz_args, ret, specz=None, sup_id=None):
         """ Decode latent variables
             @Param

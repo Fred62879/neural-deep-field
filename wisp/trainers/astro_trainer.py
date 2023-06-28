@@ -593,9 +593,8 @@ class AstroTrainer(BaseTrainer):
                       pixel_supervision_train=self.pixel_supervision or \
                                               self.train_spectra_pixels_only,
                       spectra_supervision_train=self.spectra_supervision,
+                      redshift_supervision_train=self.redshift_semi_supervision,
                       apply_gt_redshift=self.apply_gt_redshift,
-                      redshift_unsupervision=self.redshift_unsupervision,
-                      redshift_semi_supervision=self.redshift_semi_supervision,
                       recon_img=False,
                       recon_spectra=False,
                       recon_codebook_spectra=False,
@@ -649,7 +648,7 @@ class AstroTrainer(BaseTrainer):
         # iii) redshift loss
         redshift_loss = 0
         if self.redshift_semi_supervision:
-            gt_redshift = data["spectra_val_redshift"]
+            gt_redshift = data["spectra_sup_redshift"]
 
             if len(gt_redshift) > 0:
                 pred_redshift = ret["redshift"]
