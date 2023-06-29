@@ -289,18 +289,16 @@ class PatchData:
 
     def filter_spectra(self, coords):
         """ Filter out coords not present in current patch (out of range).
-            Only useful if we only use part of the current patch.
+            Useful if we only use part of the current patch.
             @Param
               coords: [n,2] img coords of all spectra pixels in current patch.
         """
         ids = np.arange(len(coords))
-        # print(self.use_full_patch, self.cur_num_rows, self.cutout_start_pos)
         if not self.use_full_patch:
             r, c = self.cutout_start_pos
             valid = (coords[:,0] >= r) & (coords[:,0] < r + self.cur_num_rows) & \
                 (coords[:,1] >= c) & (coords[:,1] < c + self.cur_num_cols)
             ids = ids[valid]
-        # print(ids, valid)
         return ids
 
     def load_spectra_data(self):

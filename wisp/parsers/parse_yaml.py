@@ -356,6 +356,9 @@ def define_cmd_line_args():
     data_group.add_argument("--plot-trans", action="store_true")
 
     # spectra data
+    data_group.add_argument("--download-source-spectra", action="store_true")
+    data_group.add_argument("--source-spectra-link", type=str)
+    data_group.add_argument("--spectra-data-format", type=str)
     data_group.add_argument("--spectra-data-source", type=str)
     data_group.add_argument("--spectra-tracts", type=str, nargs='+')
     data_group.add_argument("--spectra-patches_r", type=str, nargs='+')

@@ -25,7 +25,7 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
-    tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','log_redshift','plot_save_scaler','save_soft_qtz_weights']
+    #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra','plot_embed_map','plot_redshift','log_redshift','plot_save_scaler','save_soft_qtz_weights']
 
     #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra','log_redshift','plot_redshift','plot_save_scaler','save_soft_qtz_weights']
@@ -184,7 +184,7 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 12
+    num_supervision_spectra: 7000
     spectra_neighbour_size: 1
 
 infer:
@@ -281,16 +281,19 @@ dataset:
     hardcode_num_trans_samples: 12
     trans_sample_interval: 10
 
+    download_source_spectra: False
+    source_spectra_link: "https://irsa.ipac.caltech.edu/data/COSMOS/spectra/deimos/spec1d_tbl"
+    spectra_data_format: "tbl"
     spectra_data_source: "deimos"
     #gt_spectra_ids: [0] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
 
-    spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['1'] #['0','1','2','3','4','5','6','7','8']
-    spectra_patches_c: ['5'] #['0','1','2','3','4','5','6','7','8']
+    spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
+    spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
+    spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
-    num_gt_spectra: 100
-    processed_spectra_cho: "test"
-    spectra_supervision_wave_lo: 6050
+    num_gt_spectra: 7000  # upper bound of # spectra to load
+    processed_spectra_cho: "9812_reserved"
+    spectra_supervision_wave_lo: 7000
     spectra_supervision_wave_hi: 8000
     load_spectra_data_from_cache: True
 
