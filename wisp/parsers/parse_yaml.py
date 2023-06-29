@@ -550,6 +550,11 @@ def define_cmd_line_args():
     infer_group.add_argument("--recon-restore", action="store_true", default=False)
     infer_group.add_argument("--metric-options", nargs="+", choices=["mse","psnr","ssim"])
 
+    infer_group.add_argument("--infer-selected", action="store_true", default=False,
+                             help="infer only selected coords/spectra")
+    infer_group.add_argument("--pretrain-num-infer", type=int, default=60,
+                             help="max #spectra to infer after pretrain")
+
     # these several args, if specified, directs reconstructing smaller cutouts than train image
     # Note, if recon_img is included as inferrence tasks, we always reconstruct the full train image
     # regardless of whether these three are given or not

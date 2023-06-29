@@ -46,6 +46,7 @@ class AstroInferrer(BaseInferrer):
 
         if mode == "pretrain_infer":
             self.num_sup_spectra = dataset.get_num_supervision_spectra()
+        else: self.num_val_spectra = dataset.get_num_validation_spectra()
 
         self.set_log_path()
         self.select_models()
@@ -268,7 +269,7 @@ class AstroInferrer(BaseInferrer):
         if self.pretrain_infer:              # inferrence after pre-train
             self.dataset_length = self.num_sup_spectra
         elif self.infer_spectra_pixels_only: # inferrence after main train
-            self.dataset_length = self.dataset.get_num_validation_spectra()
+            self.dataset_length = self.num_val_spectra()
         else:                                # inferrence after main train
             self.dataset_length = self.dataset.get_num_coords()
         self.batch_size = min(self.extra_args["infer_batch_size"], self.dataset_length)
@@ -308,27 +309,21 @@ class AstroInferrer(BaseInferrer):
         if self.mode == "pretrain_infer":
             self.coords_source = "spectra_train"
             # pretrain coords set using checkpoint
-            self.dataset_length = self.dataset.get_num_supervision_spectra()
+            if self.extra_args["infer_selected"]:
+                self.dataset_length = self.extra_args["pretrain_num_infer"]
+            else: self.dataset_length = self.num_sup_spectra
         else:
             self.coords_source = "spectra_valid"
             self.dataset.set_hardcode_data(
                 "spectra_valid", self.dataset.get_validation_spectra_coords())
-            self.dataset_length = self.dataset.get_num_validation_spectra()
+            self.dataset_length = self.num_val_spectra()
 
         self.requested_fields = ["coords","spectra_data"]
-        if self.pretrain_infer:
-            self.dataset_length = self.num_sup_spectra
-        else:
-            self.dataset_length = self.dataset.get_num_validation_spectra()
-
         if not self.extra_args["infer_spectra_individually"]:
-            # self.num_batches = int(np.ceil(num_coords / self.batch_size))
             self.batch_size = min(
                 self.dataset_length * self.extra_args["spectra_neighbour_size"]**2,
                 self.extra_args["infer_batch_size"])
-        else:
-            # self.num_batches = num_coords
-            self.batch_size = self.extra_args["spectra_neighbour_size"]**2
+        else: self.batch_size = self.extra_args["spectra_neighbour_size"]**2
 
         self.reset_dataloader()
 
@@ -816,6 +811,7 @@ class AstroInferrer(BaseInferrer):
         if self.space_dim == 3:
             self.requested_fields.extend(["trans_data"])
 
+        print(self.dataset_length)
         self.dataset.set_mode(self.mode)
         self.dataset.set_length(self.dataset_length)
         self.dataset.set_fields(self.requested_fields)
@@ -827,7 +823,17 @@ class AstroInferrer(BaseInferrer):
         """ Set spectra latent vars as input coords (for pretrain infer only).
         """
         self.dataset.set_coords_source("spectra_latents")
-        self.dataset.set_hardcode_data("spectra_latents", checkpoint["latents"].weight)
+        latents = checkpoint["latents"].weight
+
+        # select the same random set of spectra to recon
+        if self.extra_args["infer_selected"]:
+            ids = np.arange(len(latents))
+            np.random.seed(48)
+            np.random.shuffle(ids)
+            latents = latents[ids[:self.extra_args["pretrain_num_infer"]]]
+            self.dataset.set_hardcode_data("selected_ids", ids)
+
+        self.dataset.set_hardcode_data("spectra_latents", latents)
 
     def _set_dataset_coords_codebook(self, checkpoint):
         """ Set codebook weights as input coords (for codebook spectra recon only).

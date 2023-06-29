@@ -235,6 +235,9 @@ class AstroDataset(Dataset):
             elif self.mode == "pretrain_infer":
                 out["spectra_sup_redshift"] = \
                     self.spectra_dataset.get_supervision_redshift()
+                if self.kwargs["infer_selected"]:
+                    out["spectra_sup_redshift"] = out["spectra_sup_redshift"][
+                        self.data["selected_ids"]]
 
             elif self.mode == "main_train": # or self.mode == "infer":
                 bin_map = out["spectra_bin_map"]

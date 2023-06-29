@@ -351,9 +351,11 @@ class SpectraData:
             if not exists(self.gt_spectra_ids_fname) or \
                not exists(self.processed_metadata_table_fname):
                 self.process_spectra()
+
             # load data for each individual spectra and save together
             self.gather_processed_spectra()
             self.process_save_gt_spectra_data()
+
         else:
             # data for all spectra are saved together (small amount of spectra)
             self.load_cached_spectra_data()
@@ -393,13 +395,14 @@ class SpectraData:
         reserved_patch_keys = filter(lambda x: "9812" in x, all_patch_keys)
         for key in reserved_patch_keys:
             validation_ids.extend(self.data["gt_spectra_ids"][key])
-        print(validation_ids)
         validation_ids = np.array(validation_ids)
-        supervision_ids = np.array(list(set(ids) - set(validation_ids)))
+        supervision_ids = np.array(list(set(ids) - set(validation_ids))).astype(int)
         return supervision_ids, validation_ids
 
     def train_valid_split(self):
         sup_ids, val_ids = self.split_spectra()
+        self.num_supervision_spectra = len(sup_ids)
+        log.info(f"spectra train/valid {len(sup_ids)}/{len(val_ids)}")
 
         # supervision spectra data (used during pretrain)
         self.data["supervision_fluxes"] = self.data["gt_spectra_fluxes"][sup_ids]
@@ -424,12 +427,6 @@ class SpectraData:
         self.data["gt_spectra_pixels"] = np.load(self.gt_spectra_pixels_fname)
         self.data["gt_spectra_redshift"] = np.load(self.gt_spectra_redshift_fname)
         self.data["gt_spectra_grid_coords"] = np.load(self.gt_spectra_coords_fname)
-
-        # print(self.data["gt_spectra_wave"].shape)
-        # print(self.data["gt_spectra_fluxes"].shape)
-        # print(self.data["gt_spectra_pixels"].shape)
-        # print(self.data["gt_spectra_redshift"].shape)
-        # print(self.data["gt_spectra_grid_coords"].shape)
 
     def process_save_gt_spectra_data(self):
         """ Clip supervision spectra to trusted range.
@@ -481,8 +478,9 @@ class SpectraData:
     def process_spectra(self):
         upper_bound = self.kwargs["num_gt_spectra"]
         df = self.load_source_metadata().iloc[:upper_bound]
-        df["tract"] = ""
-        df["patch"] = ""
+
+        for field in ["tract","patch","pix_fname","coord_fname"]:
+            df[field] = "None"
 
         if self.download_source_spectra:
             spectra_fnames = list(df["spectra_fname"])
@@ -490,10 +488,25 @@ class SpectraData:
                 self.source_spectra_link, self.source_spectra_path, spectra_fnames)
             log.info("spectra-data::download complete")
 
-        header_wcs, headers = self.load_header(df)
+        header_wcs, headers = self.load_headers(df)
+        spectra_ids, spectra_to_drop = self.localize_spectra(df, header_wcs, headers)
+        wave_ranges = self.load_spectra_patch_wise(df, spectra_ids)
 
+        df.drop(spectra_to_drop, inplace=True)   # drop nonexist spectra
+        df.reset_index(inplace=True)
+        df.drop(columns=["index"], inplace=True) # drop extra index added by `reset_index`
+
+        df.dropna(subset=["pix_fname","coord_fname","spectra_fname"], inplace=True)
+        df.reset_index(inplace=True)
+        df.drop(columns=["index"], inplace=True) # drop extra index added by `reset_index`
+
+        df.to_pickle(self.processed_metadata_table_fname)
+        with open(self.gt_spectra_ids_fname, "wb") as fp:
+            pickle.dump(dict(spectra_ids), fp)
 
     def load_headers(self, df):
+        """ Load headers of all image patches we have to localize each spectra later on.
+        """
         header_wcs, headers = [], []
         for tract in self.all_tracts:
             cur_wcs, cur_headers = [], []
@@ -518,18 +531,14 @@ class SpectraData:
         log.info("spectra-data::header loaded")
         return header_wcs, headers
 
-    def localize_spectra(self, df):
-        # locate tract and patch for each spectra
+    def localize_spectra(self, df, header_wcs, headers):
+        """ Locate tract and patch for each spectra.
+        """
+        spectra_to_drop = []
+        spectra_ids = defaultdict(lambda: [])
         localize = partial(locate_tract_patch,
                            header_wcs, headers, self.all_tracts,
                            self.all_patches_r, self.all_patches_c)
-        # spectra_ids = [
-        #     [ [] for i in range(self.num_patches) ]
-        #     for j in range(self.num_tracts)
-        # ] # id of spectra in each patch (contain patches that dont exist)
-        spectra_ids = defaultdict(lambda: [])
-
-        spectra_to_drop = []
         n = len(df)
         for idx in range(n):
             ra = df.iloc[idx]["ra"]
@@ -542,24 +551,24 @@ class SpectraData:
                 spectra_to_drop.append(idx)
                 continue
 
-            # idx spectra belongs to tract i, patch j (which exists)
-            # spectra_ids[i][j].append(idx)
             patch_uid = create_patch_uid(tract, patch)
             spectra_ids[patch_uid].append(idx)
             df.at[idx,"tract"] = tract
             df.at[idx,"patch"] = patch
 
         log.info("spectra-data::localized spectra")
+        return spectra_ids, spectra_to_drop
 
-        # load pixels and coords for each spectra
+    def load_spectra_patch_wise(self, df, spectra_ids):
+        """ Load pixels and coords for each spectra in patch-wise order.
+        """
         wave_ranges = []
         process_each_patch = partial(self.process_spectra_in_one_patch, df)
+
         for i, tract in enumerate(self.all_tracts):
             for j, patch_r in enumerate(self.all_patches_r):
                 for k, patch_c in enumerate(self.all_patches_c):
                     patch_uid = create_patch_uid(tract, f"{patch_r},{patch_c}")
-                    # l = j * self.num_patches_c + k
-                    # if len(spectra_ids[i][l]) == 0 or \
                     if len(spectra_ids[patch_uid]) == 0 or \
                        not patch_exists(self.input_patch_path, tract, f"{patch_r},{patch_c}"):
                         continue
@@ -570,24 +579,15 @@ class SpectraData:
                         load_coords=True,
                         pixel_norm_cho=self.kwargs["train_pixels_norm"],
                         **self.kwargs)
-
-                    # process_each_patch(patch_uid, cur_patch, spectra_ids[i][l])
                     cur_wave_ranges = process_each_patch(
                         patch_uid, cur_patch, spectra_ids[patch_uid])
                     wave_ranges.extend(cur_wave_ranges)
 
-        df.drop(spectra_to_drop, inplace=True) # drop nonexist spectra
-        df.reset_index(inplace=True)
-        df.drop(columns=["index"], inplace=True) # drop extra index added by `reset_index`
-        df.to_pickle(self.processed_metadata_table_fname)
-
-        wave_ranges = np.array(wave_ranges)
-        with open(self.gt_spectra_ids_fname, "wb") as fp:
-            pickle.dump(dict(spectra_ids), fp)
+        return np.array(wave_ranges)
 
     def process_spectra_in_one_patch(self, df, patch_uid, patch, spectra_ids):
         """ Get coords and pixel values for all spectra (specified by spectra_ids)
-              within the same given patch.
+              within the given patch.
             @Params
               df: source metadata dataframe for all spectra
               patch: patch that contains the current spectra
@@ -605,6 +605,7 @@ class SpectraData:
         wcs = WCS(patch.get_header())
         radecs = np.concatenate((ras[:,None], decs[:,None]), axis=-1)
         img_coords = wcs.all_world2pix(radecs, 0).astype(int) # [n,2]
+        img_coords = img_coords[:,::-1] # xy coords to rc coords
 
         wave_ranges, cur_patch_spectra = [], []
         process_one_spectra = partial(self.process_one_spectra,
@@ -1033,21 +1034,20 @@ def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
 def read_deimos_table(fname, format):
     """ Read metadata table for deimos spectra data.
     """
-    df = pandas.read_table(fname,comment='#',delim_whitespace=True)
-
+    df = pandas.read_table(fname, comment='#', delim_whitespace=True)
     replace_cols = {"ID": "id"}
-    if format == "fits":  replace_cols["fits1d"] = "spectra_fname"
-    elif format == "tbl": replace_cols["ascii1d"] = "spectra_fname"
-    else: raise ValueError(f"invalid spectra data format: {format}")
-
-    df.rename(columns=replace_cols, inplace=True)
-    df.drop(columns=['sel', 'imag', 'kmag', 'Qf', 'Q',
-                     'Remarks', 'jpg1d', 'fits2d'], inplace=True)
-    df.drop([0], inplace=True) # drop first row which is datatype
-    df.dropna(subset=["ra","dec","zspec","spectra_fname"], inplace=True)
-    df.reset_index(inplace=True) # reset index after dropping
-    df.drop(columns=["index"], inplace=True)
-
+    # below commented code are used to read v1 deimos table
+    # if format == "fits":  replace_cols["fits1d"] = "spectra_fname"
+    # elif format == "tbl": replace_cols["ascii1d"] = "spectra_fname"
+    # else: raise ValueError(f"invalid spectra data format: {format}")
+    # df.rename(columns=replace_cols, inplace=True)
+    # df.drop(columns=['sel', 'imag', 'kmag', 'Qf', 'Q',
+    #                  'Remarks', 'jpg1d', 'fits2d'], inplace=True)
+    # df.drop([0], inplace=True) # drop first row which is datatype
+    # df.dropna(subset=["ra","dec","zspec","spectra_fname"], inplace=True)
+    # df.loc[df['id'].isnull(),'id'] = 'None'
+    # df.reset_index(inplace=True) # reset index after dropping
+    # df.drop(columns=["index"], inplace=True)
     df["ra"] = pandas.to_numeric(df["ra"])
     df["dec"] = pandas.to_numeric(df["dec"])
     df["zspec"] = pandas.to_numeric(df["zspec"])
