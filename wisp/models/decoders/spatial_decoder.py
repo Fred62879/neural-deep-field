@@ -2,7 +2,8 @@
 import torch
 import torch.nn as nn
 
-from wisp.models.decoders import BasicDecoder
+from wisp.utils import PerfTimer
+from wisp.models.decoders import BasicDecoder, MLP
 from wisp.utils.common import get_input_latents_dim
 from wisp.models.activations import get_activation_class
 from wisp.models.layers import get_layer_class, Quantization
@@ -87,12 +88,16 @@ class SpatialDecoder(nn.Module):
             output_dim = self.kwargs["spatial_decod_output_dim"]
         else: return
 
-        self.decode = BasicDecoder(
+        # self.decode = BasicDecoder(
+        #     self.input_dim, output_dim,
+        #     get_activation_class(self.kwargs["spatial_decod_activation_type"]),
+        #     bias=True, layer=get_layer_class(self.kwargs["spatial_decod_layer_type"]),
+        #     num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
+        #     hidden_dim=self.kwargs["spatial_decod_hidden_dim"], skip=[])
+        self.decode = MLP(
             self.input_dim, output_dim,
-            get_activation_class(self.kwargs["spatial_decod_activation_type"]),
-            bias=True, layer=get_layer_class(self.kwargs["spatial_decod_layer_type"]),
-            num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
-            hidden_dim=self.kwargs["spatial_decod_hidden_dim"], skip=[])
+            self.kwargs["spatial_decod_num_hidden_layers"],
+            self.kwargs["spatial_decod_hidden_dim"])
 
     def forward(self, z, codebook, qtz_args, ret, specz=None, sup_id=None):
         """ Decode latent variables
@@ -101,10 +106,13 @@ class SpatialDecoder(nn.Module):
               specz: spectroscopic (gt) redshift
               sup_id: id of pixels to supervise with gt redshift
         """
+        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
+
         if self.output_scaler:
             scaler = self.scaler_decoder(z[:,0])[...,0]
         else: scaler = None
 
+        timer.reset()
         if self.apply_gt_redshift:   # dont generate redshift
             assert specz is not None
             redshift = specz
@@ -114,7 +122,9 @@ class SpatialDecoder(nn.Module):
             redshift = self.redshift_adjust(redshift + 0.5)
         else:
             redshift = None
+        timer.check("scaler and redshift done")
 
+        timer.reset()
         if self.quantize_spectra:
             logits = self.decode(z)
         else:
@@ -122,6 +132,7 @@ class SpatialDecoder(nn.Module):
                 z = self.decode(z)
             if self.quantize_z:
                 z, z_q = self.qtz(z, codebook.weight, ret, qtz_args)
+        timer.check("quantization done")
 
         ret["latents"] = z
         ret["scaler"] = scaler

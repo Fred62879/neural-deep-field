@@ -2,12 +2,12 @@
 global:
     verbose: False
     print_shape: False
-    activate_timer: True
+    activate_timer: False
     dataloader_drop_last: False
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_soft_qtz_weights_during_train']
+    tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_soft_qtz_weights_during_train']
     #tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ','log_redshift','log_soft_qtz_weights','recon_img']
 
     #tasks: ['infer','recon_img']
@@ -139,7 +139,7 @@ trainer:
     num_epochs: 4000
     batch_size: 2048 #40960 #65536 #262144
     save_every: 400
-    valid_every: 400
+    valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
     log_cli_every: 400

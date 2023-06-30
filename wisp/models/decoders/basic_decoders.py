@@ -14,26 +14,26 @@ import torch.nn.functional as F
 from scipy.stats import ortho_group
 from wisp.utils.common import get_gpu_info, query_GPU_mem
 
-class MLP_Relu(nn.Module):
-    def __init__(self, dim_in, dim_hidden, dim_out, num_hidden_layers, seed):
-        super(MLP_Relu, self).__init__()
+class MLP(nn.Module):
+    def __init__(self, input_dim, output_dim, num_layers=1, hidden_dim=128, seed=0):
+        super(MLP, self).__init__()
 
-        def block(dim_in, dim_out, seed, activate=True):
-            torch.manual_seed(seed)
+        def block(dim_in, dim_out, seed=0, activate=True):
+            # torch.manual_seed(seed)
             block = [ nn.Linear(dim_in, dim_out) ]
             if activate:
                 block.append(nn.ReLU(inplace=True))
             return block
 
         net = []
-        net.extend(block(dim_in, dim_hidden, seed))
-        for i in range(num_hidden_layers):
-            net.extend(block(dim_hidden, dim_hidden, seed + i + 1))
-        net.extend(block(dim_hidden, dim_out, seed + num_hidden_layers + 1, False))
+        net.extend(block(input_dim, hidden_dim, seed))
+        for i in range(num_layers):
+            net.extend(block(hidden_dim, hidden_dim, seed + i + 1))
+        net.extend(block(hidden_dim, output_dim, seed + num_layers + 1, False))
         self.model = nn.Sequential(*net)
 
-    def forward(self, coords):
-        return self.model(coords)
+    def forward(self, x):
+        return self.model(x)
 
 class BasicDecoder(nn.Module):
     """Super basic but super useful MLP class.

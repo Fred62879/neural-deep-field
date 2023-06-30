@@ -168,12 +168,14 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_spectra_id_map(idx)
         elif field == "spectra_bin_map":
             data = self.fits_dataset.get_spectra_bin_map(idx)
-        elif field == "spectra_fluxes":
+        elif field == "spectra_sup_fluxes":
             data = self.spectra_dataset.get_supervision_fluxes(idx)
-        elif field == "spectra_pixels":
+        elif field == "spectra_sup_pixels":
             data = self.spectra_dataset.get_supervision_pixels(idx)
-        elif field == "spectra_redshift":
+        elif field == "spectra_sup_redshift":
             data = self.spectra_dataset.get_supervision_redshift(idx)
+        elif field == "spectra_sup_wave_bound_ids":
+            data = self.spectra_dataset.get_supervision_wave_bound_ids()
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
         else:
@@ -296,8 +298,7 @@ class AstroDataset(Dataset):
         if "redshift_data" in self.requested_fields:
            self.get_redshift_data(out)
 
-        print_shape(out)
-        assert 0
+        # print_shape(out)
         if self.transform is not None:
             out = self.transform(out)
         return out
@@ -315,14 +316,14 @@ class AstroDataset(Dataset):
 
     def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
                       clip=True, is_codebook=False, save_spectra=False,
-                      save_spectra_together=False, mode="pretrain_infer"
+                      save_spectra_together=False, mode="pretrain_infer", ids=None
     ):
         self.spectra_dataset.plot_spectrum(
             spectra_dir, name, recon_fluxes, flux_norm_cho,
             clip=clip, is_codebook=is_codebook,
             save_spectra=save_spectra,
             save_spectra_together=save_spectra_together,
-            mode=mode)
+            mode=mode, ids=ids)
 
     def log_spectra_pixel_values(self, spectra):
         return self.spectra_dataset.log_spectra_pixel_values(spectra)

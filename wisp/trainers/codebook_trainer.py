@@ -8,12 +8,14 @@ import numpy as np
 import torch.nn as nn
 import logging as log
 
+from tqdm import tqdm
 from pathlib import Path
 from functools import partial
 from os.path import exists, join
 from torch.utils.data import BatchSampler, \
     SequentialSampler, RandomSampler, DataLoader
 
+from wisp.utils import PerfTimer
 from wisp.trainers import BaseTrainer
 from wisp.utils.plot import plot_grad_flow
 from wisp.loss import spectra_supervision_loss, pretrain_pixel_loss
@@ -84,7 +86,13 @@ class CodebookTrainer(BaseTrainer):
         # set required fields from dataset
         fields = ["coords","trans_data"]
         if self.extra_args["batched_pretrain"]:
-            fields.extend(["spectra_fluxes","spectra_pixels","spectra_redshift"])
+            fields.extend([
+                "spectra_sup_fluxes",
+                "spectra_sup_redshift",
+                "spectra_sup_wave_bound_ids"
+            ])
+            if self.extra_args["codebook_pretrain_pixel_supervision"]:
+                fields.append("spectra_sup_pixels")
         else:
             fields.append("spectra_data")
         self.dataset.set_fields(fields)
@@ -165,10 +173,10 @@ class CodebookTrainer(BaseTrainer):
     def init_dataloader(self):
         """ (Re-)Initialize dataloader.
         """
-        #if self.shuffle_dataloader: sampler_cls = RandomSampler
-        #else: sampler_cls = SequentialSampler
+        if self.shuffle_dataloader: sampler_cls = RandomSampler
+        else: sampler_cls = SequentialSampler
         # sampler_cls = SequentialSampler
-        sampler_cls = RandomSampler
+        # sampler_cls = RandomSampler
 
         sampler = BatchSampler(
             sampler_cls(self.dataset),
@@ -216,7 +224,7 @@ class CodebookTrainer(BaseTrainer):
 
         log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
 
-        for epoch in range(self.num_epochs + 1):
+        for epoch in tqdm(range(self.num_epochs + 1)):
             self.begin_epoch()
 
             for batch in range(self.num_iterations_cur_epoch):
@@ -355,8 +363,7 @@ class CodebookTrainer(BaseTrainer):
 
         total_loss, ret = self.calculate_loss(data)
         total_loss.backward()
-        timer.check("backward done")
-        assert 0
+        self.timer.check("backward done")
 
         if self.plot_grad_every != -1 and (self.epoch == 0 or \
            (self.plot_grad_every % self.epoch == 0)):
@@ -367,7 +374,7 @@ class CodebookTrainer(BaseTrainer):
 
         if self.save_data_to_local:
             # if self.save_redshift: self.redshifts.extend(ret["redshift"])
-            if self.plot_spectra: self.smpl_spectra.append(ret["spectra"])
+            if self.plot_spectra: self.smpl_spectra.extend(ret["spectra"])
             if self.save_soft_qtz_weights: self.qtz_weights.extend(ret["soft_qtz_weights"])
             if self.save_pixel_values:
                 self.recon_pixel_vals.extend(ret["intensity"])
@@ -386,6 +393,7 @@ class CodebookTrainer(BaseTrainer):
               to see the codebook spectra under each individual redshift,
               use astro_inferrer.
         """
+        assert 0
         load_model_weights(self.infer_pipeline, self.train_pipeline.state_dict())
         self.infer_pipeline.eval()
 
@@ -558,7 +566,6 @@ class CodebookTrainer(BaseTrainer):
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
         # log.info(f"Pixel vals gt/recon {gt_vals} / {recon_vals}")
-        print(gt_vals.shape, recon_vals.shape)
         ratio = gt_vals / recon_vals
         log.info(f"gt/recon ratio: {ratio}")
 
@@ -571,6 +578,8 @@ class CodebookTrainer(BaseTrainer):
         log.info(f"Qtz weights {weights[:,0]}")
 
     def _plot_spectrum(self):
+        log.info("plotting spectrum")
+
         self.smpl_spectra = torch.stack(self.smpl_spectra).view(
             self.num_sup_spectra, -1
         ).detach().cpu().numpy() # [num_sup_spectra,num_samples]
@@ -584,8 +593,8 @@ class CodebookTrainer(BaseTrainer):
 
     def randomly_select_spectra_to_plot(self):
         ids = np.arange(self.num_sup_spectra)
-        if self.kwargs["infer_selected"]:
+        if self.extra_args["infer_selected"]:
             np.random.seed(48)
             np.random.shuffle(ids)
-            ids = ids[:self.kwargs["pretrain_num_infer"]]
+            ids = ids[:self.extra_args["pretrain_num_infer"]]
         return ids

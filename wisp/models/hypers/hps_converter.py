@@ -74,7 +74,7 @@ class HyperSpectralConverter(nn.Module):
         """
         wave = wave.permute(1,2,0)
 
-        print(wave.shape, redshift.shape)
+        # print(wave.shape, redshift.shape)
         if wave.ndim == 3: # [nsmpl,1,bsz]
             wave = wave / (1 + redshift) # dont use `/=` this will change wave object
         elif wave.ndim == 4: # [nbands,nsmpl,1,bsz]

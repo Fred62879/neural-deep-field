@@ -668,7 +668,6 @@ class SpectraData:
             coords, _ = normalize_coords(coords, coords_range=self.coords_range)
         np.save(join(self.processed_spectra_path, coord_fname), coords)
 
-        # print('*****', idx, '*****')
         # process source spectra and save locally
         gt_spectra, wave_range = process_gt_spectra(
             join(self.source_spectra_path, spectra_fname),
@@ -850,12 +849,15 @@ class SpectraData:
               ids: if not None, indicates selected spectra to plot
                    (when we have large amount of spectra, we only select some to plot)
         """
+        n = len(recon_fluxes)
+        if ids is not None: n = min(n, len(ids))
+
         full_wave, gt_fluxes, gt_wave, recon_wave, bound_ids = \
             self.gather_spectrum_plotting_data(clip, is_codebook, mode)
 
         if self.kwargs["plot_spectrum_together"]:
-            ncols = min(len(recon_fluxes), self.kwargs["num_spectra_plot_per_row"])
-            nrows = int(np.ceil(len(recon_fluxes) / ncols))
+            ncols = min(n, self.kwargs["num_spectra_plot_per_row"])
+            nrows = int(np.ceil(n / ncols))
             fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
 
         get_data = partial(self.gather_one_spectrum_plot_data,
@@ -965,16 +967,13 @@ def process_gt_spectra(infname, outfname, full_wave, smpl_interval,
         return None, None
 
     clean_flux(flux)
-
     lo, hi = min(wave), max(wave)
 
     if sigma > 0: # smooth spectra
         try:
             flux = convolve_spectra(flux, std=sigma)
         except Exception as e:
-            log.info(flux.shape, sigma)
             log.info(e)
-            assert 0
 
     if interpolate:
         f_gt = interp1d(wave, flux)
@@ -995,6 +994,7 @@ def process_gt_spectra(infname, outfname, full_wave, smpl_interval,
         # use new gt wave to get interpolated spectra
         flux = f_gt(wave)
 
+    flux = flux.astype(float32)
     spectra_data = np.concatenate((
         wave[None,:], flux[None,:]), axis=0) # [2,nsmpl]
 

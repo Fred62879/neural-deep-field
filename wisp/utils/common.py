@@ -18,8 +18,8 @@ def print_shape(data):
         if p is None:
             print(f"{n} is None")
         elif type(p) == tuple or type(p) == list:
-            print(n, len(p))
-        else: print(n, p.shape)
+            print(n, len(p), p[0].dtype)
+        else: print(n, p.shape, p.dtype)
 
 def get_input_latents_dim(**kwargs):
     """ Infer the dimension of the input RA/DEC coordinate for MLP.

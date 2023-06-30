@@ -30,6 +30,8 @@ class HyperSpectralDecoder(nn.Module):
 
     def reconstruct_spectra(self, input, wave, scaler, redshift, wave_bound, ret,
                             codebook, qtz_args, quantize_spectra):
+        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
+
         if quantize_spectra:
             bsz = wave.shape[0]
             # each input coord has #num_code spectra generated
@@ -40,12 +42,17 @@ class HyperSpectralDecoder(nn.Module):
             ], dim=0) # [num_code,bsz,nsmpl,dim]
         else:
             latents = self.convert(wave, input, redshift, wave_bound)
+        timer.check('hps converted')
 
+        # print(self.spectra_decoder)
         spectra = self.spectra_decoder(latents)[...,0]
+        # print(latents.shape, spectra.shape)
+        timer.check('spectra decoded')
 
         if quantize_spectra:
             _, spectra = self.qtz(input, spectra, ret, qtz_args)
             spectra = spectra[:,0] # [bsz,nsmpl]
+        timer.check('spectra qtz')
 
         if self.scale and scaler is not None:
             spectra = (scaler * spectra.T).T
@@ -123,6 +130,8 @@ class HyperSpectralDecoder(nn.Module):
         self.reconstruct_spectra(
             latents, wave, ret["scaler"], ret["redshift"], full_wave_bound, ret,
             codebook, qtz_args, quantize_spectra)
+        timer.check('spectra reconstruced')
 
         intensity = self.inte(ret["spectra"], trans, nsmpl)
         ret["intensity"] = intensity
+        timer.check('integration done')

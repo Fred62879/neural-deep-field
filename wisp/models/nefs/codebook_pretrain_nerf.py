@@ -60,6 +60,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         coords = coords[:,None]
 
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)
+        # print(torch.isnan(latents).any())
         timer.check("spatial decoding done")
 
         self.hps_decoder(
@@ -67,6 +68,7 @@ class CodebookPretrainNerf(BaseNeuralField):
             codebook=self.codebook, qtz_args=qtz_args,
             quantize_spectra=True, ret=ret
         )
+        # print(torch.isnan(ret["spectra"]).any())
         timer.check("hps decoding done")
 
         return ret

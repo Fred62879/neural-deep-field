@@ -3,13 +3,14 @@ import torch.nn as nn
 
 from wisp.models.grids import *
 from wisp.models.layers import get_layer_class
-from wisp.utils.common import get_input_latents_dim, query_GPU_mem
 from wisp.models.activations import get_activation_class
+from wisp.utils.common import get_input_latents_dim, query_GPU_mem
 
-import sys
-sys.path.insert(0, "./wisp/models/decoders")
-from wisp.models.decoders.siren import Siren
-from wisp.models.decoders.basic_decoders import BasicDecoder
+from wisp.models.decoders.basic_decoders import BasicDecoder, MLP
+#import sys
+#sys.path.insert(0, "./wisp/models/decoders")
+#from wisp.models.decoders.siren import Siren
+#from wisp.models.decoders.basic_decoders import BasicDecoder
 
 
 class Decoder(nn.Module):
@@ -67,14 +68,17 @@ class Decoder(nn.Module):
         output_dim = self.get_output_dim()
 
         if self.kwargs["decoder_activation_type"] == "relu":
-            self.decoder = BasicDecoder(
-                input_dim, output_dim,
-                bias=True,
-                activation=get_activation_class(self.kwargs["decoder_activation_type"]),
-                layer=get_layer_class(self.kwargs["decoder_layer_type"]),
-                num_layers=self.kwargs["decoder_num_layers"] + 1,
-                hidden_dim=self.kwargs["decoder_hidden_dim"],
-                skip=[])
+            # self.decoder = BasicDecoder(
+            #     input_dim, output_dim,
+            #     bias=True,
+            #     activation=get_activation_class(self.kwargs["decoder_activation_type"]),
+            #     layer=get_layer_class(self.kwargs["decoder_layer_type"]),
+            #     num_layers=self.kwargs["decoder_num_layers"] + 1,
+            #     hidden_dim=self.kwargs["decoder_hidden_dim"],
+            #     skip=[])
+            self.decoder = MLP(input_dim, output_dim,
+                               self.kwargs["decoder_num_layers"],
+                               hidden_dim=self.kwargs["decoder_hidden_dim"])
 
         elif self.kwargs["decoder_activation_type"] == "sin":
             self.decoder = Siren(
