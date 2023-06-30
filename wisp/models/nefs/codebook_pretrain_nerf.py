@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 
+from wisp.utils import PerfTimer
 from collections import defaultdict
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.hypers import HyperSpectralDecoder
@@ -51,16 +52,21 @@ class CodebookPretrainNerf(BaseNeuralField):
               coords: [num_supervision_spectra,latent_dim]
               wave:   full wave [bsz,nsmpl,1]
         """
+        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
+        timer.check("forward starts")
+
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]
         coords = coords[:,None]
 
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)
+        timer.check("spatial decoding done")
 
         self.hps_decoder(
             latents, wave, trans, nsmpl, full_wave_bound,
             codebook=self.codebook, qtz_args=qtz_args,
             quantize_spectra=True, ret=ret
         )
+        timer.check("hps decoding done")
 
         return ret

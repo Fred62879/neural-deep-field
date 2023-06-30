@@ -104,7 +104,7 @@ class SpectraData:
 
         elif self.spectra_data_source == "deimos":
             path = join(spectra_path, "deimos")
-            self.source_spectra_path = join(path, "source_spectra")
+            self.source_spectra_path = join(path, f"source_spectra_{self.spectra_data_format}")
             self.source_metadata_table_fname = join(path, "source_deimos_table.tbl")
             processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
             self.processed_spectra_path = join(processed_data_path, "processed_spectra")
@@ -113,7 +113,7 @@ class SpectraData:
 
         elif self.spectra_data_source == "zcosmos":
             path = join(spectra_path, "zcosmos")
-            self.source_spectra_path = join(path, "source_spectra")
+            self.source_spectra_path = join(path, f"source_spectra_{self.spectra_data_format}")
             self.source_metadata_table_fname = join(path, "source_zcosmos_table.fits")
             processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
             self.processed_spectra_path = join(processed_data_path, "processed_spectra")
@@ -421,7 +421,7 @@ class SpectraData:
         """ Load spectra data (which are saved together).
         """
         with open(self.gt_spectra_ids_fname, "rb") as fp:
-            self.data["gt_spectra_ids"] = pickle.load(fp)
+            self.data["gt_spectra_ids"] = defaultdict(list, pickle.load(fp))
         self.data["gt_spectra_wave"] = np.load(self.gt_spectra_wave_fname)
         self.data["gt_spectra_fluxes"] = np.load(self.gt_spectra_fluxes_fname)
         self.data["gt_spectra_pixels"] = np.load(self.gt_spectra_pixels_fname)
@@ -456,7 +456,7 @@ class SpectraData:
         """
         df = pandas.read_pickle(self.processed_metadata_table_fname)
         with open(self.gt_spectra_ids_fname, "rb") as fp:
-            self.data["gt_spectra_ids"] = pickle.load(fp)
+            self.data["gt_spectra_ids"] = defaultdict(list, pickle.load(fp))
 
         redshift, pixels, coords, spectra = [], [], [], []
 
@@ -478,6 +478,7 @@ class SpectraData:
     def process_spectra(self):
         upper_bound = self.kwargs["num_gt_spectra"]
         df = self.load_source_metadata().iloc[:upper_bound]
+        log.info(f"found {len(df)} source spectra")
 
         for field in ["tract","patch","pix_fname","coord_fname"]:
             df[field] = "None"
@@ -501,8 +502,6 @@ class SpectraData:
         df.drop(columns=["index"], inplace=True) # drop extra index added by `reset_index`
 
         df.to_pickle(self.processed_metadata_table_fname)
-        with open(self.gt_spectra_ids_fname, "wb") as fp:
-            pickle.dump(dict(spectra_ids), fp)
 
     def load_headers(self, df):
         """ Load headers of all image patches we have to localize each spectra later on.
@@ -534,12 +533,26 @@ class SpectraData:
     def localize_spectra(self, df, header_wcs, headers):
         """ Locate tract and patch for each spectra.
         """
+        n = len(df)
+
+        if exists(self.gt_spectra_ids_fname):
+            with open(self.gt_spectra_ids_fname, "rb") as fp:
+                spectra_ids = pickle.load(fp)
+
+            valid_spectra_ids = []
+            for k, v in spectra_ids.items():
+                valid_spectra_ids.extend(v)
+
+            ids = np.arange(n)
+            spectra_to_drop = list(set(ids) - set(valid_spectra_ids))
+            spectra_ids = defaultdict(list, spectra_ids)
+            return spectra_ids, spectra_to_drop
+
         spectra_to_drop = []
         spectra_ids = defaultdict(lambda: [])
         localize = partial(locate_tract_patch,
                            header_wcs, headers, self.all_tracts,
                            self.all_patches_r, self.all_patches_c)
-        n = len(df)
         for idx in range(n):
             ra = df.iloc[idx]["ra"]
             dec = df.iloc[idx]["dec"]
@@ -547,7 +560,7 @@ class SpectraData:
 
             # TODO: we may adapt to spectra that doesn't belong
             #       to any patches we have in the future
-            if tract == -1: # current spectra doesn't belong to patches we have
+            if tract == -1: # current spectra doesn't belong to patches we selected
                 spectra_to_drop.append(idx)
                 continue
 
@@ -557,6 +570,8 @@ class SpectraData:
             df.at[idx,"patch"] = patch
 
         log.info("spectra-data::localized spectra")
+        with open(self.gt_spectra_ids_fname, "wb") as fp:
+            pickle.dump(dict(spectra_ids), fp)
         return spectra_ids, spectra_to_drop
 
     def load_spectra_patch_wise(self, df, spectra_ids):
@@ -595,7 +610,7 @@ class SpectraData:
         """
         if len(spectra_ids) == 0: return
 
-        log.info(f"spectra-data::processing {patch_uid}")
+        log.info(f"spectra-data::processing {patch_uid}, containing {len(spectra_ids)} spectra")
 
         ras = np.array(list(df.iloc[spectra_ids]["ra"]))
         decs = np.array(list(df.iloc[spectra_ids]["dec"]))
@@ -631,7 +646,12 @@ class SpectraData:
               coord: img coord for current spectra
         """
         spectra_fname = df.iloc[idx]["spectra_fname"]
-        fname = spectra_fname[:-5]
+        if self.spectra_data_format == "fits":
+            fname = spectra_fname[:-5]
+        elif self.spectra_data_format == "tbl":
+            fname = spectra_fname[:-4]
+        else: raise ValueError("Unsupported spectra data source")
+
         pix_fname = f"{fname}_pix.npy"
         coord_fname = f"{fname}_coord.npy"
         df.at[idx,"pix_fname"] = pix_fname
@@ -648,6 +668,7 @@ class SpectraData:
             coords, _ = normalize_coords(coords, coords_range=self.coords_range)
         np.save(join(self.processed_spectra_path, coord_fname), coords)
 
+        # print('*****', idx, '*****')
         # process source spectra and save locally
         gt_spectra, wave_range = process_gt_spectra(
             join(self.source_spectra_path, spectra_fname),
@@ -664,6 +685,7 @@ class SpectraData:
         # clip to trusted range (data collected here is for main train supervision only)
         (id_lo, id_hi) = get_bound_id(
             self.data["supervision_spectra_wave_bound"], gt_spectra[0], within_bound=True)
+        # print(gt_spectra.shape, min(gt_spectra[0]), max(gt_spectra[0]))
         cur_patch_spectra.append(gt_spectra[:,id_lo:id_hi+1])
 
     def load_source_metadata(self):
@@ -819,12 +841,14 @@ class SpectraData:
 
     def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
                       clip=True, is_codebook=False, save_spectra=False,
-                      save_spectra_together=False, mode="pretrain_infer"
+                      save_spectra_together=False, mode="pretrain_infer", ids=None
     ):
         """ Plot all given spectra.
             @Param
               recon_flux: [num_spectra(,num_neighbours),full_num_smpl]
                           in same lambda range as `full_wave`
+              ids: if not None, indicates selected spectra to plot
+                   (when we have large amount of spectra, we only select some to plot)
         """
         full_wave, gt_fluxes, gt_wave, recon_wave, bound_ids = \
             self.gather_spectrum_plotting_data(clip, is_codebook, mode)
@@ -838,6 +862,9 @@ class SpectraData:
                            full_wave, flux_norm_cho, clip, is_codebook, bound_ids)
         plot_and_save = partial(self.plot_and_save_one_spectrum,
                                 name, spectra_dir, fig, axs, nrows, ncols, save_spectra)
+        if ids is not None:
+            gt_fluxes = gt_fluxes[ids]
+            recon_fluxes = recon_fluxes[ids]
 
         for idx, (gt_flux, cur_flux) in enumerate(zip(gt_fluxes, recon_fluxes)):
             pargs = get_data(gt_flux, gt_wave, cur_flux, recon_wave)
@@ -907,6 +934,13 @@ def is_in_patch(ra, dec, wcs, num_rows, num_cols):
     x, y = wcs.wcs_world2pix(ra, dec, 0)
     return x >= 0 and y >= 0 and x < num_cols and y < num_rows
 
+def clean_flux(flux):
+    """ Replace `inf` `-inf` `nan` in flux with 0.
+    """
+    flux[np.isnan(flux)] = 0
+    flux[flux == np.inf] = 0
+    flux[flux == -np.inf] = 0
+
 def process_gt_spectra(infname, outfname, full_wave, smpl_interval,
                        sigma=-1, trusted_range=None, format="tbl",
                        interpolate=True, save=True, plot=True, validator=None):
@@ -930,10 +964,17 @@ def process_gt_spectra(infname, outfname, full_wave, smpl_interval,
         log.info(f"{infname}")
         return None, None
 
+    clean_flux(flux)
+
     lo, hi = min(wave), max(wave)
 
     if sigma > 0: # smooth spectra
-        flux = convolve_spectra(flux, std=sigma)
+        try:
+            flux = convolve_spectra(flux, std=sigma)
+        except Exception as e:
+            log.info(flux.shape, sigma)
+            log.info(e)
+            assert 0
 
     if interpolate:
         f_gt = interp1d(wave, flux)
@@ -1035,8 +1076,8 @@ def read_deimos_table(fname, format):
     """ Read metadata table for deimos spectra data.
     """
     df = pandas.read_table(fname, comment='#', delim_whitespace=True)
-    replace_cols = {"ID": "id"}
     # below commented code are used to read v1 deimos table
+    # replace_cols = {"ID": "id"}
     # if format == "fits":  replace_cols["fits1d"] = "spectra_fname"
     # elif format == "tbl": replace_cols["ascii1d"] = "spectra_fname"
     # else: raise ValueError(f"invalid spectra data format: {format}")
@@ -1113,6 +1154,7 @@ def unpack_gt_spectra(fname, format="tbl"):
 def download_deimos_data_parallel(http_prefix, local_path, fnames):
     fnames = list(filter(lambda fname: not exists(join(local_path, fname)), fnames))
     log.info(f"downloading {len(fnames)} spectra")
+    assert 0
 
     urls = [f"{http_prefix}/{fname}" for fname in fnames]
     out_fnames = [f"{local_path}/{fname}" for fname in fnames]
@@ -1123,13 +1165,6 @@ def download_deimos_data_parallel(http_prefix, local_path, fnames):
         if result is not None:
             print('url:', result[0], 'time (s):', result[1])
             # log.info(f"url: {result[0]}")
-
-def download_deimos_data(http_prefix, local_path, fnames):
-    urls = [f"{http_prefix}/{fname}" for fname in fnames]
-    out_fnames = [f"{local_path}/{fname}" for fname in fnames]
-    inputs = zip(urls, out_fnames)
-    for input_ in inputs:
-        download_from_url(input_)
 
 def download_from_url(input_):
     t0 = time.time()

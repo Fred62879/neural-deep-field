@@ -2,13 +2,13 @@
 global:
     verbose: False
     print_shape: False
-    activate_timer: False
+    activate_timer: True
     dataloader_drop_last: False
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_redshift_during_train','save_pixel_values_during_train','save_soft_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ','log_redshift','log_soft_qtz_weights','recon_img']
+    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_soft_qtz_weights_during_train']
+    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ','log_redshift','log_soft_qtz_weights','recon_img']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -137,7 +137,7 @@ trainer:
     spectra_loss_cho: l2
     redshift_loss_cho: l2
     num_epochs: 4000
-    batch_size: 40960 #65536 #262144
+    batch_size: 2048 #40960 #65536 #262144
     save_every: 400
     valid_every: 400
     render_tb_every: -1
@@ -152,6 +152,7 @@ trainer:
     train_pixel_ratio: .1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_fluxes','spectra_sup_pixels','spectra_sup_redshift','spectra_val_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
+    batched_pretrain: True
     pretrain_codebook: True
     codebook_pretrain_pixel_supervision: False
 
@@ -290,14 +291,14 @@ dataset:
     spectra_data_source: "deimos"
     #gt_spectra_ids: [0] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
 
-    spectra_tracts: ['9569','9570','9571','9572','9812'] #,'9813','9814','10054','10055','10056']
+    spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
     spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
-    processed_spectra_cho: "9812_reserved"
+    processed_spectra_cho: "wave_6000_to_8000"
     spectra_supervision_wave_lo: 7000
-    spectra_supervision_wave_hi: 8000
+    spectra_supervision_wave_hi: 7500
     load_spectra_data_from_cache: True
 
 inpaint:

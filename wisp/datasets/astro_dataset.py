@@ -168,12 +168,12 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_spectra_id_map(idx)
         elif field == "spectra_bin_map":
             data = self.fits_dataset.get_spectra_bin_map(idx)
-        # elif field == "spectra":
-        #     data = self.spectra_dataset.get_supervision_spectra(idx)
-        # elif field == "spectra_pixels":
-        #     data = self.spectra_dataset.get_supervision_pxiels(idx)
-        # elif field == "spectra_redshift":
-        #     data = self.spectra_dataset.get_supervision_redshift(idx)
+        elif field == "spectra_fluxes":
+            data = self.spectra_dataset.get_supervision_fluxes(idx)
+        elif field == "spectra_pixels":
+            data = self.spectra_dataset.get_supervision_pixels(idx)
+        elif field == "spectra_redshift":
+            data = self.spectra_dataset.get_supervision_redshift(idx)
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
         else:
@@ -296,7 +296,8 @@ class AstroDataset(Dataset):
         if "redshift_data" in self.requested_fields:
            self.get_redshift_data(out)
 
-        # print_shape(out)
+        print_shape(out)
+        assert 0
         if self.transform is not None:
             out = self.transform(out)
         return out
