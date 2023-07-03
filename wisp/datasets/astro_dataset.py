@@ -9,6 +9,7 @@ from wisp.datasets.fits_data import FitsData
 from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
+from wisp.datasets.data_utils import clip_data_to_ref_wave_range
 
 
 class AstroDataset(Dataset):
@@ -61,6 +62,7 @@ class AstroDataset(Dataset):
         self.coords_source = "fits"
         self.use_full_wave = False
         self.perform_integration = True
+        self.use_predefined_wave_range = False
 
     ############
     # Setters
@@ -73,6 +75,12 @@ class AstroDataset(Dataset):
 
     def toggle_wave_sampling(self, use_full_wave: bool):
         self.use_full_wave = use_full_wave
+
+    def toggle_within_wave_range(self, use_wave_range: bool):
+        self.use_predefined_wave_range = use_wave_range
+
+    def set_wave_range(self, lo, hi):
+        self.wave_range = (lo, hi)
 
     def toggle_integration(self, integrate: bool):
         self.perform_integration = integrate
@@ -116,14 +124,17 @@ class AstroDataset(Dataset):
     def get_spectra_img_coords(self):
         return self.spectra_dataset.get_spectra_img_coords()
 
-    def get_validation_spectra_coords(self):
-        return self.spectra_dataset.get_validation_coords()
+    def get_validation_spectra_ids(self, patch_uid=None):
+        return self.spectra_dataset.get_validation_spectra_ids(patch_uid)
 
-    def get_validation_spectra_fluxes(self):
-        return self.spectra_dataset.get_validation_fluxes()
+    def get_validation_spectra_coords(self, idx=None):
+        return self.spectra_dataset.get_validation_coords(idx)
 
-    def get_validation_spectra_pixels(self):
-        return self.spectra_dataset.get_validation_pixels()
+    def get_validation_spectra_fluxes(self, idx=None):
+        return self.spectra_dataset.get_validation_fluxes(idx)
+
+    def get_validation_spectra_pixels(self, idx=None):
+        return self.spectra_dataset.get_validation_pixels(idx)
 
     def get_supervision_spectra_pixels(self):
         return self.spectra_dataset.get_supervision_pixels()
@@ -173,7 +184,9 @@ class AstroDataset(Dataset):
         elif field == "spectra_sup_pixels":
             data = self.spectra_dataset.get_supervision_pixels(idx)
         elif field == "spectra_sup_redshift":
+            #print(idx[:10])
             data = self.spectra_dataset.get_supervision_redshift(idx)
+            #print(data[:10])
         elif field == "spectra_sup_wave_bound_ids":
             data = self.spectra_dataset.get_supervision_wave_bound_ids()
         elif field == "masks":
@@ -186,6 +199,8 @@ class AstroDataset(Dataset):
         """ Get transmission data (wave, trans, nsmpl etc.).
             These are not batched, we do sampling at every step.
         """
+        assert not (self.use_full_wave and self.use_predefined_wave_range)
+
         # trans wave min and max value (used for linear normalization)
         out["full_wave_bound"] = self.get_full_wave_bound()
 
@@ -205,6 +220,12 @@ class AstroDataset(Dataset):
                 nsmpl = out["trans"].shape[1]
                 out["trans"] = torch.cat((out["trans"], torch.ones(1,nsmpl)), dim=0)
                 out["nsmpl"] = torch.cat((out["nsmpl"], torch.tensor([nsmpl])), dim=0)
+
+        elif self.use_predefined_wave_range:
+            full_wave = self.get_full_wave()
+            clipped_wave, _ = clip_data_to_ref_wave_range(
+                full_wave, full_wave, wave_range=self.wave_range)
+            out["wave"] = torch.FloatTensor(clipped_wave)[None,:,None].tile(batch_size,1,1)
         else:
             out["wave"] = torch.FloatTensor(self.get_full_wave())
             out["wave"] = out["wave"][None,:,None].tile(batch_size,1,1)
@@ -235,11 +256,18 @@ class AstroDataset(Dataset):
                     self.spectra_dataset.get_supervision_wave_bound_ids()
 
             elif self.mode == "pretrain_infer":
+                out["spectra_sup_fluxes"] = \
+                    self.spectra_dataset.get_supervision_fluxes()
                 out["spectra_sup_redshift"] = \
                     self.spectra_dataset.get_supervision_redshift()
+
                 if self.kwargs["infer_selected"]:
+                    out["spectra_sup_fluxes"] = out["spectra_sup_fluxes"][
+                        self.data["selected_ids"]]
                     out["spectra_sup_redshift"] = out["spectra_sup_redshift"][
                         self.data["selected_ids"]]
+
+                #print('infer', out["spectra_sup_redshift"])
 
             elif self.mode == "main_train": # or self.mode == "infer":
                 bin_map = out["spectra_bin_map"]
@@ -298,7 +326,7 @@ class AstroDataset(Dataset):
         if "redshift_data" in self.requested_fields:
            self.get_redshift_data(out)
 
-        # print_shape(out)
+        print_shape(out)
         if self.transform is not None:
             out = self.transform(out)
         return out
@@ -315,12 +343,15 @@ class AstroDataset(Dataset):
         return self.fits_dataset.restore_evaluate_tiles(recon_pixels, **re_args)
 
     def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
-                      clip=True, is_codebook=False, save_spectra=False,
-                      save_spectra_together=False, mode="pretrain_infer", ids=None
+                      clip=True, spectra_clipped=False, is_codebook=False,
+                      save_spectra=False, save_spectra_together=False,
+                      mode="pretrain_infer", ids=None
     ):
         self.spectra_dataset.plot_spectrum(
             spectra_dir, name, recon_fluxes, flux_norm_cho,
-            clip=clip, is_codebook=is_codebook,
+            clip=clip,
+            spectra_clipped=spectra_clipped,
+            is_codebook=is_codebook,
             save_spectra=save_spectra,
             save_spectra_together=save_spectra_together,
             mode=mode, ids=ids)

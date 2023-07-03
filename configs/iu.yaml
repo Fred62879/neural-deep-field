@@ -8,11 +8,11 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_soft_qtz_weights_during_train']
-    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ','log_redshift','log_soft_qtz_weights','recon_img']
+    tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ'] #,'log_redshift','log_soft_qtz_weights','recon_img']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
-    #tasks: ['infer','recon_gt_spectra']
+    tasks: ['infer','recon_gt_spectra']
     #tasks: ['infer','plot_latent_embed']
     #tasks: ['infer','plot_pixel_distrib']
     #tasks: ['infer','save_soft_qtz_weights']
@@ -154,6 +154,7 @@ trainer:
 
     batched_pretrain: True
     pretrain_codebook: True
+    codebook_pretrain_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
 
     pixel_supervision: True
@@ -177,8 +178,8 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230529-180531'
-    pretrain_log_dir: '20230627-141601'
-    pretrained_model_name: 'model-ep3200-it1.pth'
+    pretrain_log_dir: '20230702-161133'
+    pretrained_model_name: 'model-ep4000-it2.pth'
 
     num_trans_samples: 40
     uniform_sample_trans: True
@@ -207,7 +208,7 @@ infer:
 
     # recon spectra
     infer_selected: True
-    pretrain_num_infer: 50
+    pretrain_num_infer: 10
 
     flux_norm_cho: "sum"
     spectra_smooth_sigma: 50
@@ -223,7 +224,7 @@ infer:
     num_spectra_plot_per_row: 10
 
     dummy_spectra_clip_range: [6000,8000]
-    recon_spectra_clip_range: [7000,8000]
+    recon_spectra_clip_range: [6000,8000]
     codebook_spectra_clip_range: [6000,8000] #[4152,5536]
 
     mark_spectra: True
@@ -250,7 +251,7 @@ dataset:
     patch_selection_cho: "test"
     patch_cutout_num_rows: [64]
     patch_cutout_num_cols: [64]
-    patch_cutout_start_pos: [[754,1917]] #[[1750,550]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    patch_cutout_start_pos: [[1917,754]] #[[1750,550]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
     #num_bands: 1
     #sensor_collection_name: '1_i'
@@ -297,8 +298,8 @@ dataset:
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
     processed_spectra_cho: "wave_6000_to_8000"
-    spectra_supervision_wave_lo: 7000
-    spectra_supervision_wave_hi: 7500
+    spectra_supervision_wave_lo: 6000
+    spectra_supervision_wave_hi: 8000
     load_spectra_data_from_cache: True
 
 inpaint:

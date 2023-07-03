@@ -454,6 +454,7 @@ def define_cmd_line_args():
 
     train_group.add_argument("--batched-pretrain", action="store_true")
     train_group.add_argument("--pretrain-codebook", action="store_true")
+    train_group.add_argument("--codebook-pretrain-within-wave-range", action="store_true")
     train_group.add_argument("--codebook-pretrain-pixel-supervision", action="store_true")
     train_group.add_argument("--weight-train", action="store_true")
     train_group.add_argument("--train-use-all-wave", action="store_true")

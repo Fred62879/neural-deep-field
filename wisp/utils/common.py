@@ -13,6 +13,10 @@ from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
+def create_patch_uid(tract, patch):
+    patch = patch.replace(",", "")
+    return f"{tract}{patch}"
+
 def print_shape(data):
     for n,p in data.items():
         if p is None:

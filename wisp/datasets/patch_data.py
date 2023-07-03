@@ -10,10 +10,10 @@ from os.path import join, exists
 from astropy.nddata import Cutout2D
 from astropy.coordinates import SkyCoord
 
-from wisp.utils.common import generate_hdu
 from wisp.utils.plot import plot_horizontally
+from wisp.utils.common import generate_hdu, create_patch_uid
 from wisp.utils.numerical import normalize, calculate_zscale_ranges
-from wisp.datasets.data_utils import set_input_path, create_patch_uid, \
+from wisp.datasets.data_utils import set_input_path, \
     create_patch_fname, create_selected_patches_uid, get_mgrid_np, add_dummy_dim
 
 
@@ -309,8 +309,6 @@ class PatchData:
         cur_patch_spectra_fname = join(path, f"{self.patch_uid}_spectra.npy")
         cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
         coords = np.load(cur_patch_coords_fname)
-        # num_spectra_full_patch = len(coords)
-        # print(coords)
         spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]
         redshift = np.load(cur_patch_redshift_fname)
 

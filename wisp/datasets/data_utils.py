@@ -53,10 +53,6 @@ def set_input_path(dataset_path, sensor_name):
     img_data_path = join(input_path, sensor_name, "img_data")
     return input_patch_path, img_data_path
 
-def create_patch_uid(tract, patch):
-    patch = patch.replace(",", "")
-    return f"{tract}{patch}"
-
 def create_selected_patches_uid(fits_obj, **kwargs):
     """ Form suffix that uniquely identifies the currently selected group of
         patches with the corresponding cropping parameters, if any.
@@ -72,6 +68,49 @@ def create_selected_patches_uid(fits_obj, **kwargs):
             suffix += f"_{patch_uid}_{num_rows}_{num_cols}_{r}_{c}"
 
     return suffix
+
+def clip_data_to_ref_wave_range(input_data, ref_wave, wave_range=None, wave_range_id=None):
+    if wave_range_id is None:
+        assert wave_range is not None
+        id_lo, id_hi = get_bound_id(wave_range, ref_wave, within_bound=True)
+        wave_range_id = (id_lo, id_hi)
+    else: id_lo, id_hi = wave_range_id
+    clipped_data = input_data[id_lo:id_hi+1]
+    return clipped_data, wave_range_id
+
+def get_bound_id(wave_bound, source_wave, within_bound=True):
+    """ Get id of lambda values in full wave that bounds or is bounded by given wave_bound
+        if `within_bound`
+            source_wave[id_lo] >= wave_lo
+            source_wave[id_hi] <= wave_hi
+        else
+            source_wave[id_lo] <= wave_lo
+            source_wave[id_hi] >= wave_hi
+    """
+    if type(source_wave).__module__ == "torch":
+        source_wave = source_wave.numpy()
+
+    wave_lo, wave_hi = wave_bound
+    wave_hi = int(min(wave_hi, int(max(source_wave))))
+
+    if within_bound:
+        if wave_lo <= min(source_wave): id_lo = 0
+        else: id_lo = np.argmax((source_wave >= wave_lo))
+
+        if wave_hi >= max(source_wave): id_hi = len(source_wave) - 1
+        else: id_hi = np.argmax((source_wave > wave_hi)) - 1
+
+        assert(source_wave[id_lo] >= wave_lo and source_wave[id_hi] <= wave_hi)
+    else:
+        if wave_lo <= min(source_wave): id_lo = 0
+        else: id_lo = np.argmax((source_wave > wave_lo)) - 1
+
+        if wave_hi >= max(source_wave): id_hi = len(source_wave) - 1
+        else: id_hi = np.argmax((source_wave >= wave_hi))
+
+        assert(source_wave[id_lo] <= wave_lo and source_wave[id_hi] >= wave_hi)
+
+    return [id_lo, id_hi]
 
 def get_mgrid_np(num_rows, num_cols, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
     #def get_mgrid_np(self, sidelen, lo=-1, hi=1, dim=2, indexing='ij', flat=True):

@@ -12,13 +12,14 @@ from astropy.nddata import Cutout2D
 from wisp.utils.common import worldToPix
 from astropy.coordinates import SkyCoord
 
-from wisp.utils.common import generate_hdu
-from wisp.datasets.patch_data import PatchData
 from wisp.utils.plot import plot_horizontally, mark_on_img
-from wisp.datasets.data_utils import set_input_path, add_dummy_dim, \
-    create_patch_uid, create_selected_patches_uid
+from wisp.utils.common import generate_hdu, create_patch_uid
 from wisp.utils.numerical import normalize_coords, normalize, \
     calculate_metrics, calculate_zscale_ranges_multiple_patches
+
+from wisp.datasets.patch_data import PatchData
+from wisp.datasets.data_utils import set_input_path, add_dummy_dim, \
+    create_selected_patches_uid
 
 
 class FitsData:
@@ -555,6 +556,7 @@ class FitsData:
             spectra_bin_map = np.concatenate(spectra_bin_map)
             spectra_pixel_fluxes = np.concatenate(spectra_pixel_fluxes)
             spectra_pixel_redshift = np.concatenate(spectra_pixel_redshift)
+
             np.save(self.spectra_id_map_fname, spectra_id_map)
             np.save(self.spectra_bin_map_fname, spectra_bin_map)
             np.save(self.spectra_pixel_fluxes_fname, spectra_pixel_fluxes)

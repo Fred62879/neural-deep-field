@@ -9,6 +9,7 @@ import torch.nn as nn
 import logging as log
 import matplotlib.pyplot as plt
 
+from tqdm import tqdm
 from pathlib import Path
 from functools import partial
 from os.path import exists, join
@@ -250,6 +251,7 @@ class AstroTrainer(BaseTrainer):
             self.epoch = epoch
             self.begin_epoch()
 
+            # for batch in tqdm(range(self.num_iterations_cur_epoch)):
             for batch in range(self.num_iterations_cur_epoch):
                 iter_start_time = time.time()
                 self.scene_state.optimization.iteration = self.iteration
@@ -387,6 +389,7 @@ class AstroTrainer(BaseTrainer):
         self.log_dict["recon_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
         self.log_dict["codebook_loss"] = 0.0
+        self.log_dict["n_gt_redshift"] = 0
         self.log_dict["redshift_loss"] = 0.0
 
     def pre_step(self):
@@ -658,6 +661,7 @@ class AstroTrainer(BaseTrainer):
 
                 redshift_loss = self.redshift_loss(
                     gt_redshift, pred_redshift, mask=mask) * self.redshift_beta
+                self.log_dict["n_gt_redshift"] += len(gt_redshift)
                 self.log_dict["redshift_loss"] += redshift_loss.item()
 
         # iv) latent quantization codebook loss
@@ -690,7 +694,11 @@ class AstroTrainer(BaseTrainer):
             log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
 
         if self.redshift_semi_supervision:
-            log_text += " | redshift loss: {:>.3E}".format(self.log_dict["redshift_loss"] / n)
+            if self.log_dict["n_gt_redshift"] == 0:
+                redshift_loss = 0
+            else: redshift_loss = self.log_dict["redshift_loss"] / self.log_dict["n_gt_redshift"]
+            log_text += " | redshift loss: {:>.3E}".format(redshift_loss)
+
         log.info(log_text)
 
     def save_model(self):

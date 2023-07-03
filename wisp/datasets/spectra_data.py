@@ -10,9 +10,11 @@ import logging as log
 import matplotlib.pyplot as plt
 
 from wisp.datasets.patch_data import PatchData
+from wisp.utils.common import create_patch_uid
 from wisp.utils.numerical import normalize_coords
 from wisp.datasets.data_utils import add_dummy_dim, \
-    create_patch_uid, set_input_path, patch_exists
+    set_input_path, patch_exists, get_bound_id, \
+    clip_data_to_ref_wave_range
 
 from pathlib import Path
 from astropy.io import fits
@@ -243,13 +245,27 @@ class SpectraData:
             return self.data["supervision_redshift"]
         return self.data["supervision_redshift"][idx]
 
-    def get_validation_coords(self):
+    def get_validation_spectra_ids(self, patch_uid=None):
+        """ Get id of validation spectra in given patch.
+            Id here is in context of all validation spectra
+        """
+        if patch_uid is not None:
+            return self.data["validation_patch_ids"][patch_uid]
+        return self.data["validation_patch_ids"]
+
+    def get_validation_coords(self, idx=None):
+        if idx is not None:
+            return self.data["validation_coords"][idx]
         return self.data["validation_coords"]
 
-    def get_validation_fluxes(self):
+    def get_validation_fluxes(self, idx=None):
+        if idx is not None:
+            return self.data["validation_fluxes"][idx]
         return self.data["validation_fluxes"]
 
-    def get_validation_pixels(self):
+    def get_validation_pixels(self, idx=None):
+        if idx is not None:
+            return self.data["validation_pixels"][idx]
         return self.data["validation_pixels"]
 
     def get_semi_supervision_redshift(self):
@@ -389,14 +405,24 @@ class SpectraData:
         # supervision_ids = ids[:n]
         # validation_ids = ids[n:]
 
-        validation_ids = []
+        validation_ids, validation_patch_ids = [], {}
         # hardcoded (reserve all 9812 tract patches for validation/main train)
         all_patch_keys = self.data["gt_spectra_ids"].keys()
         reserved_patch_keys = filter(lambda x: "9812" in x, all_patch_keys)
+
+        acc = 0
         for key in reserved_patch_keys:
-            validation_ids.extend(self.data["gt_spectra_ids"][key])
+            cur_spectra_ids = self.data["gt_spectra_ids"][key]
+            validation_ids.extend(cur_spectra_ids)
+            validation_patch_ids[key] = np.arange(acc, acc+len(cur_spectra_ids))
+            acc += len(cur_spectra_ids)
+
         validation_ids = np.array(validation_ids)
         supervision_ids = np.array(list(set(ids) - set(validation_ids))).astype(int)
+
+        self.num_validation_spectra = len(validation_ids)
+        self.num_supervision_spectra = len(supervision_ids)
+        self.data["validation_patch_ids"] = validation_patch_ids
         return supervision_ids, validation_ids
 
     def train_valid_split(self):
@@ -434,15 +460,17 @@ class SpectraData:
         # clip all spectra to trusted range
         clipped_wave, clipped_flux = None, []
         for (wave, flux) in self.data["gt_spectra"]:
-            (id_lo, id_hi) = get_bound_id(
-                self.data["supervision_spectra_wave_bound"], wave, within_bound=True)
-            if clipped_wave is None:
-                clipped_wave = wave[id_lo:id_hi+1]
+            clipped_wave, (id_lo, id_hi) = clip_data_to_ref_wave_range(
+                wave, wave, wave_range=self.data["supervision_spectra_wave_bound"])
+            # (id_lo, id_hi) = get_bound_id(
+            #     self.data["supervision_spectra_wave_bound"], wave, within_bound=True)
+            # if clipped_wave is None:
+            #     clipped_wave = wave[id_lo:id_hi+1]
             clipped_flux.append(flux[id_lo:id_hi+1][None,:])
 
         clipped_flux = np.concatenate(clipped_flux, axis=0) # [n,nsmpl]
-        self.data["gt_spectra_wave"] = clipped_wave
-        self.data["gt_spectra_fluxes"] = clipped_flux
+        self.data["gt_spectra_wave"] = clipped_wave.astype(np.float32)
+        self.data["gt_spectra_fluxes"] = clipped_flux.astype(np.float32)
 
         # save data for all spectra together
         np.save(self.gt_spectra_wave_fname, self.data["gt_spectra_wave"])
@@ -471,9 +499,9 @@ class SpectraData:
                 np.load(join(self.processed_spectra_path, df.iloc[i]["spectra_fname"])))
 
         self.data["gt_spectra"] = spectra
-        self.data["gt_spectra_pixels"] = np.concatenate(pixels, axis=0)
-        self.data["gt_spectra_grid_coords"] = np.concatenate(coords, axis=0)
         self.data["gt_spectra_redshift"] = np.array(redshift).astype(np.float32)
+        self.data["gt_spectra_pixels"] = np.concatenate(pixels, axis=0).astype(np.float32)
+        self.data["gt_spectra_grid_coords"] = np.concatenate(coords, axis=0).astype(np.float32)
 
     def process_spectra(self):
         upper_bound = self.kwargs["num_gt_spectra"]
@@ -546,6 +574,7 @@ class SpectraData:
             ids = np.arange(n)
             spectra_to_drop = list(set(ids) - set(valid_spectra_ids))
             spectra_ids = defaultdict(list, spectra_ids)
+            log.info("spectra-data::localized spectra")
             return spectra_ids, spectra_to_drop
 
         spectra_to_drop = []
@@ -684,7 +713,6 @@ class SpectraData:
         # clip to trusted range (data collected here is for main train supervision only)
         (id_lo, id_hi) = get_bound_id(
             self.data["supervision_spectra_wave_bound"], gt_spectra[0], within_bound=True)
-        # print(gt_spectra.shape, min(gt_spectra[0]), max(gt_spectra[0]))
         cur_patch_spectra.append(gt_spectra[:,id_lo:id_hi+1])
 
     def load_source_metadata(self):
@@ -748,8 +776,8 @@ class SpectraData:
         return sub_dir, gt_flux, recon_flux
 
     def gather_one_spectrum_plot_data(
-            self, full_wave, flux_norm_cho, clip, is_codebook, bound_ids,
-            gt_flux, gt_wave, recon_flux, recon_wave
+            self, full_wave, flux_norm_cho, clip, spectra_clipped, is_codebook,
+            bound_ids, gt_flux, gt_wave, recon_flux, recon_wave
     ):
         """ Collect data for spectrum plotting for the given spectra.
         """
@@ -757,11 +785,12 @@ class SpectraData:
         plot_gt_spectrum = self.kwargs["plot_spectrum_with_gt"] \
             and gt_flux is not None and not is_codebook
 
-        if clip: # clip spectra to plot range
+        if clip or spectra_clipped: # clip spectra to plot range
+            if not spectra_clipped:
+                if is_codebook or bound_ids is not None: (lo, hi) = bound_ids
+                else: lo, hi = 0, recon_flux.shape[-1]
+                recon_flux = recon_flux[...,lo:hi]
             sub_dir += "clipped_"
-            if is_codebook or bound_ids is not None: (lo, hi) = bound_ids
-            else: lo, hi = 0, recon_flux.shape[-1]
-            recon_flux = recon_flux[...,lo:hi]
 
         if recon_flux.ndim == 2: # average spectra over neighbours
             if self.kwargs["average_neighbour_spectra"]:
@@ -839,8 +868,9 @@ class SpectraData:
         return full_wave, gt_fluxes, gt_wave, recon_wave, recon_wave_bound_ids
 
     def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
-                      clip=True, is_codebook=False, save_spectra=False,
-                      save_spectra_together=False, mode="pretrain_infer", ids=None
+                      clip=True, spectra_clipped=False, is_codebook=False,
+                      save_spectra=False, save_spectra_together=False,
+                      mode="pretrain_infer", ids=None
     ):
         """ Plot all given spectra.
             @Param
@@ -861,12 +891,15 @@ class SpectraData:
             fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
 
         get_data = partial(self.gather_one_spectrum_plot_data,
-                           full_wave, flux_norm_cho, clip, is_codebook, bound_ids)
+                           full_wave, flux_norm_cho, clip, spectra_clipped,
+                           is_codebook, bound_ids)
         plot_and_save = partial(self.plot_and_save_one_spectrum,
                                 name, spectra_dir, fig, axs, nrows, ncols, save_spectra)
         if ids is not None:
-            gt_fluxes = gt_fluxes[ids]
-            recon_fluxes = recon_fluxes[ids]
+            if len(gt_fluxes) > len(ids):
+                gt_fluxes = gt_fluxes[ids]
+            if len(recon_fluxes) > len(ids):
+                recon_fluxes = recon_fluxes[ids]
 
         for idx, (gt_flux, cur_flux) in enumerate(zip(gt_fluxes, recon_fluxes)):
             pargs = get_data(gt_flux, gt_wave, cur_flux, recon_wave)
@@ -994,7 +1027,7 @@ def process_gt_spectra(infname, outfname, full_wave, smpl_interval,
         # use new gt wave to get interpolated spectra
         flux = f_gt(wave)
 
-    flux = flux.astype(float32)
+    flux = flux.astype(np.float32)
     spectra_data = np.concatenate((
         wave[None,:], flux[None,:]), axis=0) # [2,nsmpl]
 
@@ -1019,40 +1052,6 @@ def convolve_spectra(spectra, std=140, border=True):
         denom = convolve(np.ones(spectra.shape), kernel)
         return nume / denom
     return convolve(spectra, kernel)
-
-def get_bound_id(wave_bound, source_wave, within_bound=True):
-    """ Get id of lambda values in full wave that bounds or is bounded by given wave_bound
-        if `within_bound`
-            source_wave[id_lo] >= wave_lo
-            source_wave[id_hi] <= wave_hi
-        else
-            source_wave[id_lo] <= wave_lo
-            source_wave[id_hi] >= wave_hi
-    """
-    if type(source_wave).__module__ == "torch":
-        source_wave = source_wave.numpy()
-
-    wave_lo, wave_hi = wave_bound
-    wave_hi = int(min(wave_hi, int(max(source_wave))))
-
-    if within_bound:
-        if wave_lo <= min(source_wave): id_lo = 0
-        else: id_lo = np.argmax((source_wave >= wave_lo))
-
-        if wave_hi >= max(source_wave): id_hi = len(source_wave) - 1
-        else: id_hi = np.argmax((source_wave > wave_hi)) - 1
-
-        assert(source_wave[id_lo] >= wave_lo and source_wave[id_hi] <= wave_hi)
-    else:
-        if wave_lo <= min(source_wave): id_lo = 0
-        else: id_lo = np.argmax((source_wave > wave_lo)) - 1
-
-        if wave_hi >= max(source_wave): id_hi = len(source_wave) - 1
-        else: id_hi = np.argmax((source_wave >= wave_hi))
-
-        assert(source_wave[id_lo] <= wave_lo and source_wave[id_hi] >= wave_hi)
-
-    return [id_lo, id_hi]
 
 def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
     gt = np.load(gt_fn)

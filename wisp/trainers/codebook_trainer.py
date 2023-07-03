@@ -101,8 +101,14 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_coords_source("spectra_latents")
         self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
 
-        self.dataset.toggle_wave_sampling(True) # TODO: False if we have too many spectra
         self.dataset.toggle_integration(self.pixel_supervision)
+        self.dataset.toggle_within_wave_range(self.train_within_wave_range)
+        self.dataset.toggle_wave_sampling(not self.train_within_wave_range)
+        if self.train_within_wave_range:
+            self.dataset.set_wave_range(
+                self.extra_args["spectra_supervision_wave_lo"],
+                self.extra_args["spectra_supervision_wave_hi"])
+
         self.dataset.set_length(self.num_sup_spectra)
 
     def summarize_training_tasks(self):
@@ -114,6 +120,9 @@ class CodebookTrainer(BaseTrainer):
         #  and we should never do redshift supervision during pretrain
         # self.redshift_supervision = False
         self.apply_gt_redshift = self.extra_args["model_redshift"]
+
+        self.train_within_wave_range = not self.pixel_supervision and \
+            self.extra_args["codebook_pretrain_within_wave_range"]
 
         self.save_soft_qtz_weights = "save_soft_qtz_weights_during_train" in tasks
         self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
@@ -175,7 +184,7 @@ class CodebookTrainer(BaseTrainer):
         """
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
-        # sampler_cls = SequentialSampler
+        sampler_cls = SequentialSampler
         # sampler_cls = RandomSampler
 
         sampler = BatchSampler(
@@ -288,6 +297,7 @@ class CodebookTrainer(BaseTrainer):
         if self.save_local_every > -1 and self.epoch % self.save_local_every == 0:
             self.save_data_to_local = True
 
+            self.redshift = []
             if self.plot_spectra: self.smpl_spectra = []
             if self.save_soft_qtz_weights: self.qtz_weights = []
             if self.save_pixel_values:
@@ -373,7 +383,7 @@ class CodebookTrainer(BaseTrainer):
         self.timer.check("backward and step")
 
         if self.save_data_to_local:
-            # if self.save_redshift: self.redshifts.extend(ret["redshift"])
+            self.redshift.extend(data["spectra_sup_redshift"])
             if self.plot_spectra: self.smpl_spectra.extend(ret["spectra"])
             if self.save_soft_qtz_weights: self.qtz_weights.extend(ret["soft_qtz_weights"])
             if self.save_pixel_values:
@@ -406,6 +416,8 @@ class CodebookTrainer(BaseTrainer):
                       recon_codebook_spectra=True)
 
         codebook_spectra = ret["intensity"].detach().cpu().numpy()
+        print(codebook_spectra.shape)
+        assert 0
 
         fname = f"ep{self.epoch}-it{self.iteration}"
         self.dataset.plot_spectrum(
@@ -490,12 +502,16 @@ class CodebookTrainer(BaseTrainer):
                       save_spectra=self.plot_spectra,
                       save_soft_qtz_weights=self.save_soft_qtz_weights)
 
+
+
         # i) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
         gt_spectra = data["spectra_sup_fluxes"]
 
-        (lo, hi) = data["spectra_sup_wave_bound_ids"]
-        recon_spectra = ret["spectra"][:,lo:hi]
+        if not self.train_within_wave_range:
+            (lo, hi) = data["spectra_sup_wave_bound_ids"]
+            recon_spectra = ret["spectra"][:,lo:hi]
+        else: recon_spectra = ret["spectra"]
 
         if len(recon_spectra) == 0:
             spectra_loss = 0
@@ -585,10 +601,16 @@ class CodebookTrainer(BaseTrainer):
         ).detach().cpu().numpy() # [num_sup_spectra,num_samples]
 
         ids = self.randomly_select_spectra_to_plot()
+
+        self.redshift = torch.stack(self.redshift)
+        #print(self.redshift.shape)
+        #print(self.redshift[ids])
+
         fname = f"ep{self.epoch}-it{self.iteration}"
 
         self.dataset.plot_spectrum(self.spectra_dir, fname, self.smpl_spectra,
                                    self.extra_args["flux_norm_cho"], clip=True,
+                                   spectra_clipped=self.train_within_wave_range,
                                    save_spectra=True, ids=ids)
 
     def randomly_select_spectra_to_plot(self):

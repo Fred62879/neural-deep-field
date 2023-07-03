@@ -3,9 +3,11 @@ import os
 import torch
 import logging as log
 
+from wisp.utils import PerfTimer
+from wisp.utils.common import create_patch_uid
+
 from os.path import join
 from datetime import datetime
-from wisp.utils import PerfTimer
 from abc import ABC, abstractmethod
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import BatchSampler, SequentialSampler, DataLoader
@@ -73,12 +75,15 @@ class BaseInferrer(ABC):
     # Dataloader
     #############
 
-    def init_dataloader(self, drop_last=True):
+    def init_dataloader(self, drop_last=False):
         self.infer_data_loader = DataLoader(
             self.dataset,
             batch_size=None,
             sampler=BatchSampler(
-                SequentialSampler(self.dataset), batch_size=self.batch_size, drop_last=drop_last),
+                SequentialSampler(self.dataset),
+                batch_size=self.batch_size,
+                drop_last=drop_last
+            ),
             pin_memory=True,
             num_workers=self.extra_args["dataset_num_workers"]
         )
@@ -91,7 +96,7 @@ class BaseInferrer(ABC):
         """ Actually iterate the data loader. """
         return next(self.infer_data_loader_iter)
 
-    def reset_dataloader(self, drop_last=True):
+    def reset_dataloader(self, drop_last=False):
         """ Configure dataset based on current inferrence task.
             Then re-init dataloader.
         """
@@ -106,18 +111,23 @@ class BaseInferrer(ABC):
     def infer(self):
         """ Perform each inferrence task (one at a time) using all selected models.
         """
-        for group_task in self.group_tasks:
-            self._toggle(group_task)
-            self._register_inferrence_func(group_task)
+        for tract, patch in zip(
+                self.extra_args["tracts"], self.extra_args["patches"]
+        ):
+            self.cur_patch_uid = create_patch_uid(tract, patch)
 
-            if self.verbose:
-                log.info(f"inferring for {group_task}")
-            if self.run_model:
-                self.pre_inferrence()
-                self.inferrence_run_model()
-                self.post_inferrence()
-            else:
-                self.inferrence_no_model_run()
+            for group_task in self.group_tasks:
+                self._toggle(group_task)
+                self._register_inferrence_func(group_task)
+
+                if self.verbose:
+                    log.info(f"inferring for {group_task}")
+                if self.run_model:
+                    self.pre_inferrence()
+                    self.inferrence_run_model()
+                    self.post_inferrence()
+                else:
+                    self.inferrence_no_model_run()
 
     def pre_inferrence(self):
         pass
@@ -126,10 +136,6 @@ class BaseInferrer(ABC):
         """ Perform current inferrence task using each selected checkpoints.
             Override if needed.
         """
-        #if self.extra_args["infer_during_train"]:
-        #    self.infer_with_checkpoint(self.model_id, self.checkpoint)
-        #else:
-
         for model_id, model_fname in enumerate(self.selected_model_fnames):
             model_fname = join(self.model_dir, model_fname)
             checkpoint = torch.load(model_fname)

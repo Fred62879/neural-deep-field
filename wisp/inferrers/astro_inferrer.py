@@ -314,9 +314,13 @@ class AstroInferrer(BaseInferrer):
             else: self.dataset_length = self.num_sup_spectra
         else:
             self.coords_source = "spectra_valid"
+            cur_patch_spectra_ids = self.dataset.get_validation_spectra_ids(
+                self.cur_patch_uid)
             self.dataset.set_hardcode_data(
-                "spectra_valid", self.dataset.get_validation_spectra_coords())
-            self.dataset_length = self.num_val_spectra()
+                "spectra_valid",
+                self.dataset.get_validation_spectra_coords(cur_patch_spectra_ids)
+            )
+            self.dataset_length = len(cur_patch_spectra_ids)
 
         self.requested_fields = ["coords","spectra_data"]
         if not self.extra_args["infer_spectra_individually"]:
@@ -717,7 +721,7 @@ class AstroInferrer(BaseInferrer):
                             # self.redshift_val_ids.extend(data["spectra_val_ids"])
 
             except StopIteration:
-                if self.verbose: log.info("all coords inferrence done")
+                log.info("all coords inferrence done")
                 break
 
     def infer_spectra(self, model_id, checkpoint):
@@ -756,6 +760,7 @@ class AstroInferrer(BaseInferrer):
                     self.soft_qtz_weights.extend(ret["soft_qtz_weights"])
 
             except StopIteration:
+                log.info("spectra inferrence done")
                 break
 
     def infer_codebook_spectra(self, model_id, checkpoint):
@@ -798,7 +803,7 @@ class AstroInferrer(BaseInferrer):
                 self.codebook_spectra.extend(spectra)
 
             except StopIteration:
-                if self.verbose: log.info("codebook spectra inferrence done")
+                log.info("codebook spectra inferrence done")
                 break
 
     #############
@@ -811,7 +816,6 @@ class AstroInferrer(BaseInferrer):
         if self.space_dim == 3:
             self.requested_fields.extend(["trans_data"])
 
-        print(self.dataset_length)
         self.dataset.set_mode(self.mode)
         self.dataset.set_length(self.dataset_length)
         self.dataset.set_fields(self.requested_fields)
@@ -830,7 +834,7 @@ class AstroInferrer(BaseInferrer):
             ids = np.arange(len(latents))
             np.random.seed(48)
             np.random.shuffle(ids)
-            latents = latents[ids[:self.extra_args["pretrain_num_infer"]]]
+            ids = ids[:self.extra_args["pretrain_num_infer"]]
             self.dataset.set_hardcode_data("selected_ids", ids)
 
         self.dataset.set_hardcode_data("spectra_latents", latents)
