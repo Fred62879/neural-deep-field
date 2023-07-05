@@ -51,8 +51,8 @@ class CodebookTrainer(BaseTrainer):
         self.shuffle_dataloader = False
         self.dataloader_drop_last = False
 
-        self.set_path()
         self.summarize_training_tasks()
+        self.set_path()
 
         self.init_net()
         self.init_loss()
@@ -73,7 +73,8 @@ class CodebookTrainer(BaseTrainer):
             self.num_sup_spectra,
             self.extra_args["codebook_pretrain_latent_dim"]
         )
-        log.info(self.train_pipeline)
+        # log.info(self.train_pipeline)
+        # log.info(self.infer_pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.train_pipeline.parameters()))
         )
@@ -114,7 +115,11 @@ class CodebookTrainer(BaseTrainer):
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
 
+        self.plot_loss = self.extra_args["plot_loss"]
         self.pixel_supervision = self.extra_args["codebook_pretrain_pixel_supervision"]
+
+        self.quantize_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
+        self.quantize_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
 
         # as long as we model redshift, we should apply gt redshift to spectra during pretrain
         #  and we should never do redshift supervision during pretrain
@@ -129,6 +134,9 @@ class CodebookTrainer(BaseTrainer):
         self.save_pixel_values = "save_pixel_values_during_train" in tasks and \
             self.extra_args["codebook_pretrain_pixel_supervision"]
 
+        self.recon_codebook_spectra = "recon_codebook_spectra_during_train" in tasks
+        self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ_during_train" in tasks
+
     def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         log.info(f"logging to {self.log_dir}")
@@ -141,6 +149,9 @@ class CodebookTrainer(BaseTrainer):
             Path(path).mkdir(parents=True, exist_ok=True)
 
         self.grad_fname = join(self.log_dir, "grad.png")
+
+        if self.plot_loss:
+            self.loss_fname = join(self.log_dir, "loss.png")
 
         if self.extra_args["resume_train"]:
             if self.extra_args["resume_log_dir"] is not None:
@@ -227,13 +238,20 @@ class CodebookTrainer(BaseTrainer):
     # Training logic
     #############
 
-    def train(self):
+    def begin_train(self):
+        if self.plot_loss:
+            self.losses = []
+
         if self.extra_args["resume_train"]:
             self.resume_train()
 
         log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
 
-        for epoch in tqdm(range(self.num_epochs + 1)):
+    def train(self):
+        self.begin_train()
+
+        # for epoch in tqdm(range(self.num_epochs + 1)):
+        for epoch in range(self.num_epochs + 1):
             self.begin_epoch()
 
             for batch in range(self.num_iterations_cur_epoch):
@@ -250,7 +268,17 @@ class CodebookTrainer(BaseTrainer):
 
             self.end_epoch()
 
+        self.end_train()
+
+    def end_train(self):
         self.writer.close()
+
+        if self.plot_loss:
+            x = np.arange(len(self.losses))
+            plt.plot(x,y)
+            plt.savefig(self.loss_fname + ".png")
+            np.save(self.loss_fname + ".npy")
+
         if self.extra_args["log_gpu_every"] != -1:
             nvidia_smi.nvmlShutdown()
 
@@ -299,6 +327,8 @@ class CodebookTrainer(BaseTrainer):
 
             self.redshift = []
             if self.plot_spectra: self.smpl_spectra = []
+            if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
+                self.codebook_spectra = []
             if self.save_soft_qtz_weights: self.qtz_weights = []
             if self.save_pixel_values:
                 self.gt_pixel_vals = []
@@ -322,6 +352,9 @@ class CodebookTrainer(BaseTrainer):
 
         total_loss = self.log_dict["total_loss"] / len(self.train_data_loader)
         self.scene_state.optimization.losses["total_loss"].append(total_loss)
+
+        if self.plot_loss:
+            self.losses.append(total_loss)
 
         if self.save_every > -1 and self.epoch % self.save_every == 0:
             self.save_model()
@@ -385,61 +418,17 @@ class CodebookTrainer(BaseTrainer):
         if self.save_data_to_local:
             self.redshift.extend(data["spectra_sup_redshift"])
             if self.plot_spectra: self.smpl_spectra.extend(ret["spectra"])
-            if self.save_soft_qtz_weights: self.qtz_weights.extend(ret["soft_qtz_weights"])
+            if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
+                print(ret["codebook"].shape)
+                self.codebook_spectra.extend(ret["codebook"])
+            if self.save_soft_qtz_weights:
+                self.qtz_weights.extend(ret["soft_qtz_weights"])
             if self.save_pixel_values:
                 self.recon_pixel_vals.extend(ret["intensity"])
                 self.gt_pixel_vals.extend(data["spectra_sup_pixels"])
 
     def post_step(self):
         pass
-
-    #############
-    # Validation
-    #############
-
-    def validate(self):
-        """ Perform validation (recon gt spectra, codebook spectra etc.).
-            Codebook spectra reconstruced here don't involve redshift,
-              to see the codebook spectra under each individual redshift,
-              use astro_inferrer.
-        """
-        assert 0
-        load_model_weights(self.infer_pipeline, self.train_pipeline.state_dict())
-        self.infer_pipeline.eval()
-
-        data = self.get_valid_data()
-        ret = forward(data,
-                      self.infer_pipeline,
-                      self.total_steps,
-                      self.space_dim,
-                      self.extra_args["trans_sample_method"],
-                      recon_codebook_spectra=True)
-
-        codebook_spectra = ret["intensity"].detach().cpu().numpy()
-        print(codebook_spectra.shape)
-        assert 0
-
-        fname = f"ep{self.epoch}-it{self.iteration}"
-        self.dataset.plot_spectrum(
-            self.codebook_spectra_dir, fname, codebook_spectra,
-            save_spectra=True, is_codebook=True,
-            clip=self.extra_args["plot_clipped_spectrum"],
-            flux_norm_cho=self.extra_args["flux_norm_cho"])
-
-    def get_valid_data(self):
-        """ Get data for codebook spectra recon.
-        """
-        bsz = self.extra_args["qtz_num_embed"]
-        latents = load_embed(self.train_pipeline.state_dict(),
-                             transpose=False, tensor=True)[:,None]
-
-        wave = torch.FloatTensor(self.dataset.get_full_wave())[None,:,None].tile(bsz,1,1)
-        data = {
-            "coords": latents.to(self.device), # [bsz,nsmpl,latent_dim]
-            "wave": wave.to(self.device),      # [bsz,nsmpl,1]
-            "full_wave_bound": self.dataset.get_full_wave_bound(),
-        }
-        return data
 
     #############
     # Helper methods
@@ -499,10 +488,12 @@ class CodebookTrainer(BaseTrainer):
                       apply_gt_redshift=self.apply_gt_redshift,
                       quantize_spectra=True,
                       quantization_strategy="soft",
-                      save_spectra=self.plot_spectra,
-                      save_soft_qtz_weights=self.save_soft_qtz_weights)
-
-
+                      save_spectra=self.plot_spectra and \
+                                   self.save_data_to_local,
+                      save_soft_qtz_weights=self.save_soft_qtz_weights and \
+                                            self.save_data_to_local,
+                      save_codebook=self.recon_codebook_spectra_individ and \
+                                    self.save_data_to_local)
 
         # i) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
@@ -540,9 +531,10 @@ class CodebookTrainer(BaseTrainer):
         """
         # Average over iterations
         n = len(self.train_data_loader)
+        total_loss = self.log_dict["total_loss"] / n
 
         log_text = "EPOCH {}/{}".format(self.epoch, self.num_epochs)
-        log_text += " | total loss: {:>.3E}".format(self.log_dict["total_loss"] / n)
+        log_text += " | total loss: {:>.3E}".format(total_loss)
         log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
         if self.pixel_supervision:
             log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / n)
@@ -567,6 +559,9 @@ class CodebookTrainer(BaseTrainer):
     def save_local(self):
         if self.plot_spectra:
             self._plot_spectrum()
+
+        if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
+            self._recon_codebook_spectra()
 
         if self.save_pixel_values:
             self._save_pixel_values()
@@ -601,10 +596,8 @@ class CodebookTrainer(BaseTrainer):
         ).detach().cpu().numpy() # [num_sup_spectra,num_samples]
 
         ids = self.randomly_select_spectra_to_plot()
-
-        self.redshift = torch.stack(self.redshift)
-        #print(self.redshift.shape)
-        #print(self.redshift[ids])
+        if type(self.redshift) == list:
+            self.redshift = torch.stack(self.redshift)
 
         fname = f"ep{self.epoch}-it{self.iteration}"
 
@@ -613,6 +606,25 @@ class CodebookTrainer(BaseTrainer):
                                    spectra_clipped=self.train_within_wave_range,
                                    save_spectra=True, ids=ids)
 
+    def _recon_codebook_spectra(self):
+        log.info("reconstructing codebook spectrum")
+
+        self.codebook_spectra = torch.stack(self.codebook_spectra).view(
+            self.num_sup_spectra, self.extra_args["qtz_num_embed"], -1
+        ).detach().cpu().numpy() # [num_sup_spectra,num_samples]
+
+        ids = self.randomly_select_spectra_to_plot()
+        if type(self.redshift) == list:
+            self.redshift = torch.stack(self.redshift)
+
+        fname = f"ep{self.epoch}-it{self.iteration}"
+
+        self.dataset.plot_spectrum(
+            self.codebook_spectra_dir, fname, self.codebook_spectra,
+            self.extra_args["flux_norm_cho"], is_codebook=True,
+            spectra_clipped=self.train_within_wave_range,
+            save_spectra=True, ids=ids)
+
     def randomly_select_spectra_to_plot(self):
         ids = np.arange(self.num_sup_spectra)
         if self.extra_args["infer_selected"]:
@@ -620,3 +632,56 @@ class CodebookTrainer(BaseTrainer):
             np.random.shuffle(ids)
             ids = ids[:self.extra_args["pretrain_num_infer"]]
         return ids
+
+    #############
+    # Validation
+    #############
+
+    def validate(self):
+        """ Perform validation (recon gt spectra, codebook spectra etc.).
+            Codebook spectra reconstruced here don't involve redshift,
+              to see the codebook spectra under each individual redshift,
+              use astro_inferrer.
+        """
+        load_model_weights(self.infer_pipeline, self.train_pipeline.state_dict())
+        self.infer_pipeline.eval()
+
+        data = self.get_valid_data()
+        ret = forward(data,
+                      self.infer_pipeline,
+                      self.total_steps,
+                      self.space_dim,
+                      self.extra_args["trans_sample_method"],
+                      quantize_latent=self.quantize_latent,
+                      quantize_spectra=self.quantize_spectra,
+                      save_codebook=self.recon_codebook_spectra_individ,
+                      recon_codebook_spectra=True)
+
+        if self.recon_codebook_spectra:
+            codebook_spectra = ret["intensity"]
+        elif self.recon_codebook_spectra_individ:
+            codebook_spectra = ret["codebook"]
+        else: assert 0
+        codebook_spectra = codebook_spectra.detach().cpu().numpy()
+
+        fname = f"ep{self.epoch}-it{self.iteration}"
+        self.dataset.plot_spectrum(
+            self.codebook_spectra_dir, fname, codebook_spectra,
+            save_spectra=True, is_codebook=True,
+            clip=self.extra_args["plot_clipped_spectrum"],
+            flux_norm_cho=self.extra_args["flux_norm_cho"])
+
+    def get_valid_data(self):
+        """ Get data for codebook spectra recon.
+        """
+        bsz = self.extra_args["qtz_num_embed"]
+        latents = load_embed(self.train_pipeline.state_dict(),
+                             transpose=False, tensor=True)[:,None]
+
+        wave = torch.FloatTensor(self.dataset.get_full_wave())[None,:,None].tile(bsz,1,1)
+        data = {
+            "coords": latents.to(self.device), # [bsz,nsmpl,latent_dim]
+            "wave": wave.to(self.device),      # [bsz,nsmpl,1]
+            "full_wave_bound": self.dataset.get_full_wave_bound(),
+        }
+        return data

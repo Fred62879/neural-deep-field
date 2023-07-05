@@ -46,13 +46,15 @@ class CodebookPretrainNerf(BaseNeuralField):
             _model_redshift=self.model_redshift,
             **self.kwargs)
 
-    def pretrain(self, coords, wave, full_wave_bound, trans=None, nsmpl=None, qtz_args=None, specz=None):
+    def pretrain(self, coords, wave, full_wave_bound, trans=None,
+                 nsmpl=None, qtz_args=None, specz=None
+    ):
         """ Pretrain codebook.
             @Param
               coords: [num_supervision_spectra,latent_dim]
               wave:   full wave [bsz,nsmpl,1]
         """
-        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
+        timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.check("forward starts")
 
         ret = defaultdict(lambda: None)
@@ -65,10 +67,8 @@ class CodebookPretrainNerf(BaseNeuralField):
 
         self.hps_decoder(
             latents, wave, trans, nsmpl, full_wave_bound,
-            codebook=self.codebook, qtz_args=qtz_args,
-            quantize_spectra=True, ret=ret
-        )
-        # print(torch.isnan(ret["spectra"]).any())
+            codebook=self.codebook, qtz_args=qtz_args, ret=ret)
+
         timer.check("hps decoding done")
 
         return ret

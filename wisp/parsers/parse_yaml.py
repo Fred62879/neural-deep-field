@@ -100,7 +100,9 @@ def define_cmd_line_args():
     global_group.add_argument("--use_gpu", action="store_true")
     global_group.add_argument("--verbose", action="store_true")
     global_group.add_argument("--print-shape", action="store_true")
-    global_group.add_argument("--activate_timer", action="store_true")
+    global_group.add_argument("--activate-model-timer", action="store_true")
+    global_group.add_argument("--activate-dataset-timer", action="store_true")
+    global_group.add_argument("--activate-trainer-timer", action="store_true")
     global_group.add_argument("--dataloader-drop-last", action="store_true")
     global_group.add_argument("--perf", action="store_true",
                               help="Use high-level profiling for the trainer.")
@@ -381,7 +383,7 @@ def define_cmd_line_args():
     data_group.add_argument("--processed-spectra-cho", type=str)
     data_group.add_argument("--spectra-supervision-wave-lo", type=int)
     data_group.add_argument("--spectra-supervision-wave-hi", type=int)
-    data_group.add_argument("--load_spectra_data_from_cache", action="store_true")
+    data_group.add_argument("--load-spectra-data-from-cache", action="store_true")
 
     ###################
     # Arguments for optimizer
@@ -409,6 +411,7 @@ def define_cmd_line_args():
 
     train_group.add_argument("--trainer-type", type=str, help="Trainer class to use")
 
+    data_group.add_argument("--plot-loss", action="store_true")
     train_group.add_argument("--num-epochs", type=int, default=250,
                              help="Number of epochs to run the training.")
     train_group.add_argument("--batch-size", type=int, default=512,

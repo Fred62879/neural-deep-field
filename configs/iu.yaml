@@ -2,17 +2,18 @@
 global:
     verbose: False
     print_shape: False
-    activate_timer: False
+    activate_model_timer: False
+    activate_trainer_timer: False
     dataloader_drop_last: False
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_soft_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ'] #,'log_redshift','log_soft_qtz_weights','recon_img']
+    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','recon_codebook_spectra_individ_during_train'] #,'save_soft_qtz_weights_during_train']
+    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ'] #,'log_redshift','log_soft_qtz_weights','recon_img']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
-    tasks: ['infer','recon_gt_spectra']
+    #tasks: ['infer','recon_gt_spectra']
     #tasks: ['infer','plot_latent_embed']
     #tasks: ['infer','plot_pixel_distrib']
     #tasks: ['infer','save_soft_qtz_weights']
@@ -131,13 +132,13 @@ hyperspectral:
 trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '/scratch/projects/vision/data/pdr3/output'
-    perf: False
 
+    plot_loss: True
     pixel_loss_cho: l1
     spectra_loss_cho: l2
     redshift_loss_cho: l2
     num_epochs: 4000
-    batch_size: 2048 #40960 #65536 #262144
+    batch_size: 40960 #65536 #262144
     save_every: 400
     valid_every: -1
     render_tb_every: -1
@@ -152,18 +153,19 @@ trainer:
     train_pixel_ratio: .1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_fluxes','spectra_sup_pixels','spectra_sup_redshift','spectra_val_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
+    pretrain_codebook: True          # these two conflict
+    spectra_supervision: False       #  each other
+
     batched_pretrain: True
-    pretrain_codebook: True
     codebook_pretrain_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
 
-    pixel_supervision: True
-    spectra_supervision: False
-    train_spectra_pixels_only: False
+    pixel_supervision: True          # these two conflict
+    train_spectra_pixels_only: False #  each other
 
-    apply_gt_redshift: False        # -
-    redshift_unsupervision: False   #  |- these three conflict each other
-    redshift_semi_supervision: True # -
+    apply_gt_redshift: False         # -
+    redshift_unsupervision: False    #  |- these three conflict each other
+    redshift_semi_supervision: True  # -
 
     spectra_beta: 1
     redshift_beta: 1
@@ -178,15 +180,15 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230529-180531'
-    pretrain_log_dir: '20230702-161133'
-    pretrained_model_name: 'model-ep4000-it2.pth'
+    pretrain_log_dir: '20230704-141230_50_spectra_pretrain'
+    pretrained_model_name: 'model-ep4000-it1.pth'
 
     num_trans_samples: 40
     uniform_sample_trans: True
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 7000
+    num_supervision_spectra: 20
     spectra_neighbour_size: 1
 
 infer:
@@ -208,7 +210,7 @@ infer:
 
     # recon spectra
     infer_selected: True
-    pretrain_num_infer: 10
+    pretrain_num_infer: 5
 
     flux_norm_cho: "sum"
     spectra_smooth_sigma: 50

@@ -66,24 +66,23 @@ class PerfTimer():
     def check(self, name=None):
         if self.activate:
             cpu_time = time.process_time() - self.prev_time
-          
+
             self.end.record()
             torch.cuda.synchronize()
 
             gpu_time = self.start.elapsed_time(self.end) / 1e3
-            
+
             if self.print_mode:
                 cpu_time_disp = colorize_time(cpu_time)
                 gpu_time_disp = colorize_time(gpu_time)
                 if name:
-                    print("CPU Checkpoint {}: {} s".format(name, cpu_time_disp))
+                    # print("CPU Checkpoint {}: {} s".format(name, cpu_time_disp))
                     print("GPU Checkpoint {}: {} s".format(name, gpu_time_disp))
                 else:
-                    print("CPU Checkpoint {}: {} s".format(self.counter, cpu_time_disp))
+                    # print("CPU Checkpoint {}: {} s".format(self.counter, cpu_time_disp))
                     print("GPU Checkpoint {}: {} s".format(self.counter, gpu_time_disp))
                 if self.show_memory:
                     print(f"{torch.cuda.memory_allocated()//1048576}MB")
-                
 
             self.prev_time = time.process_time()
             self.prev_time_gpu = self.start.record()

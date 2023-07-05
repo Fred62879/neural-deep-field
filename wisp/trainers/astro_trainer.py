@@ -50,8 +50,8 @@ class AstroTrainer(BaseTrainer):
         self.shuffle_dataloader = True
         self.dataloader_drop_last = extra_args["dataloader_drop_last"]
 
-        self.set_log_path()
         self.summarize_training_tasks()
+        self.set_log_path()
 
         self.init_net()
         self.init_loss()
@@ -71,7 +71,7 @@ class AstroTrainer(BaseTrainer):
         if self.extra_args["pretrain_codebook"]:
             self.load_pretrained_model()
 
-        # log.info(self.pipeline)
+        log.info(self.pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.pipeline.parameters()))
         )
@@ -97,9 +97,6 @@ class AstroTrainer(BaseTrainer):
 
         if self.spectra_supervision:
             fields.append("spectra_data")
-
-        # if self.redshift_semi_supervision:
-        #    fields.append("redshift_data")
 
         length = self.get_dataset_length()
 
@@ -150,6 +147,7 @@ class AstroTrainer(BaseTrainer):
             self.extra_args["model_redshift"] and \
             "save_redshift_during_train" in tasks
 
+        self.plot_loss = self.extra_args["plot_loss"]
         self.plot_spectra = self.space_dim == 3 and \
             "recon_gt_spectra_during_train" in tasks
         self.plot_embed_map = self.pixel_supervision and \
@@ -184,6 +182,9 @@ class AstroTrainer(BaseTrainer):
             Path(path).mkdir(parents=True, exist_ok=True)
 
         self.grad_fname = join(self.log_dir, "grad.png")
+
+        if self.plot_loss:
+            self.loss_fname = join(self.log_dir, "loss.png")
 
         if self.extra_args["pretrain_codebook"]:
             self.pretrained_model_fname = self.get_checkpoint_fname(
@@ -240,12 +241,18 @@ class AstroTrainer(BaseTrainer):
     # Training logic
     #############
 
-    def train(self):
+    def begin_train(self):
+        if self.plot_loss:
+            self.losses = []
+
         if self.extra_args["resume_train"]:
             self.resume_train()
 
         self.scene_state.optimization.running = True
         log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
+
+    def train(self):
+        self.begin_train()
 
         for epoch in range(self.num_epochs + 1):
             self.epoch = epoch
@@ -256,10 +263,14 @@ class AstroTrainer(BaseTrainer):
                 iter_start_time = time.time()
                 self.scene_state.optimization.iteration = self.iteration
 
+                self.timer.reset()
                 data = self.next_batch()
+                self.timer.check('got data')
 
                 self.pre_step()
+                self.timer.check('pre step')
                 self.step(data)
+                self.timer.check('post step')
                 self.post_step()
 
                 self.iteration += 1
@@ -270,7 +281,16 @@ class AstroTrainer(BaseTrainer):
 
             self.end_epoch()
 
+        self.end_train()
+
+    def end_train(self):
         self.writer.close()
+
+        if self.plot_loss:
+            x = np.arange(len(self.losses))
+            plt.plot(x,y)
+            plt.savefig(self.loss_fname + ".png")
+            np.save(self.loss_fname + ".npy")
 
         if self.extra_args["log_gpu_every"] != -1:
             nvidia_smi.nvmlShutdown()
@@ -352,6 +372,9 @@ class AstroTrainer(BaseTrainer):
         total_loss = self.log_dict["total_loss"] / len(self.train_data_loader)
         self.scene_state.optimization.losses["total_loss"].append(total_loss)
 
+        if self.plot_loss:
+            self.losses.append(total_loss)
+
         if self.extra_args["log_tb_every"] > -1 and self.epoch % self.extra_args["log_tb_every"] == 0:
             self.log_tb()
 
@@ -410,13 +433,13 @@ class AstroTrainer(BaseTrainer):
         self.timer.check("zero grad")
 
         total_loss, recon_pixels, ret = self.calculate_loss(data)
+        self.timer.check("loss")
 
         total_loss.backward()
         if self.epoch != 0 and self.plot_grad_every != -1 \
            and self.plot_grad_every % self.epoch == 0:
             plot_grad_flow(self.pipeline.named_parameters(), self.grad_fname)
         self.optimizer.step()
-
         self.timer.check("backward and step")
 
         if self.save_data_to_local:
@@ -588,6 +611,7 @@ class AstroTrainer(BaseTrainer):
         total_loss = 0
         add_to_device(data, self.extra_args["gpu_data"], self.device)
 
+        self.timer.reset()
         ret = forward(data,
                       self.pipeline,
                       self.total_steps,
@@ -612,6 +636,7 @@ class AstroTrainer(BaseTrainer):
                       save_codebook=self.save_data_to_local and self.save_codebook,
                       save_redshift=self.save_data_to_local and self.save_redshift,
                       save_embed_ids=self.save_data_to_local and self.plot_embed_map)
+        self.timer.check('forward')
 
         # i) reconstruction loss (taking inpaint into account)
         recon_loss, recon_pixels = 0, None
@@ -631,6 +656,7 @@ class AstroTrainer(BaseTrainer):
                 recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
 
             self.log_dict["recon_loss"] += recon_loss.item()
+            self.timer.check("recon loss")
 
         # ii) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
@@ -647,6 +673,7 @@ class AstroTrainer(BaseTrainer):
             else:
                 spectra_loss = self.spectra_loss(gt_spectra, recon_spectra) * self.spectra_beta
                 self.log_dict["spectra_loss"] += spectra_loss.item()
+            self.timer.check("spectra loss")
 
         # iii) redshift loss
         redshift_loss = 0
@@ -655,7 +682,8 @@ class AstroTrainer(BaseTrainer):
 
             if len(gt_redshift) > 0:
                 pred_redshift = ret["redshift"]
-                if self.extra_args["pretrain_codebook"]:
+                if self.extra_args["pretrain_codebook"] and \
+                   not self.extra_args["train_spectra_pixels_only"]:
                     mask= data["spectra_bin_map"]
                 else: mask = None
 
@@ -663,17 +691,18 @@ class AstroTrainer(BaseTrainer):
                     gt_redshift, pred_redshift, mask=mask) * self.redshift_beta
                 self.log_dict["n_gt_redshift"] += len(gt_redshift)
                 self.log_dict["redshift_loss"] += redshift_loss.item()
+            self.timer.check("redshift loss")
 
         # iv) latent quantization codebook loss
         codebook_loss = 0
         if self.quantize_latent and self.extra_args["quantization_strategy"] == "hard":
             codebook_loss = ret["codebook_loss"]
             self.log_dict["codebook_loss"] += codebook_loss.item()
+            self.timer.check("codebook loss")
 
         torch.autograd.set_detect_anomaly(True)
         total_loss = redshift_loss + recon_loss + spectra_loss + codebook_loss
         self.log_dict["total_loss"] += total_loss.item()
-        self.timer.check("loss")
         return total_loss, recon_pixels, ret
 
     def log_cli(self):

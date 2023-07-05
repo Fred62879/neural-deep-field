@@ -405,20 +405,19 @@ class SpectraData:
         # supervision_ids = ids[:n]
         # validation_ids = ids[n:]
 
-        validation_ids, validation_patch_ids = [], {}
-        # hardcoded (reserve all 9812 tract patches for validation/main train)
-        all_patch_keys = self.data["gt_spectra_ids"].keys()
-        reserved_patch_keys = filter(lambda x: "9812" in x, all_patch_keys)
-
-        acc = 0
-        for key in reserved_patch_keys:
-            cur_spectra_ids = self.data["gt_spectra_ids"][key]
+        acc, validation_ids, validation_patch_ids = 0, [], {}
+        for tract, patch in zip(self.kwargs["tracts"], self.kwargs["patches"]):
+            patch_uid = create_patch_uid(tract, patch)
+            cur_spectra_ids = self.data["gt_spectra_ids"][patch_uid]
             validation_ids.extend(cur_spectra_ids)
-            validation_patch_ids[key] = np.arange(acc, acc+len(cur_spectra_ids))
+            validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
             acc += len(cur_spectra_ids)
-
         validation_ids = np.array(validation_ids)
+
+        # get supervision ids
         supervision_ids = np.array(list(set(ids) - set(validation_ids))).astype(int)
+        np.random.shuffle(supervision_ids)
+        supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra"]]
 
         self.num_validation_spectra = len(validation_ids)
         self.num_supervision_spectra = len(supervision_ids)
@@ -427,7 +426,6 @@ class SpectraData:
 
     def train_valid_split(self):
         sup_ids, val_ids = self.split_spectra()
-        self.num_supervision_spectra = len(sup_ids)
         log.info(f"spectra train/valid {len(sup_ids)}/{len(val_ids)}")
 
         # supervision spectra data (used during pretrain)
@@ -768,7 +766,7 @@ class SpectraData:
             if flux_norm_cho == "max":
                 gt_flux = gt_flux / np.max(gt_flux)
             elif flux_norm_cho == "sum":
-                gt_flux = gt_flux / np.sum(gt_flux)
+                gt_flux = gt_flux / (np.sum(gt_flux) + 1e-10)
             elif flux_norm_cho == "scale_gt":
                 gt_flux = gt_flux / np.max(gt_flux) * recon_max
             elif flux_norm_cho == "scale_recon":

@@ -96,7 +96,7 @@ class BaseTrainer(ABC):
             self.scene_state.graph.cameras = self.dataset.data.get("cameras", dict())
         self.scene_state.optimization.max_epochs = self.num_epochs
 
-        self.timer = PerfTimer(activate=extra_args["perf"])
+        self.timer = PerfTimer(activate=extra_args["activate_trainer_timer"])
         self.timer.reset()
 
         self.scaler = torch.cuda.amp.GradScaler()
@@ -122,7 +122,7 @@ class BaseTrainer(ABC):
         self.plot_grad_every = extra_args["plot_grad_every"]
         self.render_tb_every = extra_args["render_tb_every"]
         self.save_local_every = extra_args["save_local_every"]
-        self.timer.check('set_logger')
+        # self.timer.check('set_logger')
 
         if self.using_wandb:
             for d in range(self.extra_args["num_lods"]):
@@ -248,7 +248,6 @@ class BaseTrainer(ABC):
        # Save model
         if self.save_every > -1 and self.epoch % self.save_every == 0 and self.epoch != 0:
             self.save_model()
-        return
 
         self.timer.check('post_epoch done')
 

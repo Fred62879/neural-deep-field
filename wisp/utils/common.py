@@ -233,12 +233,9 @@ def forward(
             if quantization_strategy == "soft":
                 qtz_args["save_soft_qtz_weights"] = save_soft_qtz_weights
                 qtz_args["temperature"] = step_num + 1
-
                 if save_embed_ids:
                     qtz_args["find_embed_id"] = save_embed_ids
-
-            if save_codebook:
-                qtz_args["save_codebook"] = save_codebook
+            qtz_args["save_codebook"] = save_codebook
 
             net_args["qtz_args"] = qtz_args
 

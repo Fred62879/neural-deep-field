@@ -270,8 +270,12 @@ class AstroDataset(Dataset):
                 #print('infer', out["spectra_sup_redshift"])
 
             elif self.mode == "main_train": # or self.mode == "infer":
+                ids = out["spectra_id_map"]
                 bin_map = out["spectra_bin_map"]
-                ids = out["spectra_id_map"][bin_map]
+
+                if not self.kwargs["train_spectra_pixels_only"]:
+                    ids = ids[bin_map]
+
                 out["spectra_val_ids"] = ids
                 # out["spectra_val_fluxes"] = self.fits_dataset.get_spectra_pixel_fluxes(ids)
                 out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
@@ -326,7 +330,7 @@ class AstroDataset(Dataset):
         if "redshift_data" in self.requested_fields:
            self.get_redshift_data(out)
 
-        print_shape(out)
+        # print_shape(out)
         if self.transform is not None:
             out = self.transform(out)
         return out

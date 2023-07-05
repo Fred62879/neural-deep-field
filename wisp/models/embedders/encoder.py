@@ -61,7 +61,7 @@ class Encoder(nn.Module):
             @Return
               latents: [batch_size,num_samples,latent_dim]
         """
-        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
+        timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
 
         batch, num_samples, _ = coords.shape
 
