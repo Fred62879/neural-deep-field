@@ -184,9 +184,7 @@ class AstroDataset(Dataset):
         elif field == "spectra_sup_pixels":
             data = self.spectra_dataset.get_supervision_pixels(idx)
         elif field == "spectra_sup_redshift":
-            #print(idx[:10])
             data = self.spectra_dataset.get_supervision_redshift(idx)
-            #print(data[:10])
         elif field == "spectra_sup_wave_bound_ids":
             data = self.spectra_dataset.get_supervision_wave_bound_ids()
         elif field == "masks":
@@ -256,18 +254,17 @@ class AstroDataset(Dataset):
                     self.spectra_dataset.get_supervision_wave_bound_ids()
 
             elif self.mode == "pretrain_infer":
-                out["spectra_sup_fluxes"] = \
-                    self.spectra_dataset.get_supervision_fluxes()
+                out["selected_ids"] = self.data["selected_ids"]
+                # out["spectra_sup_fluxes"] = \
+                #     self.spectra_dataset.get_supervision_fluxes()
                 out["spectra_sup_redshift"] = \
                     self.spectra_dataset.get_supervision_redshift()
 
                 if self.kwargs["infer_selected"]:
-                    out["spectra_sup_fluxes"] = out["spectra_sup_fluxes"][
-                        self.data["selected_ids"]]
+                    # out["spectra_sup_fluxes"] = out["spectra_sup_fluxes"][
+                    #     self.data["selected_ids"]]
                     out["spectra_sup_redshift"] = out["spectra_sup_redshift"][
                         self.data["selected_ids"]]
-
-                #print('infer', out["spectra_sup_redshift"])
 
             elif self.mode == "main_train": # or self.mode == "infer":
                 ids = out["spectra_id_map"]

@@ -328,12 +328,12 @@ class CodebookTrainer(BaseTrainer):
 
             self.redshift = []
             if self.plot_spectra: self.smpl_spectra = []
-            if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
-                self.codebook_spectra = []
             if self.save_soft_qtz_weights: self.qtz_weights = []
             if self.save_pixel_values:
                 self.gt_pixel_vals = []
                 self.recon_pixel_vals = []
+            if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
+                self.codebook_spectra = []
 
             # re-init dataloader to make sure pixels are in order
             self.shuffle_dataloader = False
@@ -583,7 +583,7 @@ class CodebookTrainer(BaseTrainer):
         np.save(fname, weights)
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
-        log.info(f"Qtz weights {weights[:,0]}")
+        # log.info(f"Qtz weights {weights[:,0]}")
 
     def _plot_spectrum(self):
         log.info("plotting spectrum")
@@ -629,7 +629,7 @@ class CodebookTrainer(BaseTrainer):
             self.dataset.plot_spectrum(
                 cur_dir, fname, cur_codebook_spectra,
                 self.extra_args["flux_norm_cho"],
-                is_codebook=True, save_spectra=True, ids=ids,
+                is_codebook=True, save_spectra_together=True, ids=ids,
                 clip=self.extra_args["plot_clipped_spectrum"],
                 spectra_clipped=self.train_within_wave_range,
             )

@@ -76,8 +76,8 @@ class AstroInferrer(BaseInferrer):
             Path(path).mkdir(parents=True, exist_ok=True)
 
     def select_models(self):
-        self.selected_model_fnames = os.listdir(self.model_dir)
-        self.selected_model_fnames = sort_alphanumeric(self.selected_model_fnames)
+        self.model_fnames = os.listdir(self.model_dir)
+        self.selected_model_fnames = sort_alphanumeric(self.model_fnames)
         if self.infer_last_model_only:
             self.selected_model_fnames = self.selected_model_fnames[-1:]
         self.num_models = len(self.selected_model_fnames)
@@ -111,6 +111,7 @@ class AstroInferrer(BaseInferrer):
         self.quantize_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
         assert not (self.quantize_latent and self.quantize_spectra)
 
+        self.infer_selected = self.extra_args["infer_selected"]
         self.apply_gt_redshift = self.extra_args["apply_gt_redshift"]
         self.redshift_unsupervision = self.extra_args["redshift_unsupervision"]
         self.redshift_semi_supervision = self.extra_args["redshift_semi_supervision"]
@@ -309,7 +310,7 @@ class AstroInferrer(BaseInferrer):
         if self.mode == "pretrain_infer":
             self.coords_source = "spectra_train"
             # pretrain coords set using checkpoint
-            if self.extra_args["infer_selected"]:
+            if self.infer_selected:
                 self.dataset_length = self.extra_args["pretrain_num_infer"]
             else: self.dataset_length = self.num_sup_spectra
         else:
@@ -593,6 +594,8 @@ class AstroInferrer(BaseInferrer):
     def pre_checkpoint_selected_coords_partial_model(self, model_id):
         self.reset_data_iterator()
         self.recon_spectra = []
+        if self.infer_selected:
+            self.selected_ids = []
         if self.log_qtz_w_main:
             self.soft_qtz_weights = []
 
@@ -608,11 +611,15 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()
 
+        if self.infer_selected:
+            self.selected_ids = torch.stack(self.selected_ids)
+        else: self.selected_ids = None
+
         self.dataset.plot_spectrum(
             self.spectra_dir, model_id, self.recon_spectra,
             flux_norm_cho=self.extra_args["flux_norm_cho"],
             save_spectra=True, clip=self.extra_args["plot_clipped_spectrum"],
-            mode=self.mode)
+            mode=self.mode, ids=self.selected_ids)
 
         if self.log_pixel_value:
             self.dataset.log_spectra_pixel_values(self.recon_spectra)
@@ -754,8 +761,10 @@ class AstroInferrer(BaseInferrer):
                 spectra = ret["intensity"]
                 if spectra.ndim == 3: # bandwise
                     spectra = spectra.flatten(1,2) # [bsz,nsmpl]
-                self.recon_spectra.extend(spectra)
 
+                self.recon_spectra.extend(spectra)
+                if self.infer_selected:
+                    self.selected_ids.extend(data["selected_ids"])
                 if self.log_qtz_w_main:
                     self.soft_qtz_weights.extend(ret["soft_qtz_weights"])
 
@@ -830,7 +839,7 @@ class AstroInferrer(BaseInferrer):
         latents = checkpoint["latents"].weight
 
         # select the same random set of spectra to recon
-        if self.extra_args["infer_selected"]:
+        if self.infer_selected:
             ids = np.arange(len(latents))
             np.random.seed(48)
             np.random.shuffle(ids)

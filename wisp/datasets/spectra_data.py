@@ -878,7 +878,6 @@ class SpectraData:
                    (when we have large amount of spectra, we only select some to plot)
               clip: whether or not we plot spectra within certain range
               spectra_clipped: whether or not `recon_spectra` is already clipped to
-                               the given range
         """
         n = len(recon_fluxes)
         if ids is not None: n = min(n, len(ids))
@@ -895,7 +894,8 @@ class SpectraData:
                            full_wave, flux_norm_cho, clip, spectra_clipped,
                            is_codebook, bound_ids)
         plot_and_save = partial(self.plot_and_save_one_spectrum,
-                                name, spectra_dir, fig, axs, nrows, ncols, save_spectra)
+                                name, spectra_dir, fig, axs, nrows, ncols,
+                                save_spectra and not save_spectra_together)
         if ids is not None:
             if len(gt_fluxes) > len(ids):
                 gt_fluxes = gt_fluxes[ids]
