@@ -137,7 +137,7 @@ trainer:
     pixel_loss_cho: l1
     spectra_loss_cho: l2
     redshift_loss_cho: l2
-    num_epochs: 4000
+    num_epochs: 800
     batch_size: 40960 #65536 #262144
     save_every: 400
     valid_every: -1
@@ -210,7 +210,7 @@ infer:
 
     # recon spectra
     infer_selected: True
-    pretrain_num_infer: 5
+    pretrain_num_infer: 20
 
     flux_norm_cho: "sum"
     spectra_smooth_sigma: 50

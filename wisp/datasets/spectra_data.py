@@ -876,6 +876,9 @@ class SpectraData:
                           in same lambda range as `full_wave`
               ids: if not None, indicates selected spectra to plot
                    (when we have large amount of spectra, we only select some to plot)
+              clip: whether or not we plot spectra within certain range
+              spectra_clipped: whether or not `recon_spectra` is already clipped to
+                               the given range
         """
         n = len(recon_fluxes)
         if ids is not None: n = min(n, len(ids))

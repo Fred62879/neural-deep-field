@@ -31,13 +31,17 @@ class HyperSpectralDecoder(nn.Module):
 
     def reconstruct_spectra(self, input, wave, scaler, redshift, wave_bound, ret,
                             codebook, qtz_args):
+        """ Reconstruct spectra under given wave.
+            @Param
+               input: logits if qtz_spectra
+                      latents o.w.
+        """
         #timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         #timer.reset()
 
         if self.qtz_spectra:
             bsz = wave.shape[0]
             # each input coord has #num_code spectra generated
-
             latents = torch.stack([
                 self.convert(wave, code.tile(bsz,1,1), redshift, wave_bound)
                 for code in codebook.weight
@@ -50,6 +54,7 @@ class HyperSpectralDecoder(nn.Module):
         #timer.check("recon_spectra::spectra decoded")
 
         if self.qtz_spectra:
+            # input here is logits, spectra is codebook spectra for each coord
             _, spectra = self.qtz(input, spectra, ret, qtz_args)
             spectra = spectra[:,0] # [bsz,nsmpl]
         #timer.check("recon_spectra::spectra qtz")
@@ -117,9 +122,10 @@ class HyperSpectralDecoder(nn.Module):
               intensity: reconstructed pixel values
               spectra:   reconstructed spectra
         """
-        #timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
-        #timer.reset()
+        timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
+        timer.reset()
 
+        # spectra supervision (no pretrain in this case)
         if num_spectra_coords > 0:
             # forward the last #num_spectra_coords latents with all lambda
             self.forward_with_full_wave(
@@ -132,8 +138,8 @@ class HyperSpectralDecoder(nn.Module):
         self.reconstruct_spectra(
             latents, wave, ret["scaler"], ret["redshift"], full_wave_bound, ret,
             codebook, qtz_args)
-        #timer.check("hps_decoder::spectra reconstruced")
+        timer.check("hps_decoder::spectra reconstruced")
 
         intensity = self.inte(ret["spectra"], trans, nsmpl)
         ret["intensity"] = intensity
-        #timer.check("hps_decoder::integration done")
+        timer.check("hps_decoder::integration done")

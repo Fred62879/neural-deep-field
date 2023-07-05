@@ -7,6 +7,7 @@ import nvidia_smi
 import numpy as np
 import torch.nn as nn
 import logging as log
+import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from pathlib import Path
@@ -151,7 +152,7 @@ class CodebookTrainer(BaseTrainer):
         self.grad_fname = join(self.log_dir, "grad.png")
 
         if self.plot_loss:
-            self.loss_fname = join(self.log_dir, "loss.png")
+            self.loss_fname = join(self.log_dir, "loss")
 
         if self.extra_args["resume_train"]:
             if self.extra_args["resume_log_dir"] is not None:
@@ -275,9 +276,9 @@ class CodebookTrainer(BaseTrainer):
 
         if self.plot_loss:
             x = np.arange(len(self.losses))
-            plt.plot(x,y)
+            plt.plot(x, self.losses)
             plt.savefig(self.loss_fname + ".png")
-            np.save(self.loss_fname + ".npy")
+            np.save(self.loss_fname + ".npy", np.array(self.losses))
 
         if self.extra_args["log_gpu_every"] != -1:
             nvidia_smi.nvmlShutdown()
@@ -359,9 +360,6 @@ class CodebookTrainer(BaseTrainer):
         if self.save_every > -1 and self.epoch % self.save_every == 0:
             self.save_model()
 
-        if self.valid_every > -1 and self.epoch % self.valid_every == 0:
-            self.validate()
-
         if self.log_tb_every > -1 and self.epoch % self.log_tb_every == 0:
             self.log_tb()
 
@@ -419,7 +417,6 @@ class CodebookTrainer(BaseTrainer):
             self.redshift.extend(data["spectra_sup_redshift"])
             if self.plot_spectra: self.smpl_spectra.extend(ret["spectra"])
             if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
-                print(ret["codebook"].shape)
                 self.codebook_spectra.extend(ret["codebook"])
             if self.save_soft_qtz_weights:
                 self.qtz_weights.extend(ret["soft_qtz_weights"])
@@ -600,30 +597,42 @@ class CodebookTrainer(BaseTrainer):
             self.redshift = torch.stack(self.redshift)
 
         fname = f"ep{self.epoch}-it{self.iteration}"
-
-        self.dataset.plot_spectrum(self.spectra_dir, fname, self.smpl_spectra,
-                                   self.extra_args["flux_norm_cho"], clip=True,
-                                   spectra_clipped=self.train_within_wave_range,
-                                   save_spectra=True, ids=ids)
+        self.dataset.plot_spectrum(
+            self.spectra_dir, fname, self.smpl_spectra,
+            self.extra_args["flux_norm_cho"],
+            clip=self.extra_args["plot_clipped_spectrum"],
+            spectra_clipped=self.train_within_wave_range,
+            save_spectra=True, ids=ids
+        )
 
     def _recon_codebook_spectra(self):
         log.info("reconstructing codebook spectrum")
 
         self.codebook_spectra = torch.stack(self.codebook_spectra).view(
             self.num_sup_spectra, self.extra_args["qtz_num_embed"], -1
-        ).detach().cpu().numpy() # [num_sup_spectra,num_samples]
+        ).detach().cpu().numpy() # [num_sup_spectra,num_embed,num_samples]
 
         ids = self.randomly_select_spectra_to_plot()
         if type(self.redshift) == list:
             self.redshift = torch.stack(self.redshift)
 
-        fname = f"ep{self.epoch}-it{self.iteration}"
+        if self.recon_codebook_spectra:
+            self.codebook_spectra = [self.codebook_spectra]
+            prefix = ""
+        else: prefix = "individ-"
 
-        self.dataset.plot_spectrum(
-            self.codebook_spectra_dir, fname, self.codebook_spectra,
-            self.extra_args["flux_norm_cho"], is_codebook=True,
-            spectra_clipped=self.train_within_wave_range,
-            save_spectra=True, ids=ids)
+        for i, cur_codebook_spectra in enumerate(self.codebook_spectra):
+            cur_dir = join(self.codebook_spectra_dir, f"spectra-{i}")
+            Path(cur_dir).mkdir(parents=True, exist_ok=True)
+
+            fname = f"{prefix}ep{self.epoch}-it{self.iteration}"
+            self.dataset.plot_spectrum(
+                cur_dir, fname, cur_codebook_spectra,
+                self.extra_args["flux_norm_cho"],
+                is_codebook=True, save_spectra=True, ids=ids,
+                clip=self.extra_args["plot_clipped_spectrum"],
+                spectra_clipped=self.train_within_wave_range,
+            )
 
     def randomly_select_spectra_to_plot(self):
         ids = np.arange(self.num_sup_spectra)
@@ -633,55 +642,5 @@ class CodebookTrainer(BaseTrainer):
             ids = ids[:self.extra_args["pretrain_num_infer"]]
         return ids
 
-    #############
-    # Validation
-    #############
-
     def validate(self):
-        """ Perform validation (recon gt spectra, codebook spectra etc.).
-            Codebook spectra reconstruced here don't involve redshift,
-              to see the codebook spectra under each individual redshift,
-              use astro_inferrer.
-        """
-        load_model_weights(self.infer_pipeline, self.train_pipeline.state_dict())
-        self.infer_pipeline.eval()
-
-        data = self.get_valid_data()
-        ret = forward(data,
-                      self.infer_pipeline,
-                      self.total_steps,
-                      self.space_dim,
-                      self.extra_args["trans_sample_method"],
-                      quantize_latent=self.quantize_latent,
-                      quantize_spectra=self.quantize_spectra,
-                      save_codebook=self.recon_codebook_spectra_individ,
-                      recon_codebook_spectra=True)
-
-        if self.recon_codebook_spectra:
-            codebook_spectra = ret["intensity"]
-        elif self.recon_codebook_spectra_individ:
-            codebook_spectra = ret["codebook"]
-        else: assert 0
-        codebook_spectra = codebook_spectra.detach().cpu().numpy()
-
-        fname = f"ep{self.epoch}-it{self.iteration}"
-        self.dataset.plot_spectrum(
-            self.codebook_spectra_dir, fname, codebook_spectra,
-            save_spectra=True, is_codebook=True,
-            clip=self.extra_args["plot_clipped_spectrum"],
-            flux_norm_cho=self.extra_args["flux_norm_cho"])
-
-    def get_valid_data(self):
-        """ Get data for codebook spectra recon.
-        """
-        bsz = self.extra_args["qtz_num_embed"]
-        latents = load_embed(self.train_pipeline.state_dict(),
-                             transpose=False, tensor=True)[:,None]
-
-        wave = torch.FloatTensor(self.dataset.get_full_wave())[None,:,None].tile(bsz,1,1)
-        data = {
-            "coords": latents.to(self.device), # [bsz,nsmpl,latent_dim]
-            "wave": wave.to(self.device),      # [bsz,nsmpl,1]
-            "full_wave_bound": self.dataset.get_full_wave_bound(),
-        }
-        return data
+        pass

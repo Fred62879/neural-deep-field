@@ -51,7 +51,7 @@ class CodebookPretrainNerf(BaseNeuralField):
     ):
         """ Pretrain codebook.
             @Param
-              coords: [num_supervision_spectra,latent_dim]
+              coords: trainable latent variable [num_supervision_spectra,latent_dim]
               wave:   full wave [bsz,nsmpl,1]
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
@@ -61,8 +61,8 @@ class CodebookPretrainNerf(BaseNeuralField):
         bsz = coords.shape[0]
         coords = coords[:,None]
 
+        # `latents` is either logits or qtz latents or latents
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)
-        # print(torch.isnan(latents).any())
         timer.check("spatial decoding done")
 
         self.hps_decoder(

@@ -114,18 +114,13 @@ class SpatialDecoder(nn.Module):
               specz: spectroscopic (gt) redshift
               sup_id: id of pixels to supervise with gt redshift
         """
-        #import time
-        #start = time.time()
-        #timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
-        #timer.reset()
+        timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
+        timer.reset()
 
         if self.output_scaler:
             scaler = self.scaler_decoder(z[:,0])[...,0]
-            #print(time.time() - start)
         else: scaler = None
-        #a = time.time()
-        #print(a - start)
-        #timer.check("spatial_decod::scaler done")
+        timer.check("spatial_decod::scaler done")
 
         if self.apply_gt_redshift:   # dont generate redshift
             assert specz is not None
@@ -136,9 +131,7 @@ class SpatialDecoder(nn.Module):
             redshift = self.redshift_adjust(redshift + 0.5)
         else:
             redshift = None
-        #b = time.time()
-        #print(b - a)
-        #timer.check("spatial_decod::redshift done")
+        timer.check("spatial_decod::redshift done")
 
         if self.quantize_spectra:
             logits = self.decode(z)
@@ -147,9 +140,7 @@ class SpatialDecoder(nn.Module):
                 z = self.decode(z)
             if self.quantize_z:
                 z, z_q = self.qtz(z, codebook.weight, ret, qtz_args)
-        #timer.check("spatial_decod::qtz done")
-        #c = time.time()
-        #print(c - b)
+        timer.check("spatial_decod::qtz done")
 
         ret["latents"] = z
         ret["scaler"] = scaler
