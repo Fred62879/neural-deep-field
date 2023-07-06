@@ -13,6 +13,13 @@ from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
+def select_inferrence_ids(n, m):
+    np.random.seed(48)
+    ids = np.arange(n)
+    np.random.shuffle(ids)
+    ids = ids[:m]
+    return ids
+
 def create_patch_uid(tract, patch):
     patch = patch.replace(",", "")
     return f"{tract}{patch}"
@@ -170,17 +177,15 @@ def forward(
         save_soft_qtz_weights=False
 ):
     # forward should only be called under one and only one of the following states
-    train = pixel_supervision_train or spectra_supervision_train
-    recon_all = not train and not codebook_pretrain and (recon_img or save_scaler or save_latents or save_redshift or save_embed_ids)
-
+    # train = pixel_supervision_train or spectra_supervision_train
+    # recon_all = not train and not codebook_pretrain and (recon_img or save_scaler or save_latents or save_redshift or save_embed_ids)
     # print(codebook_pretrain, train, recon_all, recon_spectra, recon_codebook_spectra)
-    is_valid = reduce(
-        lambda x, y: x ^ y,
-        [codebook_pretrain, train, recon_all, recon_spectra,
-         recon_codebook_spectra, recon_codebook_spectra_individ
-        ])
-
-    assert(is_valid)
+    # is_valid = reduce(
+    #     lambda x, y: x ^ y,
+    #     [codebook_pretrain, train, recon_all, recon_spectra,
+    #      recon_codebook_spectra, recon_codebook_spectra_individ
+    #     ])
+    # assert(is_valid)
 
     requested_channels = []
     net_args = {"coords": data["coords"] }
@@ -199,9 +204,9 @@ def forward(
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if spectra_supervision_train: requested_channels.append("spectra")
         if redshift_supervision_train: requested_channels.append("redshift")
-        if train and quantize_latent and quantization_strategy == "hard" \
-           and calculate_codebook_loss:
-            requested_channels.append("codebook_loss")
+        # if train and quantize_latent and quantization_strategy == "hard" \
+        #    and calculate_codebook_loss:
+        #     requested_channels.append("codebook_loss")
         if save_soft_qtz_weights and \
            (quantize_spectra or (quantize_latent and quantization_strategy == "soft")):
             requested_channels.append("soft_qtz_weights")

@@ -21,7 +21,7 @@ from wisp.trainers import BaseTrainer
 from wisp.utils.plot import plot_grad_flow
 from wisp.loss import spectra_supervision_loss, pretrain_pixel_loss
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
-    load_embed, load_model_weights, forward
+    select_inferrence_ids, load_embed, load_model_weights, forward
 
 
 class CodebookTrainer(BaseTrainer):
@@ -113,6 +113,11 @@ class CodebookTrainer(BaseTrainer):
 
         self.dataset.set_length(self.num_sup_spectra)
 
+        self.selected_ids = select_inferrence_ids(
+            self.num_sup_spectra,
+            self.extra_args["pretrain_num_infer"]
+        )
+
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
 
@@ -135,7 +140,6 @@ class CodebookTrainer(BaseTrainer):
         self.save_pixel_values = "save_pixel_values_during_train" in tasks and \
             self.extra_args["codebook_pretrain_pixel_supervision"]
 
-        self.recon_codebook_spectra = "recon_codebook_spectra_during_train" in tasks
         self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ_during_train" in tasks
 
     def set_path(self):
@@ -144,7 +148,7 @@ class CodebookTrainer(BaseTrainer):
 
         for cur_path, cur_pname, in zip(
                 ["model_dir","spectra_dir","codebook_spectra_dir","soft_qtz_weight_dir"],
-                ["models","train_spectra","codebook_spectra","soft_qtz_weights"]):
+                ["models","train_spectra","train_codebook_spectra","soft_qtz_weights"]):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -332,7 +336,7 @@ class CodebookTrainer(BaseTrainer):
             if self.save_pixel_values:
                 self.gt_pixel_vals = []
                 self.recon_pixel_vals = []
-            if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
+            if self.recon_codebook_spectra_individ:
                 self.codebook_spectra = []
 
             # re-init dataloader to make sure pixels are in order
@@ -416,7 +420,7 @@ class CodebookTrainer(BaseTrainer):
         if self.save_data_to_local:
             self.redshift.extend(data["spectra_sup_redshift"])
             if self.plot_spectra: self.smpl_spectra.extend(ret["spectra"])
-            if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
+            if self.recon_codebook_spectra_individ:
                 self.codebook_spectra.extend(ret["codebook"])
             if self.save_soft_qtz_weights:
                 self.qtz_weights.extend(ret["soft_qtz_weights"])
@@ -557,8 +561,8 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_spectra:
             self._plot_spectrum()
 
-        if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
-            self._recon_codebook_spectra()
+        if self.recon_codebook_spectra_individ:
+            self._recon_codebook_spectra_individ()
 
         if self.save_pixel_values:
             self._save_pixel_values()
@@ -567,13 +571,12 @@ class CodebookTrainer(BaseTrainer):
             self._save_soft_qtz_weights()
 
     def _save_pixel_values(self):
-        gt_vals = torch.stack(self.gt_pixel_vals).detach().cpu().numpy()[:,0]
-        recon_vals = torch.stack(self.recon_pixel_vals).detach().cpu().numpy()
+        gt_vals = torch.stack(self.gt_pixel_vals).detach().cpu().numpy()[self.selected_ids,0]
+        recon_vals = torch.stack(self.recon_pixel_vals).detach().cpu().numpy()[self.selected_ids]
         # fname = join(self.pixel_val_dir, f"model-ep{self.epoch}-it{self.iteration}.pth")
         # np.save(fname, vals)
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
-        # log.info(f"Pixel vals gt/recon {gt_vals} / {recon_vals}")
         ratio = gt_vals / recon_vals
         log.info(f"gt/recon ratio: {ratio}")
 
@@ -583,7 +586,8 @@ class CodebookTrainer(BaseTrainer):
         np.save(fname, weights)
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
-        # log.info(f"Qtz weights {weights[:,0]}")
+        w = weights[self.selected_ids,0]
+        log.info(f"Qtz weights {w}")
 
     def _plot_spectrum(self):
         log.info("plotting spectrum")
@@ -592,7 +596,6 @@ class CodebookTrainer(BaseTrainer):
             self.num_sup_spectra, -1
         ).detach().cpu().numpy() # [num_sup_spectra,num_samples]
 
-        ids = self.randomly_select_spectra_to_plot()
         if type(self.redshift) == list:
             self.redshift = torch.stack(self.redshift)
 
@@ -602,25 +605,23 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["flux_norm_cho"],
             clip=self.extra_args["plot_clipped_spectrum"],
             spectra_clipped=self.train_within_wave_range,
-            save_spectra=True, ids=ids
+            save_spectra=True, ids=self.selected_ids
         )
 
-    def _recon_codebook_spectra(self):
+    def _recon_codebook_spectra_individ(self):
+        """ Reconstruct codebook spectra for each spectra individually.
+        """
         log.info("reconstructing codebook spectrum")
 
         self.codebook_spectra = torch.stack(self.codebook_spectra).view(
             self.num_sup_spectra, self.extra_args["qtz_num_embed"], -1
         ).detach().cpu().numpy() # [num_sup_spectra,num_embed,num_samples]
+        self.codebook_spectra = self.codebook_spectra[self.selected_ids]
 
-        ids = self.randomly_select_spectra_to_plot()
         if type(self.redshift) == list:
             self.redshift = torch.stack(self.redshift)
 
-        if self.recon_codebook_spectra:
-            self.codebook_spectra = [self.codebook_spectra]
-            prefix = ""
-        else: prefix = "individ-"
-
+        prefix = "individ-"
         for i, cur_codebook_spectra in enumerate(self.codebook_spectra):
             cur_dir = join(self.codebook_spectra_dir, f"spectra-{i}")
             Path(cur_dir).mkdir(parents=True, exist_ok=True)
@@ -629,18 +630,11 @@ class CodebookTrainer(BaseTrainer):
             self.dataset.plot_spectrum(
                 cur_dir, fname, cur_codebook_spectra,
                 self.extra_args["flux_norm_cho"],
-                is_codebook=True, save_spectra_together=True, ids=ids,
+                is_codebook=True,
+                save_spectra_together=True,
                 clip=self.extra_args["plot_clipped_spectrum"],
                 spectra_clipped=self.train_within_wave_range,
             )
-
-    def randomly_select_spectra_to_plot(self):
-        ids = np.arange(self.num_sup_spectra)
-        if self.extra_args["infer_selected"]:
-            np.random.seed(48)
-            np.random.shuffle(ids)
-            ids = ids[:self.extra_args["pretrain_num_infer"]]
-        return ids
 
     def validate(self):
         pass

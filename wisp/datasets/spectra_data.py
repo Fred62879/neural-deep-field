@@ -857,7 +857,7 @@ class SpectraData:
         if clip:
             if is_codebook: clip_range = self.kwargs["codebook_spectra_clip_range"]
             else:           clip_range = self.kwargs["recon_spectra_clip_range"]
-        else: clip_range = (full_wave[0], full_wave[-1])
+        else:               clip_range = (full_wave[0], full_wave[-1])
 
         (id_lo, id_hi) = get_bound_id(clip_range, full_wave, within_bound=False)
         recon_wave = np.arange(

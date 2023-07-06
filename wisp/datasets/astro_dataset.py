@@ -175,7 +175,8 @@ class AstroDataset(Dataset):
                selected_ids: select from source data (filter index)
                idx: dataset index (batch index)
         """
-        if "selected_ids" in self.data:
+        if self.mode == "pretrain_infer" and self.kwargs["infer_selected"]:
+            assert "selected_ids" in self.data
             data = data[self.data["selected_ids"]]
         return data[idx]
 
