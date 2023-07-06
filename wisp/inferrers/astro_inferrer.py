@@ -323,7 +323,7 @@ class AstroInferrer(BaseInferrer):
             )
             self.dataset_length = len(cur_patch_spectra_ids)
 
-        self.requested_fields = ["coords","spectra_data"]
+        self.requested_fields = ["coords","spectra_sup_redshift"]
         if not self.extra_args["infer_spectra_individually"]:
             self.batch_size = min(
                 self.dataset_length * self.extra_args["spectra_neighbour_size"]**2,
@@ -348,8 +348,11 @@ class AstroInferrer(BaseInferrer):
         elif self.recon_codebook_spectra_individ:
             assert self.apply_gt_redshift
             if self.pretrain_infer:
-                self.requested_fields.append("spectra_data")
-            self.dataset_length = self.num_sup_spectra
+                self.requested_fields.append("spectra_sup_redshift")
+
+            if self.infer_selected:
+                self.dataset_length = self.extra_args["pretrain_num_infer"]
+            else: self.dataset_length = self.num_sup_spectra
 
         self.batch_size = min(self.extra_args["infer_batch_size"], self.dataset_length)
         self.reset_dataloader()
@@ -594,8 +597,6 @@ class AstroInferrer(BaseInferrer):
     def pre_checkpoint_selected_coords_partial_model(self, model_id):
         self.reset_data_iterator()
         self.recon_spectra = []
-        if self.infer_selected:
-            self.selected_ids = []
         if self.log_qtz_w_main:
             self.soft_qtz_weights = []
 
@@ -606,20 +607,23 @@ class AstroInferrer(BaseInferrer):
 
     def post_checkpoint_selected_coords_partial_model(self, model_id):
         self.recon_spectra = torch.stack(self.recon_spectra).view(
-            #self.dataset.get_num_spectra_to_plot(),
             self.dataset_length,
             self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()
 
         if self.infer_selected:
-            self.selected_ids = torch.stack(self.selected_ids)
+            self.selected_ids = self.dataset.get_selected_ids()
         else: self.selected_ids = None
 
+        print(self.selected_ids)
+        assert 0
         self.dataset.plot_spectrum(
             self.spectra_dir, model_id, self.recon_spectra,
-            flux_norm_cho=self.extra_args["flux_norm_cho"],
-            save_spectra=True, clip=self.extra_args["plot_clipped_spectrum"],
-            mode=self.mode, ids=self.selected_ids)
+            self.extra_args["flux_norm_cho"],
+            save_spectra=True,
+            clip=self.extra_args["plot_clipped_spectrum"],
+            mode=self.mode, ids=self.selected_ids
+        )
 
         if self.log_pixel_value:
             self.dataset.log_spectra_pixel_values(self.recon_spectra)
@@ -649,16 +653,19 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             self.codebook_spectra = [self.codebook_spectra]
             prefix = ""
-        else: prefix = "individ_"
+        else: prefix = "individ-"
 
         for i, codebook_spectra in enumerate(self.codebook_spectra):
-            fname = f"{prefix}{i}_{model_id}"
+            cur_dir = join(self.codebook_spectra_dir, f"spectra-{i}")
+            Path(cur_dir).mkdir(parents=True, exist_ok=True)
+
+            fname = f"{prefix}{model_id}"
             self.dataset.plot_spectrum(
-                self.codebook_spectra_dir, fname, codebook_spectra,
-                is_codebook=True,
-                save_spectra_together=True,
-                clip=self.extra_args["plot_clipped_spectrum"],
-                flux_norm_cho=self.extra_args["flux_norm_cho"])
+                cur_dir, fname, codebook_spectra,
+                self.extra_args["flux_norm_cho"],
+                is_codebook=True, save_spectra_together=True,
+                mode=self.mode, clip=self.extra_args["plot_clipped_spectrum"]
+            )
 
     #############
     # Infer logic
@@ -747,7 +754,6 @@ class AstroInferrer(BaseInferrer):
                         data,
                         self.spectra_infer_pipeline,
                         iterations,
-                        # self.extra_args["num_epochs"],
                         self.space_dim,
                         self.extra_args["trans_sample_method"],
                         apply_gt_redshift=self.apply_gt_redshift,
@@ -763,8 +769,6 @@ class AstroInferrer(BaseInferrer):
                     spectra = spectra.flatten(1,2) # [bsz,nsmpl]
 
                 self.recon_spectra.extend(spectra)
-                if self.infer_selected:
-                    self.selected_ids.extend(data["selected_ids"])
                 if self.log_qtz_w_main:
                     self.soft_qtz_weights.extend(ret["soft_qtz_weights"])
 
@@ -840,10 +844,7 @@ class AstroInferrer(BaseInferrer):
 
         # select the same random set of spectra to recon
         if self.infer_selected:
-            ids = np.arange(len(latents))
-            np.random.seed(48)
-            np.random.shuffle(ids)
-            ids = ids[:self.extra_args["pretrain_num_infer"]]
+            ids = self.select_inferrence_ids(len(latents))
             self.dataset.set_hardcode_data("selected_ids", ids)
 
         self.dataset.set_hardcode_data("spectra_latents", latents)
@@ -855,8 +856,21 @@ class AstroInferrer(BaseInferrer):
             checkpoint['model_state_dict'], lambda n: "grid" not in n and "codebook" in n)
         codebook_latents = codebook_latents[:,None] # [num_embd, 1, latent_dim]
         codebook_latents = codebook_latents.detach().cpu().numpy()
+
+        # select the same random set of spectra to recon
+        if self.infer_selected:
+            ids = self.select_inferrence_ids(len(codebook_latents))
+            self.dataset.set_hardcode_data("selected_ids", ids)
+
         self.dataset.set_coords_source("codebook_latents")
         self.dataset.set_hardcode_data("codebook_latents", codebook_latents)
+
+    def select_inferrence_ids(self, n):
+        ids = np.arange(n)
+        # np.random.seed(48)
+        np.random.shuffle(ids)
+        ids = ids[:self.extra_args["pretrain_num_infer"]]
+        return ids
 
     # def calculate_recon_spectra_pixel_values(self):
     #     for patch_uid in self.patch_uids:

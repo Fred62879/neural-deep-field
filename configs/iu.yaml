@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'recon_codebook_spectra_individ_during_train','save_soft_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ'] #,'log_redshift','log_soft_qtz_weights','recon_img']
+    tasks: ['pretrain_infer','recon_gt_spectra','recon_codebook_spectra_individ'] #,'log_redshift','log_soft_qtz_weights','recon_img']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -163,9 +163,9 @@ trainer:
     pixel_supervision: True          # these two conflict
     train_spectra_pixels_only: False #  each other
 
-    apply_gt_redshift: False         # -
+    apply_gt_redshift: True         # -
     redshift_unsupervision: False    #  |- these three conflict each other
-    redshift_semi_supervision: True  # -
+    redshift_semi_supervision: False  # -
 
     spectra_beta: 1
     redshift_beta: 1

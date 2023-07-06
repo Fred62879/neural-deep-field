@@ -157,6 +157,10 @@ class AstroDataset(Dataset):
     def get_num_validation_spectra(self):
         return self.spectra_dataset.get_num_validation_spectra()
 
+    def get_selected_ids(self):
+        assert "selected_ids" in self.data
+        return self.data["selected_ids"]
+
 
     def get_full_wave(self):
         return self.trans_dataset.get_full_wave()
@@ -164,27 +168,43 @@ class AstroDataset(Dataset):
     def get_full_wave_bound(self):
         return self.trans_dataset.get_full_wave_bound()
 
+    def index_selected_data(self, data, idx):
+        """ Index data with both selected_ids and given idx
+              (for selective spectra inferrence only)
+            @Param
+               selected_ids: select from source data (filter index)
+               idx: dataset index (batch index)
+        """
+        if "selected_ids" in self.data:
+            data = data[self.data["selected_ids"]]
+        return data[idx]
 
     def get_batched_data(self, field, idx):
         if field == "coords":
             if self.coords_source == "fits":
                 data = self.fits_dataset.get_coords(idx)
             else:
-                data = self.data[self.coords_source][idx]
+                data = self.data[self.coords_source]
+                data = self.index_selected_data(data, idx)
         elif field == "pixels":
             data = self.fits_dataset.get_pixels(idx)
         elif field == "weights":
             data = self.fits_dataset.get_weights(idx)
         elif field == "spectra_id_map":
-            data = self.fits_dataset.get_spectra_id_map(idx)
+            data = self.fits_dataset.get_spectra_id_map()
+            if "selected_ids" in self.data:
+                data = data[self.data["selected_ids"]]
         elif field == "spectra_bin_map":
             data = self.fits_dataset.get_spectra_bin_map(idx)
         elif field == "spectra_sup_fluxes":
-            data = self.spectra_dataset.get_supervision_fluxes(idx)
+            data = self.spectra_dataset.get_supervision_fluxes()
+            data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_pixels":
-            data = self.spectra_dataset.get_supervision_pixels(idx)
+            data = self.spectra_dataset.get_supervision_pixels()
+            data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_redshift":
-            data = self.spectra_dataset.get_supervision_redshift(idx)
+            data = self.spectra_dataset.get_supervision_redshift()
+            data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_wave_bound_ids":
             data = self.spectra_dataset.get_supervision_wave_bound_ids()
         elif field == "masks":
@@ -253,18 +273,19 @@ class AstroDataset(Dataset):
                 out["spectra_sup_wave_bound_ids"] = \
                     self.spectra_dataset.get_supervision_wave_bound_ids()
 
-            elif self.mode == "pretrain_infer":
-                out["selected_ids"] = self.data["selected_ids"]
-                # out["spectra_sup_fluxes"] = \
-                #     self.spectra_dataset.get_supervision_fluxes()
-                out["spectra_sup_redshift"] = \
-                    self.spectra_dataset.get_supervision_redshift()
+            # elif self.mode == "pretrain_infer":
+            #     # out["spectra_sup_fluxes"] = \
+            #     #     self.spectra_dataset.get_supervision_fluxes()
+            #     out["spectra_sup_redshift"] = \
+            #         self.spectra_dataset.get_supervision_redshift()
 
-                if self.kwargs["infer_selected"]:
-                    # out["spectra_sup_fluxes"] = out["spectra_sup_fluxes"][
-                    #     self.data["selected_ids"]]
-                    out["spectra_sup_redshift"] = out["spectra_sup_redshift"][
-                        self.data["selected_ids"]]
+            #     if self.kwargs["infer_selected"]:
+            #         print(out["selected_ids"])
+            #         # out["selected_ids"] = self.data["selected_ids"]
+            #         # out["spectra_sup_fluxes"] = out["spectra_sup_fluxes"][
+            #         #     self.data["selected_ids"]]
+            #         out["spectra_sup_redshift"] = out["spectra_sup_redshift"][
+            #             out["selected_ids"]]
 
             elif self.mode == "main_train": # or self.mode == "infer":
                 ids = out["spectra_id_map"]
