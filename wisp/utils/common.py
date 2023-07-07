@@ -153,40 +153,25 @@ def forward(
         pipeline,
         step_num,
         space_dim,
-        trans_sample_method,
-        codebook_pretrain=False,
+        qtz=False,
+        qtz_strategy="none",
         pretrain_infer=False,
-        pixel_supervision_train=False,
-        spectra_supervision_train=False,
-        redshift_supervision_train=False,
         apply_gt_redshift=False,
-        recon_img=False, # reconstruct img, embed map, redshift heatmap, etc.
-        recon_spectra=False,
-        recon_codebook_spectra=False,
-        recon_codebook_spectra_individ=False,
-        quantize_latent=False,
-        quantize_spectra=False,
-        quantization_strategy="hard",
-        calculate_codebook_loss=False,
+        codebook_pretrain=False,   # | these two
+        spectra_supervision=False, # |  conflicts
+        perform_integration=False,
+        trans_sample_method="none",
+        redshift_supervision_train=False,
         save_scaler=False,
         save_spectra=False,
         save_latents=False,
         save_codebook=False,
         save_redshift=False,
         save_embed_ids=False,
+        save_codebook_loss=False,
+        save_codebook_spectra=False,
         save_soft_qtz_weights=False
 ):
-    # forward should only be called under one and only one of the following states
-    # train = pixel_supervision_train or spectra_supervision_train
-    # recon_all = not train and not codebook_pretrain and (recon_img or save_scaler or save_latents or save_redshift or save_embed_ids)
-    # print(codebook_pretrain, train, recon_all, recon_spectra, recon_codebook_spectra)
-    # is_valid = reduce(
-    #     lambda x, y: x ^ y,
-    #     [codebook_pretrain, train, recon_all, recon_spectra,
-    #      recon_codebook_spectra, recon_codebook_spectra_individ
-    #     ])
-    # assert(is_valid)
-
     requested_channels = []
     net_args = {"coords": data["coords"] }
 
@@ -200,51 +185,33 @@ def forward(
         if save_latents: requested_channels.append("latents")
         if save_codebook: requested_channels.append("codebook")
         if save_redshift: requested_channels.append("redshift")
-        if codebook_pretrain: requested_channels.append("spectra")
         if save_embed_ids: requested_channels.append("min_embed_ids")
-        if spectra_supervision_train: requested_channels.append("spectra")
-        if redshift_supervision_train: requested_channels.append("redshift")
-        # if train and quantize_latent and quantization_strategy == "hard" \
-        #    and calculate_codebook_loss:
-        #     requested_channels.append("codebook_loss")
-        if save_soft_qtz_weights and \
-           (quantize_spectra or (quantize_latent and quantization_strategy == "soft")):
-            requested_channels.append("soft_qtz_weights")
+        if save_codebook_loss: requested_channels.append("codebook_loss")
+        if save_codebook_spectra: requested_channels.append("codebook_spectra")
+        if save_soft_qtz_weights: requested_channels.append("soft_qtz_weights")
 
-        # transmission wave, and min and max value (used for linear normalization)
-        net_args["wave"] = data["wave"]
-        net_args["full_wave_bound"] = data["full_wave_bound"]
-
-        if pixel_supervision_train or recon_img:
-            assert(trans_sample_method != "bandwise")
+        net_args["wave"] = data["wave"] # trans wave
+        net_args["full_wave_bound"] = data["full_wave_bound"] # linear normalization
+        if apply_gt_redshift:
+            net_args["specz"] = data["spectra_sup_redshift"]
+        if perform_integration:
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
-
-        if codebook_pretrain or pretrain_infer or apply_gt_redshift:
-            net_args["specz"] = data["spectra_sup_redshift"]
-
-        #if redshift_semi_supervision:
-        #net_args["sup_id"] = data["spectra_bin_map"]
-        #net_args["specz"] = data["spectra_val_redshift"]
-
-        if spectra_supervision_train:
+        if spectra_supervision:
             net_args["full_wave"] = data["full_wave"]
             # num of coords for gt, dummy (incl. neighbours) spectra
             net_args["num_spectra_coords"] = data["num_spectra_coords"]
-
-        if quantize_latent or quantize_spectra:
+        if qtz:
             qtz_args = defaultdict(lambda: False)
-
-            if quantization_strategy == "soft":
+            if qtz_strategy == "soft":
                 qtz_args["save_soft_qtz_weights"] = save_soft_qtz_weights
                 qtz_args["temperature"] = step_num + 1
                 if save_embed_ids:
                     qtz_args["find_embed_id"] = save_embed_ids
-            qtz_args["save_codebook"] = save_codebook
-
+            qtz_args["save_codebook_spectra"] = save_codebook_spectra
             net_args["qtz_args"] = qtz_args
-
-    else: raise ValueError("Unsupported space dimension.")
+    else:
+        raise ValueError("Unsupported space dimension.")
 
     requested_channels = set(requested_channels)
     return pipeline(channels=requested_channels, **net_args)

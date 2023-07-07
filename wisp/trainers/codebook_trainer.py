@@ -93,7 +93,7 @@ class CodebookTrainer(BaseTrainer):
                 "spectra_sup_redshift",
                 "spectra_sup_wave_bound_ids"
             ])
-            if self.extra_args["codebook_pretrain_pixel_supervision"]:
+            if self.pixel_supervision:
                 fields.append("spectra_sup_pixels")
         else:
             fields.append("spectra_data")
@@ -122,10 +122,16 @@ class CodebookTrainer(BaseTrainer):
         tasks = set(self.extra_args["tasks"])
 
         self.plot_loss = self.extra_args["plot_loss"]
-        self.pixel_supervision = self.extra_args["codebook_pretrain_pixel_supervision"]
 
-        self.quantize_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
-        self.quantize_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
+        # quantization setups
+        self.qtz_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
+        self.qtz_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
+        assert not (self.qtz_latent and self.qtz_spectra)
+        self.qtz = self.qtz_latent or self.qtz_spectra
+        self.qtz_strategy = self.extra_args["quantization_strategy"]
+
+        self.pixel_supervision = self.extra_args["codebook_pretrain_pixel_supervision"]
+        self.trans_sample_method = self.extra_args["trans_sample_method"]
 
         # as long as we model redshift, we should apply gt redshift to spectra during pretrain
         #  and we should never do redshift supervision during pretrain
@@ -134,12 +140,10 @@ class CodebookTrainer(BaseTrainer):
         self.train_within_wave_range = not self.pixel_supervision and \
             self.extra_args["codebook_pretrain_within_wave_range"]
 
+        self.recon_gt_spectra = "recon_gt_spectra_during_train" in tasks
         self.save_soft_qtz_weights = "save_soft_qtz_weights_during_train" in tasks
-        self.plot_spectra = self.space_dim == 3 and "recon_gt_spectra_during_train" in tasks
-        self.save_pixel_values = "save_pixel_values_during_train" in tasks and \
-            self.extra_args["codebook_pretrain_pixel_supervision"]
-
         self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ_during_train" in tasks
+        self.save_pixel_values = "save_pixel_values_during_train" in tasks and self.pixel_supervision
 
     def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
@@ -330,8 +334,10 @@ class CodebookTrainer(BaseTrainer):
             self.save_data_to_local = True
 
             self.redshift = []
-            if self.plot_spectra: self.smpl_spectra = []
-            if self.save_soft_qtz_weights: self.qtz_weights = []
+            if self.recon_gt_spectra:
+                self.smpl_spectra = []
+            if self.save_soft_qtz_weights:
+                self.qtz_weights = []
             if self.save_pixel_values:
                 self.gt_pixel_vals = []
                 self.recon_pixel_vals = []
@@ -418,14 +424,15 @@ class CodebookTrainer(BaseTrainer):
 
         if self.save_data_to_local:
             self.redshift.extend(data["spectra_sup_redshift"])
-            if self.plot_spectra: self.smpl_spectra.extend(ret["spectra"])
-            if self.recon_codebook_spectra_individ:
-                self.codebook_spectra.extend(ret["codebook"])
-            if self.save_soft_qtz_weights:
-                self.qtz_weights.extend(ret["soft_qtz_weights"])
+            if self.recon_gt_spectra:
+                self.smpl_spectra.extend(ret["spectra"])
             if self.save_pixel_values:
                 self.recon_pixel_vals.extend(ret["intensity"])
                 self.gt_pixel_vals.extend(data["spectra_sup_pixels"])
+            if self.save_soft_qtz_weights:
+                self.qtz_weights.extend(ret["soft_qtz_weights"])
+            if self.recon_codebook_spectra_individ:
+                self.codebook_spectra.extend(ret["codebook_spectra"])
 
     def post_step(self):
         pass
@@ -478,22 +485,22 @@ class CodebookTrainer(BaseTrainer):
         total_loss = 0
         add_to_device(data, self.gpu_fields, self.device)
 
-        ret = forward(data,
-                      self.train_pipeline,
-                      self.total_steps,
-                      self.space_dim,
-                      self.extra_args["trans_sample_method"],
-                      codebook_pretrain=True,
-                      pixel_supervision_train=self.pixel_supervision,
-                      apply_gt_redshift=self.apply_gt_redshift,
-                      quantize_spectra=True,
-                      quantization_strategy="soft",
-                      save_spectra=self.plot_spectra and \
-                                   self.save_data_to_local,
-                      save_soft_qtz_weights=self.save_soft_qtz_weights and \
-                                            self.save_data_to_local,
-                      save_codebook=self.recon_codebook_spectra_individ and \
-                                    self.save_data_to_local)
+        ret = forward(
+            data,
+            self.train_pipeline,
+            self.total_steps,
+            self.space_dim,
+            qtz=self.qtz,
+            qtz_strategy=self.qtz_strategy,
+            apply_gt_redshift=self.apply_gt_redshift,
+            perform_integration=self.pixel_supervision,
+            trans_sample_method=self.trans_sample_method,
+            save_spectra=True, # we always need recon spectra to calculate loss
+            save_soft_qtz_weights=self.save_data_to_local and \
+                                  self.save_soft_qtz_weights,
+            save_codebook_spectra=self.save_data_to_local and \
+                                  self.recon_codebook_spectra_individ
+        )
 
         # i) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
@@ -557,8 +564,8 @@ class CodebookTrainer(BaseTrainer):
         return checkpoint
 
     def save_local(self):
-        if self.plot_spectra:
-            self._plot_spectrum()
+        if self.recon_gt_spectra:
+            self._recon_gt_spectra()
 
         if self.recon_codebook_spectra_individ:
             self._recon_codebook_spectra_individ()
@@ -588,8 +595,8 @@ class CodebookTrainer(BaseTrainer):
         w = weights[self.selected_ids,0]
         log.info(f"Qtz weights {w}")
 
-    def _plot_spectrum(self):
-        log.info("plotting spectrum")
+    def _recon_gt_spectra(self):
+        log.info("reconstructing gt spectrum")
 
         self.smpl_spectra = torch.stack(self.smpl_spectra).view(
             self.num_sup_spectra, -1

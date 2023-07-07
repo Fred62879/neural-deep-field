@@ -259,6 +259,11 @@ class SpectraData:
             return self.data["validation_img_coords"][idx]
         return self.data["validation_img_coords"]
 
+    def get_validation_norm_world_coords(self, idx=None):
+        if idx is not None:
+            return self.data["validation_norm_world_coords"][idx]
+        return self.data["validation_norm_world_coords"]
+
     def get_validation_fluxes(self, idx=None):
         if idx is not None:
             return self.data["validation_fluxes"][idx]
@@ -439,6 +444,7 @@ class SpectraData:
         self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids]
         self.data["validation_img_coords"] = self.data["gt_spectra_img_coords"][val_ids]
         self.data["validation_world_coords"] = self.data["gt_spectra_world_coords"][val_ids]
+        self.data["validation_norm_world_coords"] = self.data["gt_spectra_norm_world_coords"][val_ids]
         if self.kwargs["redshift_semi_supervision"]:
             self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
 
@@ -455,7 +461,7 @@ class SpectraData:
         self.data["gt_spectra_world_coords"] = np.load(self.gt_spectra_world_coords_fname)
         norm_coords, _ = normalize_coords(
             self.data["gt_spectra_world_coords"], coords_range=self.coords_range)
-        self.data["gt_spectra_norm_coords"] = norm_coords
+        self.data["gt_spectra_norm_world_coords"] = norm_coords
         # print(self.data["gt_spectra_img_coords"], self.data["gt_spectra_world_coords"], norm_coords)
 
     def process_save_gt_spectra_data(self):
@@ -558,7 +564,7 @@ class SpectraData:
                         continue
 
                     cur_patch = PatchData(
-                        self.dataset_path, tract, f"{patch_r},{patch_c}", **self.kwargs)
+                        tract, f"{patch_r},{patch_c}", **self.kwargs)
                     header = cur_patch.get_header()
                     wcs = WCS(header)
                     cur_headers.append(header)
@@ -630,7 +636,7 @@ class SpectraData:
                         continue
 
                     cur_patch = PatchData(
-                        self.dataset_path, tract, f"{patch_r},{patch_c}",
+                        tract, f"{patch_r},{patch_c}",
                         load_pixels=True,
                         load_coords=True,
                         pixel_norm_cho=self.kwargs["train_pixels_norm"],
@@ -661,6 +667,10 @@ class SpectraData:
         wcs = WCS(patch.get_header())
         world_coords = np.concatenate((ras[:,None], decs[:,None]), axis=-1)
         img_coords = wcs.all_world2pix(world_coords, 0).astype(int) # [n,2]
+        # world coords from spectra data may not be accurate in terms of
+        #  wcs of each patch, here after we get img coords, we convert
+        #  img coords back to world coords to get accurate values
+        world_coords = wcs.all_pix2world(img_coords, 0) # [n,2]
         img_coords = img_coords[:,::-1] # xy coords to rc coords
 
         wave_ranges, cur_patch_spectra = [], []

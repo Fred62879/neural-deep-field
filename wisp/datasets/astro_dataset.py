@@ -122,6 +122,9 @@ class AstroDataset(Dataset):
     def get_zscale_ranges(self, patch_uid=None):
         return self.fits_dataset.get_zscale_ranges(patch_uid)
 
+    def get_coords(self):
+        return self.fits_dataset.get_coords()
+
 
     # def get_spectra_coord_ids(self):
     #     return self.spectra_dataset.get_spectra_coord_ids()
@@ -134,6 +137,9 @@ class AstroDataset(Dataset):
 
     def get_validation_spectra_img_coords(self, idx=None):
         return self.spectra_dataset.get_validation_img_coords(idx)
+
+    def get_validation_spectra_norm_world_coords(self, idx=None):
+        return self.spectra_dataset.get_validation_norm_world_coords(idx)
 
     def get_validation_spectra_fluxes(self, idx=None):
         return self.spectra_dataset.get_validation_fluxes(idx)
@@ -208,6 +214,7 @@ class AstroDataset(Dataset):
             data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_redshift":
             data = self.spectra_dataset.get_supervision_redshift()
+            print(data.shape, idx)
             data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_wave_bound_ids":
             data = self.spectra_dataset.get_supervision_wave_bound_ids()

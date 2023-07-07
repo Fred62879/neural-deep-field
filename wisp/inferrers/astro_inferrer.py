@@ -101,16 +101,15 @@ class AstroInferrer(BaseInferrer):
         self.pretrain_infer = self.mode == "pretrain_infer"
         self.infer_selected = self.extra_args["infer_selected"]
 
-        # quantization choices
-        self.quantize_latent = self.space_dim == 3 and \
-            self.extra_args["quantize_latent"]
-        self.quantize_spectra = self.space_dim == 3 and \
-            self.extra_args["quantize_spectra"]
-        self.qtz = self.quantize_latent or self.quantize_spectra
+        # quantization setups
+        self.qtz_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
+        self.qtz_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
+        assert not (self.qtz_latent and self.qtz_spectra)
+        self.qtz = self.qtz_latent or self.qtz_spectra
         self.qtz_strategy = self.extra_args["quantization_strategy"]
-        assert not (self.quantize_latent and self.quantize_spectra)
+        self.generate_scaler = self.qtz and self.extra_args["generate_scaler"]
 
-        # redshift choices
+        # redshift setups
         self.model_redshift = self.extra_args["model_redshift"]
         self.apply_gt_redshift = self.model_redshift and \
             self.extra_args["apply_gt_redshift"]
@@ -118,13 +117,12 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["redshift_unsupervision"]
         self.redshift_semi_supervision = self.model_redshift and \
             self.extra_args["redshift_semi_supervision"]
-
         if self.pretrain_infer: assert self.apply_gt_redshift
         else: assert self.redshift_semi_supervision
 
-        self.generate_scaler = self.qtz and self.extra_args["generate_scaler"]
 
         # infer all coords using original model
+        self.trans_sample_method = self.extra_args["trans_sample_method"]
         self.recon_img = False
         self.recon_img_pretrain = False
         self.recon_img_valid_spectra = False
@@ -145,8 +143,8 @@ class AstroInferrer(BaseInferrer):
         self.plot_scaler = "plot_scaler" in tasks and self.generate_scaler and self.qtz
         self.plot_redshift = "plot_redshift" in tasks and self.model_redshift and self.qtz
 
-        self.log_soft_qtz_weights = "log_soft_qtz_weights" in tasks and ((self.quantize_latent and self.qtz_strategy == "soft") or self.quantize_spectra)
-        self.save_soft_qtz_weights = "save_soft_qtz_weights" in tasks and ((self.quantize_latent and self.qtz__strategy == "soft") or self.quantize_spectra)
+        self.log_soft_qtz_weights = "log_soft_qtz_weights" in tasks and ((self.qtz_latent and self.qtz_strategy == "soft") or self.qtz_spectra)
+        self.save_soft_qtz_weights = "save_soft_qtz_weights" in tasks and ((self.qtz_latent and self.qtz__strategy == "soft") or self.qtz_spectra)
         self.log_qtz_w_main = self.log_soft_qtz_weights and self.main_infer
         self.log_qtz_w_pre = self.log_soft_qtz_weights and self.pretrain_infer
         self.log_redshift = "log_redshift" in tasks and self.model_redshift and self.qtz
@@ -237,7 +235,8 @@ class AstroInferrer(BaseInferrer):
 
         self.use_full_wave = True
         self.calculate_metrics = False
-        self.perform_integration = self.recon_img or self.recon_img_pretrain
+        self.perform_integration = self.recon_img or self.recon_img_pretrain or \
+            self.recon_img_valid_spectra
 
         self.requested_fields = ["coords"]
 
@@ -303,10 +302,10 @@ class AstroInferrer(BaseInferrer):
         """
         self.use_full_wave = True
         self.perform_integration = False
-
-        self.requested_fields = ["coords","spectra_sup_redshift"]
+        self.requested_fields = ["coords"]
 
         if self.pretrain_infer:
+            self.requested_fields.append("spectra_sup_redshift")
             self.coords_source = "spectra_train"
             # pretrain coords set using checkpoint
             if self.infer_selected:
@@ -690,16 +689,13 @@ class AstroInferrer(BaseInferrer):
                         self.full_pipeline,
                         iterations,
                         self.space_dim,
-                        self.extra_args["trans_sample_method"],
-                        pretrain_infer=self.pretrain_infer,
+                        qtz=self.qtz,
+                        qtz_strategy=self.qtz_strategy,
                         apply_gt_redshift=self.apply_gt_redshift,
-                        quantize_latent=self.quantize_latent,
-                        quantize_spectra=self.quantize_spectra,
-                        quantization_strategy=self.qtz_strategy,
+                        perform_integration=self.perform_integration,
+                        trans_sample_method=self.trans_sample_method,
                         save_soft_qtz_weights=self.save_soft_qtz_weights or \
                                               self.log_qtz_w_pre,
-                        recon_img=self.recon_img or self.recon_img_pretrain or \
-                                  self.recon_img_valid_spectra,
                         save_scaler=self.plot_scaler,
                         save_embed_ids=self.plot_embed_map,
                         save_latents=self.plot_latent_embed,
@@ -752,19 +748,16 @@ class AstroInferrer(BaseInferrer):
                         self.spectra_infer_pipeline,
                         iterations,
                         self.space_dim,
-                        self.extra_args["trans_sample_method"],
+                        qtz=self.qtz,
+                        qtz_strategy=self.qtz_strategy,
                         apply_gt_redshift=self.apply_gt_redshift,
-                        pretrain_infer=self.pretrain_infer,
-                        quantize_latent=self.quantize_latent,
-                        quantize_spectra=self.quantize_spectra,
-                        quantization_strategy=self.qtz_strategy,
-                        recon_spectra=True,
-                        save_soft_qtz_weights=self.log_qtz_w_main)
+                        save_spectra=True,
+                        save_soft_qtz_weights=self.log_qtz_w_main
+                    )
 
                 spectra = ret["intensity"]
                 if spectra.ndim == 3: # bandwise
                     spectra = spectra.flatten(1,2) # [bsz,nsmpl]
-
                 self.recon_spectra.extend(spectra)
                 if self.log_qtz_w_main:
                     self.soft_qtz_weights.extend(ret["soft_qtz_weights"])
@@ -793,21 +786,16 @@ class AstroInferrer(BaseInferrer):
                         self.codebook_spectra_infer_pipeline,
                         iterations,
                         self.space_dim,
-                        self.extra_args["trans_sample_method"],
-                        pretrain_infer=self.pretrain_infer,
+                        qtz=self.qtz,
+                        qtz_strategy=self.qtz_strategy,
                         apply_gt_redshift=self.apply_gt_redshift,
-                        quantize_latent=self.quantize_latent,
-                        quantize_spectra=self.quantize_spectra,
-                        quantization_strategy=self.qtz_strategy,
-                        recon_codebook_spectra=self.recon_codebook_spectra,
-                        recon_codebook_spectra_individ=self.recon_codebook_spectra_individ,
-                        save_codebook=self.recon_codebook_spectra_individ
+                        save_codebook_spectra=self.recon_codebook_spectra_individ
                     )
 
                     if self.recon_codebook_spectra:
                         spectra = ret["intensity"]
                     elif self.recon_codebook_spectra_individ:
-                        spectra = ret["codebook"]
+                        spectra = ret["codebook_spectra"]
                     else: assert 0
 
                 self.codebook_spectra.extend(spectra)
@@ -845,8 +833,6 @@ class AstroInferrer(BaseInferrer):
         """ Set spectra latent vars as input coords (for pretrain infer only).
         """
         latents = checkpoint["latents"].weight
-        # self.dataset.set_coords_source("spectra_latents")
-        # self.dataset.set_hardcode_data("spectra_latents", latents)
         self.dataset.set_hardcode_data(self.coords_source, latents)
 
     def _set_dataset_coords_codebook(self, checkpoint):
@@ -856,17 +842,15 @@ class AstroInferrer(BaseInferrer):
             checkpoint['model_state_dict'], lambda n: "grid" not in n and "codebook" in n)
         codebook_latents = codebook_latents[:,None] # [num_embd, 1, latent_dim]
         codebook_latents = codebook_latents.detach().cpu().numpy()
-        # self.dataset.set_coords_source("codebook_latents")
-        # self.dataset.set_hardcode_data("codebook_latents", codebook_latents)
         self.dataset.set_hardcode_data(self.coords_source, codebook_latents)
 
     def _set_dataset_coords_cur_val_coords(self):
-        cur_patch_spectra_ids = self.dataset.get_validation_spectra_ids(self.cur_patch_uid)
-        cur_val_coords = self.dataset.get_validation_spectra_coords(cur_patch_spectra_ids)
-        self.num_cur_val_coords = len(cur_val_coords)
-        # self.coords_source = "spectra_valid"
-        # self.dataset.set_hardcode_data("spectra_valid", cur_val_coords)
+        # cur_patch_spectra_ids = self.dataset.get_validation_spectra_ids(self.cur_patch_uid)
+        # cur_val_coords = self.dataset.get_validation_spectra_norm_world_coords(cur_patch_spectra_ids)
+        cur_val_coords = self.dataset.get_coords()[self.val_spectra_map]
+        # print(cur_val_coords)
         self.dataset.set_hardcode_data(self.coords_source, cur_val_coords)
+        self.num_cur_val_coords = len(cur_val_coords)
 
     # def calculate_recon_spectra_pixel_values(self):
     #     for patch_uid in self.patch_uids:

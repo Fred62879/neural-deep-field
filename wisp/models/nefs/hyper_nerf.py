@@ -83,7 +83,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         channels = ["intensity","latents","spectra"]
         if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
             channels.extend(["scaler","redshift","codebook_loss",
-                             "min_embed_ids","codebook","soft_qtz_weights"])
+                             "min_embed_ids","codebook","soft_qtz_weights","codebook_spectra"])
 
         self._register_forward_function(self.hyperspectral, channels)
 
@@ -131,5 +131,5 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         timer.check("nef::hyperspectral decoding done")
 
         if self.codebook is not None:
-            ret["model_codebook"] = self.codebook.weight
+            ret["codebook"] = self.codebook.weight
         return ret

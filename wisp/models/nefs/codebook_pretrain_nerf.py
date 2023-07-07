@@ -25,7 +25,7 @@ class CodebookPretrainNerf(BaseNeuralField):
     def register_forward_functions(self):
         """ Register forward functions with the channels that they output.
         """
-        channels = ["intensity","spectra","redshift","soft_qtz_weights","codebook"]
+        channels = ["intensity","spectra","redshift","soft_qtz_weights","codebook_spectra"]
         self._register_forward_function(self.pretrain, channels)
 
     def init_model(self):

@@ -28,8 +28,8 @@ global:
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_soft_qtz_weights']
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra_individ','plot_embed_map','plot_redshift','log_redshift','plot_scaler','save_soft_qtz_weights']
 
-    #tasks: ['train','recon_gt_spectra_during_train','recon_codebook_spectra_individ_during_train','recon_img_during_train']
-    #tasks: ['train','infer','recon_gt_spectra','recon_codebook_spectra_individ']
+    tasks: ['train','recon_gt_spectra_during_train','recon_codebook_spectra_individ_during_train','recon_img_during_train']
+    tasks: ['infer','recon_gt_spectra','recon_codebook_spectra_individ','recon_img']
     #tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra_individ','log_redshift','plot_redshift','plot_scaler','save_soft_qtz_weights']
 
 optimizer:
@@ -164,9 +164,9 @@ trainer:
     pixel_supervision: True          # these two conflict
     train_spectra_pixels_only: False #  each other
 
-    apply_gt_redshift: True         # -
+    apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
-    redshift_semi_supervision: False  # -
+    redshift_semi_supervision: True  # -
 
     spectra_beta: 1
     redshift_beta: 1
@@ -181,7 +181,7 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230529-180531'
-    pretrain_log_dir: '20230706-132130'
+    pretrain_log_dir: '20230707-135011'
     pretrained_model_name: 'model-ep4000-it1.pth'
 
     num_trans_samples: 40

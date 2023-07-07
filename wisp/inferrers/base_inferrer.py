@@ -5,6 +5,7 @@ import logging as log
 
 from wisp.utils import PerfTimer
 from wisp.utils.common import create_patch_uid
+from wisp.datasets.patch_data import PatchData
 
 from os.path import join
 from datetime import datetime
@@ -111,10 +112,10 @@ class BaseInferrer(ABC):
     def infer(self):
         """ Perform each inferrence task (one at a time) using all selected models.
         """
-        for tract, patch in zip(
+        for i, (tract, patch) in enumerate(zip(
                 self.extra_args["tracts"], self.extra_args["patches"]
-        ):
-            self.cur_patch_uid = create_patch_uid(tract, patch)
+        )):
+            self.get_cur_patch_data(i, tract, patch)
 
             for group_task in self.group_tasks:
                 self._toggle(group_task)
@@ -148,6 +149,24 @@ class BaseInferrer(ABC):
 
     def post_inferrence(self):
         pass
+
+    #############
+    # Get data for cur Patch
+    #############
+
+    def get_cur_patch_data(self, i, tract, patch):
+        self.cur_patch = PatchData(
+            tract, patch,
+            load_spectra=True,
+            cutout_num_rows=self.extra_args["patch_cutout_num_rows"][i],
+            cutout_num_cols=self.extra_args["patch_cutout_num_cols"][i],
+            cutout_start_pos=self.extra_args["patch_cutout_start_pos"][i],
+            full_patch=self.extra_args["use_full_patch"],
+            spectra_obj=self.dataset.get_spectra_data_obj(),
+            **self.extra_args
+        )
+        self.cur_patch_uid = create_patch_uid(tract, patch)
+        self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
 
     #############
     # Infer w/ one checkpoint
