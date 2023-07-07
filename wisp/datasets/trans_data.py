@@ -14,7 +14,7 @@ from wisp.utils.plot import plot_save
 
 class TransData:
 
-    def __init__(self, dataset_path, device, **kwargs):
+    def __init__(self, device, **kwargs):
 
         if kwargs["space_dim"] != 3:
             return
@@ -36,7 +36,7 @@ class TransData:
         self.smpl_interval = kwargs["trans_sample_interval"]
         #assert(self.smpl_interval == 10)
 
-        self.set_log_path(dataset_path)
+        self.set_log_path(kwargs["dataset_path"])
         self.init_trans()
 
     #############

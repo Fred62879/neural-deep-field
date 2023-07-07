@@ -176,7 +176,8 @@ class Quantization(nn.Module):
 
     def quantize(self, z, codebook, temperature, find_embed_id, save_codebook):
         """ @Param
-              codebook [num_embeds,embed_dim]
+              z: logits [bsz,1,num_embed/embed_dim]
+              codebook: [num_embeds,(bsz,)embed_dim]
         """
         if self.quantization_strategy == "soft":
             if find_embed_id:

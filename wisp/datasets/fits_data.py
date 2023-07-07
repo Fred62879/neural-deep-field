@@ -24,7 +24,7 @@ from wisp.datasets.data_utils import set_input_path, add_dummy_dim, \
 
 class FitsData:
     """ Data class for all selected patches. """
-    def __init__(self, dataset_path, device, spectra_obj=None, **kwargs):
+    def __init__(self, device, spectra_obj=None, **kwargs):
         self.kwargs = kwargs
         self.qtz = kwargs["quantize_latent"] or kwargs["quantize_spectra"]
 
@@ -32,7 +32,7 @@ class FitsData:
 
         self.device = device
         self.spectra_obj = spectra_obj
-        self.dataset_path = dataset_path
+        self.dataset_path = kwargs["dataset_path"]
         self.verbose = kwargs["verbose"]
         self.num_bands = kwargs["num_bands"]
         self.u_band_scale = kwargs["u_band_scale"]
@@ -47,7 +47,7 @@ class FitsData:
         self.patch_cutout_start_pos = kwargs["patch_cutout_start_pos"]
 
         self.compile_patch_fnames()
-        self.set_path(dataset_path)
+        self.set_path(self.dataset_path)
         self.load_data()
 
     #############
@@ -343,6 +343,51 @@ class FitsData:
             ids = self.calculate_neighbour_ids(base_count, r, c, neighbour_size, index, patch_uid)
         return ids
 
+    def calculate_local_id_one_patch(self, r, c, start_pos, num_cols):
+        """ Count number of pixels before given position in one given patch.
+        """
+        if not self.use_full_patch:
+            start_r, start_c = start_pos
+            r = r - start_r
+            c = c - start_c
+        return num_cols * r + c
+
+    def calculate_neighbour_ids_one_patch(self, r, c, neighbour_size, start_pos, num_cols):
+        """ Get id of pixels within neighbour_size of given position in one given patch.
+            e.g. For neighbour_size being: 2, 3, 4, the collected ids:
+            . .   . . .   . . . .
+            . *   . * .   . . . .
+                  . . .   . . * .
+                          . . . .
+            @Return: ids [n,]
+        """
+        ids = []
+        offset = neighbour_size // 2
+        for i in range(r - offset, r + (neighbour_size - offset)):
+            for j in range(c - offset, c + (neighbour_size - offset)):
+                local_id = self.calculate_local_id_one_patch(
+                    i, j, start_pos, num_cols, use_full_patch)
+                ids.append(local_id)
+        return ids
+
+    def get_pixel_ids_one_patch(self, r, c, neighbour_size=1):
+        """ Get id of given position in current patch.
+            If neighbour_size is > 1, also find id of neighbour pixels within neighbour_size.
+            @Param: r/c, img coord in terms of the full patch
+            @Return: ids [n,]
+        """
+        start_pos = self.cutout_start_pos[patch_uid]
+        num_cols = self.num_cols[patch_uid]
+
+        if neighbour_size <= 1:
+            local_id = self.calculate_local_id_one_patch(r, c, cutout_start_pos, num_cols)
+            ids = [local_id]
+        else:
+            ids = self.calculate_neighbour_ids_one_patch(
+                r, c, neighbour_size, cutout_start_pos, num_cols)
+        ids = np.array(ids)
+        return ids
+
     def evaluate(self, index, patch_uid, recon_patch, **re_args):
         """ Image evaluation function (e.g. saving, metric calculation).
             @Param:
@@ -571,7 +616,7 @@ class FitsData:
                        tract, patch, cutout_num_rows, cutout_num_cols, cutout_start_pos
     ):
         cur_patch = PatchData(
-            self.dataset_path, tract, patch,
+            tract, patch,
             load_pixels=self.load_pixels,
             load_coords=self.load_coords,
             load_weights=self.load_weights,

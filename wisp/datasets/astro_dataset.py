@@ -19,7 +19,6 @@ class AstroDataset(Dataset):
     """
     def __init__(self,
                  device                   : str,
-                 dataset_path             : str,
                  dataset_num_workers      : int      = -1, # not used
                  transform                : Callable = None,
                  **kwargs):
@@ -31,10 +30,10 @@ class AstroDataset(Dataset):
         self.kwargs = kwargs
 
         self.device = device
-        self.root = dataset_path
         self.transform = transform
         self.dataset_num_workers = dataset_num_workers
 
+        self.root = kwargs["dataset_path"]
         self.space_dim = kwargs["space_dim"]
         self.nsmpls = kwargs["num_trans_samples"]
 
@@ -50,11 +49,11 @@ class AstroDataset(Dataset):
             Load only needed data based on given tasks (in kwargs).
         """
         self.data = {}
-        self.trans_dataset = TransData(self.root, self.device, **self.kwargs)
+        self.trans_dataset = TransData(self.device, **self.kwargs)
         self.spectra_dataset = SpectraData(self.trans_dataset,
-                                           self.root, self.device, **self.kwargs)
-        self.fits_dataset = FitsData(self.root, self.device, self.spectra_dataset, **self.kwargs)
-        self.mask_dataset = MaskData(self.fits_dataset, self.root, self.device, **self.kwargs)
+                                           self.device, **self.kwargs)
+        self.fits_dataset = FitsData(self.device, self.spectra_dataset, **self.kwargs)
+        self.mask_dataset = MaskData(self.fits_dataset, self.device, **self.kwargs)
 
         # randomly initialize
         self.set_length(0)
@@ -104,6 +103,12 @@ class AstroDataset(Dataset):
     # Getters
     ############
 
+    def get_trans_data_obj(self):
+        return self.trans_dataset
+
+    def get_spectra_data_obj(self):
+        return self.spectra_dataset
+
     def get_num_patches(self):
         return len(self.get_patch_uids())
 
@@ -118,8 +123,8 @@ class AstroDataset(Dataset):
         return self.fits_dataset.get_zscale_ranges(patch_uid)
 
 
-    def get_spectra_coord_ids(self):
-        return self.spectra_dataset.get_spectra_coord_ids()
+    # def get_spectra_coord_ids(self):
+    #     return self.spectra_dataset.get_spectra_coord_ids()
 
     def get_spectra_img_coords(self):
         return self.spectra_dataset.get_spectra_img_coords()
@@ -127,8 +132,8 @@ class AstroDataset(Dataset):
     def get_validation_spectra_ids(self, patch_uid=None):
         return self.spectra_dataset.get_validation_spectra_ids(patch_uid)
 
-    def get_validation_spectra_coords(self, idx=None):
-        return self.spectra_dataset.get_validation_coords(idx)
+    def get_validation_spectra_img_coords(self, idx=None):
+        return self.spectra_dataset.get_validation_img_coords(idx)
 
     def get_validation_spectra_fluxes(self, idx=None):
         return self.spectra_dataset.get_validation_fluxes(idx)
@@ -192,9 +197,7 @@ class AstroDataset(Dataset):
         elif field == "weights":
             data = self.fits_dataset.get_weights(idx)
         elif field == "spectra_id_map":
-            data = self.fits_dataset.get_spectra_id_map()
-            if "selected_ids" in self.data:
-                data = data[self.data["selected_ids"]]
+            data = self.fits_dataset.get_spectra_id_map(idx)
         elif field == "spectra_bin_map":
             data = self.fits_dataset.get_spectra_bin_map(idx)
         elif field == "spectra_sup_fluxes":
@@ -357,6 +360,9 @@ class AstroDataset(Dataset):
     ############
     # Utilities
     ############
+
+    def get_pixel_ids_one_patch(self, r, c, neighbour_size=1):
+        return self.fits_dataset.get_pixel_ids_one_patch(r, c, neighbour_size)
 
     def restore_evaluate_tiles(self, recon_pixels, **re_args):
         """ Restore flattened image, save locally and/or calculate metrics.

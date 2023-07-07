@@ -31,14 +31,14 @@ from multiprocessing.pool import ThreadPool
 
 class SpectraData:
     # def __init__(self, fits_obj, trans_obj, dataset_path, device, **kwargs):
-    def __init__(self, trans_obj, dataset_path, device, **kwargs):
+    def __init__(self, trans_obj, device, **kwargs):
         self.kwargs = kwargs
         self.summarize_tasks(kwargs["tasks"])
 
         self.device = device
         # self.fits_obj = fits_obj
         self.trans_obj = trans_obj
-        self.dataset_path = dataset_path
+        self.dataset_path = kwargs["dataset_path"]
 
         self.num_bands = kwargs["num_bands"]
         self.space_dim = kwargs["space_dim"]
@@ -62,7 +62,7 @@ class SpectraData:
 
         self.load_spectra_data_from_cache = kwargs["load_spectra_data_from_cache"]
 
-        self.set_path(dataset_path)
+        self.set_path(self.dataset_path)
         self.load_accessory_data()
         self.load_spectra()
 
@@ -129,8 +129,9 @@ class SpectraData:
         self.gt_spectra_wave_fname = join(processed_data_path, "gt_spectra_wave.npy")
         self.gt_spectra_fluxes_fname = join(processed_data_path, "gt_spectra_fluxes.npy")
         self.gt_spectra_pixels_fname = join(processed_data_path, "gt_spectra_pixels.npy")
-        self.gt_spectra_coords_fname = join(processed_data_path, "gt_spectra_coords.npy")
         self.gt_spectra_redshift_fname = join(processed_data_path, "gt_spectra_redshift.npy")
+        self.gt_spectra_img_coords_fname = join(processed_data_path, "gt_spectra_img_coords.npy")
+        self.gt_spectra_world_coords_fname = join(processed_data_path, "gt_spectra_world_coords.npy")
 
         for path in [processed_data_path, self.processed_spectra_path]:
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -183,27 +184,27 @@ class SpectraData:
     #     """
     #     return self.data["spectra_grid_coords"]
 
-    def get_spectra_img_coords(self):
-        """ Get image coords of all selected spectra (gt & dummy, incl. neighbours). """
-        return self.data["spectra_img_coords"]
+    # def get_spectra_img_coords(self):
+    #     """ Get image coords of all selected spectra (gt & dummy, incl. neighbours). """
+    #     return self.data["spectra_img_coords"]
 
-    def get_num_spectra_coords(self):
-        """ Get number of coords of all selected spectra
-            (gt & dummy, incl. neighbours).
-        """
-        return self.get_spectra_grid_coords().shape[0]
+    # def get_num_spectra_coords(self):
+    #     """ Get number of coords of all selected spectra
+    #         (gt & dummy, incl. neighbours).
+    #     """
+    #     return self.get_spectra_grid_coords().shape[0]
 
-    def get_spectra_coord_ids(self):
-        """ Get pixel id of all selected spectra (correspond to coords). """
-        return self.data["spectra_coord_ids"]
+    # def get_spectra_coord_ids(self):
+    #     """ Get pixel id of all selected spectra (correspond to coords). """
+    #     return self.data["spectra_coord_ids"]
 
-    def get_spectra_recon_wave_bound_ids(self):
-        """ Get ids of boundary lambda of recon spectra. """
-        return self.data["spectra_recon_wave_bound_ids"]
+    # def get_spectra_recon_wave_bound_ids(self):
+    #     """ Get ids of boundary lambda of recon spectra. """
+    #     return self.data["spectra_recon_wave_bound_ids"]
 
-    def get_recon_spectra_wave(self):
-        """ Get lambda values (for plotting). """
-        return self.data["recon_wave"]
+    # def get_recon_spectra_wave(self):
+    #     """ Get lambda values (for plotting). """
+    #     return self.data["recon_wave"]
 
     def get_gt_spectra_ids(self):
         return self.data["gt_spectra_ids"]
@@ -253,10 +254,10 @@ class SpectraData:
             return self.data["validation_patch_ids"][patch_uid]
         return self.data["validation_patch_ids"]
 
-    def get_validation_coords(self, idx=None):
+    def get_validation_img_coords(self, idx=None):
         if idx is not None:
-            return self.data["validation_coords"][idx]
-        return self.data["validation_coords"]
+            return self.data["validation_img_coords"][idx]
+        return self.data["validation_img_coords"]
 
     def get_validation_fluxes(self, idx=None):
         if idx is not None:
@@ -360,8 +361,9 @@ class SpectraData:
            not exists(self.gt_spectra_ids_fname) or \
            not exists(self.gt_spectra_fluxes_fname) or \
            not exists(self.gt_spectra_pixels_fname) or \
-           not exists(self.gt_spectra_coords_fname) or \
-           not exists(self.gt_spectra_redshift_fname):
+           not exists(self.gt_spectra_redshift_fname) or \
+           not exists(self.gt_spectra_img_coords_fname) or \
+           not exists(self.gt_spectra_world_coords_fname):
 
             # process and save data for each spectra individually
             if not exists(self.gt_spectra_ids_fname) or \
@@ -385,7 +387,7 @@ class SpectraData:
             "gt_spectra_fluxes",
             "gt_spectra_pixels",
             "gt_spectra_redshift",
-            "gt_spectra_grid_coords"
+            "gt_spectra_world_coords"
         ])
 
     #############
@@ -437,7 +439,8 @@ class SpectraData:
         # valiation(and semi sup) spectra data (used during main train)
         self.data["validation_fluxes"] = self.data["gt_spectra_fluxes"][val_ids]
         self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids]
-        self.data["validation_coords"] = self.data["gt_spectra_grid_coords"][val_ids]
+        self.data["validation_img_coords"] = self.data["gt_spectra_img_coords"][val_ids]
+        self.data["validation_world_coords"] = self.data["gt_spectra_world_coords"][val_ids]
         if self.kwargs["redshift_semi_supervision"]:
             self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
 
@@ -450,7 +453,12 @@ class SpectraData:
         self.data["gt_spectra_fluxes"] = np.load(self.gt_spectra_fluxes_fname)
         self.data["gt_spectra_pixels"] = np.load(self.gt_spectra_pixels_fname)
         self.data["gt_spectra_redshift"] = np.load(self.gt_spectra_redshift_fname)
-        self.data["gt_spectra_grid_coords"] = np.load(self.gt_spectra_coords_fname)
+        self.data["gt_spectra_img_coords"] = np.load(self.gt_spectra_img_coords_fname)
+        self.data["gt_spectra_world_coords"] = np.load(self.gt_spectra_world_coords_fname)
+        norm_coords, _ = normalize_coords(
+            self.data["gt_spectra_world_coords"], coords_range=self.coords_range)
+        self.data["gt_spectra_norm_coords"] = norm_coords
+        # print(self.data["gt_spectra_img_coords"], self.data["gt_spectra_world_coords"], norm_coords)
 
     def process_save_gt_spectra_data(self):
         """ Clip supervision spectra to trusted range.
@@ -475,7 +483,8 @@ class SpectraData:
         np.save(self.gt_spectra_fluxes_fname, self.data["gt_spectra_fluxes"])
         np.save(self.gt_spectra_pixels_fname, self.data["gt_spectra_pixels"])
         np.save(self.gt_spectra_redshift_fname, self.data["gt_spectra_redshift"])
-        np.save(self.gt_spectra_coords_fname, self.data["gt_spectra_grid_coords"])
+        np.save(self.gt_spectra_img_coords_fname, self.data["gt_spectra_img_coords"])
+        np.save(self.gt_spectra_world_coords_fname, self.data["gt_spectra_world_coords"])
 
     def gather_processed_spectra(self):
         """ Load processed data for each spectra and save together.
@@ -484,29 +493,35 @@ class SpectraData:
         with open(self.gt_spectra_ids_fname, "rb") as fp:
             self.data["gt_spectra_ids"] = defaultdict(list, pickle.load(fp))
 
-        redshift, pixels, coords, spectra = [], [], [], []
+        redshift, pixels, img_coords, world_coords, spectra = [], [], [], [], []
 
         n = len(df)
         for i in range(n):
             redshift.append(df.iloc[i]["zspec"])
             pixels.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["pix_fname"])))
-            coords.append(
-                np.load(join(self.processed_spectra_path, df.iloc[i]["coord_fname"])))
             spectra.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["spectra_fname"])))
+            img_coords.append(
+                np.load(join(self.processed_spectra_path, df.iloc[i]["img_coord_fname"])))
+            world_coords.append(
+                np.load(join(self.processed_spectra_path, df.iloc[i]["world_coord_fname"])))
 
         self.data["gt_spectra"] = spectra
         self.data["gt_spectra_redshift"] = np.array(redshift).astype(np.float32)
         self.data["gt_spectra_pixels"] = np.concatenate(pixels, axis=0).astype(np.float32)
-        self.data["gt_spectra_grid_coords"] = np.concatenate(coords, axis=0).astype(np.float32)
+        self.data["gt_spectra_img_coords"] = np.concatenate(
+            img_coords, axis=0).astype(np.float32)
+        self.data["gt_spectra_world_coords"] = np.concatenate(
+            world_coords, axis=0).astype(np.float32)
 
     def process_spectra(self):
         upper_bound = self.kwargs["num_gt_spectra"]
         df = self.load_source_metadata().iloc[:upper_bound]
         log.info(f"found {len(df)} source spectra")
 
-        for field in ["tract","patch","pix_fname","coord_fname"]:
+        for field in ["tract","patch","pix_fname",
+                      "img_coord_fname","world_coord_fname"]:
             df[field] = "None"
 
         if self.download_source_spectra:
@@ -523,7 +538,8 @@ class SpectraData:
         df.reset_index(inplace=True)
         df.drop(columns=["index"], inplace=True) # drop extra index added by `reset_index`
 
-        df.dropna(subset=["pix_fname","coord_fname","spectra_fname"], inplace=True)
+        df.dropna(subset=[
+            "pix_fname","img_coord_fname","world_coord_fname","spectra_fname"], inplace=True)
         df.reset_index(inplace=True)
         df.drop(columns=["index"], inplace=True) # drop extra index added by `reset_index`
 
@@ -637,7 +653,7 @@ class SpectraData:
         """
         if len(spectra_ids) == 0: return
 
-        log.info(f"spectra-data::processing {patch_uid}, containing {len(spectra_ids)} spectra")
+        log.info(f"spectra-data::processing {patch_uid}, contains {len(spectra_ids)} spectra")
 
         ras = np.array(list(df.iloc[spectra_ids]["ra"]))
         decs = np.array(list(df.iloc[spectra_ids]["dec"]))
@@ -645,32 +661,38 @@ class SpectraData:
 
         # get img coords for all spectra within current patch
         wcs = WCS(patch.get_header())
-        radecs = np.concatenate((ras[:,None], decs[:,None]), axis=-1)
-        img_coords = wcs.all_world2pix(radecs, 0).astype(int) # [n,2]
+        world_coords = np.concatenate((ras[:,None], decs[:,None]), axis=-1)
+        img_coords = wcs.all_world2pix(world_coords, 0).astype(int) # [n,2]
         img_coords = img_coords[:,::-1] # xy coords to rc coords
 
         wave_ranges, cur_patch_spectra = [], []
         process_one_spectra = partial(self.process_one_spectra,
                                       wave_ranges, cur_patch_spectra, df, patch)
-        for i, (idx, coord) in enumerate(zip(spectra_ids, img_coords)):
-            process_one_spectra(idx, coord)
+        for i, (idx, img_coord) in enumerate(zip(spectra_ids, img_coords)):
+            process_one_spectra(idx, img_coord)
 
-        cur_patch_coords_fname = join(self.processed_spectra_path, f"{patch_uid}_coords.npy")
         cur_patch_spectra_fname = join(self.processed_spectra_path, f"{patch_uid}_spectra.npy")
-        cur_patch_redshift_fname = join(self.processed_spectra_path, f"{patch_uid}_redshift.npy")
+        cur_patch_redshift_fname = join(
+            self.processed_spectra_path, f"{patch_uid}_redshift.npy")
+        cur_patch_img_coords_fname = join(
+            self.processed_spectra_path, f"{patch_uid}_img_coords.npy")
+        cur_patch_world_coords_fname = join(
+            self.processed_spectra_path, f"{patch_uid}_world_coords.npy")
+
         np.save(cur_patch_redshift_fname, redshift)
-        np.save(cur_patch_coords_fname, img_coords)
+        np.save(cur_patch_img_coords_fname, img_coords)     # excl neighbours
+        np.save(cur_patch_world_coords_fname, world_coords) # excl neighbours
         np.save(cur_patch_spectra_fname, np.array(cur_patch_spectra))
         return wave_ranges
 
-    def process_one_spectra(self, wave_ranges, cur_patch_spectra, df, patch, idx, coord):
+    def process_one_spectra(self, wave_ranges, cur_patch_spectra, df, patch, idx, img_coord):
         """ Get pixel and normalized coord and
               process spectra data for one spectra.
             @Params
               df: source metadata dataframe for all spectra
               patch: patch that contains the current spectra
               idx: spectra idx (within the df table)
-              coord: img coord for current spectra
+              img_coord: img coord for current spectra
         """
         spectra_fname = df.iloc[idx]["spectra_fname"]
         if self.spectra_data_format == "fits":
@@ -680,20 +702,23 @@ class SpectraData:
         else: raise ValueError("Unsupported spectra data source")
 
         pix_fname = f"{fname}_pix.npy"
-        coord_fname = f"{fname}_coord.npy"
+        img_coord_fname = f"{fname}_img_coord.npy"
+        world_coord_fname = f"{fname}_world_coord.npy"
         df.at[idx,"pix_fname"] = pix_fname
-        df.at[idx,"coord_fname"] = coord_fname
         df.at[idx,"spectra_fname"] = f"{fname}.npy"
+        df.at[idx,"img_coord_fname"] = img_coord_fname
+        df.at[idx,"world_coord_fname"] = world_coord_fname
 
-        pixel_ids = patch.get_pixel_ids(coord[0], coord[1],
-                                        neighbour_size=self.neighbour_size)
+        pixel_ids = patch.get_pixel_ids(
+            img_coord[0], img_coord[1], neighbour_size=self.neighbour_size
+        )
         pixels = patch.get_pixels(pixel_ids)[None,:]
         np.save(join(self.processed_spectra_path, pix_fname), pixels)
 
-        coords = patch.get_coords(pixel_ids)[None,:] # world coords [n,]
-        if not (self.codebook_pretrain or self.pretrain_infer): # normed (grid) coords
-            coords, _ = normalize_coords(coords, coords_range=self.coords_range)
-        np.save(join(self.processed_spectra_path, coord_fname), coords)
+        # `img_coord` excludes neighbours, `world_coords` include
+        world_coords = patch.get_coords(pixel_ids)[None,:] # un-normed ra/dec [n,]
+        np.save(join(self.processed_spectra_path, img_coord_fname), img_coord[None,:])
+        np.save(join(self.processed_spectra_path, world_coord_fname), world_coords)
 
         # process source spectra and save locally
         gt_spectra, wave_range = process_gt_spectra(
@@ -851,8 +876,8 @@ class SpectraData:
         gt_wave = self.get_gt_spectra_wave() # [nsmpl]
         if mode == "pretrain_infer":
             gt_fluxes = self.get_supervision_fluxes() # [n,nsmpl]
-        elif mode == "infer":
-            gt_fluxes = self.get_validation_fluxes() # [n,nsmpl]
+        elif mode == "infer" or mode == "main_train":
+            gt_fluxes = self.get_validation_fluxes()  # [n,nsmpl]
 
         if clip:
             if is_codebook: clip_range = self.kwargs["codebook_spectra_clip_range"]
@@ -903,6 +928,7 @@ class SpectraData:
                 recon_fluxes = recon_fluxes[ids]
 
         for idx, (gt_flux, cur_flux) in enumerate(zip(gt_fluxes, recon_fluxes)):
+            print(gt_flux.shape, gt_wave.shape, cur_flux.shape, recon_wave.shape)
             pargs = get_data(gt_flux, gt_wave, cur_flux, recon_wave)
             sub_dir = plot_and_save(idx, pargs)
 

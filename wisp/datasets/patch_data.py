@@ -20,7 +20,7 @@ from wisp.datasets.data_utils import set_input_path, \
 class PatchData:
     """ Data class for each patch. """
 
-    def __init__(self, dataset_path, tract, patch,
+    def __init__(self, tract, patch,
                  load_pixels=False, load_coords=False, load_weights=False, load_spectra=False,
                  cutout_num_rows=None, cutout_num_cols=None, cutout_start_pos=None,
                  pixel_norm_cho=None, full_patch=True, spectra_obj=None, **kwargs
@@ -53,7 +53,7 @@ class PatchData:
         self.qtz = kwargs["quantize_latent"] or kwargs["quantize_spectra"]
 
         self.patch_uid = create_patch_uid(tract, patch)
-        self.set_path(dataset_path)
+        self.set_path(kwargs["dataset_path"])
 
         self.verify_patch_exists(tract, patch)
         if not self.patch_exists(): return
@@ -143,6 +143,11 @@ class PatchData:
 
     def get_num_cols(self):
         return self.cur_num_cols
+
+    def get_num_spectra(self):
+        """ Get number of spectra in current (cropped) patch.
+        """
+        return self.num_spectra
 
     def get_gt_path(self):
         return self.gt_path
@@ -305,34 +310,34 @@ class PatchData:
         """ Load spectra fluxes and redshift values for all pixels with gt spectra.
         """
         path = self.spectra_obj.get_processed_spectra_path()
-        cur_patch_coords_fname = join(path, f"{self.patch_uid}_coords.npy")
         cur_patch_spectra_fname = join(path, f"{self.patch_uid}_spectra.npy")
         cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
-        coords = np.load(cur_patch_coords_fname)
+        cur_patch_img_coords_fname = join(path, f"{self.patch_uid}_img_coords.npy")
         spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]
         redshift = np.load(cur_patch_redshift_fname)
+        img_coords = np.load(cur_patch_img_coords_fname)
 
-        valid_spectra_ids = self.filter_spectra(coords)
-        coords = coords[valid_spectra_ids]
+        valid_spectra_ids = self.filter_spectra(img_coords)
         spectra = spectra[valid_spectra_ids]
         redshift = redshift[valid_spectra_ids]
+        img_coords = img_coords[valid_spectra_ids]
 
-        self.num_spectra = len(coords)
+        self.num_spectra = len(img_coords)
 
         if not self.use_full_patch:
             r, c = self.cutout_start_pos
         else: r, c = 0, 0
 
         spectra_bin_map = np.zeros((self.cur_num_rows, self.cur_num_cols)).astype(bool)
-        spectra_bin_map[coords[:,0]-r,coords[:,1]-c] = 1
+        spectra_bin_map[img_coords[:,0]-r, img_coords[:,1]-c] = 1
         spectra_bin_map = spectra_bin_map.flatten()
 
         ids = np.arange(self.num_spectra)
         spectra_id_map = np.full((self.cur_num_rows, self.cur_num_cols), -1).astype(int)
-        spectra_id_map[coords[:,0]-r,coords[:,1]-c] = ids
+        spectra_id_map[img_coords[:,0]-r, img_coords[:,1]-c] = ids
         spectra_id_map = spectra_id_map.flatten()
 
-        self.spectra_pixel_ids = self.get_pixel_ids(coords[:,0], coords[:,1])
+        self.spectra_pixel_ids = self.get_pixel_ids(img_coords[:,0], img_coords[:,1])
         self.data["spectra_id_map"] = spectra_id_map
         self.data["spectra_bin_map"] = spectra_bin_map
         self.data["spectra_pixel_wave"] = spectra[:,0]

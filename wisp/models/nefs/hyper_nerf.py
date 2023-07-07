@@ -116,24 +116,20 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         ret = defaultdict(lambda: None)
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.reset()
-        #timer.check("nef::begin")
 
-        #timer.check("nef::spatial encoding starts")
         if self.kwargs["encode_coords"]:
             latents = self.spatial_encoder(coords, lod_idx=lod_idx)
         else: latents = coords
         timer.check("nef::spatial encoding done")
 
-        #timer.check("nef::spatial decoding starts")
         latents = self.spatial_decoder(
             latents, self.codebook, qtz_args, ret, specz=specz, sup_id=sup_id)
         timer.check("nef::spatial decoding done")
 
-        #timer.check("nef::hyperspectral decoding starts")
         self.hps_decoder(latents, wave, trans, nsmpl, full_wave_bound,
                          full_wave, num_spectra_coords, self.codebook, qtz_args, ret)
         timer.check("nef::hyperspectral decoding done")
 
         if self.codebook is not None:
-            ret["codebook"] = self.codebook.weight
+            ret["model_codebook"] = self.codebook.weight
         return ret

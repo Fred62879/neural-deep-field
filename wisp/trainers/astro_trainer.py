@@ -17,9 +17,11 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
     RandomSampler, DataLoader
 
 from wisp.datasets import default_collate
+from wisp.datasets.patch_data import PatchData
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
-from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, load_pretrained_model_weights, forward, print_shape
+from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
+    load_pretrained_model_weights, forward, print_shape, create_patch_uid
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
 
@@ -103,6 +105,7 @@ class AstroTrainer(BaseTrainer):
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
         self.dataset.set_mode("main_train")
+        self.dataset.toggle_wave_sampling(False)
         self.set_coords()
 
     def summarize_training_tasks(self):
@@ -126,43 +129,46 @@ class AstroTrainer(BaseTrainer):
             self.apply_gt_redshift = self.extra_args["apply_gt_redshift"]
             self.redshift_unsupervision = self.extra_args["redshift_unsupervision"]
             self.redshift_semi_supervision = self.extra_args["redshift_semi_supervision"]
-            assert sum([
-                self.apply_gt_redshift, self.redshift_unsupervision,
-                self.redshift_semi_supervision]) <= 1 # at most one of these three can be True
+            assert self.redshift_semi_supervision
+            # assert sum([
+            #     self.apply_gt_redshift, self.redshift_unsupervision,
+            #     self.redshift_semi_supervision]) <= 1 # at most one of these three can be True
         else:
             self.apply_gt_redshift, self.redshift_unsupervision, \
                 self.redshift_semi_supervision = False, False, False
 
-        self.save_recon = self.pixel_supervision and \
-            "save_recon_during_train" in tasks
-        self.save_cropped_recon = self.pixel_supervision and \
-            "save_cropped_recon_during_train" in tasks
-        self.save_codebook = self.pixel_supervision and self.quantize and \
-            "save_codebook" in tasks
+        self.plot_loss = self.extra_args["plot_loss"]
+
+        # save intensity of intereset for full train img
+        self.recon_img = self.pixel_supervision and "recon_img_during_train" in tasks
+        self.recon_crop = self.pixel_supervision and "recon_crop_during_train" in tasks
+        self.save_codebook = self.pixel_supervision and \
+            self.quantize and "save_codebook" in tasks
+        self.plot_embed_map = self.pixel_supervision and \
+            self.quantize and "plot_embed_map_during_train" in tasks
         self.save_latents = self.pixel_supervision and self.quantize and \
             ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
         self.save_scaler = self.pixel_supervision and self.quantize and \
             self.extra_args["generate_scaler"] and "plot_save_scaler" in tasks
-        self.save_redshift =  self.quantize and \
-            self.extra_args["model_redshift"] and \
+        self.save_redshift =  self.quantize and self.extra_args["model_redshift"] and \
             "save_redshift_during_train" in tasks
 
-        self.plot_loss = self.extra_args["plot_loss"]
-        self.plot_spectra = self.space_dim == 3 and \
+        # recon spectra
+        self.recon_gt_spectra = self.space_dim == 3 and \
             "recon_gt_spectra_during_train" in tasks
-        self.plot_embed_map = self.pixel_supervision and \
-            self.quantize and "plot_embed_map_during_train" in tasks
-        self.plot_codebook_spectra = self.pixel_supervision and self.quantize and \
+        self.recon_codebook_spectra = self.space_dim == 3 and self.quantize and \
             "recon_codebook_spectra_during_train" in tasks
+        self.recon_codebook_spectra_individ = self.space_dim == 3 and self.quantize and \
+            "recon_codebook_spectra_individ_during_train" in tasks
 
-        if self.save_cropped_recon:
+        if self.recon_crop:
             # save selected-cropped train image reconstruction
-            self.recon_cutout_fits_uids = self.extra_args["recon_cutout_fits_uids"]
             self.recon_cutout_sizes = self.extra_args["recon_cutout_sizes"]
+            self.recon_cutout_fits_uids = self.extra_args["recon_cutout_fits_uids"]
             self.recon_cutout_start_pos = self.extra_args["recon_cutout_start_pos"]
 
-        if self.plot_spectra:
-            self.selected_spectra_ids = self.dataset.get_spectra_coord_ids()
+        # if self.recon_gt_spectra:
+        # self.selected_spectra_ids = self.dataset.get_spectra_coord_ids()
 
         if self.spectra_supervision:
             self.num_supervision_spectra = self.extra_args["num_supervision_spectra"]
@@ -172,11 +178,13 @@ class AstroTrainer(BaseTrainer):
         log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
-                ["model_dir","recon_dir","spectra_dir","embed_map_dir",
-                 "latent_dir","scaler_dir","codebook_dir","soft_qtz_weights_dir"],
-                ["models","train_recons","train_spectra","train_embed_maps",
-                 "latents","scaler","codebook","soft_qtz_weights"]):
-
+                ["model_dir","recon_dir","spectra_dir","codebook_spectra_dir",
+                 "embed_map_dir","latent_dir","scaler_dir",
+                 "codebook_dir","soft_qtz_weights_dir"],
+                ["models","train_recons","train_spectra","train_codebook_spectra",
+                 "train_embed_maps","latents","scaler",
+                 "codebook","soft_qtz_weights"]
+        ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -184,7 +192,7 @@ class AstroTrainer(BaseTrainer):
         self.grad_fname = join(self.log_dir, "grad.png")
 
         if self.plot_loss:
-            self.loss_fname = join(self.log_dir, "loss.png")
+            self.loss_fname = join(self.log_dir, "loss")
 
         if self.extra_args["pretrain_codebook"]:
             self.pretrained_model_fname = self.get_checkpoint_fname(
@@ -214,10 +222,10 @@ class AstroTrainer(BaseTrainer):
     def init_dataloader(self):
         """ (Re-)Initialize dataloader.
         """
-        #if self.shuffle_dataloader: sampler_cls = RandomSampler
-        #else: sampler_cls = SequentialSampler
+        if self.shuffle_dataloader: sampler_cls = RandomSampler
+        else: sampler_cls = SequentialSampler
         # sampler_cls = SequentialSampler
-        sampler_cls = RandomSampler
+        # sampler_cls = RandomSampler
 
         self.train_data_loader = DataLoader(
             self.dataset,
@@ -252,45 +260,44 @@ class AstroTrainer(BaseTrainer):
         log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
 
     def train(self):
-        self.begin_train()
+        for i, (tract, patch) in enumerate(zip(
+                self.extra_args["tracts"], self.extra_args["patches"]
+        )):
+            self.get_cur_patch_data(i, tract, patch)
 
-        for epoch in range(self.num_epochs + 1):
-            self.epoch = epoch
-            self.begin_epoch()
+            self.begin_train()
+            for epoch in range(self.num_epochs + 1):
+                self.epoch = epoch
+                self.begin_epoch()
 
-            # for batch in tqdm(range(self.num_iterations_cur_epoch)):
-            for batch in range(self.num_iterations_cur_epoch):
-                iter_start_time = time.time()
-                self.scene_state.optimization.iteration = self.iteration
+                # for batch in tqdm(range(self.num_iterations_cur_epoch)):
+                for batch in range(self.num_iterations_cur_epoch):
+                    iter_start_time = time.time()
+                    self.scene_state.optimization.iteration = self.iteration
 
-                self.timer.reset()
-                data = self.next_batch()
-                self.timer.check('got data')
+                    data = self.next_batch()
+                    self.pre_step()
+                    self.step(data)
+                    self.post_step()
 
-                self.pre_step()
-                self.timer.check('pre step')
-                self.step(data)
-                self.timer.check('post step')
-                self.post_step()
+                    self.iteration += 1
+                    self.total_steps += 1
 
-                self.iteration += 1
-                self.total_steps += 1
+                    iter_end_time = time.time()
+                    self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
 
-                iter_end_time = time.time()
-                self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
+                self.end_epoch()
 
-            self.end_epoch()
-
-        self.end_train()
+            self.end_train()
 
     def end_train(self):
         self.writer.close()
 
         if self.plot_loss:
             x = np.arange(len(self.losses))
-            plt.plot(x,y)
+            plt.plot(x, self.losses)
             plt.savefig(self.loss_fname + ".png")
-            np.save(self.loss_fname + ".npy")
+            np.save(self.loss_fname + ".npy", self.losses)
 
         if self.extra_args["log_gpu_every"] != -1:
             nvidia_smi.nvmlShutdown()
@@ -348,15 +355,17 @@ class AstroTrainer(BaseTrainer):
             if self.save_redshift: self.redshifts = []
             if self.save_scaler: self.pixel_scaler = []
             if self.plot_embed_map: self.embed_ids = []
-            if self.plot_spectra: self.smpl_spectra = []
+            if self.recon_gt_spectra: self.smpl_spectra = []
+            if self.recon_codebook_spectra_individ: self.codebook_spectra = []
             if self.save_codebook: self.codebook_to_save = None
-            if self.save_recon or self.save_cropped_recon: self.smpl_pixels = []
+            if self.recon_img or self.recon_crop: self.smpl_pixels = []
 
             # re-init dataloader to make sure pixels are in order
-            self.shuffle_dataloader = False
-            self.dataset.toggle_wave_sampling(use_full_wave=False)
             self.use_all_pixels = True
-            self.set_num_batches()
+            self.shuffle_dataloader = False
+            self.set_num_batches(max_bsz=2048)
+            self.dataset.toggle_wave_sampling(True)
+
             self.init_dataloader()
             self.reset_data_iterator()
 
@@ -375,27 +384,28 @@ class AstroTrainer(BaseTrainer):
         if self.plot_loss:
             self.losses.append(total_loss)
 
-        if self.extra_args["log_tb_every"] > -1 and self.epoch % self.extra_args["log_tb_every"] == 0:
-            self.log_tb()
-
-        if self.extra_args["log_cli_every"] > -1 and self.epoch % self.extra_args["log_cli_every"] == 0:
-            self.log_cli()
-
-        # render visualizations to tensorboard
-        if self.render_tb_every > -1 and self.epoch % self.render_tb_every == 0:
-            self.render_tb()
-
         if self.save_every > -1 and self.epoch % self.save_every == 0:
             self.save_model()
 
-        # save data locally and restore trainer state
+        if self.log_tb_every > -1 and self.epoch % self.log_tb_every == 0:
+            self.log_tb()
+
+        if self.log_cli_every > -1 and self.epoch % self.log_cli_every == 0:
+            self.log_cli()
+
+        if self.render_tb_every > -1 and self.epoch % self.render_tb_every == 0:
+            self.render_tb()
+
         if self.save_data_to_local:
             self.save_local()
-            self.use_all_pixels = self.extra_args["train_with_all_pixels"]
+
+            # restore trainer state
             self.shuffle_dataloader = True
             self.save_data_to_local = False
-            self.set_num_batches()
-            self.dataset.toggle_wave_sampling(use_full_wave=False)
+            self.use_all_pixels = self.extra_args["train_with_all_pixels"]
+            self.set_num_batches(self.extra_args["batch_size"])
+            self.dataset.toggle_wave_sampling(False)
+
             self.init_dataloader()
             self.reset_data_iterator()
 
@@ -449,14 +459,43 @@ class AstroTrainer(BaseTrainer):
             if self.save_latents: self.latents.extend(latents)
             if self.save_redshift: self.redshifts.extend(redshift)
             if self.plot_embed_map: self.embed_ids.extend(embed_ids)
-            if self.plot_spectra: self.smpl_spectra.append(recon_spectra)
-            if self.save_recon or self.save_cropped_recon:
+            if self.recon_gt_spectra: self.smpl_spectra.append(recon_spectra)
+            if self.recon_img or self.recon_crop:
                 self.smpl_pixels.extend(recon_pixels)
             if self.save_codebook and self.codebook_to_save is None:
                 self.codebook_to_save = codebook
 
     def post_step(self):
         pass
+
+    #############
+    # Get data for cur Patch
+    #############
+
+    def get_cur_patch_data(self, i, tract, patch):
+        self.cur_patch = PatchData(
+            tract, patch,
+            load_spectra=True,
+            cutout_num_rows=self.extra_args["patch_cutout_num_rows"][i],
+            cutout_num_cols=self.extra_args["patch_cutout_num_cols"][i],
+            cutout_start_pos=self.extra_args["patch_cutout_start_pos"][i],
+            full_patch=self.extra_args["use_full_patch"],
+            spectra_obj=self.dataset.get_spectra_data_obj(),
+            **self.extra_args
+        )
+        self.cur_patch_uid = create_patch_uid(tract, patch)
+
+        # get pixel ids of spectra validation pixels (in context of current (cropped) patch)
+        # cur_patch_spectra_ids = self.dataset.get_validation_spectra_ids(self.cur_patch_uid)
+        # coords = self.dataset.get_validation_spectra_img_coords(cur_patch_spectra_ids)
+        # keep_ids = patch_data.filter_spectra(coords)
+        # coords = coords[keep_ids]
+        # ids = []
+        # for r, c in coords:
+        #     ids.append(self.dataset.get_pixel_ids_one_patch(
+        #         r, c, self.extra_args["spectra_neighbour_size"], self.cur_patch_uid))
+        # self.val_spectra_ids = np.array(ids)
+        self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
 
     #############
     # Helper methods
@@ -522,16 +561,18 @@ class AstroTrainer(BaseTrainer):
         else:
             self.dataset.set_coords_source("fits")
 
-    def set_num_batches(self):
+    def set_num_batches(self, max_bsz=None):
         """ Set number of batches/iterations and batch size for each epoch.
-            At certain epochs, we may not need all data and can break before
-              iterating thru all data.
+            At certain epochs, we may not need all data and/or all wave
+              and can break before iterating thru all data.
         """
         length = self.get_dataset_length()
         if not self.use_all_pixels:
             length = int(length * self.extra_args["train_pixel_ratio"])
 
         self.batch_size = min(self.extra_args["batch_size"], length)
+        if max_bsz is not None: # when we use all wave, we need to control bsz
+            self.batch_size = min(self.batch_size, max_bsz)
 
         if self.dataloader_drop_last:
             self.num_iterations_cur_epoch = int(length // self.batch_size)
@@ -631,7 +672,7 @@ class AstroTrainer(BaseTrainer):
                       save_soft_qtz_weights=True,
                       calculate_codebook_loss=self.quantize_latent,
                       save_scaler=self.save_data_to_local and self.save_scaler,
-                      save_spectra=self.save_data_to_local and self.plot_spectra,
+                      save_spectra=self.save_data_to_local and self.recon_gt_spectra,
                       save_latents=self.save_data_to_local and self.save_latents,
                       save_codebook=self.save_data_to_local and self.save_codebook,
                       save_redshift=self.save_data_to_local and self.save_redshift,
@@ -752,9 +793,9 @@ class AstroTrainer(BaseTrainer):
         scaler = None if not self.save_scaler else ret["scaler"]
         latents = None if not self.save_latents else ret["latents"]
         redshift = None if not self.save_redshift else ret["redshift"]
-        recon_spectra = None if not self.plot_spectra else ret["spectra"]
+        recon_spectra = None if not self.recon_gt_spectra else ret["spectra"]
+        codebook = None if not self.save_codebook else ret["model_codebook"]
         embed_ids = None if not self.plot_embed_map else ret["min_embed_ids"]
-        codebook = None if not self.save_codebook else ret["codebook"]
         return scaler, recon_spectra, embed_ids, latents, redshift, codebook
 
     def save_local(self):
@@ -773,10 +814,10 @@ class AstroTrainer(BaseTrainer):
             log.info(self.codebook_to_save)
             # np.save(join(self.codebook_dir, f"{self.epoch}"), self.codebook_to_save)
 
-        if self.save_recon or self.save_cropped_recon:
+        if self.recon_img or self.recon_crop:
             self.restore_evaluate_tiles()
 
-        if self.plot_spectra:
+        if self.recon_gt_spectra:
             self.plot_spectrum()
 
         if self.plot_embed_map:
@@ -822,7 +863,7 @@ class AstroTrainer(BaseTrainer):
             "calculate_metrics": False
         }
         _, _ = self.dataset.restore_evaluate_tiles(self.embed_ids, **re_args)
-        if self.save_cropped_recon:
+        if self.recon_crop:
             self.save_cropped_recon_locally(**re_args)
 
     def restore_evaluate_tiles(self):
@@ -841,31 +882,37 @@ class AstroTrainer(BaseTrainer):
             "calculate_metrics": False
         }
         _, _ = self.dataset.restore_evaluate_tiles(self.smpl_pixels, **re_args)
-        if self.save_cropped_recon:
+        if self.recon_crop:
             self.save_cropped_recon_locally(**re_args)
 
     def plot_spectrum(self):
         self.smpl_spectra = torch.stack(self.smpl_spectra)
 
         if not self.spectra_supervision:
-            # smpl_spectra [bsz,num_samples]
             # all spectra are collected (no duplications) and we need
             #   only selected ones (incl. neighbours)
             self.smpl_spectra = self.smpl_spectra.view(
-                -1, self.smpl_spectra.shape[-1])
-            self.smpl_spectra = self.smpl_spectra[self.selected_spectra_ids]
-            clip_spectra = False
+                -1, self.smpl_spectra.shape[-1]) # [bsz,num_samples]
+
+            # print(self.smpl_spectra.shape, self.val_spectra_map.shape)
+            self.smpl_spectra = self.smpl_spectra[self.val_spectra_map]
+            # print(self.smpl_spectra.shape, np.count_nonzero(self.val_spectra_map))
         else:
             # smpl_spectra [bsz,num_spectra_coords,num_sampeles]
             # we get all spectra at each batch (duplications), thus average over batches
             self.smpl_spectra = torch.mean(self.smpl_spectra, dim=0)
-            clip_spectra = True
 
         self.smpl_spectra = self.smpl_spectra.detach().cpu().numpy().reshape((
-            self.dataset.get_num_gt_spectra(),
+            self.cur_patch.get_num_spectra(),
             self.extra_args["spectra_neighbour_size"]**2, -1))
 
-        self.dataset.plot_spectrum(self.spectra_dir, self.epoch, self.smpl_spectra, clip=clip_spectra)
+        ids = self.dataset.get_validation_spectra_ids(self.cur_patch_uid)
+        self.dataset.plot_spectrum(
+            self.spectra_dir, self.epoch, self.smpl_spectra,
+            self.extra_args["flux_norm_cho"],
+            save_spectra=True, mode="main_train", ids=ids,
+            clip=self.extra_args["plot_clipped_spectrum"]
+        )
 
     def save_cropped_recon_locally(self, **re_args):
         for index, fits_uid in enumerate(self.extra_args["recon_cutout_fits_uids"]):

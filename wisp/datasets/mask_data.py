@@ -15,7 +15,7 @@ class MaskData:
     """ Data class for masks.
         Only used when doing inpainting
     """
-    def __init__(self, fits_obj, dataset_path, device, **kwargs):
+    def __init__(self, fits_obj, device, **kwargs):
 
         self.spatial_inpaint = kwargs["inpaint_cho"] == "spatial_inpaint"
         self.spectral_inpaint = kwargs["inpaint_cho"] == "spectral_inpaint"
@@ -39,7 +39,7 @@ class MaskData:
         self.inpaint_bands_str = "".join(np.array(kwargs["filters"])[self.inpaint_bands])
         print(self.inpaint_bands_str)
 
-        self.set_path(dataset_path)
+        self.set_path(kwargs["dataset_path"])
         self.data = defaultdict(lambda: [])
         self.load_mask()
 

@@ -52,6 +52,7 @@ def normalize_coords(coords, coords_range=None):
         @Param
           coords: [...,2] (float32)
     '''
+    coords = coords.copy()
     if coords_range is None:
         coords_range = get_coords_range(coords)
     (min_x, max_x, min_y, max_y) = coords_range

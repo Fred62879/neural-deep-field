@@ -129,7 +129,6 @@ class CodebookTrainer(BaseTrainer):
 
         # as long as we model redshift, we should apply gt redshift to spectra during pretrain
         #  and we should never do redshift supervision during pretrain
-        # self.redshift_supervision = False
         self.apply_gt_redshift = self.extra_args["model_redshift"]
 
         self.train_within_wave_range = not self.pixel_supervision and \

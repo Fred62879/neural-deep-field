@@ -20,6 +20,82 @@ str2optim = {m.lower(): getattr(torch.optim, m) for m in dir(torch.optim) if m[0
 def register_class(cls, name):
     globals()[name] = cls
 
+def get_pretrain_pipelines(pipelines, tasks, args):
+    if not args.pretrain_codebook: return
+
+    if "codebook_pretrain" in tasks:
+        assert(args.quantize_latent or args.quantize_spectra)
+        pretrain_nef = CodebookPretrainNerf(
+            args.codebook_pretrain_pixel_supervision,
+            _model_redshift=args.model_redshift,
+            **vars(args)
+        )
+        codebook_nef = CodebookNef(integrate=False, **vars(args))
+        pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
+        pipelines["codebook"] = AstroPipeline(codebook_nef)
+
+    # pipeline for codebook pretrain inferrence
+    if "pretrain_infer" in tasks:
+        pretrain_nef = CodebookPretrainNerf(
+            args.codebook_pretrain_pixel_supervision, **vars(args))
+        pipelines["full"] = AstroPipeline(pretrain_nef)
+
+        if "recon_gt_spectra" in tasks:
+            spectra_nef = CodebookPretrainNerf(False, **vars(args))
+            pipelines["spectra_infer"] = AstroPipeline(spectra_nef)
+
+        if "recon_codebook_spectra_individ" in tasks:
+            codebook_spectra_nef = CodebookPretrainNerf(False, **vars(args))
+            pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_spectra_nef)
+
+    return pipelines
+
+def get_main_train_pipelines(pipelines, tasks, args):
+    if "train" in tasks:
+        # full pipline for training
+        nef_train = globals()[args.nef_type](**vars(args))
+        pipelines["full"] = AstroPipeline(nef_train)
+
+    if "infer" in tasks:
+        # full pipline for img recon
+        nef_train = globals()[args.nef_type](**vars(args))
+        pipelines["full"] = AstroPipeline(nef_train)
+
+        # pipeline for spectra inferrence
+        if "recon_gt_spectra" in tasks or "recon_dummy_spectra" in tasks:
+            spectra_nef = globals()[args.nef_type](
+                integrate=False, qtz_calculate_loss=False, **vars(args))
+            pipelines["spectra_infer"] = AstroPipeline(spectra_nef)
+
+        # pipeline for codebook spectra inferrence
+        if "recon_codebook_spectra" in tasks:
+            codebook_nef = CodebookNef(integrate=False, **vars(args))
+            pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_nef)
+        elif "recon_codebook_spectra_individ" in tasks:
+            codebook_nef = globals()[args.nef_type](
+                integrate=False, qtz_calculate_loss=False, **vars(args))
+            pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_nef)
+
+    return pipelines
+
+def get_pipelines_from_config(args, tasks={}):
+    """ Utility function to get all required pipelines from the parsed config.
+    """
+    pipelines = {}
+    if args.use_gpu:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    else: device = "cpu"
+
+    if args.dataset_type == 'astro':
+        pipelines = get_pretrain_pipelines(pipelines, tasks, args)
+        pipelines = get_main_train_pipelines(pipelines, tasks, args)
+    else:
+        raise ValueError(f"{args.dataset_type} unrecognized dataset_type")
+
+    for _, pipeline in pipelines.items():
+        pipeline.to(device)
+    return device, pipelines
+
 def get_optimizer_from_config(args):
     """ Utility function to get the optimizer from the parsed config.
     """
@@ -49,62 +125,6 @@ def get_dataset_from_config(args):
     else:
         raise ValueError(f'"{args.dataset_type}" unrecognized dataset_type')
     return dataset
-
-def get_pipelines_from_config(args, tasks={}):
-    """ Utility function to get the pipelines from the parsed config.
-    """
-    pipelines = {}
-    if args.use_gpu:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    else: device = "cpu"
-
-    if args.dataset_type == 'astro':
-        # pipeline for codebook pretraining
-        if "codebook_pretrain" in tasks and args.pretrain_codebook:
-            assert(args.quantize_latent or args.quantize_spectra)
-            pretrain_nef = CodebookPretrainNerf(
-                args.codebook_pretrain_pixel_supervision,
-                _model_redshift=args.model_redshift,
-                **vars(args)
-            )
-            codebook_nef = CodebookNef(integrate=False, **vars(args))
-            pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
-            pipelines["codebook"] = AstroPipeline(codebook_nef)
-
-        # pipeline for codebook pretrain inferrence
-        if "pretrain_infer" in tasks and args.pretrain_codebook:
-            pretrain_nef = CodebookPretrainNerf(
-                args.codebook_pretrain_pixel_supervision, **vars(args))
-            pipelines["pretrain_infer"] = AstroPipeline(pretrain_nef)
-
-            if "recon_gt_spectra" in tasks:
-                spectra_nef = CodebookPretrainNerf(False, **vars(args))
-                pipelines["spectra_infer"] = AstroPipeline(spectra_nef)
-
-            if "recon_codebook_spectra_individ" in tasks:
-                pretrain_nef = CodebookPretrainNerf(False, **vars(args))
-                pipelines["codebook_individ"] = AstroPipeline(pretrain_nef)
-
-        # full pipline for training and/or inferrence
-        nef_train = globals()[args.nef_type](**vars(args))
-        pipelines["full"] = AstroPipeline(nef_train)
-
-        # pipeline for spectra inferrence
-        if "infer" in tasks and ("recon_gt_spectra" in tasks or "recon_dummy_spectra" in tasks):
-            nef_infer_spectra = globals()[args.nef_type](
-                integrate=False, qtz_calculate_loss=False, **vars(args))
-            pipelines["spectra_infer"] = AstroPipeline(nef_infer_spectra)
-
-        # pipeline for codebook spectra inferrence
-        if "recon_codebook_spectra" in tasks and "codebook" not in pipelines:
-            codebook_nef = CodebookNef(integrate=False, **vars(args))
-            pipelines["codebook"] = AstroPipeline(codebook_nef)
-    else:
-        raise ValueError(f"{args.dataset_type} unrecognized dataset_type")
-
-    for _, pipeline in pipelines.items():
-        pipeline.to(device)
-    return device, pipelines
 
 def get_trainer_from_config(trainer_cls, pipeline, dataset, optim_cls, optim_params, device, args):
     trainer = trainer_cls(
