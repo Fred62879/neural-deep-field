@@ -119,6 +119,9 @@ class AstroInferrer(BaseInferrer):
         self.redshift_semi_supervision = self.model_redshift and \
             self.extra_args["redshift_semi_supervision"]
 
+        if self.pretrain_infer: assert self.apply_gt_redshift
+        else: assert self.redshift_semi_supervision
+
         self.generate_scaler = self.qtz and self.extra_args["generate_scaler"]
 
         # infer all coords using original model
@@ -404,7 +407,7 @@ class AstroInferrer(BaseInferrer):
 
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
         if self.pretrain_infer:
-            self._set_dataset_coords_pretrain(self.coords_source, checkpoint)
+            self._set_dataset_coords_pretrain(checkpoint)
         self.infer_all_coords(model_id, checkpoint)
 
         if self.plot_latent_embed:
@@ -597,7 +600,7 @@ class AstroInferrer(BaseInferrer):
 
     def run_checkpoint_selected_coords_partial_model(self, model_id, checkpoint):
         if self.pretrain_infer:
-            self._set_dataset_coords_pretrain(self.coords_source, checkpoint)
+            self._set_dataset_coords_pretrain(checkpoint)
         self.infer_spectra(model_id, checkpoint)
 
     def post_checkpoint_selected_coords_partial_model(self, model_id):
@@ -633,9 +636,9 @@ class AstroInferrer(BaseInferrer):
 
     def run_checkpoint_hardcode_coords_modified_model(self, model_id, checkpoint):
         if self.recon_codebook_spectra:
-            self._set_dataset_coords_codebook(self.coords_source, checkpoint)
+            self._set_dataset_coords_codebook(checkpoint)
         elif self.recon_codebook_spectra_individ and self.pretrain_infer:
-            self._set_dataset_coords_pretrain(self.coords_source, checkpoint)
+            self._set_dataset_coords_pretrain(checkpoint)
 
         self.infer_codebook_spectra(model_id, checkpoint)
 

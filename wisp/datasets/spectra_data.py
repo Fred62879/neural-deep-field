@@ -353,9 +353,7 @@ class SpectraData:
               iii) finally we do necessary transformations.
         """
         self.find_full_wave_bound_ids()
-        if not (self.codebook_pretrain or self.pretrain_infer):
-            # range used to normalize world to img coords
-            self.coords_range = np.load(self.coords_range_fname + ".npy")
+        self.coords_range = np.load(self.coords_range_fname + ".npy")
 
         if not self.load_spectra_data_from_cache or \
            not exists(self.gt_spectra_ids_fname) or \
@@ -928,7 +926,7 @@ class SpectraData:
                 recon_fluxes = recon_fluxes[ids]
 
         for idx, (gt_flux, cur_flux) in enumerate(zip(gt_fluxes, recon_fluxes)):
-            print(gt_flux.shape, gt_wave.shape, cur_flux.shape, recon_wave.shape)
+            # print(gt_flux.shape, gt_wave.shape, cur_flux.shape, recon_wave.shape)
             pargs = get_data(gt_flux, gt_wave, cur_flux, recon_wave)
             sub_dir = plot_and_save(idx, pargs)
 

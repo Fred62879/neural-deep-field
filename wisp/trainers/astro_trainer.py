@@ -484,17 +484,6 @@ class AstroTrainer(BaseTrainer):
             **self.extra_args
         )
         self.cur_patch_uid = create_patch_uid(tract, patch)
-
-        # get pixel ids of spectra validation pixels (in context of current (cropped) patch)
-        # cur_patch_spectra_ids = self.dataset.get_validation_spectra_ids(self.cur_patch_uid)
-        # coords = self.dataset.get_validation_spectra_img_coords(cur_patch_spectra_ids)
-        # keep_ids = patch_data.filter_spectra(coords)
-        # coords = coords[keep_ids]
-        # ids = []
-        # for r, c in coords:
-        #     ids.append(self.dataset.get_pixel_ids_one_patch(
-        #         r, c, self.extra_args["spectra_neighbour_size"], self.cur_patch_uid))
-        # self.val_spectra_ids = np.array(ids)
         self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
 
     #############
@@ -893,10 +882,7 @@ class AstroTrainer(BaseTrainer):
             #   only selected ones (incl. neighbours)
             self.smpl_spectra = self.smpl_spectra.view(
                 -1, self.smpl_spectra.shape[-1]) # [bsz,num_samples]
-
-            # print(self.smpl_spectra.shape, self.val_spectra_map.shape)
             self.smpl_spectra = self.smpl_spectra[self.val_spectra_map]
-            # print(self.smpl_spectra.shape, np.count_nonzero(self.val_spectra_map))
         else:
             # smpl_spectra [bsz,num_spectra_coords,num_sampeles]
             # we get all spectra at each batch (duplications), thus average over batches
@@ -906,11 +892,11 @@ class AstroTrainer(BaseTrainer):
             self.cur_patch.get_num_spectra(),
             self.extra_args["spectra_neighbour_size"]**2, -1))
 
-        ids = self.dataset.get_validation_spectra_ids(self.cur_patch_uid)
+        # ids = self.dataset.get_validation_spectra_ids(self.cur_patch_uid)
         self.dataset.plot_spectrum(
             self.spectra_dir, self.epoch, self.smpl_spectra,
             self.extra_args["flux_norm_cho"],
-            save_spectra=True, mode="main_train", ids=ids,
+            save_spectra=True, mode="main_train",
             clip=self.extra_args["plot_clipped_spectrum"]
         )
 
