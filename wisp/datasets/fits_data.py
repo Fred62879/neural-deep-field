@@ -97,7 +97,7 @@ class FitsData:
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.coords_fname = join(img_data_path, f"coords{suffix}.npy")
         self.pixels_fname = join(img_data_path, f"pixels_{norm_str}{suffix}.npy")
-        self.coords_range_fname = join(img_data_path, self.kwargs["coords_range_fname"])
+        self.coords_range_fname = join(img_data_path, self.kwargs["coords_range_fname"]+".npy")
         self.zscale_ranges_fname = join(img_data_path, f"zscale_ranges_{norm_str}{suffix}.npy")
         self.spectra_id_map_fname = join(img_data_path, f"spectra_id_map_{norm_str}{suffix}.npy")
         self.spectra_bin_map_fname = join(
@@ -122,7 +122,9 @@ class FitsData:
             (not self.load_coords or (exists(self.coords_fname) and \
                                       exists(self.coords_range_fname))) and \
             (not self.load_spectra or (exists(self.spectra_id_map_fname) and \
-                                       exists(self.spectra_bin_map_fname)))
+                                       exists(self.spectra_bin_map_fname) and \
+                                       exists(self.spectra_pixel_fluxes_fname) and \
+                                       exists(self.spectra_pixel_redshift_fname)))
 
         if cached: pixels, coords, weights, spectra_data  = self.load_cache()
         else:      pixels, coords, weights, spectra_data = self.process_data()

@@ -29,7 +29,7 @@ global:
     #tasks: ['infer','recon_img','recon_gt_spectra','recon_codebook_spectra_individ','plot_embed_map','plot_redshift','log_redshift','plot_scaler','save_soft_qtz_weights']
 
     tasks: ['train','recon_gt_spectra_during_train','recon_codebook_spectra_individ_during_train','recon_img_during_train']
-    tasks: ['infer','recon_gt_spectra','recon_codebook_spectra_individ','recon_img']
+    #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra_individ','recon_img']
     #tasks: ['train','infer','recon_img','recon_gt_spectra','plot_embed_map','recon_codebook_spectra_individ','log_redshift','plot_redshift','plot_scaler','save_soft_qtz_weights']
 
 optimizer:
@@ -138,7 +138,7 @@ trainer:
     pixel_loss_cho: l1
     spectra_loss_cho: l2
     redshift_loss_cho: l2
-    num_epochs: 400
+    num_epochs: 1
     batch_size: 40960 #65536 #262144
     save_every: 400
     valid_every: -1

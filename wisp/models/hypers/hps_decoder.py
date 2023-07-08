@@ -39,6 +39,8 @@ class HyperSpectralDecoder(nn.Module):
         #timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         #timer.reset()
 
+        # ids = torch.tensor([32]) # 96,2080
+
         if self.qtz_spectra:
             bsz = wave.shape[0]
             # each input coord has #num_code spectra generated
@@ -48,21 +50,23 @@ class HyperSpectralDecoder(nn.Module):
             ], dim=0) # [num_code,bsz,nsmpl,dim]
         else:
             latents = self.convert(wave, input, redshift, wave_bound)
-        #timer.check("recon_spectra::hps converted")
+        # timer.check("recon_spectra::hps converted")
 
         spectra = self.spectra_decoder(latents)[...,0]
-        #timer.check("recon_spectra::spectra decoded")
+        # timer.check("recon_spectra::spectra decoded")
 
         if self.qtz_spectra:
             # input here is logits, spectra is codebook spectra for each coord
             _, spectra = self.qtz(input, spectra, ret, qtz_args)
             spectra = spectra[:,0] # [bsz,nsmpl]
-        #timer.check("recon_spectra::spectra qtz")
+        # timer.check("recon_spectra::spectra qtz")
+        # print(spectra[ids])
 
         if self.scale and scaler is not None:
             spectra = (scaler * spectra.T).T
 
         spectra = self.norm(spectra)
+        # print(spectra[ids])
         #timer.check("recon_spectra::spectra norm")
         ret["spectra"] = spectra
 

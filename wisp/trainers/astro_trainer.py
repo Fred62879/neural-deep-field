@@ -466,7 +466,7 @@ class AstroTrainer(BaseTrainer):
         self.optimizer.zero_grad(set_to_none=True)
         self.timer.check("zero grad")
 
-        total_loss, recon_pixels, ret = self.calculate_loss(data)
+        total_loss, ret = self.calculate_loss(data)
         self.timer.check("loss")
 
         total_loss.backward()
@@ -477,19 +477,17 @@ class AstroTrainer(BaseTrainer):
         self.timer.check("backward and step")
 
         if self.save_data_to_local:
-            scaler, recon_spectra, embed_ids, latents, redshift, codebook, \
-                codebook_spectra_individ = self.get_data_to_save(ret)
-            if self.save_scaler: self.pixel_scaler.extend(scaler)
-            if self.save_latents: self.latents.extend(latents)
-            if self.save_redshift: self.redshifts.extend(redshift)
-            if self.plot_embed_map: self.embed_ids.extend(embed_ids)
-            if self.recon_gt_spectra: self.smpl_spectra.append(recon_spectra)
+            if self.save_latents: self.latents.extend(ret["latents"])
+            if self.save_scaler: self.pixel_scaler.extend(ret["scaler"])
+            if self.save_redshift: self.redshifts.extend(ret["redshift"])
+            if self.plot_embed_map: self.embed_ids.extend(ret["embed_ids"])
+            if self.recon_gt_spectra: self.smpl_spectra.append(ret["spectra"])
             if self.recon_img or self.recon_crop:
-                self.smpl_pixels.extend(recon_pixels)
+                self.smpl_pixels.extend(ret["intensity"])
             if self.save_codebook and self.codebook_to_save is None:
-                self.codebook_to_save = codebook
+                self.codebook_to_save = ret["codebook"]
             if self.recon_codebook_spectra_individ:
-                self.codebook_spectra.extend(codebook_spectra_individ)
+                self.codebook_spectra.extend(ret["codebook_spectra"])
 
     def post_step(self):
         pass
@@ -740,7 +738,7 @@ class AstroTrainer(BaseTrainer):
         torch.autograd.set_detect_anomaly(True)
         total_loss = redshift_loss + recon_loss + spectra_loss + codebook_loss
         self.log_dict["total_loss"] += total_loss.item()
-        return total_loss, recon_pixels, ret
+        return total_loss, ret
 
     def log_cli(self):
         """ Controls CLI logging.
@@ -784,16 +782,6 @@ class AstroTrainer(BaseTrainer):
 
         torch.save(checkpoint, model_fname)
         return checkpoint
-
-    def get_data_to_save(self, ret):
-        scaler = None if not self.save_scaler else ret["scaler"]
-        latents = None if not self.save_latents else ret["latents"]
-        redshift = None if not self.save_redshift else ret["redshift"]
-        codebook = None if not self.save_codebook else ret["model_codebook"]
-        embed_ids = None if not self.plot_embed_map else ret["min_embed_ids"]
-        recon_spectra = None if not self.recon_gt_spectra else ret["spectra"]
-        codebook_spectra_individ = None if not self.recon_codebook_spectra_individ else ret["codebook_spectra"]
-        return scaler, recon_spectra, embed_ids, latents, redshift, codebook, codebook_spectra_individ
 
     def save_local(self):
         if self.save_latents:
