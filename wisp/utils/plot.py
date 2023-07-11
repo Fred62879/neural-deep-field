@@ -229,7 +229,7 @@ def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
     """ Plot heat map with markers for given coordinate positions.
         Currently only used to plot heatmap for redshift.
         @Param
-          coords:  [n,3]: r,c,fits id
+          coords:  [n,2/3]: r,c(,fits id)
           markers: markers choices, different for each coord
           data:    data to heat [1,num_rwos,num_cols]
           fits_id: fits id of current tile, only draw coord with same fits id
@@ -245,8 +245,9 @@ def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
         heat(fig, band, r, c, i+1)
     fig.tight_layout()
 
-    for (y, x, cur_fits_id), marker in zip(coords, markers):
-        if cur_fits_id != fits_id: continue
+    # for (y, x, cur_fits_id), marker in zip(coords, markers):
+    for (y, x), marker in zip(coords, markers):
+        # if cur_fits_id != fits_id: continue
         plt.scatter(x, y, marker=marker)
         cur_redshift = data[0,y,x]
         log.info(f"redshift value of {fits_id}_{y}_{x} is: {cur_redshift}")

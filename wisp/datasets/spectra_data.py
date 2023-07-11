@@ -224,6 +224,9 @@ class SpectraData:
     def get_gt_spectra_redshift(self):
         return self.data["gt_spectra_redshift"]
 
+    def get_gt_spectra_img_coords(self):
+        return self.data["gt_spectra_img_coords"]
+
     def get_supervision_wave_bound_ids(self):
         """ Get ids of boundary lambda of spectra supervision. """
         return self.data["supervision_wave_bound_ids"]
@@ -462,7 +465,6 @@ class SpectraData:
         norm_coords, _ = normalize_coords(
             self.data["gt_spectra_world_coords"], coords_range=self.coords_range)
         self.data["gt_spectra_norm_world_coords"] = norm_coords
-        # print(self.data["gt_spectra_img_coords"], self.data["gt_spectra_world_coords"], norm_coords)
 
     def process_save_gt_spectra_data(self):
         """ Clip supervision spectra to trusted range.
@@ -515,7 +517,7 @@ class SpectraData:
         self.data["gt_spectra_redshift"] = np.array(redshift).astype(np.float32)
         self.data["gt_spectra_pixels"] = np.concatenate(pixels, axis=0).astype(np.float32)
         self.data["gt_spectra_img_coords"] = np.concatenate(
-            img_coords, axis=0).astype(np.float32)
+            img_coords, axis=0).astype(np.int16)
         self.data["gt_spectra_world_coords"] = np.concatenate(
             world_coords, axis=0).astype(np.float32)
 
@@ -899,9 +901,10 @@ class SpectraData:
         return full_wave, gt_fluxes, gt_wave, recon_wave, recon_wave_bound_ids
 
     def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
-                      clip=True, spectra_clipped=False, is_codebook=False,
+                      mode="pretrain_infer", clip=True,
+                      spectra_clipped=False, is_codebook=False,
                       save_spectra=False, save_spectra_together=False,
-                      mode="pretrain_infer", ids=None
+                      gt_spectra_ids=None, recon_spectra_ids=None
     ):
         """ Plot all given spectra.
             @Param
@@ -913,7 +916,8 @@ class SpectraData:
               spectra_clipped: whether or not `recon_spectra` is already clipped to
         """
         n = len(recon_fluxes)
-        if ids is not None: n = min(n, len(ids))
+        if gt_spectra_ids is not None: n = min(n, len(gt_spectra_ids))
+        if recon_spectra_ids is not None: n = min(n, len(recon_spectra_ids))
 
         full_wave, gt_fluxes, gt_wave, recon_wave, bound_ids = \
             self.gather_spectrum_plotting_data(clip, is_codebook, mode)
@@ -929,14 +933,13 @@ class SpectraData:
         plot_and_save = partial(self.plot_and_save_one_spectrum,
                                 name, spectra_dir, fig, axs, nrows, ncols,
                                 save_spectra and not save_spectra_together)
-        if ids is not None:
-            if len(gt_fluxes) > len(ids):
-                gt_fluxes = gt_fluxes[ids]
-            if len(recon_fluxes) > len(ids):
-                recon_fluxes = recon_fluxes[ids]
+
+        if gt_spectra_ids is not None:
+            gt_fluxes = gt_fluxes[gt_spectra_ids]
+        if recon_spectra_ids is not None:
+            recon_fluxes = recon_fluxes[recon_spectra_ids]
 
         for idx, (gt_flux, cur_flux) in enumerate(zip(gt_fluxes, recon_fluxes)):
-            # print(gt_flux.shape, gt_wave.shape, cur_flux.shape, recon_wave.shape)
             pargs = get_data(gt_flux, gt_wave, cur_flux, recon_wave)
             sub_dir = plot_and_save(idx, pargs)
 

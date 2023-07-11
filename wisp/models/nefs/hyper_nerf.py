@@ -83,7 +83,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         channels = ["intensity","latents","spectra"]
         if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
             channels.extend(["scaler","redshift","codebook_loss",
-                             "min_embed_ids","codebook","soft_qtz_weights","codebook_spectra"])
+                             "min_embed_ids","codebook","qtz_weights","codebook_spectra"])
 
         self._register_forward_function(self.hyperspectral, channels)
 
@@ -100,7 +100,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
                 temperature: temperature for soft quantization, if performed
                 find_embed_id: whether find embed id or not (used for soft quantization)
                 save_codebook: save codebook weights value to local
-                save_soft_qtz_weights: save weights for each code (when doing soft qtz)
+                save_qtz_weights: save weights for each code (when doing soft qtz)
 
               - grid_args:
                 pidx (torch.LongTensor): SPC point_hierarchy indices of shape [batch].

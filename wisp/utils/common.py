@@ -168,9 +168,9 @@ def forward(
         save_codebook=False,
         save_redshift=False,
         save_embed_ids=False,
+        save_qtz_weights=False,
         save_codebook_loss=False,
         save_codebook_spectra=False,
-        save_soft_qtz_weights=False
 ):
     requested_channels = []
     net_args = {"coords": data["coords"] }
@@ -186,9 +186,9 @@ def forward(
         if save_codebook: requested_channels.append("codebook")
         if save_redshift: requested_channels.append("redshift")
         if save_embed_ids: requested_channels.append("min_embed_ids")
+        if save_qtz_weights: requested_channels.append("qtz_weights")
         if save_codebook_loss: requested_channels.append("codebook_loss")
         if save_codebook_spectra: requested_channels.append("codebook_spectra")
-        if save_soft_qtz_weights: requested_channels.append("soft_qtz_weights")
 
         net_args["wave"] = data["wave"] # trans wave
         net_args["full_wave_bound"] = data["full_wave_bound"] # linear normalization
@@ -204,7 +204,7 @@ def forward(
         if qtz:
             qtz_args = defaultdict(lambda: False)
             if qtz_strategy == "soft":
-                qtz_args["save_soft_qtz_weights"] = save_soft_qtz_weights
+                qtz_args["save_qtz_weights"] = save_qtz_weights
                 qtz_args["temperature"] = step_num + 1
                 if save_embed_ids:
                     qtz_args["find_embed_id"] = save_embed_ids

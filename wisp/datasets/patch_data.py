@@ -177,6 +177,11 @@ class PatchData:
             return self.data["coords"][idx]
         return self.data["coords"]
 
+    def get_spectra_img_coords(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_img_coords"][idx]
+        return self.data["spectra_img_coords"]
+
     def get_spectra_id_map(self, idx=None):
         if idx is not None:
             return self.data["spectra_id_map"][idx]
@@ -189,7 +194,7 @@ class PatchData:
 
     def get_spectra_pixel_ids(self):
         """ Get id of pixels with gt spectra data. """
-        return self.spectra_pixel_ids
+        return self.data["spectra_pixel_ids"]
 
     def get_spectra_pixel_fluxes(self, idx=None):
         if idx is not None:
@@ -321,25 +326,29 @@ class PatchData:
         spectra = spectra[valid_spectra_ids]
         redshift = redshift[valid_spectra_ids]
         img_coords = img_coords[valid_spectra_ids]
+        pixel_ids = self.get_pixel_ids(img_coords[:,0], img_coords[:,1])
 
-        self.num_spectra = len(img_coords)
-
+        # convert global img coords to local img coords
         if not self.use_full_patch:
             r, c = self.cutout_start_pos
         else: r, c = 0, 0
+        img_coords[:,0] -= r
+        img_coords[:,1] -= c
 
-        spectra_bin_map = np.zeros((self.cur_num_rows, self.cur_num_cols)).astype(bool)
-        spectra_bin_map[img_coords[:,0]-r, img_coords[:,1]-c] = 1
-        spectra_bin_map = spectra_bin_map.flatten()
+        self.num_spectra = len(img_coords)
+        bin_map = np.zeros((self.cur_num_rows, self.cur_num_cols)).astype(bool)
+        bin_map[img_coords[:,0], img_coords[:,1]] = 1
+        bin_map = bin_map.flatten()
 
         ids = np.arange(self.num_spectra)
-        spectra_id_map = np.full((self.cur_num_rows, self.cur_num_cols), -1).astype(int)
-        spectra_id_map[img_coords[:,0]-r, img_coords[:,1]-c] = ids
-        spectra_id_map = spectra_id_map.flatten()
+        id_map = np.full((self.cur_num_rows, self.cur_num_cols), -1).astype(int)
+        id_map[img_coords[:,0], img_coords[:,1]] = ids
+        id_map = id_map.flatten()
 
-        self.spectra_pixel_ids = self.get_pixel_ids(img_coords[:,0], img_coords[:,1])
-        self.data["spectra_id_map"] = spectra_id_map
-        self.data["spectra_bin_map"] = spectra_bin_map
+        self.data["spectra_id_map"] = id_map
+        self.data["spectra_bin_map"] = bin_map
+        self.data["spectra_pixel_ids"] = pixel_ids
+        self.data["spectra_img_coords"] = img_coords
         self.data["spectra_pixel_wave"] = spectra[:,0]
         self.data["spectra_pixel_fluxes"] = spectra[:,1]
         self.data["spectra_pixel_redshift"] = redshift

@@ -47,10 +47,12 @@ class AstroTrainer(BaseTrainer):
         self.spectra_beta = self.extra_args["spectra_beta"]
         self.redshift_beta = self.extra_args["redshift_beta"]
 
-        self.use_all_pixels = extra_args["train_with_all_pixels"]
         self.save_data_to_local = False
         self.shuffle_dataloader = True
         self.dataloader_drop_last = extra_args["dataloader_drop_last"]
+
+        self.pretrain_codebook = extra_args["pretrain_codebook"]
+        self.use_all_pixels = extra_args["train_with_all_pixels"]
 
         self.summarize_training_tasks()
         self.set_log_path()
@@ -70,10 +72,10 @@ class AstroTrainer(BaseTrainer):
     #############
 
     def init_net(self):
-        if self.extra_args["pretrain_codebook"]:
+        if self.pretrain_codebook:
             self.load_pretrained_model()
 
-        log.info(self.pipeline)
+        # log.info(self.pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.pipeline.parameters()))
         )
@@ -92,13 +94,14 @@ class AstroTrainer(BaseTrainer):
             if self.spectral_inpaint:
                 pass
 
-        if self.extra_args["pretrain_codebook"]:
-            fields.extend(["spectra_id_map",
-                           "spectra_bin_map",
-                           "spectra_data"])
-
         if self.spectra_supervision:
             fields.append("spectra_data")
+
+        if self.pretrain_codebook:
+            fields.extend([
+                "spectra_id_map","spectra_bin_map",
+                "spectra_data","redshift_data"
+            ])
 
         length = self.get_dataset_length()
 
@@ -117,8 +120,8 @@ class AstroTrainer(BaseTrainer):
         self.qtz = self.qtz_latent or self.qtz_spectra
         self.qtz_strategy = self.extra_args["quantization_strategy"]
         self.cal_codebook_loss = self.qtz_latent and self.qtz_strategy == "hard"
-        self.save_soft_qtz_weights = self.qtz_spectra or (
-            self.qtz_latent and qtz_strategy == "soft")
+        self.save_qtz_weights = "save_qtz_weights_during_train" in tasks and \
+            (self.qtz_spectra or (self.qtz_latent and qtz_strategy == "soft"))
 
         self.pixel_supervision = self.extra_args["pixel_supervision"]
         self.train_spectra_pixels_only = self.extra_args["train_spectra_pixels_only"]
@@ -155,7 +158,7 @@ class AstroTrainer(BaseTrainer):
         self.save_latents = self.pixel_supervision and self.qtz and \
             ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
         self.save_scaler = self.pixel_supervision and self.qtz and \
-            self.extra_args["generate_scaler"] and "plot_save_scaler" in tasks
+            self.extra_args["generate_scaler"] and "save_scaler_during_train" in tasks
         self.save_redshift =  self.qtz and self.extra_args["model_redshift"] and \
             "save_redshift_during_train" in tasks
 
@@ -185,11 +188,11 @@ class AstroTrainer(BaseTrainer):
 
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","spectra_dir","codebook_spectra_dir",
-                 "embed_map_dir","latent_dir","scaler_dir",
-                 "codebook_dir","soft_qtz_weights_dir"],
+                 "embed_map_dir","latent_dir","scaler_dir","redshift_dir",
+                 "codebook_dir","qtz_weights_dir"],
                 ["models","train_recons","train_spectra","train_codebook_spectra",
-                 "train_embed_maps","latents","scaler",
-                 "codebook","soft_qtz_weights"]
+                 "train_embed_maps","latents","scaler","train_redshift"
+                 "codebook","train_qtz_weights"]
         ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
@@ -200,7 +203,7 @@ class AstroTrainer(BaseTrainer):
         if self.plot_loss:
             self.loss_fname = join(self.log_dir, "loss")
 
-        if self.extra_args["pretrain_codebook"]:
+        if self.pretrain_codebook:
             self.pretrained_model_fname = self.get_checkpoint_fname(
                 self.extra_args["pretrain_log_dir"])
 
@@ -246,7 +249,7 @@ class AstroTrainer(BaseTrainer):
         )
 
     def init_optimizer(self):
-        if self.extra_args["pretrain_codebook"]:
+        if self.pretrain_codebook:
             self.init_optimizer_off_pretrain()
         else:
             self.init_optimizer_no_pretrain()
@@ -290,10 +293,10 @@ class AstroTrainer(BaseTrainer):
                     self.total_steps += 1
 
                     iter_end_time = time.time()
-                    self.scene_state.optimization.elapsed_time += iter_end_time - iter_start_time
+                    self.scene_state.optimization.elapsed_time += \
+                        iter_end_time - iter_start_time
 
                 self.end_epoch()
-
             self.end_train()
 
     def end_train(self):
@@ -366,23 +369,18 @@ class AstroTrainer(BaseTrainer):
         if self.extra_args["only_last"]:
             self.loss_lods = self.loss_lods[-1:]
 
-        if self.extra_args["resample"] and self.epoch % self.extra_args["resample_every"] == 0:
-            self.resample_dataset()
-
-        # save model
-        # if self.save_every > -1 and self.epoch % self.save_every == 0:
-        #     self.save_model()
-
-        if self.extra_args["save_local_every"] > -1 and self.epoch % self.extra_args["save_local_every"] == 0:
+        if self.save_local_every > -1 and self.epoch % self.save_local_every == 0:
             self.save_data_to_local = True
+            if self.save_scaler: self.scalers = []
             if self.save_latents: self.latents = []
-            if self.save_redshift: self.redshifts = []
-            if self.save_scaler: self.pixel_scaler = []
+            if self.save_redshift:
+                self.redshift, self.gt_redshift = [], []
+            if self.save_codebook: self.codebook = None
             if self.plot_embed_map: self.embed_ids = []
+            if self.save_qtz_weights: self.qtz_weights = []
             if self.recon_gt_spectra: self.smpl_spectra = []
-            if self.recon_codebook_spectra_individ: self.codebook_spectra = []
-            if self.save_codebook: self.codebook_to_save = None
             if self.recon_img or self.recon_crop: self.smpl_pixels = []
+            if self.recon_codebook_spectra_individ: self.codebook_spectra = []
 
             # re-init dataloader to make sure pixels are in order
             self.use_all_pixels = True
@@ -477,15 +475,18 @@ class AstroTrainer(BaseTrainer):
         self.timer.check("backward and step")
 
         if self.save_data_to_local:
+            if self.save_scaler: self.scalers.extend(ret["scaler"])
             if self.save_latents: self.latents.extend(ret["latents"])
-            if self.save_scaler: self.pixel_scaler.extend(ret["scaler"])
-            if self.save_redshift: self.redshifts.extend(ret["redshift"])
+            if self.save_redshift:
+                self.redshift.extend(ret["redshift"])
+                self.gt_redshift = data["spectra_valid_redshift"]
             if self.plot_embed_map: self.embed_ids.extend(ret["embed_ids"])
             if self.recon_gt_spectra: self.smpl_spectra.append(ret["spectra"])
+            if self.save_qtz_weights: self.qtz_weights.extend(ret["qtz_weights"])
             if self.recon_img or self.recon_crop:
                 self.smpl_pixels.extend(ret["intensity"])
-            if self.save_codebook and self.codebook_to_save is None:
-                self.codebook_to_save = ret["codebook"]
+            if self.save_codebook and self.codebook is None:
+                self.codebook = ret["codebook"]
             if self.recon_codebook_spectra_individ:
                 self.codebook_spectra.extend(ret["codebook_spectra"])
 
@@ -666,8 +667,7 @@ class AstroTrainer(BaseTrainer):
                       save_embed_ids=self.save_data_to_local and self.plot_embed_map,
                       save_spectra=self.save_data_to_local and self.recon_gt_spectra,
                       save_codebook_loss=self.save_data_to_local and self.cal_codebook_loss,
-                      save_soft_qtz_weights=self.save_data_to_local and \
-                                            self.save_soft_qtz_weights,
+                      save_qtz_weights=self.save_data_to_local and self.save_qtz_weights,
                       save_codebook_spectra=self.save_data_to_local and \
                                             self.recon_codebook_spectra_individ
         )
@@ -717,7 +717,7 @@ class AstroTrainer(BaseTrainer):
 
             if len(gt_redshift) > 0:
                 pred_redshift = ret["redshift"]
-                if self.extra_args["pretrain_codebook"] and \
+                if self.pretrain_codebook and \
                    not self.extra_args["train_spectra_pixels_only"]:
                     mask= data["spectra_bin_map"]
                 else: mask = None
@@ -783,38 +783,30 @@ class AstroTrainer(BaseTrainer):
         torch.save(checkpoint, model_fname)
         return checkpoint
 
+    #############
+    # Save helpers
+    #############
+
     def save_local(self):
         if self.save_latents:
             fname = join(self.latent_dir, str(self.epoch))
             self.latents = torch.stack(self.latents).detach().cpu().numpy()
             np.save(fname, self.latents)
 
-        if self.save_scaler:
-            self.plot_save_scaler()
-
-        if self.save_redshift:
-            self.log.info(self.redshifts)
-
-        if self.save_codebook:
-            log.info(self.codebook_to_save)
-            # np.save(join(self.codebook_dir, f"{self.epoch}"), self.codebook_to_save)
-
+        if self.save_scaler: self._save_scaler()
+        if self.save_redshift: self._save_redshift()
+        if self.plot_embed_map: self._plot_embed_map()
+        if self.save_qtz_weights: self.log_qtz_weights()
+        if self.recon_gt_spectra: self._recon_gt_spectra()
         if self.recon_img or self.recon_crop:
             self.restore_evaluate_tiles()
-
-        if self.recon_gt_spectra:
-            self._recon_gt_spectra()
-
-        if self.plot_embed_map:
-            self.plot_save_embed_map()
-
         if self.recon_codebook_spectra_individ:
             self._recon_codebook_spectra_individ()
 
-    def plot_save_scaler(self):
+    def _save_scaler(self):
         """ Plot scaler values generated by the decoder before qtz for each pixel.
         """
-        self.pixel_scaler = torch.stack(self.pixel_scaler).detach().cpu().numpy()
+        scalers = torch.stack(self.scalers).detach().cpu().numpy()
         re_args = {
             "fname": self.epoch,
             "dir": self.scaler_dir,
@@ -828,9 +820,23 @@ class AstroTrainer(BaseTrainer):
             "recon_flat_trans": False,
             "calculate_metrics": False
         }
-        _, _ = self.dataset.restore_evaluate_tiles(self.pixel_scaler, **re_args)
+        _, _ = self.dataset.restore_evaluate_tiles(scalers, **re_args)
 
-    def plot_save_embed_map(self):
+        scalers = scalers[self.val_spectra_map]
+        np.set_printoptions(suppress=True)
+        np.set_printoptions(precision=3)
+        log.info(f"scaler: {scalers}")
+
+    def _save_redshift(self):
+        redshift = torch.stack(self.redshift).detach().cpu().numpy()
+        redshift = redshift[self.val_spectra_map]
+        gt_redshift = self.gt_redshift.detach().cpu().numpy()
+        np.set_printoptions(suppress=True)
+        np.set_printoptions(precision=3)
+        log.info(f"est redshift: {redshift}")
+        log.info(f"GT. redshift: {gt_redshift}")
+
+    def _plot_embed_map(self):
         """ Plot embed ids and save locally.
             Needs to subtract embed ids for spectra coords, if any.
               (During training, we add extra spectra coords, refer to
@@ -854,24 +860,10 @@ class AstroTrainer(BaseTrainer):
         if self.recon_crop:
             self.save_cropped_recon_locally(**re_args)
 
-    def restore_evaluate_tiles(self):
-        self.smpl_pixels = torch.stack(self.smpl_pixels).detach().cpu().numpy()
-        re_args = {
-            "fname": self.epoch,
-            "dir": self.recon_dir,
-            "verbose": self.verbose,
-            "num_bands": self.extra_args["num_bands"],
-            "log_max": True,
-            "save_locally": True,
-            "plot_func": plot_horizontally,
-            "zscale": True,
-            "to_HDU": False,
-            "recon_flat_trans": False,
-            "calculate_metrics": False
-        }
-        _, _ = self.dataset.restore_evaluate_tiles(self.smpl_pixels, **re_args)
-        if self.recon_crop:
-            self.save_cropped_recon_locally(**re_args)
+    def log_qtz_weights(self):
+        self.qtz_weights = torch.stack(self.qtz_weights).detach().cpu().numpy()[:,0]
+        self.qtz_weights = self.qtz_weights[self.val_spectra_map]
+        log.info(f"est qtz weights: {self.qtz_weights}")
 
     def _recon_gt_spectra(self):
         self.smpl_spectra = torch.stack(self.smpl_spectra)
@@ -897,6 +889,25 @@ class AstroTrainer(BaseTrainer):
             save_spectra=True, mode="main_train",
             clip=self.extra_args["plot_clipped_spectrum"]
         )
+
+    def restore_evaluate_tiles(self):
+        self.smpl_pixels = torch.stack(self.smpl_pixels).detach().cpu().numpy()
+        re_args = {
+            "fname": self.epoch,
+            "dir": self.recon_dir,
+            "verbose": self.verbose,
+            "num_bands": self.extra_args["num_bands"],
+            "log_max": True,
+            "save_locally": True,
+            "plot_func": plot_horizontally,
+            "zscale": True,
+            "to_HDU": False,
+            "recon_flat_trans": False,
+            "calculate_metrics": False
+        }
+        _, _ = self.dataset.restore_evaluate_tiles(self.smpl_pixels, **re_args)
+        if self.recon_crop:
+            self.save_cropped_recon_locally(**re_args)
 
     def _recon_codebook_spectra_individ(self):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()

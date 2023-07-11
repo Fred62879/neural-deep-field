@@ -68,10 +68,10 @@ class AstroInferrer(BaseInferrer):
                 ["model_dir","recon_dir","recon_synthetic_dir","metric_dir", "spectra_dir",
                  "codebook_spectra_dir", "embed_map_dir","latent_dir",
                  "redshift_dir","latent_embed_dir","zoomed_recon_dir",
-                 "scaler_dir","pixel_distrib_dir","soft_qtz_weights_dir"],
+                 "scaler_dir","pixel_distrib_dir","qtz_weights_dir"],
                 ["models","recons","recon_synthetic","metrics","spectra","codebook_spectra",
                  "embed_map","latents","redshift","latent_embed","zoomed_recon",
-                 "scaler","pixel_distrib","soft_qtz_weights"]
+                 "scaler","pixel_distrib","qtz_weights"]
         ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
@@ -120,7 +120,6 @@ class AstroInferrer(BaseInferrer):
         if self.pretrain_infer: assert self.apply_gt_redshift
         else: assert self.redshift_semi_supervision
 
-
         # infer all coords using original model
         self.trans_sample_method = self.extra_args["trans_sample_method"]
         self.recon_img = False
@@ -140,14 +139,16 @@ class AstroInferrer(BaseInferrer):
         self.plot_pixel_distrib = "plot_pixel_distrib" in tasks
         self.plot_embed_map = "plot_embed_map" in tasks and self.qtz
         self.plot_latent_embed = "plot_latent_embed" in tasks and self.qtz
-        self.plot_scaler = "plot_scaler" in tasks and self.generate_scaler and self.qtz
-        self.plot_redshift = "plot_redshift" in tasks and self.model_redshift and self.qtz
 
-        self.log_soft_qtz_weights = "log_soft_qtz_weights" in tasks and ((self.qtz_latent and self.qtz_strategy == "soft") or self.qtz_spectra)
-        self.save_soft_qtz_weights = "save_soft_qtz_weights" in tasks and ((self.qtz_latent and self.qtz__strategy == "soft") or self.qtz_spectra)
-        self.log_qtz_w_main = self.log_soft_qtz_weights and self.main_infer
-        self.log_qtz_w_pre = self.log_soft_qtz_weights and self.pretrain_infer
-        self.log_redshift = "log_redshift" in tasks and self.model_redshift and self.qtz
+        self.save_qtz_weights = "save_qtz_weights" in tasks and \
+            ((self.qtz_latent and self.qtz_strategy == "soft") or self.qtz_spectra)
+        self.save_qtz_w_main = self.save_qtz_weights and self.main_infer
+        self.save_qtz_w_pre = self.save_qtz_weights and self.pretrain_infer
+
+        self.save_scaler = "save_scaler" in tasks and self.generate_scaler and \
+            self.qtz and self.main_infer
+        self.save_redshift = "save_redshift" in tasks and self.model_redshift and \
+            self.qtz and self.main_infer
 
         # infer all coords using modified model (recon codebook spectra)
         #   either we have the codebook spectra for all coords
@@ -166,12 +167,11 @@ class AstroInferrer(BaseInferrer):
 
         if self.recon_HSI or self.recon_synthetic_band or \
            self.plot_embed_map or self.plot_latent_embed or \
-           self.save_soft_qtz_weights or self.log_qtz_w_pre or \
-           self.plot_redshift or self.log_redshift  or self.plot_scaler or \
+           self.save_qtz_weights or self.save_redshift or self.save_scaler or \
            self.recon_img or self.recon_img_pretrain or self.recon_img_valid_spectra:
             self.group_tasks.append("infer_all_coords_full_model")
 
-        if self.recon_dummy_spectra or self.recon_gt_spectra or self.log_qtz_w_main:
+        if self.recon_dummy_spectra or self.recon_gt_spectra or self.save_qtz_weights:
             self.group_tasks.append("infer_selected_coords_partial_model")
 
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
@@ -181,10 +181,10 @@ class AstroInferrer(BaseInferrer):
             self.group_tasks.append("infer_no_model_run")
 
         # set all grouped tasks to False, only required tasks will be toggled afterwards
-        self.infer_all_coords_full_model = False
-        self.infer_hardcode_coords_modified_model = False
-        self.infer_selected_coords_partial_model = False
         self.infer_without_model_run = False
+        self.infer_all_coords_full_model = False
+        self.infer_selected_coords_partial_model = False
+        self.infer_hardcode_coords_modified_model = False
 
         if self.verbose:
             log.info(f"inferrence group tasks: {self.group_tasks}.")
@@ -259,9 +259,9 @@ class AstroInferrer(BaseInferrer):
 
             if self.recon_img:
                 self.requested_fields.append("pixels")
-            if self.log_redshift:
+            if self.save_redshift:
                 self.requested_fields.append("redshift_data")
-                self.requested_fields.append("spectra_bin_map")
+                # self.requested_fields.append("spectra_bin_map")
             if self.redshift_semi_supervision:
                 self.requested_fields.extend(["spectra_id_map","spectra_bin_map"])
 
@@ -375,34 +375,17 @@ class AstroInferrer(BaseInferrer):
         self.reset_data_iterator()
 
         if self.recon_img:
-            self.to_HDU_now = self.extra_args["to_HDU"] and model_id == self.num_models
+            self.recon_pixels = []
             self.recon_HSI_now = self.recon_HSI and model_id == self.num_models
+            self.to_HDU_now = self.extra_args["to_HDU"] and model_id == self.num_models
             # self.recon_flat_trans_now = self.recon_flat_trans and model_id == self.num_models
-            self.recon_pixels = []
-
-        if self.recon_img_pretrain:
-            self.recon_pixels = []
-
-        if self.recon_synthetic_band:
-            self.recon_synthetic_pixels = []
-
-        if self.plot_scaler:
-            self.scalers = []
-
-        if self.plot_latent_embed:
-            self.latents = []
-
-        if self.plot_embed_map:
-            self.embed_ids = []
-
-        if self.plot_redshift or self.log_redshift:
-            self.redshift = []
-            if self.main_infer and self.extra_args["pretrain_codebook"]:
-                self.redshift_mask = []
-                # self.redshift_val_ids = []
-
-        if self.save_soft_qtz_weights or self.log_qtz_w_pre:
-            self.soft_qtz_weights = []
+        if self.save_scaler: self.scalers = []
+        if self.save_redshift: self.redshift = []
+        if self.plot_embed_map: self.embed_ids = []
+        if self.plot_latent_embed: self.latents = []
+        if self.save_qtz_weights: self.qtz_weights = []
+        if self.recon_img_pretrain: self.recon_pixels = []
+        if self.recon_synthetic_band: self.recon_synthetic_pixels = []
 
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
         if self.pretrain_infer:
@@ -513,9 +496,11 @@ class AstroInferrer(BaseInferrer):
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.embed_ids, **re_args)
 
-        if self.plot_redshift:
+        if self.save_redshift:
+            # plot redshift img
             if self.extra_args["mark_spectra"]:
-                positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/patch_id
+                # positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/patch_id
+                positions = self.cur_patch.get_spectra_img_coords()
                 markers = np.array(self.extra_args["spectra_markers"])
             else:
                 positions, markers = [], []
@@ -536,23 +521,17 @@ class AstroInferrer(BaseInferrer):
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.redshift, **re_args)
 
-        if self.log_redshift:
-            redshift = torch.stack(self.redshift).detach().cpu().numpy()
-            gt_redshift = self.gt_redshift.detach().cpu().numpy()
+            # log redshift for spectra pixels
+            if self.extra_args["pretrain_codebook"]:
+                redshift = torch.stack(self.redshift).detach().cpu().numpy()
+                redshift = redshift[self.val_spectra_map]
+                gt_redshift = self.gt_redshift.detach().cpu().numpy()
+                np.set_printoptions(suppress=True)
+                np.set_printoptions(precision=3)
+                log.info(f"est redshift (full): {redshift}")
+                log.info(f"GT. redshift (full): {gt_redshift}")
 
-            # during main inferrence, we have redshift for all pixels predicted
-            #   and we only log pixels with gt redshift & in validation set
-            if self.main_infer and self.extra_args["pretrain_codebook"]:
-                redshift_mask = np.array(self.redshift_mask)
-                redshift = redshift[redshift_mask]
-                # redshift_val_ids = torch.stack(self.redshift_val_ids).detach().cpu().numpy()
-                # self.gt_redshift = self.gt_redshift[redshift_val_ids]
-
-            np.set_printoptions(precision=3)
-            log.info(f"Est. redshift {redshift}")
-            log.info(f"G.T. redshift {gt_redshift}")
-
-        if self.plot_scaler:
+        if self.save_scaler:
             re_args = {
                 "fname": f'infer_{model_id}',
                 "dir": self.scaler_dir,
@@ -568,10 +547,23 @@ class AstroInferrer(BaseInferrer):
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.scalers, **re_args)
 
-        if self.save_soft_qtz_weights:
+            if self.main_infer and self.extra_args["pretrain_codebook"]:
+                scalers = torch.stack(self.scalers).detach().cpu().numpy()
+                scalers = scalers[self.val_spectra_map]
+                np.set_printoptions(suppress=True)
+                np.set_printoptions(precision=3)
+                log.info(f"scaler: {scalers}")
+
+        if self.save_qtz_w_pre:
+            weights = torch.stack(self.qtz_weights).detach().cpu().numpy()[:,0]
+            np.set_printoptions(suppress=True)
+            np.set_printoptions(precision=3)
+            log.info(f"qtz weights (full): {weights}")
+
+        elif self.save_qtz_w_main:
             re_args = {
                 "fname": f'{model_id}',
-                "dir": self.soft_qtz_weights_dir,
+                "dir": self.qtz_weights_dir,
                 "verbose": self.verbose,
                 "num_bands": self.extra_args["qtz_num_embed"],
                 "log_max": False,
@@ -581,21 +573,19 @@ class AstroInferrer(BaseInferrer):
                 "zscale": False,
                 "calculate_metrics": False,
             }
-            _, _ = self.dataset.restore_evaluate_tiles(self.soft_qtz_weights, **re_args)
+            _, _ = self.dataset.restore_evaluate_tiles(self.qtz_weights, **re_args)
 
-        if self.log_qtz_w_pre:
-            weights = torch.stack(self.soft_qtz_weights).detach().cpu().numpy()
-            fname = join(self.soft_qtz_weights_dir, f"{model_id}.pth")
-            np.save(fname, weights)
+            weights = torch.stack(self.qtz_weights).detach().cpu().numpy()[:,0]
+            weights = weights[self.val_spectra_map]
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
-            log.info(f"Qtz weights {weights[:,0]}")
+            log.info(f"qtz weights (full): {weights}")
 
     def pre_checkpoint_selected_coords_partial_model(self, model_id):
         self.reset_data_iterator()
         self.recon_spectra = []
-        if self.log_qtz_w_main:
-            self.soft_qtz_weights = []
+        if self.save_redshift: self.redshift = []
+        if self.save_qtz_weights: self.qtz_weights = []
 
     def run_checkpoint_selected_coords_partial_model(self, model_id, checkpoint):
         if self.pretrain_infer:
@@ -617,17 +607,23 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["flux_norm_cho"],
             save_spectra=True,
             clip=self.extra_args["plot_clipped_spectrum"],
-            mode=self.mode, ids=self.selected_ids
+            mode=self.mode, gt_spectra_ids=self.selected_ids
         )
 
         if self.log_pixel_value:
             self.dataset.log_spectra_pixel_values(self.recon_spectra)
 
-        if self.log_qtz_w_main:
-            weights = torch.stack(self.soft_qtz_weights).detach().cpu().numpy()
+        if self.save_redshift:
+            redshift = torch.stack(self.redshift).detach().cpu().numpy()
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
-            log.info(f"Qtz weights {weights[:,0]}")
+            log.info(f"redshift (patrtial): {redshift}")
+
+        if self.save_qtz_weights:
+            weights = torch.stack(self.qtz_weights).detach().cpu().numpy()[:,0]
+            np.set_printoptions(suppress=True)
+            np.set_printoptions(precision=3)
+            log.info(f"qtz weights (patrtial): {weights}")
 
     def pre_checkpoint_hardcode_coords_modified_model(self, model_id):
         self.reset_data_iterator()
@@ -694,12 +690,11 @@ class AstroInferrer(BaseInferrer):
                         apply_gt_redshift=self.apply_gt_redshift,
                         perform_integration=self.perform_integration,
                         trans_sample_method=self.trans_sample_method,
-                        save_soft_qtz_weights=self.save_soft_qtz_weights or \
-                                              self.log_qtz_w_pre,
-                        save_scaler=self.plot_scaler,
+                        save_qtz_weights=self.save_qtz_weights,
+                        save_scaler=self.save_scaler,
+                        save_redshift=self.save_redshift,
                         save_embed_ids=self.plot_embed_map,
                         save_latents=self.plot_latent_embed,
-                        save_redshift=self.plot_redshift or self.log_redshift,
                     )
 
                 if self.recon_img or self.recon_img_pretrain:
@@ -709,23 +704,18 @@ class AstroInferrer(BaseInferrer):
                         ret["intensity"] = ret["intensity"][...,:-1]
                     self.recon_pixels.extend(ret["intensity"])
 
-                if self.plot_scaler:
+                if self.save_scaler:
                     self.scalers.extend(ret["scaler"])
                 if self.plot_latent_embed:
                     self.latents.extend(ret["latents"])
                 if self.plot_embed_map:
                     self.embed_ids.extend(ret["min_embed_ids"])
-                if self.save_soft_qtz_weights or self.log_qtz_w_pre:
-                    self.soft_qtz_weights.extend(ret["soft_qtz_weights"])
-
-                if self.plot_redshift or self.log_redshift:
+                if self.save_qtz_weights:
+                    self.qtz_weights.extend(ret["qtz_weights"])
+                if self.save_redshift:
                     self.redshift.extend(ret["redshift"])
-
-                    if self.log_redshift:
+                    if self.extra_args["pretrain_codebook"]:
                         self.gt_redshift = data["spectra_valid_redshift"]
-                        if self.main_infer and self.extra_args["pretrain_codebook"]:
-                            self.redshift_mask.extend(data["spectra_bin_map"])
-                            # self.redshift_val_ids.extend(data["spectra_val_ids"])
 
             except StopIteration:
                 log.info("all coords inferrence done")
@@ -752,18 +742,21 @@ class AstroInferrer(BaseInferrer):
                         qtz_strategy=self.qtz_strategy,
                         apply_gt_redshift=self.apply_gt_redshift,
                         save_spectra=True,
-                        save_soft_qtz_weights=self.log_qtz_w_main
+                        save_redshift=self.save_redshift,
+                        save_qtz_weights=self.save_qtz_weights
                     )
 
                 spectra = ret["intensity"]
                 if spectra.ndim == 3: # bandwise
                     spectra = spectra.flatten(1,2) # [bsz,nsmpl]
                 self.recon_spectra.extend(spectra)
-                if self.log_qtz_w_main:
-                    self.soft_qtz_weights.extend(ret["soft_qtz_weights"])
+                if self.save_redshift:
+                    self.redshift.extend(ret["redshift"])
+                if self.save_qtz_weights:
+                    self.qtz_weights.extend(ret["qtz_weights"])
 
             except StopIteration:
-                log.info("spectra inferrence done")
+                log.info("spectra forward done")
                 break
 
     def infer_codebook_spectra(self, model_id, checkpoint):
@@ -801,7 +794,7 @@ class AstroInferrer(BaseInferrer):
                 self.codebook_spectra.extend(spectra)
 
             except StopIteration:
-                log.info("codebook spectra inferrence done")
+                log.info("codebook spectra forward done")
                 break
 
     #############

@@ -141,7 +141,7 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["codebook_pretrain_within_wave_range"]
 
         self.recon_gt_spectra = "recon_gt_spectra_during_train" in tasks
-        self.save_soft_qtz_weights = "save_soft_qtz_weights_during_train" in tasks
+        self.save_qtz_weights = "save_qtz_weights_during_train" in tasks
         self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ_during_train" in tasks
         self.save_pixel_values = "save_pixel_values_during_train" in tasks and self.pixel_supervision
 
@@ -150,8 +150,8 @@ class CodebookTrainer(BaseTrainer):
         log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
-                ["model_dir","spectra_dir","codebook_spectra_dir","soft_qtz_weight_dir"],
-                ["models","train_spectra","train_codebook_spectra","soft_qtz_weights"]):
+                ["model_dir","spectra_dir","codebook_spectra_dir","qtz_weight_dir"],
+                ["models","train_spectra","train_codebook_spectra","qtz_weights"]):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -336,7 +336,7 @@ class CodebookTrainer(BaseTrainer):
             self.redshift = []
             if self.recon_gt_spectra:
                 self.smpl_spectra = []
-            if self.save_soft_qtz_weights:
+            if self.save_qtz_weights:
                 self.qtz_weights = []
             if self.save_pixel_values:
                 self.gt_pixel_vals = []
@@ -429,8 +429,8 @@ class CodebookTrainer(BaseTrainer):
             if self.save_pixel_values:
                 self.recon_pixel_vals.extend(ret["intensity"])
                 self.gt_pixel_vals.extend(data["spectra_sup_pixels"])
-            if self.save_soft_qtz_weights:
-                self.qtz_weights.extend(ret["soft_qtz_weights"])
+            if self.save_qtz_weights:
+                self.qtz_weights.extend(ret["qtz_weights"])
             if self.recon_codebook_spectra_individ:
                 self.codebook_spectra.extend(ret["codebook_spectra"])
 
@@ -496,8 +496,7 @@ class CodebookTrainer(BaseTrainer):
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
             save_spectra=True, # we always need recon spectra to calculate loss
-            save_soft_qtz_weights=self.save_data_to_local and \
-                                  self.save_soft_qtz_weights,
+            save_qtz_weights=self.save_data_to_local and self.save_qtz_weights,
             save_codebook_spectra=self.save_data_to_local and \
                                   self.recon_codebook_spectra_individ
         )
@@ -573,8 +572,8 @@ class CodebookTrainer(BaseTrainer):
         if self.save_pixel_values:
             self._save_pixel_values()
 
-        if self.save_soft_qtz_weights:
-            self._save_soft_qtz_weights()
+        if self.save_qtz_weights:
+            self._save_qtz_weights()
 
     def _save_pixel_values(self):
         gt_vals = torch.stack(self.gt_pixel_vals).detach().cpu().numpy()[self.selected_ids,0]
@@ -586,9 +585,9 @@ class CodebookTrainer(BaseTrainer):
         ratio = gt_vals / recon_vals
         log.info(f"gt/recon ratio: {ratio}")
 
-    def _save_soft_qtz_weights(self):
+    def _save_qtz_weights(self):
         weights = torch.stack(self.qtz_weights).detach().cpu().numpy()
-        fname = join(self.soft_qtz_weight_dir, f"model-ep{self.epoch}-it{self.iteration}.pth")
+        fname = join(self.qtz_weight_dir, f"model-ep{self.epoch}-it{self.iteration}.pth")
         np.save(fname, weights)
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)

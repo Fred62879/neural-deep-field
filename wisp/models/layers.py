@@ -230,8 +230,8 @@ class Quantization(nn.Module):
 
         if qtz_args["find_embed_id"]:
             ret["min_embed_ids"] = min_embed_ids
-        if qtz_args["save_soft_qtz_weights"]:
-            ret["soft_qtz_weights"] = weights
+        if qtz_args["save_qtz_weights"]:
+            ret["qtz_weights"] = weights
         if qtz_args["save_codebook_spectra"]:
             ret["codebook_spectra"] = codebook # [bsz,num_embeds,full_nsmpl]
         return z_q

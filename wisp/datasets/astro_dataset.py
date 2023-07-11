@@ -130,7 +130,7 @@ class AstroDataset(Dataset):
     #     return self.spectra_dataset.get_spectra_coord_ids()
 
     def get_spectra_img_coords(self):
-        return self.spectra_dataset.get_spectra_img_coords()
+        return self.spectra_dataset.get_gt_spectra_img_coords()
 
     def get_validation_spectra_ids(self, patch_uid=None):
         return self.spectra_dataset.get_validation_spectra_ids(patch_uid)
@@ -214,7 +214,6 @@ class AstroDataset(Dataset):
             data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_redshift":
             data = self.spectra_dataset.get_supervision_redshift()
-            print(data.shape, idx)
             data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_wave_bound_ids":
             data = self.spectra_dataset.get_supervision_wave_bound_ids()
@@ -284,29 +283,12 @@ class AstroDataset(Dataset):
                 out["spectra_sup_wave_bound_ids"] = \
                     self.spectra_dataset.get_supervision_wave_bound_ids()
 
-            # elif self.mode == "pretrain_infer":
-            #     # out["spectra_sup_fluxes"] = \
-            #     #     self.spectra_dataset.get_supervision_fluxes()
-            #     out["spectra_sup_redshift"] = \
-            #         self.spectra_dataset.get_supervision_redshift()
-
-            #     if self.kwargs["infer_selected"]:
-            #         print(out["selected_ids"])
-            #         # out["selected_ids"] = self.data["selected_ids"]
-            #         # out["spectra_sup_fluxes"] = out["spectra_sup_fluxes"][
-            #         #     self.data["selected_ids"]]
-            #         out["spectra_sup_redshift"] = out["spectra_sup_redshift"][
-            #             out["selected_ids"]]
-
-            elif self.mode == "main_train": # or self.mode == "infer":
+            elif self.mode == "main_train":
                 ids = out["spectra_id_map"]
                 bin_map = out["spectra_bin_map"]
-
                 if not self.kwargs["train_spectra_pixels_only"]:
                     ids = ids[bin_map]
-
                 out["spectra_val_ids"] = ids
-                # out["spectra_val_fluxes"] = self.fits_dataset.get_spectra_pixel_fluxes(ids)
                 out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
                 del out["spectra_id_map"]
 
@@ -381,16 +363,19 @@ class AstroDataset(Dataset):
     def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
                       clip=True, spectra_clipped=False, is_codebook=False,
                       save_spectra=False, save_spectra_together=False,
-                      mode="pretrain_infer", ids=None
+                      mode="pretrain_infer", gt_spectra_ids=None, recon_spectra_ids=None
     ):
         self.spectra_dataset.plot_spectrum(
             spectra_dir, name, recon_fluxes, flux_norm_cho,
             clip=clip,
+            mode=mode,
             spectra_clipped=spectra_clipped,
             is_codebook=is_codebook,
             save_spectra=save_spectra,
             save_spectra_together=save_spectra_together,
-            mode=mode, ids=ids)
+            gt_spectra_ids=gt_spectra_ids,
+            recon_spectra_ids=recon_spectra_ids,
+        )
 
     def log_spectra_pixel_values(self, spectra):
         return self.spectra_dataset.log_spectra_pixel_values(spectra)
