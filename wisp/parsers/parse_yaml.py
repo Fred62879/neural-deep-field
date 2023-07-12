@@ -359,9 +359,11 @@ def define_cmd_line_args():
 
     # spectra data
     data_group.add_argument("--download-source-spectra", action="store_true")
+    data_group.add_argument("--source-spectra-fname", type=str)
     data_group.add_argument("--source-spectra-link", type=str)
     data_group.add_argument("--spectra-data-format", type=str)
     data_group.add_argument("--spectra-data-source", type=str)
+    data_group.add_argument("--max-spectra-len", type=int)
     data_group.add_argument("--spectra-tracts", type=str, nargs='+')
     data_group.add_argument("--spectra-patches_r", type=str, nargs='+')
     data_group.add_argument("--spectra-patches_c", type=str, nargs='+')

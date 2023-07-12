@@ -287,14 +287,16 @@ dataset:
     trans_sample_interval: 10
 
     download_source_spectra: False
+    source_spectra_fname: "source_deimos_table_v7_different_wave_range_exclude_0_flux.tbl"
     source_spectra_link: "https://irsa.ipac.caltech.edu/data/COSMOS/spectra/deimos/spec1d_tbl"
     spectra_data_format: "tbl"
     spectra_data_source: "deimos"
+    max_spectra_len: 8191 # hardcoded
     #gt_spectra_ids: [0] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
 
     spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
-    spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
+    spectra_patches_r: ['0'] #,'1','2','3','4','5','6','7','8']
+    spectra_patches_c: ['5','6'] #['0','1','2','3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
     processed_spectra_cho: "test" #"wave_6000_to_8000"
