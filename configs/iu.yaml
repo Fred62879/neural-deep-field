@@ -8,8 +8,8 @@ global:
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_qtz_weights_during_train'] #,'recon_codebook_spectra_individ_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights'] #,'recon_codebook_spectra_individ']
+    tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_qtz_weights_during_train'] #,'recon_codebook_spectra_individ_during_train']
+    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights'] #,'recon_codebook_spectra_individ']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -26,8 +26,8 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    #tasks: ['train','recon_gt_spectra_during_train','recon_codebook_spectra_individ_during_train','recon_img_during_train','save_qtz_weights_during_train','save_redshift_during_train','save_scaler_during_train']
-    #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra_individ','recon_img','save_qtz_weights','save_redshift','save_scaler']
+    #tasks: ['train'] #,'recon_gt_spectra_during_train','recon_img_during_train','save_qtz_weights_during_train','save_redshift_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
+    #tasks: ['infer','recon_gt_spectra','recon_img','recon_codebook_spectra_individ','save_qtz_weights','save_redshift','save_scaler']
 
 optimizer:
     optimizer_type: 'adam'
@@ -178,8 +178,8 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230529-180531'
-    #pretrain_log_dir: '20230707-135011'
-    pretrained_model_name: 'model-ep4000-it1.pth'
+    pretrain_log_dir: '20230710-181343_pretrain_50_spectra_2k'
+    pretrained_model_name: 'model-ep2000-it1.pth'
 
     num_trans_samples: 40
     uniform_sample_trans: True
@@ -237,7 +237,7 @@ dataset:
     plot_img_distrib: True
     load_patch_data_cache: True
     dataset_path: '/scratch/projects/vision/data/pdr3'
-    coords_range_fname: 'coords_range1' # make sure pretrain and main train
+    coords_range_fname: 'coords_range0' # make sure pretrain and main train
                                         # use the same norm range for coords
     gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)

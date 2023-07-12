@@ -269,28 +269,19 @@ class AstroDataset(Dataset):
         assert(self.kwargs["pretrain_codebook"] ^ self.kwargs["spectra_supervision"])
 
         if self.kwargs["pretrain_codebook"]:
-            if self.mode == "pre_train":
-                n = self.spectra_dataset.get_num_gt_spectra()
-                out["coords"] = self.data["spectra_latents"][:n]
-                if self.kwargs["codebook_pretrain_pixel_supervision"]:
-                    out["spectra_sup_pixels"] = self.spectra_dataset.get_supervision_pixels()
+            assert self.mode == "pre_train"
+            n = self.spectra_dataset.get_num_gt_spectra()
+            out["coords"] = self.data["spectra_latents"][:n]
+            if self.kwargs["codebook_pretrain_pixel_supervision"]:
+                out["spectra_sup_pixels"] = self.spectra_dataset.get_supervision_pixels()
 
-                # get only supervision spectra (not all gt spectra) for loss calculation
-                out["spectra_sup_fluxes"] = \
-                    self.spectra_dataset.get_supervision_fluxes()
-                out["spectra_sup_redshift"] = \
-                    self.spectra_dataset.get_supervision_redshift()
-                out["spectra_sup_wave_bound_ids"] = \
-                    self.spectra_dataset.get_supervision_wave_bound_ids()
-
-            elif self.mode == "main_train":
-                ids = out["spectra_id_map"]
-                bin_map = out["spectra_bin_map"]
-                if not self.kwargs["train_spectra_pixels_only"]:
-                    ids = ids[bin_map]
-                out["spectra_val_ids"] = ids
-                out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
-                del out["spectra_id_map"]
+            # get only supervision spectra (not all gt spectra) for loss calculation
+            out["spectra_sup_fluxes"] = \
+                self.spectra_dataset.get_supervision_fluxes()
+            out["spectra_sup_redshift"] = \
+                self.spectra_dataset.get_supervision_redshift()
+            out["spectra_sup_wave_bound_ids"] = \
+                self.spectra_dataset.get_supervision_wave_bound_ids()
 
         elif self.kwargs["spectra_supervision"]:
             assert self.mode == "main_train"
@@ -310,10 +301,18 @@ class AstroDataset(Dataset):
                 out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
 
     def get_redshift_data(self, out):
-        """ Get validation redshift values (only when apply gt redshift directly).
+        """ Get supervision redshift values (only when apply gt redshift directly).
         """
-        # out["spectra_valid_redshift"] = self.spectra_dataset.get_validation_redshift()
-        out["spectra_valid_redshift"] = self.fits_dataset.get_spectra_pixel_redshift()
+        # out["spectra_sup_redshift"] = self.spectra_dataset.get_validation_redshift()
+        # out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift()
+        ids = out["spectra_id_map"]
+        bin_map = out["spectra_bin_map"]
+        if not self.kwargs["train_spectra_pixels_only"]:
+            ids = ids[bin_map]
+        #out["spectra_val_ids"] = ids
+        out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
+        del out["spectra_id_map"]
+
 
     def __len__(self):
         """ Length of the dataset in number of coords.

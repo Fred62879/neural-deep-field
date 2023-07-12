@@ -12,7 +12,7 @@ from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
 
 class HyperSpectralDecoder(nn.Module):
 
-    def __init__(self, integrate=True, scale=True, _model_redshift=True, **kwargs):
+    def __init__(self, integrate=True, scale=True, redshift_supervision=True, **kwargs):
 
         super(HyperSpectralDecoder, self).__init__()
 
@@ -21,7 +21,7 @@ class HyperSpectralDecoder(nn.Module):
         self.qtz_spectra = kwargs["quantize_spectra"]
 
         self.convert = HyperSpectralConverter(
-            _model_redshift=_model_redshift, **kwargs
+            redshift_supervision=redshift_supervision, **kwargs
         )
         self.spectra_decoder = Decoder(**kwargs)
         self.norm = Normalization(kwargs["mlp_output_norm_method"])
@@ -38,8 +38,6 @@ class HyperSpectralDecoder(nn.Module):
         """
         #timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         #timer.reset()
-
-        # ids = torch.tensor([32]) # 96,2080
 
         if self.qtz_spectra:
             bsz = wave.shape[0]
@@ -60,13 +58,11 @@ class HyperSpectralDecoder(nn.Module):
             _, spectra = self.qtz(input, spectra, ret, qtz_args)
             spectra = spectra[:,0] # [bsz,nsmpl]
         # timer.check("recon_spectra::spectra qtz")
-        # print(spectra[ids])
 
         if self.scale and scaler is not None:
             spectra = (scaler * spectra.T).T
 
         spectra = self.norm(spectra)
-        # print(spectra[ids])
         #timer.check("recon_spectra::spectra norm")
         ret["spectra"] = spectra
 

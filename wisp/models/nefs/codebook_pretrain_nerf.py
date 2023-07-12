@@ -32,11 +32,13 @@ class CodebookPretrainNerf(BaseNeuralField):
         self.codebook = init_codebook(
             self.kwargs["qtz_seed"], self.kwargs["qtz_num_embed"], self.kwargs["qtz_latent_dim"])
 
+        assert self.kwargs["model_redshift"] and \
+            self.kwargs["apply_gt_redshift"] and \
+            not self.kwargs["redshift_unsupervision"] and \
+            not self.kwargs["redshift_semi_supervision"]
+
         self.spatial_decoder = SpatialDecoder(
             output_scaler=False,
-            apply_redshift=True,
-            redshift_unsup=False,
-            redshift_semisup=False,
             qtz_calculate_loss=False,
             **self.kwargs)
 

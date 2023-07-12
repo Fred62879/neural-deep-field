@@ -97,10 +97,9 @@ class AstroTrainer(BaseTrainer):
         if self.spectra_supervision:
             fields.append("spectra_data")
 
-        if self.pretrain_codebook:
+        if self.pretrain_codebook or self.redshift_semi_supervision:
             fields.extend([
-                "spectra_id_map","spectra_bin_map",
-                "spectra_data","redshift_data"
+                "spectra_id_map","spectra_bin_map","redshift_data"
             ])
 
         length = self.get_dataset_length()
@@ -138,10 +137,10 @@ class AstroTrainer(BaseTrainer):
             self.apply_gt_redshift = self.extra_args["apply_gt_redshift"]
             self.redshift_unsupervision = self.extra_args["redshift_unsupervision"]
             self.redshift_semi_supervision = self.extra_args["redshift_semi_supervision"]
-            assert self.redshift_semi_supervision
-            # assert sum([
-            #     self.apply_gt_redshift, self.redshift_unsupervision,
-            #     self.redshift_semi_supervision]) <= 1 # at most one of these three can be True
+            # assert self.redshift_semi_supervision
+            assert sum([
+                self.apply_gt_redshift, self.redshift_unsupervision,
+                self.redshift_semi_supervision]) <= 1 # at most one of these three can be True
         else:
             self.apply_gt_redshift, self.redshift_unsupervision, \
                 self.redshift_semi_supervision = False, False, False
@@ -479,7 +478,7 @@ class AstroTrainer(BaseTrainer):
             if self.save_latents: self.latents.extend(ret["latents"])
             if self.save_redshift:
                 self.redshift.extend(ret["redshift"])
-                self.gt_redshift = data["spectra_valid_redshift"]
+                self.gt_redshift = data["spectra_sup_redshift"]
             if self.plot_embed_map: self.embed_ids.extend(ret["embed_ids"])
             if self.recon_gt_spectra: self.smpl_spectra.append(ret["spectra"])
             if self.save_qtz_weights: self.qtz_weights.extend(ret["qtz_weights"])
@@ -527,7 +526,7 @@ class AstroTrainer(BaseTrainer):
     def init_optimizer_off_pretrain(self):
         """ Optimize parts of the model, freeze other parts shared with pretrain.
         """
-        params, grid_params, scaler_params, logit_params = [],[],[],[]
+        params, grid_params, scaler_params, redshift_params, logit_params = [],[],[],[],[]
         params_dict = { name : param for name, param
                         in self.pipeline.named_parameters() }
 
@@ -536,6 +535,8 @@ class AstroTrainer(BaseTrainer):
                 grid_params.append(params_dict[name])
             elif "scaler_decoder" in name:
                 scaler_params.append(params_dict[name])
+            elif "redshift_decoder" in name:
+                redshift_params.append(params_dict[name])
             elif "spatial_decoder.decode" in name:
                 logit_params.append(params_dict[name])
             else: pass
@@ -543,7 +544,9 @@ class AstroTrainer(BaseTrainer):
         params.append({"params": grid_params,
                        "lr": self.extra_args["grid_lr"] * self.grid_lr_weight})
         params.append({"params": scaler_params, "lr": self.extra_args["lr"]})
-        #params.append({"params": logit_params, "lr": self.extra_args["lr"]})
+        if self.redshift_semi_supervision:
+            params.append({"params": redshift_params, "lr": self.extra_args["lr"]})
+        params.append({"params": logit_params, "lr": self.extra_args["lr"]})
 
         self.optimizer = self.optim_cls(params, **self.optim_params)
         if self.verbose:
@@ -626,8 +629,7 @@ class AstroTrainer(BaseTrainer):
         """ Load weights from pretrained model.
         """
         try:
-            if self.verbose:
-                log.info(f"pretrained model found, loading {self.pretrained_model_fname}")
+            log.info(f"pretrained model found, loading {self.pretrained_model_fname}")
 
             checkpoint = torch.load(self.pretrained_model_fname)
             load_pretrained_model_weights(self.pipeline, checkpoint["model_state_dict"])
@@ -717,11 +719,12 @@ class AstroTrainer(BaseTrainer):
 
             if len(gt_redshift) > 0:
                 pred_redshift = ret["redshift"]
-                if self.pretrain_codebook and \
+                if (self.pretrain_codebook or self.redshift_semi_supervision) and \
                    not self.extra_args["train_spectra_pixels_only"]:
                     mask= data["spectra_bin_map"]
                 else: mask = None
 
+                # print(gt_redshift.shape, pred_redshift.shape, torch.sum(mask))
                 redshift_loss = self.redshift_loss(
                     gt_redshift, pred_redshift, mask=mask) * self.redshift_beta
                 self.log_dict["n_gt_redshift"] += len(gt_redshift)
@@ -730,7 +733,7 @@ class AstroTrainer(BaseTrainer):
 
         # iv) latent quantization codebook loss
         codebook_loss = 0
-        if self.qtz_latent and self.extra_args["quantization_strategy"] == "hard":
+        if self.qtz_latent and self.qtz_strategy == "hard":
             codebook_loss = ret["codebook_loss"]
             self.log_dict["codebook_loss"] += codebook_loss.item()
             self.timer.check("codebook loss")
@@ -750,7 +753,7 @@ class AstroTrainer(BaseTrainer):
         log_text = "EPOCH {}/{}".format(self.epoch, self.num_epochs)
         log_text += " | total loss: {:>.3E}".format(self.log_dict["total_loss"] / n)
         log_text += " | recon loss: {:>.3E}".format(self.log_dict["recon_loss"] / n)
-        if self.qtz_latent and self.extra_args["quantization_strategy"] == "hard":
+        if self.qtz_latent and self.qtz_strategy == "hard":
             log_text += " | codebook loss: {:>.3E}".format(self.log_dict["codebook_loss"] / n)
 
         if self.spectra_supervision and \

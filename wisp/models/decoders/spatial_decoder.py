@@ -13,10 +13,7 @@ class SpatialDecoder(nn.Module):
     """ Accept as input latent variables and quantize based on
           a codebook which is optimizaed simultaneously during training
     """
-    def __init__(self, output_scaler,
-                 apply_redshift, redshift_unsup, redshift_semisup,
-                 qtz_calculate_loss, **kwargs
-    ):
+    def __init__(self, output_scaler, qtz_calculate_loss, **kwargs):
         super(SpatialDecoder, self).__init__()
 
         self.kwargs = kwargs
@@ -33,10 +30,13 @@ class SpatialDecoder(nn.Module):
         self.output_scaler = self.qtz and output_scaler
 
         # we either pred redshift and supervise or apply gt redshift directly or semi-sup
-        assert sum([apply_redshift, redshift_unsup, redshift_semisup]) <= 1
-        self.apply_gt_redshift = self.qtz and apply_redshift
-        self.redshift_unsup = self.qtz and redshift_unsup
-        self.redshift_semisup = self.qtz and redshift_semisup
+        assert sum([kwargs["apply_gt_redshift"],
+                    kwargs["redshift_unsupervision"],
+                    kwargs["redshift_semi_supervision"]]) <= 1
+
+        self.model_redshift = kwargs["model_redshift"] and self.qtz
+        self.apply_gt_redshift = self.model_redshift and \
+            kwargs["apply_gt_redshift"] and self.qtz
 
         self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
 
@@ -53,7 +53,7 @@ class SpatialDecoder(nn.Module):
         if self.output_scaler:
             self.init_scaler_decoder()
 
-        if self.redshift_unsup or self.redshift_semisup:
+        if self.model_redshift:
             self.init_redshift_decoder()
 
     def init_scaler_decoder(self):
@@ -126,7 +126,7 @@ class SpatialDecoder(nn.Module):
             assert specz is not None
             redshift = specz
             ret["redshift"] = redshift
-        elif self.redshift_unsup or self.redshift_semisup:
+        elif self.model_redshift:
             redshift = self.redshift_decoder(z[:,0])[...,0]
             redshift = self.redshift_adjust(redshift + 0.5)
         else:

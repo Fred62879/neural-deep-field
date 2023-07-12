@@ -87,8 +87,9 @@ def get_pipelines_from_config(args, tasks={}):
     else: device = "cpu"
 
     if args.dataset_type == 'astro':
-        pipelines = get_pretrain_pipelines(pipelines, tasks, args)
-        pipelines = get_main_train_pipelines(pipelines, tasks, args)
+        if args.pretrain_codebook:
+            get_pretrain_pipelines(pipelines, tasks, args)
+        get_main_train_pipelines(pipelines, tasks, args)
     else:
         raise ValueError(f"{args.dataset_type} unrecognized dataset_type")
 

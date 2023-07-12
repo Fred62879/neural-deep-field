@@ -9,14 +9,15 @@ from wisp.models.decoders import BasicDecoder, Siren
 class HyperSpectralConverter(nn.Module):
     """ Processing module, no weights to update here.
     """
-    def __init__(self, _model_redshift=True, **kwargs):
+    def __init__(self, redshift_supervision=True, **kwargs):
         """ @Param:
               wave_encoder: encoder network for lambda.
         """
         super(HyperSpectralConverter, self).__init__()
 
         self.kwargs = kwargs
-        self.model_redshift = _model_redshift
+        self.redshift_supervision = redshift_supervision
+
         self.encode_wave = kwargs["encode_wave"]
         self.quantize_spectra = kwargs["quantize_spectra"]
         self.combine_method = kwargs["hps_combine_method"]
@@ -120,7 +121,7 @@ class HyperSpectralConverter(nn.Module):
         coords_encode_dim = latents.shape[-1]
 
         if redshift is None:
-            assert not self.model_redshift
+            assert not self.redshift_supervision
         else: wave = self.shift_wave(wave, redshift)
         wave = self.linear_norm_wave(wave, wave_bound)
 

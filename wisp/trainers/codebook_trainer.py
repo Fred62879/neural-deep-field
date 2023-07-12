@@ -610,7 +610,9 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["flux_norm_cho"],
             clip=self.extra_args["plot_clipped_spectrum"],
             spectra_clipped=self.train_within_wave_range,
-            save_spectra=True, ids=self.selected_ids
+            save_spectra=True,
+            gt_spectra_ids=self.selected_ids,
+            recon_spectra_ids=self.selected_ids
         )
 
     def _recon_codebook_spectra_individ(self):

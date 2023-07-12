@@ -118,7 +118,7 @@ class AstroInferrer(BaseInferrer):
         self.redshift_semi_supervision = self.model_redshift and \
             self.extra_args["redshift_semi_supervision"]
         if self.pretrain_infer: assert self.apply_gt_redshift
-        else: assert self.redshift_semi_supervision
+        #else: assert self.redshift_semi_supervision
 
         # infer all coords using original model
         self.trans_sample_method = self.extra_args["trans_sample_method"]
@@ -715,7 +715,7 @@ class AstroInferrer(BaseInferrer):
                 if self.save_redshift:
                     self.redshift.extend(ret["redshift"])
                     if self.extra_args["pretrain_codebook"]:
-                        self.gt_redshift = data["spectra_valid_redshift"]
+                        self.gt_redshift = data["spectra_sup_redshift"]
 
             except StopIteration:
                 log.info("all coords inferrence done")
