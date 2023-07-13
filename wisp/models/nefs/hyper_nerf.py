@@ -84,7 +84,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
 
         self._register_forward_function(self.hyperspectral, channels)
 
-    def hyperspectral(self, coords, wave, full_wave_bound,
+    def hyperspectral(self, coords, wave, wave_range,
                       trans=None, nsmpl=None,
                       specz=None, sup_id=None,
                       full_wave=None, num_spectra_coords=-1,
@@ -123,7 +123,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             latents, self.codebook, qtz_args, ret, specz=specz, sup_id=sup_id)
         timer.check("nef::spatial decoding done")
 
-        self.hps_decoder(latents, wave, trans, nsmpl, full_wave_bound,
+        self.hps_decoder(latents, wave, trans, nsmpl, wave_range,
                          full_wave, num_spectra_coords, self.codebook, qtz_args, ret)
         timer.check("nef::hyperspectral decoding done")
 

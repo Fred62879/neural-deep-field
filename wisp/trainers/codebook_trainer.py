@@ -86,26 +86,31 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_mode("pre_train")
 
         # set required fields from dataset
-        fields = ["coords","trans_data"]
+        fields = ["coords","wave_data"]
         if self.extra_args["batched_pretrain"]:
             fields.extend([
-                "spectra_sup_fluxes",
+                "spectra_sup_data",
+                "spectra_sup_mask",
                 "spectra_sup_redshift",
-                "spectra_sup_wave_bound_ids"
+                #"spectra_sup_wave_bound_ids"
             ])
             if self.pixel_supervision:
                 fields.append("spectra_sup_pixels")
         else:
             fields.append("spectra_data")
+
         self.dataset.set_fields(fields)
+
+        # use original spectra wave
+        self.dataset.set_wave_source("spectra")
 
         # set input latents for codebook net
         self.dataset.set_coords_source("spectra_latents")
         self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
 
         self.dataset.toggle_integration(self.pixel_supervision)
-        self.dataset.toggle_within_wave_range(self.train_within_wave_range)
-        self.dataset.toggle_wave_sampling(not self.train_within_wave_range)
+        # self.dataset.toggle_within_wave_range(self.train_within_wave_range)
+        self.dataset.toggle_wave_sampling(self.train_within_wave_range)
         if self.train_within_wave_range:
             self.dataset.set_wave_range(
                 self.extra_args["spectra_supervision_wave_lo"],
@@ -502,18 +507,22 @@ class CodebookTrainer(BaseTrainer):
         )
 
         # i) spectra supervision loss
-        spectra_loss, recon_spectra = 0, None
-        gt_spectra = data["spectra_sup_fluxes"]
+        spectra_loss = 0
 
-        if not self.train_within_wave_range:
-            (lo, hi) = data["spectra_sup_wave_bound_ids"]
-            recon_spectra = ret["spectra"][:,lo:hi]
-        else: recon_spectra = ret["spectra"]
+        recon_flux = ret["spectra"]
+        gt_spectra = data["spectra_sup_data"]
+        spectra_mask = data["spectra_sup_mask"]
 
-        if len(recon_spectra) == 0:
+        # if not self.train_within_wave_range:
+        #     (lo, hi) = data["spectra_sup_wave_bound_ids"]
+        #     recon_spectra = ret["spectra"][:,lo:hi]
+        # else: recon_spectra = ret["spectra"]
+
+        if len(recon_flux) == 0:
             spectra_loss = 0
         else:
-            spectra_loss = self.spectra_loss(gt_spectra, recon_spectra)
+            spectra_loss = self.spectra_loss(
+                spectra_mask, gt_spectra, recon_flux)
             self.log_dict["spectra_loss"] += spectra_loss.item()
 
         # ii) pixel supervision loss

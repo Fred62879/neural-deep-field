@@ -48,12 +48,12 @@ class CodebookPretrainNerf(BaseNeuralField):
             _model_redshift=self.model_redshift,
             **self.kwargs)
 
-    def pretrain(self, coords, wave, full_wave_bound, trans=None,
+    def pretrain(self, coords, wave, wave_range, trans=None,
                  nsmpl=None, qtz_args=None, specz=None
     ):
         """ Pretrain codebook.
             @Param
-              coords: trainable latent variable [num_supervision_spectra,latent_dim]
+              coords: trainable latent variable [num_supervision_spectra,1,latent_dim]
               wave:   full wave [bsz,nsmpl,1]
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
@@ -62,13 +62,13 @@ class CodebookPretrainNerf(BaseNeuralField):
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]
         coords = coords[:,None]
-
+        # print(wave.shape, wave[...,0])
         # `latents` is either logits or qtz latents or latents
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)
         timer.check("spatial decoding done")
 
         self.hps_decoder(
-            latents, wave, trans, nsmpl, full_wave_bound,
+            latents, wave, trans, nsmpl, wave_range,
             codebook=self.codebook, qtz_args=qtz_args, ret=ret)
 
         timer.check("hps decoding done")

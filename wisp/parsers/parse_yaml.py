@@ -307,8 +307,10 @@ def define_cmd_line_args():
 
     # Astro Dataset
     data_group.add_argument("--space-dim", type=int)
-    data_group.add_argument("--coords-range-fname", type=str)
-
+    data_group.add_argument("--wave-range-fname", type=str,
+                            help="fname of lambda range used for linear normalization.")
+    data_group.add_argument("--coords-range-fname", type=str,
+                            help="fname of ra/dec used for normalization.")
     # fits data
     data_group.add_argument("--patch-selection-cho", type=str)
     data_group.add_argument("--tracts", nargs="+", help="tracts of chose FITS files")
@@ -491,10 +493,10 @@ def define_cmd_line_args():
     train_group.add_argument("--pretrain-log-dir", type=str)
     train_group.add_argument("--pretrained-model-name", type=str)
 
-    train_group.add_argument("--num-trans-samples", type=int, default=40,
-                             help="# transmission to sample at each training iteration.")
-    train_group.add_argument("--uniform-sample-trans", action="store_true",
-                             help="whether uniformly sample transmission or not.")
+    train_group.add_argument("--num-wave-samples", type=int, default=40,
+                             help="# wave to sample at each training iteration.")
+    train_group.add_argument("--uniform-sample-wave", action="store_true",
+                             help="whether uniformly sample wave or not.")
     train_group.add_argument("--mixture-avg-per-band", action="store_true",
                             help="for mixture sampling method, whether average pixel values \
                             with number of samples falling within each band")

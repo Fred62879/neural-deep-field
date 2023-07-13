@@ -31,6 +31,17 @@ def patch_exists(path, tract, patch):
     fname = join(path, fname)
     return exists(fname)
 
+def get_wave_range_fname(**kwargs):
+    fname = join(
+        kwargs["dataset_path"], "input/wave", kwargs["wave_range_fname"])
+    return fname
+
+def get_coords_range_fname(**kwargs):
+    assert 0
+    fname = join(
+        kwargs["dataset_path"], "input/", kwargs["coords_range_fname"])
+    return fname
+
 def create_patch_fname(tract, patch, band, megau=False, weights=False):
     """ Create image patch file name.
         @Param
@@ -77,6 +88,29 @@ def clip_data_to_ref_wave_range(input_data, ref_wave, wave_range=None, wave_rang
     else: id_lo, id_hi = wave_range_id
     clipped_data = input_data[id_lo:id_hi+1]
     return clipped_data, wave_range_id
+
+def batch_uniform_sample_torch(data, nsmpl, sample_ids=None, keep_sample_ids=False):
+    """ Batched uniform sampling from given data.
+        We sample the same nsmpl out of n samples for all dims in the middle.
+        @Param
+          data [bsz,...,n]
+          sample_ids: pre-defined ids to sample
+    """
+    sp = data.shape
+    if sample_ids is not None:
+        assert list(sample_ids.shape) == [sp[0], nsmpl, 2]
+    else:
+        sample_ids = torch.zeros(sp[0], nsmpl).uniform_(0, sp[-1]).to(torch.long)
+        row_ids = torch.repeat_interleave(torch.arange(sp[0]), nsmpl).view(sp[0],nsmpl)
+        sample_ids = torch.cat((row_ids[...,None],sample_ids[...,None]), dim=-1)
+
+    ret = data[sample_ids[...,0],...,sample_ids[...,1]]
+    mid_axis = list(np.arange(2,len(sp)))
+    reorded_axis = [0] + mid_axis + [1]
+    ret = ret.permute(reorded_axis)
+
+    if keep_sample_ids: return ret, sample_ids
+    return ret
 
 def get_bound_id(wave_bound, source_wave, within_bound=True):
     """ Get id of lambda values in full wave that bounds or is bounded by given wave_bound

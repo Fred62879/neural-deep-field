@@ -10,21 +10,46 @@ def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     emd = torch.mean(torch.abs(emd))
     return emd
 
-def spectra_supervision_loss(loss, gt_spectra, recon_spectra):
+def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
     ''' Loss function for few-shot spectra supervision
         @Param
           loss: l1/l2 as specified in config
-          gt/recon_spectra: [bsz, num_smpls]
+          mask:       [bsz,num_smpls]
+          gt_spectra: [bsz,3,num_smpls] (wave/flux/ivar)
+          recon_flux: [bsz,num_smpls]
     '''
     # norm spectra each so they sum to 1 (earth movers distance)
     # DON'T use /= or spectra will be modified in place and if we save spectra later on
     # the spectra will be inaccurate
-    gt_spectra = gt_spectra / (torch.sum(gt_spectra, dim=-1)[...,None] + 1e-10)
-    recon_spectra = recon_spectra / (torch.sum(recon_spectra, dim=-1)[...,None])
+    # print(mask[0], gt_spectra[0], recon_flux[0])
+    # print(mask.shape, gt_spectra.shape, recon_flux.shape)
 
-    emd = calculate_emd(gt_spectra, recon_spectra)
+    gt_flux = gt_spectra[:,1] / (torch.sum(gt_spectra[:,1]*mask, dim=-1)[...,None] + 1e-10)
+    recon_flux = recon_flux / (torch.sum(recon_flux*mask, dim=-1)[...,None] + 1e-10)
+
+    gt_flux = torch.masked_select(gt_flux, mask.bool())
+    recon_flux = torch.masked_select(recon_flux, mask.bool())
+    # print(torch.sum(gt_flux), torch.sum(recon_flux))
+
+    emd = calculate_emd(gt_flux, recon_flux)
     emd = torch.mean(torch.abs(emd))
     return emd
+
+# def spectra_supervision_loss(loss, gt_spectra, recon_spectra):
+#     ''' Loss function for few-shot spectra supervision
+#         @Param
+#           loss: l1/l2 as specified in config
+#           gt/recon_spectra: [bsz, num_smpls]
+#     '''
+#     # norm spectra each so they sum to 1 (earth movers distance)
+#     # DON'T use /= or spectra will be modified in place and if we save spectra later on
+#     # the spectra will be inaccurate
+#     gt_spectra = gt_spectra / (torch.sum(gt_spectra, dim=-1)[...,None] + 1e-10)
+#     recon_spectra = recon_spectra / (torch.sum(recon_spectra, dim=-1)[...,None])
+
+#     emd = calculate_emd(gt_spectra, recon_spectra)
+#     emd = torch.mean(torch.abs(emd))
+#     return emd
 
 def redshift_supervision_loss(loss, gt_redshift, recon_redshift, mask=None):
     ''' Loss function for few-shot redshift supervision

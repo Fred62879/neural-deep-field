@@ -155,7 +155,6 @@ def forward(
         space_dim,
         qtz=False,
         qtz_strategy="none",
-        pretrain_infer=False,
         apply_gt_redshift=False,
         codebook_pretrain=False,   # | these two
         spectra_supervision=False, # |  conflicts
@@ -190,8 +189,9 @@ def forward(
         if save_codebook_loss: requested_channels.append("codebook_loss")
         if save_codebook_spectra: requested_channels.append("codebook_spectra")
 
-        net_args["wave"] = data["wave"] # trans wave
-        net_args["full_wave_bound"] = data["full_wave_bound"] # linear normalization
+        net_args["wave"] = data["wave"]
+        net_args["wave_range"] = data["wave_range"] # linear normalization
+
         if apply_gt_redshift:
             net_args["specz"] = data["spectra_sup_redshift"]
         if perform_integration:

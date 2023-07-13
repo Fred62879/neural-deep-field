@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from os.path import join, exists
 from wisp.utils.plot import plot_save
+from wisp.datasets.data_utils import get_wave_range_fname
 #from astroquery.svo_fps import SvoFps
 #from unagi import filters as unagi_filters
 
@@ -27,7 +28,7 @@ class TransData:
         self.filters = kwargs["filters"]
         self.filter_ids = kwargs["filter_ids"]
         self.sample_method = kwargs["trans_sample_method"]
-        self.uniform_sample = kwargs["uniform_sample_trans"]
+        self.uniform_sample = kwargs["uniform_sample_wave"]
 
         self.wave_lo = kwargs["wave_lo"]
         self.wave_hi = kwargs["wave_hi"]
@@ -36,7 +37,7 @@ class TransData:
         self.smpl_interval = kwargs["trans_sample_interval"]
         #assert(self.smpl_interval == 10)
 
-        self.set_log_path(kwargs["dataset_path"])
+        self.set_path(kwargs["dataset_path"])
         self.init_trans()
 
     #############
@@ -51,14 +52,17 @@ class TransData:
         elif self.kwargs["trans_sample_method"] == "hardcode":
             self.load_hdcd_wave_trans()
         self.load_sampling_trans_data()
+        self.set_wave_range()
 
-    def set_log_path(self, dataset_path):
+    def set_path(self, dataset_path):
         input_path = join(dataset_path, "input")
-        source_trans_path = join(input_path, "transmission")
+        source_wave_path = join(input_path, "wave")
+
+        self.wave_range_fname = get_wave_range_fname(**self.kwargs)
         self.trans_dir = join(input_path, self.kwargs['sensor_collection_name'], 'transmission')
 
-        self.source_wave_fname = join(source_trans_path, "source_wave.txt")
-        self.source_trans_fname = join(source_trans_path, "source_trans.txt")
+        self.source_wave_fname = join(source_wave_path, "source_wave.txt")
+        self.source_trans_fname = join(source_wave_path, "source_trans.txt")
         self.nsmpl_within_bands_fname = join(self.trans_dir, "nsmpl_within_bands.npy")
         self.band_coverage_range_fname = join(self.trans_dir, "band_coverage_range.npy")
 
@@ -83,7 +87,7 @@ class TransData:
         self.flat_trans_fname = join(self.trans_dir, "flat_trans")
 
         # create path
-        for path in [source_trans_path, self.trans_dir]:
+        for path in [source_wave_path, self.trans_dir]:
             Path(path).mkdir(parents=True, exist_ok=True)
 
     #############
@@ -117,14 +121,14 @@ class TransData:
     def get_band_coverage_range(self):
         return np.load(self.band_coverage_range_fname)
 
-    def get_full_wave_bound(self):
-        if self.kwargs["trans_sample_method"] == "hardcode":
-            hdcd_wave = self.data["hdcd_wave"]
-            return (min(hdcd_wave), max(hdcd_wave))
-        return ( min(self.data["full_wave"]), max(self.data["full_wave"]) )
-        # return ( 0, max(self.data["full_wave"]) )
+    # def get_full_wave_bound(self):
+    #     if self.kwargs["trans_sample_method"] == "hardcode":
+    #         hdcd_wave = self.data["hdcd_wave"]
+    #         return (min(hdcd_wave), max(hdcd_wave))
+    #     return ( min(self.data["full_wave"]), max(self.data["full_wave"]) )
+    #     # return ( 0, max(self.data["full_wave"]) )
 
-    def sample_wave_trans(self, batch_size, num_samples, use_full_wave=False):
+    def sample_wave(self, batch_size, num_samples, use_full_wave=False):
         """ Sample lambda and transmission data for given sampling methods.
             @Return
               wave:  [bsz,nsmpl,1]/[bsz,nbands,nsmpl,1]
@@ -148,11 +152,11 @@ class TransData:
             smpl_wave, smpl_trans = None, self.trans
 
         elif self.sample_method == "bandwise":
-            smpl_wave, smpl_trans, _ = batch_sample_trans_bandwise(
+            smpl_wave, smpl_trans, _ = batch_sample_wave_bandwise(
                 batch_size, num_samples, self.trans_data, waves=self.wave, sort=False)
 
         elif self.sample_method == "mixture":
-            smpl_wave, smpl_trans, smpl_ids, nsmpl_within_each_band = batch_sample_trans(
+            smpl_wave, smpl_trans, smpl_ids, nsmpl_within_each_band = batch_sample_wave(
                 batch_size, num_samples, self.trans_data, **self.kwargs)
         else:
             raise Exception("Unsupported monte carlo choice")
@@ -182,6 +186,19 @@ class TransData:
     #############
     # Helper methods
     #############
+
+    def set_wave_range(self):
+        """ Set wave range used for linear normalization.
+            Note if the wave range used to normalize transmission wave and
+              the spectra wave should be the same.
+        """
+        if exists(self.wave_range_fname): return
+        if self.kwargs["trans_sample_method"] == "hardcode":
+            wave_range = (min(self.data["hdcd_wave"]), max(self.data["hdcd_wave"]))
+        else:
+            wave_range = (min(self.data["full_wave"]), max(self.data["full_wave"]))
+        self.data["wave_range"] = wave_range
+        np.save(self.wave_range_fname, wave_range)
 
     def load_source_wave_trans(self):
         """ Load source lambda and transmission data.
@@ -439,7 +456,7 @@ def increment_repeat(counts, ids):
     bu = torch.unique(sids)
     counts[bu] += incr
 
-def batch_sample_trans(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, **kwargs):
+def batch_sample_wave(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, **kwargs):
     """ Sample wave and trans for all bands together (mixture sampling)
         @Param  wave        [nsmpl_full]
                 trans       [nbands,nsmpl_full]
@@ -471,7 +488,8 @@ def batch_sample_trans(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, 
         ids = torch.arange(nsmpl_full)
         ids = ids[None,:].tile((bsz,1))
 
-    elif kwargs["uniform_sample_trans"]:
+    elif kwargs["uniform_sample_wave"]:
+        assert 0
         ids = torch.zeros(bsz,nsmpls).uniform_(0,nsmpl_full).to(torch.long)
 
     else:
@@ -501,7 +519,7 @@ def batch_sample_trans(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, 
     smpl_trans = smpl_trans.permute(1,0,2)   # [bsz,nbands,nsmpls]
     return smpl_wave, smpl_trans, ids, avg_nsmpl
 
-def batch_sample_trans_bandwise(bsz, nsmpls, trans_data, waves=None, sort=True):
+def batch_sample_wave_bandwise(bsz, nsmpls, trans_data, waves=None, sort=True):
     """ Sample wave and trans for each band independently
           (use for bandwise mc training)
         @Param  norm_waves: list of tensor nbands*[nsmpl_cur_band]

@@ -90,7 +90,8 @@ class AstroTrainer(BaseTrainer):
             if self.weight_train:
                 fields.append("weights")
             if self.space_dim == 3:
-                fields.append("trans_data")
+                fields.append("wave_data")
+                self.dataset.set_wave_source("trans")
             if self.spectral_inpaint:
                 pass
 
