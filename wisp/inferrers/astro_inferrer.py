@@ -106,6 +106,7 @@ class AstroInferrer(BaseInferrer):
         self.qtz_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
         assert not (self.qtz_latent and self.qtz_spectra)
         self.qtz = self.qtz_latent or self.qtz_spectra
+        self.qtz_n_embd = self.extra_args["qtz_num_embed"]
         self.qtz_strategy = self.extra_args["quantization_strategy"]
         self.generate_scaler = self.qtz and self.extra_args["generate_scaler"]
 
@@ -350,7 +351,7 @@ class AstroInferrer(BaseInferrer):
 
         if self.recon_codebook_spectra:
             self.coords_source = "codebook_latents"
-            self.dataset_length = self.extra_args["qtz_num_embed"]
+            self.dataset_length = self.qtz_n_embd
 
         elif self.recon_codebook_spectra_individ:
             if self.pretrain_infer:
@@ -584,7 +585,7 @@ class AstroInferrer(BaseInferrer):
                 "fname": f'{model_id}',
                 "dir": self.qtz_weights_dir,
                 "verbose": self.verbose,
-                "num_bands": self.extra_args["qtz_num_embed"],
+                "num_bands": self.qtz_n_embd,
                 "log_max": False,
                 "to_HDU": False,
                 "save_locally": True,
@@ -671,8 +672,6 @@ class AstroInferrer(BaseInferrer):
         self.spectra_masks_c = torch.stack(self.spectra_masks_c).bool().view(
             self.dataset_length, -1).detach().cpu().numpy()
 
-        print(self.codebook_spectra.shape, self.spectra_wave_c.shape, self.spectra_masks_c.shape)
-
         # if spectra is 2d, add dummy 1st dim to simplify code
         if self.recon_codebook_spectra:
             self.codebook_spectra = [self.codebook_spectra]
@@ -682,13 +681,14 @@ class AstroInferrer(BaseInferrer):
         for i, (wave, masks, codebook_spectra) in enumerate(
                 zip(self.spectra_wave_c, self.spectra_masks_c, self.codebook_spectra)
         ):
-            print(wave.shape, masks.shape, codebook_spectra.shape)
+            # print(wave.shape, masks.shape, codebook_spectra.shape)
             cur_dir = join(self.codebook_spectra_dir, f"spectra-{i}")
             Path(cur_dir).mkdir(parents=True, exist_ok=True)
 
             fname = f"{prefix}{model_id}"
-            wave = np.tile(wave[None,:], self.dataset_length).reshape(-1, self.dataset_length).T
-            masks = np.tile(masks[None,:], self.dataset_length).reshape(-1, self.dataset_length).T
+            wave = np.tile(wave, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
+            masks = np.tile(masks, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
+
             self.dataset.plot_spectrum(
                 cur_dir, fname, self.extra_args["flux_norm_cho"],
                 wave, None, codebook_spectra,
@@ -829,13 +829,15 @@ class AstroInferrer(BaseInferrer):
                         save_codebook_spectra=self.recon_codebook_spectra_individ
                     )
 
-                    if self.recon_codebook_spectra:
-                        spectra = ret["intensity"]
-                    elif self.recon_codebook_spectra_individ:
-                        spectra = ret["codebook_spectra"]
-                    else: assert 0
+                if self.recon_codebook_spectra:
+                    spectra = ret["intensity"]
+                elif self.recon_codebook_spectra_individ:
+                    spectra = ret["codebook_spectra"]
+                else: assert 0
 
                 self.codebook_spectra.extend(spectra)
+                self.spectra_masks_c.extend(data["spectra_sup_mask"])
+                self.spectra_wave_c.extend(data["spectra_sup_data"][:,0])
 
             except StopIteration:
                 log.info("codebook spectra forward done")

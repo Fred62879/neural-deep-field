@@ -682,8 +682,8 @@ class CodebookTrainer(BaseTrainer):
             Path(cur_dir).mkdir(parents=True, exist_ok=True)
 
             fname = f"{prefix}ep{self.epoch}-it{self.iteration}"
-            wave = np.tile(wave[None,:], self.qtz_n_embd).reshape(-1, self.qtz_n_embd).T
-            masks = np.tile(masks[None,:], self.qtz_n_embd).reshape(-1, self.qtz_n_embd).T
+            wave = np.tile(wave, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
+            masks = np.tile(masks, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
 
             self.dataset.plot_spectrum(
                 cur_dir, fname, self.extra_args["flux_norm_cho"],

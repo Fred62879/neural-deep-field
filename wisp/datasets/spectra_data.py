@@ -850,15 +850,14 @@ class SpectraData:
             else: recon_flux = recon_flux[0]
         else: assert(recon_flux.ndim == 1)
 
-        # print(wave, recon_flux)
         # clip spectra to plot range
         if clip or spectra_clipped:
             sub_dir += "clipped_"
             if not spectra_clipped:
                 wave = wave[mask]
-                gt_flux = gt_flux[mask]
+                if gt_flux is not None:
+                    gt_flux = gt_flux[mask]
                 recon_flux = recon_flux[mask]
-        # print(wave, recon_flux)
 
         sub_dir, gt_flux, recon_flux = self.normalize_one_flux(
             sub_dir, is_codebook, plot_gt_spectrum, flux_norm_cho, gt_flux, recon_flux
@@ -903,6 +902,8 @@ class SpectraData:
         # if recon_spectra_ids is not None:
         #     recon_fluxes = recon_fluxes[recon_spectra_ids]
         # assert(len(gt_fluxes) == len(recon_fluxes))
+
+        # print(wave.shape, recon_fluxes.shape, masks.shape)
 
         if spectra_ids is not None:
             wave = wave[spectra_ids]
