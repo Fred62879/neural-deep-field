@@ -144,7 +144,7 @@ class CodebookTrainer(BaseTrainer):
 
         self.sample_wave = True
         self.train_within_wave_range = not self.pixel_supervision and \
-            self.extra_args["codebook_pretrain_within_wave_range"]
+            self.extra_args["learn_spectra_within_wave_range"]
 
         self.save_redshift = "save_redshift_during_train" in tasks
         self.save_qtz_weights = "save_qtz_weights_during_train" in tasks
@@ -633,14 +633,15 @@ class CodebookTrainer(BaseTrainer):
         log.info("reconstructing gt spectrum")
 
         self.gt_fluxes = torch.stack(self.gt_fluxes).view(
-            self.num_sup_spectra, -1).detach().cpu().numpy() # [n_spectra,nsmpl]
+            self.num_sup_spectra, -1).detach().cpu().numpy()[self.selected_ids]
+        # [n_spectra,nsmpl]
         self.recon_fluxes = torch.stack(self.recon_fluxes).view(
             self.num_sup_spectra, self.extra_args["spectra_neighbour_size"]**2, -1
-        ).detach().cpu().numpy()
+        ).detach().cpu().numpy()[self.selected_ids]
         self.spectra_wave = torch.stack(self.spectra_wave).view(
-            self.num_sup_spectra, -1).detach().cpu().numpy()
+            self.num_sup_spectra, -1).detach().cpu().numpy()[self.selected_ids]
         self.spectra_masks = torch.stack(self.spectra_masks).bool().view(
-            self.num_sup_spectra, -1).detach().cpu().numpy()
+            self.num_sup_spectra, -1).detach().cpu().numpy()[self.selected_ids]
 
         # print(self.gt_fluxes.shape, self.recon_fluxes.shape,
         #       self.spectra_masks.shape, self.spectra_wave.shape)
@@ -650,14 +651,12 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.plot_spectrum(
             self.spectra_dir, fname,
             self.extra_args["flux_norm_cho"],
-            self.spectra_wave,
-            self.gt_fluxes, self.recon_fluxes,
+            self.spectra_wave, self.gt_fluxes,
+            self.spectra_wave, self.recon_fluxes,
             save_spectra=True,
-            spectra_ids=self.selected_ids,
-            #gt_spectra_ids=self.selected_ids,
-            #recon_spectra_ids=self.selected_ids,
             clip=self.extra_args["plot_clipped_spectrum"],
-            masks=self.spectra_masks,
+            gt_masks=self.spectra_masks,
+            recon_masks=self.spectra_masks,
             spectra_clipped=False,
         )
 
@@ -687,11 +686,11 @@ class CodebookTrainer(BaseTrainer):
 
             self.dataset.plot_spectrum(
                 cur_dir, fname, self.extra_args["flux_norm_cho"],
-                wave, None, codebook_spectra,
+                None, None, wave, codebook_spectra,
                 is_codebook=True,
                 save_spectra_together=True,
                 clip=self.extra_args["plot_clipped_spectrum"],
-                masks=masks
+                recon_masks=masks
             )
 
     def validate(self):

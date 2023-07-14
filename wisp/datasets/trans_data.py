@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from os.path import join, exists
 from wisp.utils.plot import plot_save
-from wisp.datasets.data_utils import get_wave_range_fname
+from wisp.datasets.data_utils import get_wave_range_fname, get_bound_id
 #from astroquery.svo_fps import SvoFps
 #from unagi import filters as unagi_filters
 
@@ -29,13 +29,14 @@ class TransData:
         self.filter_ids = kwargs["filter_ids"]
         self.sample_method = kwargs["trans_sample_method"]
         self.uniform_sample = kwargs["uniform_sample_wave"]
+        self.learn_trusted_spectra = kwargs["learn_spectra_within_wave_range"]
 
         self.wave_lo = kwargs["wave_lo"]
         self.wave_hi = kwargs["wave_hi"]
         self.u_scale = kwargs["u_band_scale"]
         self.trans_threshold = kwargs["trans_threshold"]
         self.smpl_interval = kwargs["trans_sample_interval"]
-        #assert(self.smpl_interval == 10)
+        assert(self.smpl_interval == 10)
 
         self.set_path(kwargs["dataset_path"])
         self.init_trans()
@@ -46,6 +47,11 @@ class TransData:
 
     def init_trans(self):
         self.data = {}
+        if self.learn_trusted_spectra:
+            self.trusted_wave_bound = [
+                self.kwargs["spectra_supervision_wave_lo"],
+                self.kwargs["spectra_supervision_wave_hi"]
+            ]
         self.preprocess_wave_trans()
         if self.kwargs["trans_sample_method"] == "mixture":
             self.load_full_wave_trans()
@@ -73,6 +79,12 @@ class TransData:
         self.full_trans_fname = join(self.trans_dir, f"full_trans_{self.smpl_interval}")
         self.full_distrib_fname = join(self.trans_dir, f"full_distrib_{self.smpl_interval}")
         self.full_uniform_distrib_fname = join(self.trans_dir, f"full_uniform_distrib_{self.smpl_interval}")
+        if self.learn_trusted_spectra:
+            name = str(self.kwargs["spectra_supervision_wave_lo"]) + "_" + \
+                str(self.kwargs["spectra_supervision_wave_hi"])
+            self.full_wave_masks_fname = join(
+                self.trans_dir, f"full_wave_masks_{name}_{self.smpl_interval}"
+            )
         self.encd_ids_fname = join(self.trans_dir, f"encd_ids.npy_{self.smpl_interval}")
 
         self.bdws_wave_fname = join(self.trans_dir, f"bdws_wave_{self.smpl_interval}")
@@ -112,8 +124,11 @@ class TransData:
     def get_full_wave(self):
         return self.data["full_wave"]
 
-    def get_full_norm_wave(self):
-        return self.data["full_norm_wave"]
+    def get_full_wave_masks(self):
+        """ Get masks for supervised wave range.
+        """
+        assert self.learn_trusted_spectra
+        return self.data["full_wave_masks"]
 
     def get_num_samples_within_bands(self):
         return np.load(self.nsmpl_within_bands_fname)
@@ -317,8 +332,10 @@ class TransData:
     def load_full_wave_trans(self):
         """ Load wave, trans, and distribution for mixture sampling.
         """
-        if not exists(self.full_wave_fname) or not exists(self.full_trans_fname) \
-           or (not self.uniform_sample and not exists(self.full_distrib_fname)):
+        if not exists(self.full_wave_fname) or \
+           not exists(self.full_trans_fname) or \
+           (not self.uniform_sample and not exists(self.full_distrib_fname)) or \
+           (self.learn_trusted_spectra and not exists(self.full_wave_masks_fname)):
 
             # average all bands to get probability for mixture sampling
             trans_pdf = pnormalize(self.data["trans"])
@@ -327,8 +344,15 @@ class TransData:
             trans_dict = convert_to_dict(self.data["wave"], self.data["trans"])
             full_trans, encd_ids = convert_trans(full_wave, trans_dict)
 
+            if self.learn_trusted_spectra:
+                (lo, hi) = get_bound_id(self.trusted_wave_bound, full_wave)
+                full_wave_masks = np.zeros(len(full_wave)).astype(bool)
+                full_wave_masks[lo:hi+1] = 1
+                # print(full_wave[full_wave_masks])
+
             np.save(self.encd_ids_fname, encd_ids)
             np.save(self.full_wave_fname, full_wave)
+            np.save(self.full_wave_masks_fname, full_wave_masks)
             plot_save(self.full_trans_fname, full_wave, full_trans.T)
             plot_save(self.full_distrib_fname, full_wave, distrib)
 
@@ -337,6 +361,8 @@ class TransData:
             full_trans = np.load(self.full_trans_fname)
             if not self.uniform_sample:
                 distrib = np.load(self.full_distrib_fname)
+            if self.learn_trusted_spectra:
+                full_wave_masks = np.load(self.full_wave_masks_fname)
 
         lo, hi = min(full_wave), max(full_wave)
         full_norm_wave = ((full_wave - lo) / (hi - lo))
@@ -345,15 +371,15 @@ class TransData:
             distrib = np.ones(len(full_wave)).astype(np.float64)
             distrib /= len(distrib)
 
-        bound = (full_wave[0], full_wave[-1])
-
         self.data["full_wave"] = full_wave.astype('float32')
-        self.data["distrib"] = torch.FloatTensor(distrib)
         self.data["encd_ids"] = torch.FloatTensor(encd_ids)
-        #self.data["full_wave"] = torch.FloatTensor(full_wave)
-        #self.data["full_wave_bound"] = torch.FloatTensor(bound)
         self.data["full_trans"] = torch.FloatTensor(full_trans)
         self.data["full_norm_wave"] = torch.FloatTensor(full_norm_wave)
+        if self.learn_trusted_spectra:
+            self.data["full_wave_masks"] = full_wave_masks
+        if not self.uniform_sample:
+            self.data["distrib"] = torch.FloatTensor(distrib)
+        else: self.data["distrib"] = None
 
     def load_hdcd_wave_trans(self):
         """ Load wave, trans, and distribution for hardcode sampling.
@@ -487,11 +513,8 @@ def batch_sample_wave(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, *
         # use all lambda [bsz,nsmpl_full]
         ids = torch.arange(nsmpl_full)
         ids = ids[None,:].tile((bsz,1))
-
     elif kwargs["uniform_sample_wave"]:
-        assert 0
         ids = torch.zeros(bsz,nsmpls).uniform_(0,nsmpl_full).to(torch.long)
-
     else:
         # sample #nsmpl lambda [bsz,nsmpl]
         distrib = distrib[None,:].tile(bsz,1)

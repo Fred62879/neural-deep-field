@@ -370,8 +370,8 @@ def define_cmd_line_args():
     data_group.add_argument("--spectra-patches_r", type=str, nargs='+')
     data_group.add_argument("--spectra-patches_c", type=str, nargs='+')
 
-    data_group.add_argument("--recon-spectra-clip-range", type=int, nargs='+')
-    data_group.add_argument("--dummy-spectra-clip-range", type=int, nargs='+')
+    #data_group.add_argument("--recon-spectra-clip-range", type=int, nargs='+')
+    #data_group.add_argument("--dummy-spectra-clip-range", type=int, nargs='+')
     data_group.add_argument("--gt-spectra-ids", type=int, nargs='+',
                             help="id of chosen gt spectra for supervision/recon etc.")
     data_group.add_argument("--spectra-markers", type=int, nargs='+',
@@ -461,7 +461,7 @@ def define_cmd_line_args():
 
     train_group.add_argument("--batched-pretrain", action="store_true")
     train_group.add_argument("--pretrain-codebook", action="store_true")
-    train_group.add_argument("--codebook-pretrain-within-wave-range", action="store_true")
+    train_group.add_argument("--learn-spectra-within-wave-range", action="store_true")
     train_group.add_argument("--codebook-pretrain-pixel-supervision", action="store_true")
     train_group.add_argument("--weight-train", action="store_true")
     train_group.add_argument("--train-use-all-wave", action="store_true")
@@ -493,7 +493,9 @@ def define_cmd_line_args():
     train_group.add_argument("--pretrain-log-dir", type=str)
     train_group.add_argument("--pretrained-model-name", type=str)
 
-    train_group.add_argument("--num-wave-samples", type=int, default=40,
+    train_group.add_argument("--pretrain-num-wave-samples", type=int, default=819,
+                             help="# wave to sample at each training iteration.")
+    train_group.add_argument("--main-train-num-wave-samples", type=int, default=40,
                              help="# wave to sample at each training iteration.")
     train_group.add_argument("--uniform-sample-wave", action="store_true",
                              help="whether uniformly sample wave or not.")

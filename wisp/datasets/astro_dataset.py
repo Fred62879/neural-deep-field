@@ -10,7 +10,7 @@ from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
 from wisp.datasets.data_utils import clip_data_to_ref_wave_range, \
-    get_wave_range_fname, batch_uniform_sample_torch
+    get_wave_range_fname, batch_sample_torch
 
 
 class AstroDataset(Dataset):
@@ -36,7 +36,6 @@ class AstroDataset(Dataset):
 
         self.root = kwargs["dataset_path"]
         self.space_dim = kwargs["space_dim"]
-        self.nsmpls = kwargs["num_wave_samples"]
 
         if self.space_dim == 3:
             self.unbatched_fields = {
@@ -189,6 +188,9 @@ class AstroDataset(Dataset):
     def get_full_wave(self):
         return self.trans_dataset.get_full_wave()
 
+    def get_full_wave_masks(self):
+        return self.trans_dataset.get_full_wave_masks()
+
     def get_wave_range(self):
         """ Get wave min and max value (used for linear normalization)
         """
@@ -245,8 +247,6 @@ class AstroDataset(Dataset):
     def get_wave_data(self, batch_size, out):
         """ Get wave (lambda) (and transmission) data depending on data source.
         """
-        # assert not (self.use_full_wave and self.use_predefined_wave_range)
-
         out["wave_range"] = self.get_wave_range()
 
         if self.wave_source == "spectra":
@@ -257,18 +257,16 @@ class AstroDataset(Dataset):
             if self.sample_wave:
                 # sample from spectra data (wave, flux, ivar, and interpolated trans)
                 assert self.kwargs["uniform_sample_wave"]
-                out["spectra_sup_data"], sample_ids = batch_uniform_sample_torch(
-                    out["spectra_sup_data"], self.kwargs["num_wave_samples"],
-                    keep_sample_ids=True
-                )
+                out["spectra_sup_data"], sample_ids = batch_sample_torch(
+                    out["spectra_sup_data"], self.kwargs["pretrain_num_wave_samples"],
+                    keep_sample_ids=True)
                 out["spectra_sup_mask"] = batch_uniform_sample_torch(
-                    out["spectra_sup_mask"], self.kwargs["num_wave_samples"],
-                    sample_ids=sample_ids
-                )
+                    out["spectra_sup_mask"], self.kwargs["pretrain_num_wave_samples"],
+                    sample_ids=sample_ids)
 
             out["wave"] = out["spectra_sup_data"][:,0][...,None] # [bsz,nsmpl]
 
-        elif self.wave_sourcce == "trans":
+        elif self.wave_source == "trans":
             # These are not batched, we do sampling at every step.
             if self.perform_integration:
                 if self.kwargs["trans_sample_method"] == "hardcode":
@@ -279,59 +277,21 @@ class AstroDataset(Dataset):
                 else:
                     out["wave"], out["trans"], out["wave_smpl_ids"], out["nsmpl"] = \
                         self.trans_dataset.sample_wave(
-                            batch_size, self.nsmpls, use_full_wave=self.use_full_wave)
+                            batch_size,
+                            self.kwargs["main_train_num_wave_samples"],
+                            use_full_wave=self.use_full_wave
+                        )
 
                 if self.mode == "infer" and "recon_synthetic_band" in self.kwargs["tasks"]:
                     assert(self.use_full_wave) # only in inferrence
                     nsmpl = out["trans"].shape[1]
                     out["trans"] = torch.cat((out["trans"], torch.ones(1,nsmpl)), dim=0)
                     out["nsmpl"] = torch.cat((out["nsmpl"], torch.tensor([nsmpl])), dim=0)
-
-            # elif self.use_predefined_wave_range:
-            #     full_wave = self.get_full_wave()
-            #     clipped_wave, _ = clip_data_to_ref_wave_range(
-            #         full_wave, full_wave, wave_range=self.wave_range)
-            #     out["wave"] = torch.FloatTensor(clipped_wave)[None,:,None].tile(batch_size,1,1)
             else:
                 out["wave"] = torch.FloatTensor(self.get_full_wave())
                 out["wave"] = out["wave"][None,:,None].tile(batch_size,1,1)
         else:
             raise ValueError("Unsupported wave data source.")
-
-    # def get_trans_data(self, batch_size, out):
-    #     """ Get transmission data (wave, trans, nsmpl etc.).
-    #         These are not batched, we do sampling at every step.
-    #     """
-    #     assert not (self.use_full_wave and self.use_predefined_wave_range)
-
-    #     # trans wave min and max value (used for linear normalization)
-    #     out["full_wave_bound"] = self.get_full_wave_bound()
-
-    #     if self.perform_integration:
-    #         if self.kwargs["trans_sample_method"] == "hardcode":
-    #             out["wave"] = self.trans_dataset.get_hdcd_wave()
-    #             out["wave"] = out["wave"][None,:,None].tile(batch_size,1,1)
-    #             out["trans"] = self.trans_dataset.get_hdcd_trans()
-    #             out["nsmpl"] = self.trans_dataset.get_hdcd_nsmpl()
-    #         else:
-    #             out["wave"], out["trans"], out["wave_smpl_ids"], out["nsmpl"] = \
-    #                 self.trans_dataset.sample_wave_trans(
-    #                     batch_size, self.nsmpls, use_full_wave=self.use_full_wave)
-
-    #         if self.mode == "infer" and "recon_synthetic_band" in self.kwargs["tasks"]:
-    #             assert(self.use_full_wave) # only in inferrence
-    #             nsmpl = out["trans"].shape[1]
-    #             out["trans"] = torch.cat((out["trans"], torch.ones(1,nsmpl)), dim=0)
-    #             out["nsmpl"] = torch.cat((out["nsmpl"], torch.tensor([nsmpl])), dim=0)
-
-    #     elif self.use_predefined_wave_range:
-    #         full_wave = self.get_full_wave()
-    #         clipped_wave, _ = clip_data_to_ref_wave_range(
-    #             full_wave, full_wave, wave_range=self.wave_range)
-    #         out["wave"] = torch.FloatTensor(clipped_wave)[None,:,None].tile(batch_size,1,1)
-    #     else:
-    #         out["wave"] = torch.FloatTensor(self.get_full_wave())
-    #         out["wave"] = out["wave"][None,:,None].tile(batch_size,1,1)
 
     def get_spectra_data(self, out):
         """ Get unbatched spectra data during
@@ -435,23 +395,22 @@ class AstroDataset(Dataset):
         return self.fits_dataset.restore_evaluate_tiles(recon_pixels, **re_args)
 
     def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
-                      wave, gt_fluxes, recon_fluxes,
+                      gt_wave, gt_fluxes, recon_wave, recon_fluxes,
                       mode="pretrain_infer", is_codebook=False,
                       save_spectra=False, save_spectra_together=False,
                       spectra_ids=None,
-                      #gt_spectra_ids=None, recon_spectra_ids=None,
-                      clip=False, masks=None, spectra_clipped=False,
+                      gt_masks=None, recon_masks=None,
+                      clip=False, spectra_clipped=False
     ):
         self.spectra_dataset.plot_spectrum(
             spectra_dir, name, flux_norm_cho,
-            wave, gt_fluxes, recon_fluxes,
+            gt_wave, gt_fluxes, recon_wave, recon_fluxes,
             mode=mode, is_codebook=is_codebook,
             save_spectra=save_spectra,
             save_spectra_together=save_spectra_together,
             spectra_ids=spectra_ids,
-            #gt_spectra_ids=gt_spectra_ids,
-            #recon_spectra_ids=recon_spectra_ids,
-            clip=clip, masks=masks, spectra_clipped=spectra_clipped,
+            gt_masks=gt_masks, recon_masks=recon_masks,
+            clip=clip, spectra_clipped=spectra_clipped,
         )
 
     def log_spectra_pixel_values(self, spectra):

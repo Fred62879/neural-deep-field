@@ -196,6 +196,16 @@ class PatchData:
         """ Get id of pixels with gt spectra data. """
         return self.data["spectra_pixel_ids"]
 
+    def get_spectra_pixel_wave(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_pixel_wave"][idx]
+        return self.data["spectra_pixel_wave"]
+
+    def get_spectra_pixel_masks(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_pixel_masks"][idx]
+        return self.data["spectra_pixel_masks"]
+
     def get_spectra_pixel_fluxes(self, idx=None):
         if idx is not None:
             return self.data["spectra_pixel_fluxes"][idx]
@@ -317,12 +327,15 @@ class PatchData:
         path = self.spectra_obj.get_processed_spectra_path()
         cur_patch_spectra_fname = join(path, f"{self.patch_uid}.npy")
         cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
+        cur_patch_spectra_masks_fname = join(path, f"{self.patch_uid}_mask.npy")
         cur_patch_img_coords_fname = join(path, f"{self.patch_uid}_img_coords.npy")
         spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]
         redshift = np.load(cur_patch_redshift_fname)
+        masks = np.load(cur_patch_spectra_masks_fname)
         img_coords = np.load(cur_patch_img_coords_fname)
 
         valid_spectra_ids = self.filter_spectra(img_coords)
+        masks = masks[valid_spectra_ids]
         spectra = spectra[valid_spectra_ids]
         redshift = redshift[valid_spectra_ids]
         img_coords = img_coords[valid_spectra_ids]
@@ -350,6 +363,7 @@ class PatchData:
         self.data["spectra_pixel_ids"] = pixel_ids
         self.data["spectra_img_coords"] = img_coords
         self.data["spectra_pixel_wave"] = spectra[:,0]
+        self.data["spectra_pixel_masks"] = masks
         self.data["spectra_pixel_fluxes"] = spectra[:,1]
         self.data["spectra_pixel_redshift"] = redshift
 

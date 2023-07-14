@@ -89,10 +89,10 @@ def clip_data_to_ref_wave_range(input_data, ref_wave, wave_range=None, wave_rang
     clipped_data = input_data[id_lo:id_hi+1]
     return clipped_data, wave_range_id
 
-def batch_uniform_sample_torch(data, nsmpl,
-                               sample_ids=None, keep_sample_ids=False, ordered=True
+def batch_sample_torch(data, nsmpl, sample_method="uniform", distrib=None,
+                       sample_ids=None, keep_sample_ids=False, ordered=True
 ):
-    """ Batched uniform sampling from given data.
+    """ Batched sampling from given data.
         We sample the same nsmpl out of n samples for all dims in the middle.
         @Param
           data: [bsz,...,n]
@@ -105,7 +105,13 @@ def batch_uniform_sample_torch(data, nsmpl,
     if sample_ids is not None:
         assert list(sample_ids.shape) == [sp[0], nsmpl, 2]
     else:
-        sample_ids = torch.zeros(sp[0], nsmpl).uniform_(0, sp[-1]).to(torch.long)
+        if sample_method == "uniform":
+            sample_ids = torch.zeros(sp[0], nsmpl).uniform_(0, sp[-1]).to(torch.long)
+        elif sample_method == "importance":
+            sample_ids = torch.multinomial(distrib, nsmpl, replacement=True)
+        else:
+            raise ValueError("Unsupported sampling method.")
+
         if ordered:
             sample_ids, _ = torch.sort(sample_ids, dim=-1)
         row_ids = torch.repeat_interleave(torch.arange(sp[0]), nsmpl).view(sp[0],nsmpl)

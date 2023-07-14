@@ -53,6 +53,7 @@ class AstroTrainer(BaseTrainer):
 
         self.pretrain_codebook = extra_args["pretrain_codebook"]
         self.use_all_pixels = extra_args["train_with_all_pixels"]
+        self.spectra_n_neighb = extra_args["spectra_neighbour_size"]**2
 
         self.summarize_training_tasks()
         self.set_log_path()
@@ -85,13 +86,14 @@ class AstroTrainer(BaseTrainer):
         """
         fields = []
 
+        if self.space_dim == 3:
+            fields.append("wave_data")
+            self.dataset.set_wave_source("trans")
+
         if self.pixel_supervision or self.train_spectra_pixels_only:
             fields.extend(["coords","pixels"])
             if self.weight_train:
                 fields.append("weights")
-            if self.space_dim == 3:
-                fields.append("wave_data")
-                self.dataset.set_wave_source("trans")
             if self.spectral_inpaint:
                 pass
 
@@ -108,7 +110,7 @@ class AstroTrainer(BaseTrainer):
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
         self.dataset.set_mode("main_train")
-        self.dataset.toggle_wave_sampling(False)
+        self.dataset.toggle_wave_sampling(True)
         self.set_coords()
 
     def summarize_training_tasks(self):
@@ -378,15 +380,19 @@ class AstroTrainer(BaseTrainer):
             if self.save_codebook: self.codebook = None
             if self.plot_embed_map: self.embed_ids = []
             if self.save_qtz_weights: self.qtz_weights = []
-            if self.recon_gt_spectra: self.smpl_spectra = []
             if self.recon_img or self.recon_crop: self.smpl_pixels = []
-            if self.recon_codebook_spectra_individ: self.codebook_spectra = []
+            if self.recon_gt_spectra:
+                self.recon_wave = []
+                self.recon_masks = []
+                self.recon_fluxes = []
+            if self.recon_codebook_spectra_individ:
+                self.codebook_spectra = []
 
             # re-init dataloader to make sure pixels are in order
             self.use_all_pixels = True
             self.shuffle_dataloader = False
             self.set_num_batches(max_bsz=2048)
-            self.dataset.toggle_wave_sampling(True)
+            self.dataset.toggle_wave_sampling(False)
 
             self.init_dataloader()
             self.reset_data_iterator()
@@ -426,7 +432,7 @@ class AstroTrainer(BaseTrainer):
             self.save_data_to_local = False
             self.use_all_pixels = self.extra_args["train_with_all_pixels"]
             self.set_num_batches(self.extra_args["batch_size"])
-            self.dataset.toggle_wave_sampling(False)
+            self.dataset.toggle_wave_sampling(True)
 
             self.init_dataloader()
             self.reset_data_iterator()
@@ -481,12 +487,18 @@ class AstroTrainer(BaseTrainer):
                 self.redshift.extend(ret["redshift"])
                 self.gt_redshift = data["spectra_sup_redshift"]
             if self.plot_embed_map: self.embed_ids.extend(ret["embed_ids"])
-            if self.recon_gt_spectra: self.smpl_spectra.append(ret["spectra"])
             if self.save_qtz_weights: self.qtz_weights.extend(ret["qtz_weights"])
             if self.recon_img or self.recon_crop:
                 self.smpl_pixels.extend(ret["intensity"])
             if self.save_codebook and self.codebook is None:
                 self.codebook = ret["codebook"]
+
+            if self.recon_gt_spectra:
+                #self.gt_wave.extend()
+                #self.gt_masks.extend(data["spectra_sup_mask"])
+                #self.gt_fluxes.extend(data["spectra_sup_data"][:,1])
+                self.recon_fluxes.extend(ret["spectra"])
+
             if self.recon_codebook_spectra_individ:
                 self.codebook_spectra.extend(ret["codebook_spectra"])
 
@@ -870,27 +882,44 @@ class AstroTrainer(BaseTrainer):
         log.info(f"est qtz weights: {self.qtz_weights}")
 
     def _recon_gt_spectra(self):
-        self.smpl_spectra = torch.stack(self.smpl_spectra)
+        num_spectra = self.cur_patch.get_num_spectra()
+        sp = (num_spectra, self.spectra_n_neighb, -1)
+        #self.gt_wave = self.gt_wave.view(sp).detach().cpu().numpy()
+        #self.gt_masks = self.gt_masks.view(sp).detach().cpu().numpy()
+        #self.gt_fluxes = self.gt_fluxes.view(sp).detach().cpu().numpy()
+        self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
+        self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
+        self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
+        # print(self.gt_wave.shape, self.gt_masks.shape, self.gt_fluxes.shape)
 
-        if not self.spectra_supervision:
+        self.recon_fluxes = torch.stack(self.recon_fluxes)
+        if self.spectra_supervision:
+            # recon_fluxes [bsz,num_spectra_coords,num_sampeles]
+            # we get all spectra at each batch (duplications), thus average over batches
+            self.recon_fluxes = torch.mean(self.recon_fluxes, dim=0)
+        else: # self.codebook_pretrain
             # all spectra are collected (no duplications) and we need
             #   only selected ones (incl. neighbours)
-            self.smpl_spectra = self.smpl_spectra.view(
-                -1, self.smpl_spectra.shape[-1]) # [bsz,num_samples]
-            self.smpl_spectra = self.smpl_spectra[self.val_spectra_map]
-        else:
-            # smpl_spectra [bsz,num_spectra_coords,num_sampeles]
-            # we get all spectra at each batch (duplications), thus average over batches
-            self.smpl_spectra = torch.mean(self.smpl_spectra, dim=0)
+            self.recon_fluxes = self.recon_fluxes.view(
+                -1, self.recon_fluxes.shape[-1]) # [bsz,num_samples]
+            self.recon_fluxes = self.recon_fluxes[self.val_spectra_map]
+        self.recon_fluxes = self.recon_fluxes.view(sp).detach().cpu().numpy()
 
-        self.smpl_spectra = self.smpl_spectra.detach().cpu().numpy().reshape((
-            self.cur_patch.get_num_spectra(),
-            self.extra_args["spectra_neighbour_size"]**2, -1))
+        self.recon_wave = np.tile(
+            self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
+        self.recon_masks = np.tile(
+            self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
+        # print(self.recon_wave.shape, self.recon_masks.shape, self.recon_fluxes.shape)
 
         self.dataset.plot_spectrum(
-            self.spectra_dir, self.epoch, self.smpl_spectra,
+            self.spectra_dir, self.epoch,
             self.extra_args["flux_norm_cho"],
-            save_spectra=True, mode="main_train",
+            self.gt_wave, self.gt_fluxes,
+            self.recon_wave, self.recon_fluxes,
+            mode="main_train",
+            save_spectra=True,
+            gt_masks=self.gt_masks,
+            recon_masks=self.recon_masks,
             clip=self.extra_args["plot_clipped_spectrum"]
         )
 

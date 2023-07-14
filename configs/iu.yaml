@@ -26,8 +26,8 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    #tasks: ['train'] #,'recon_gt_spectra_during_train','recon_img_during_train','save_qtz_weights_during_train','save_redshift_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
-    #tasks: ['infer','recon_gt_spectra','recon_img','recon_codebook_spectra_individ','save_qtz_weights','save_redshift','save_scaler']
+    tasks: ['train','recon_gt_spectra_during_train','recon_img_during_train','save_qtz_weights_during_train','save_redshift_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
+    tasks: ['infer','recon_gt_spectra','recon_img','recon_codebook_spectra_individ','save_qtz_weights','save_redshift','save_scaler']
 
 optimizer:
     optimizer_type: 'adam'
@@ -135,7 +135,7 @@ trainer:
     pixel_loss_cho: l1
     spectra_loss_cho: l2
     redshift_loss_cho: l2
-    num_epochs: 1200
+    num_epochs: 400
     batch_size: 40960 #65536 #262144
     save_every: 400
     valid_every: -1
@@ -155,15 +155,15 @@ trainer:
     spectra_supervision: False       #  each other
 
     batched_pretrain: True
-    codebook_pretrain_within_wave_range: True
+    learn_spectra_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
 
     pixel_supervision: True          # these two conflict
     train_spectra_pixels_only: False #  each other
 
-    apply_gt_redshift: True         # -
+    apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
-    redshift_semi_supervision: False  # -
+    redshift_semi_supervision: True  # -
 
     spectra_beta: 1
     redshift_beta: 1
@@ -178,10 +178,11 @@ trainer:
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230529-180531'
-    pretrain_log_dir: '20230710-181343_pretrain_50_spectra_2k'
-    pretrained_model_name: 'model-ep2000-it1.pth'
+    pretrain_log_dir: '20230714-115005' #'20230710-181343_pretrain_50_spectra_2k'
+    pretrained_model_name: 'model-ep1200-it1.pth'
 
-    num_wave_samples: 819
+    pretrain_num_wave_samples: 819
+    main_train_num_wave_samples: 40
     uniform_sample_wave: True
     mixture_avg_per_band: True
 
@@ -210,7 +211,7 @@ infer:
     infer_selected: True
     pretrain_num_infer: 50
 
-    flux_norm_cho: "sum"
+    flux_norm_cho: "max"
     spectra_smooth_sigma: 50
     # spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]
     spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]
@@ -223,8 +224,8 @@ infer:
     infer_spectra_individually: False
     num_spectra_plot_per_row: 10
 
-    dummy_spectra_clip_range: [6000,8000]
-    recon_spectra_clip_range: [6000,8000]
+    #dummy_spectra_clip_range: [6000,8000]
+    #recon_spectra_clip_range: [6000,8000]
     codebook_spectra_clip_range: [6000,8000] #[4152,5536]
 
     mark_spectra: True

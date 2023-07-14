@@ -628,10 +628,12 @@ class AstroInferrer(BaseInferrer):
 
         self.dataset.plot_spectrum(
             self.spectra_dir, model_id, self.extra_args["flux_norm_cho"],
-            self.spectra_wave, self.gt_fluxes, self.recon_fluxes,
+            self.spectra_wave, self.gt_fluxes,
+            self.spectra_wave, self.recon_fluxes,
             mode=self.mode, save_spectra=True,
             clip=self.extra_args["plot_clipped_spectrum"],
-            masks=self.spectra_masks,
+            gt_masks=self.spectra_masks,
+            recon_masks=self.spectra_masks,
             spectra_clipped=False
         )
 
@@ -691,12 +693,12 @@ class AstroInferrer(BaseInferrer):
 
             self.dataset.plot_spectrum(
                 cur_dir, fname, self.extra_args["flux_norm_cho"],
-                wave, None, codebook_spectra,
+                None, None, wave, codebook_spectra,
                 mode=self.mode,
                 is_codebook=True,
                 save_spectra_together=True,
                 clip=self.extra_args["plot_clipped_spectrum"],
-                masks=masks
+                recon_masks=masks
             )
 
     #############
