@@ -58,6 +58,8 @@ class CodebookPretrainNerf(BaseNeuralField):
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.check("forward starts")
+        # ids = torch.tensor([8,3,45,1,47,7,9 ,14 ,20 ,19 ,11 ,42 ,23 ,26 ,12  ,5 ,40 ,33, 38, 48])
+        # print(wave.shape, wave[...,0][ids])
 
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]

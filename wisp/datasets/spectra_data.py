@@ -793,47 +793,13 @@ class SpectraData:
                 recon_flux = recon_flux / np.max(recon_flux) * np.max(gt_flux)
         return sub_dir, gt_flux, recon_flux
 
-    def gather_one_spectrum_plot_data(
-            self, full_wave, flux_norm_cho, clip, spectra_clipped, is_codebook,
-            bound_ids, gt_flux, gt_wave, recon_flux, recon_wave
-    ):
-        """ Collect data for spectrum plotting for the given spectra.
-        """
-        sub_dir = ""
-        plot_gt_spectrum = self.kwargs["plot_spectrum_with_gt"] \
-            and gt_flux is not None and not is_codebook
-
-        if clip or spectra_clipped: # clip spectra to plot range
-            if not spectra_clipped:
-                if is_codebook or bound_ids is not None: (lo, hi) = bound_ids
-                else: lo, hi = 0, recon_flux.shape[-1]
-                recon_flux = recon_flux[...,lo:hi]
-            sub_dir += "clipped_"
-
-        if recon_flux.ndim == 2: # average spectra over neighbours
-            if self.kwargs["average_neighbour_spectra"]:
-                recon_flux = np.mean(recon_flux, axis=0)
-            else: recon_flux = recon_flux[0]
-        else: assert(recon_flux.ndim == 1)
-
-        if not clip: # get wave (x-axis)
-            recon_wave = full_wave
-        elif is_codebook or recon_wave is not None:
-            recon_wave = recon_wave
-        else: recon_wave = full_wave
-
-        sub_dir, gt_flux, recon_flux = self.normalize_one_flux(
-            sub_dir, is_codebook, plot_gt_spectrum, flux_norm_cho, gt_flux, recon_flux
-        )
-        pargs = (sub_dir, gt_flux, gt_wave, recon_flux, recon_wave, plot_gt_spectrum)
-        return pargs
-
     def plot_and_save_one_spectrum(
             self, name, spectra_dir, fig, axs, nrows, ncols, save_spectra, idx, pargs
     ):
         """ Plot one spectrum and save as required.
         """
-        sub_dir, gt_flux, gt_wave, recon_flux, recon_wave, plot_gt_spectrum = pargs
+        # sub_dir, gt_flux, gt_wave, recon_flux, recon_wave, plot_gt_spectrum = pargs
+        sub_dir, wave, gt_flux, recon_flux, plot_gt_spectrum = pargs
 
         if self.kwargs["plot_spectrum_together"]:
             if nrows == 1: axis = axs if ncols == 1 else axs[idx%ncols]
@@ -845,9 +811,9 @@ class SpectraData:
             self.trans_obj.plot_trans(axis=axis)
 
         axis.set_title(idx)
-        axis.plot(recon_wave, recon_flux, color="black", label="Recon.")
         if plot_gt_spectrum:
-            axis.plot(gt_wave, gt_flux, color="blue", label="GT")
+            axis.plot(wave, gt_flux, color="blue", label="GT")
+        axis.plot(wave, recon_flux, color="black", label="Recon.")
 
         if sub_dir != "":
             if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]
@@ -866,66 +832,108 @@ class SpectraData:
 
         return sub_dir
 
-    def gather_spectrum_plotting_data(self, clip, is_codebook, mode):
-        full_wave = self.get_full_wave()     # [full_nsmpl]
-        gt_wave = self.get_gt_spectra_wave() # [nsmpl]
-        if mode == "pretrain_infer":
-            gt_fluxes = self.get_supervision_spectra()[1] # [n,nsmpl]
-        elif mode == "infer" or mode == "main_train":
-            gt_fluxes = self.get_validation_spectra()[1]  # [n,nsmpl]
+    def process_spectrum_plot_data(
+            self, flux_norm_cho, is_codebook,
+            clip, spectra_clipped,
+            mask, wave, gt_flux, recon_flux
+    ):
+        """ Collect data for spectrum plotting for the given spectra.
+        """
+        sub_dir = ""
+        plot_gt_spectrum = self.kwargs["plot_spectrum_with_gt"] \
+            and gt_flux is not None and not is_codebook
 
-        if clip:
-            if is_codebook: clip_range = self.kwargs["codebook_spectra_clip_range"]
-            else:           clip_range = self.kwargs["recon_spectra_clip_range"]
-        else:               clip_range = (full_wave[0], full_wave[-1])
+        # average spectra over neighbours
+        if recon_flux.ndim == 2:
+            if self.kwargs["average_neighbour_spectra"]:
+                recon_flux = np.mean(recon_flux, axis=0)
+            else: recon_flux = recon_flux[0]
+        else: assert(recon_flux.ndim == 1)
 
-        (id_lo, id_hi) = get_bound_id(clip_range, full_wave, within_bound=False)
-        recon_wave = np.arange(
-            full_wave[id_lo], full_wave[id_hi] + 1, self.wave_discretz_interval)
-        recon_wave_bound_ids = [id_lo, id_hi + 1]
-        return full_wave, gt_fluxes, gt_wave, recon_wave, recon_wave_bound_ids
+        # print(wave, recon_flux)
+        # clip spectra to plot range
+        if clip or spectra_clipped:
+            sub_dir += "clipped_"
+            if not spectra_clipped:
+                wave = wave[mask]
+                gt_flux = gt_flux[mask]
+                recon_flux = recon_flux[mask]
+        # print(wave, recon_flux)
 
-    def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
-                      mode="pretrain_infer", clip=True,
-                      spectra_clipped=False, is_codebook=False,
-                      save_spectra=False, save_spectra_together=False,
-                      gt_spectra_ids=None, recon_spectra_ids=None
+        sub_dir, gt_flux, recon_flux = self.normalize_one_flux(
+            sub_dir, is_codebook, plot_gt_spectrum, flux_norm_cho, gt_flux, recon_flux
+        )
+        # pargs = (sub_dir, gt_flux, gt_wave, recon_flux, recon_wave, plot_gt_spectrum)
+        pargs = (sub_dir, wave, gt_flux, recon_flux, plot_gt_spectrum)
+        return pargs
+
+    def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
+                      wave, gt_fluxes, recon_fluxes,
+                      mode="pretrain_infer",
+                      is_codebook=False,
+                      save_spectra=False,
+                      save_spectra_together=False,
+                      spectra_ids=None,
+                      #gt_spectra_ids=None,
+                      #recon_spectra_ids=None,
+                      clip=False, masks=None, spectra_clipped=False,
     ):
         """ Plot all given spectra.
             @Param
-              recon_flux: [num_spectra(,num_neighbours),full_num_smpl]
-                          in same lambda range as `full_wave`
-              ids: if not None, indicates selected spectra to plot
+              spectra_dir:   directory to save spectra
+              name:          file name
+              flux_norm_cho: norm choice for flux
+
+              wave:        corresponding wave for gt and recon fluxes
+              gt_fluxes:   [num_spectra,nsmpl]
+              recon_fluxs: [num_spectra(,num_neighbours),nsmpl]
+
+              gt/recon_spectra_ids: if not None, indicates selected spectra to plot
                    (when we have large amount of spectra, we only select some to plot)
+
+            - clip config:
               clip: whether or not we plot spectra within certain range
-              spectra_clipped: whether or not `recon_spectra` is already clipped to
+              masks: not None if clip. use mask to clip flux
+              spectra_clipped: whether or not spectra is already clipped to
         """
+        assert not clip or (masks is not None or spectra_clipped)
+
+        # if gt_spectra_ids is not None:
+        #     gt_fluxes = gt_fluxes[gt_spectra_ids]
+        # if recon_spectra_ids is not None:
+        #     recon_fluxes = recon_fluxes[recon_spectra_ids]
+        # assert(len(gt_fluxes) == len(recon_fluxes))
+
+        if spectra_ids is not None:
+            wave = wave[spectra_ids]
+            recon_fluxes = recon_fluxes[spectra_ids]
+            if masks is not None: masks = masks[spectra_ids]
+            if gt_fluxes is not None: gt_fluxes = gt_fluxes[spectra_ids]
+
+        if masks is None: masks = [None]*len(wave)
+        if gt_fluxes is None: gt_fluxes = [None]* len(wave)
+
+        assert(len(wave) == len(recon_fluxes) and \
+               (masks is None or len(wave) == len(masks)) and \
+               (gt_fluxes is None or len(wave) == len(gt_fluxes))
+        )
+
         n = len(recon_fluxes)
-        if gt_spectra_ids is not None: n = min(n, len(gt_spectra_ids))
-        if recon_spectra_ids is not None: n = min(n, len(recon_spectra_ids))
-
-        full_wave, gt_fluxes, gt_wave, recon_wave, bound_ids = \
-            self.gather_spectrum_plotting_data(clip, is_codebook, mode)
-
         if self.kwargs["plot_spectrum_together"]:
             ncols = min(n, self.kwargs["num_spectra_plot_per_row"])
             nrows = int(np.ceil(n / ncols))
             fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
 
-        get_data = partial(self.gather_one_spectrum_plot_data,
-                           full_wave, flux_norm_cho, clip, spectra_clipped,
-                           is_codebook, bound_ids)
+        process_data = partial(self.process_spectrum_plot_data,
+                               flux_norm_cho, is_codebook, clip, spectra_clipped)
         plot_and_save = partial(self.plot_and_save_one_spectrum,
                                 name, spectra_dir, fig, axs, nrows, ncols,
                                 save_spectra and not save_spectra_together)
 
-        if gt_spectra_ids is not None:
-            gt_fluxes = gt_fluxes[gt_spectra_ids]
-        if recon_spectra_ids is not None:
-            recon_fluxes = recon_fluxes[recon_spectra_ids]
-
-        for idx, (gt_flux, cur_flux) in enumerate(zip(gt_fluxes, recon_fluxes)):
-            pargs = get_data(gt_flux, gt_wave, cur_flux, recon_wave)
+        for idx, (cur_wave, mask, gt_flux, recon_flux) in enumerate(
+                zip(wave, masks, gt_fluxes, recon_fluxes)
+        ):
+            pargs = process_data(mask, cur_wave, gt_flux, recon_flux)
             sub_dir = plot_and_save(idx, pargs)
 
         if save_spectra_together:
@@ -935,6 +943,111 @@ class SpectraData:
         if self.kwargs["plot_spectrum_together"]:
             fname = join(spectra_dir, sub_dir, f"all_spectra_{name}")
             fig.tight_layout(); plt.savefig(fname); plt.close()
+
+    # def gather_one_spectrum_plot_data(
+    #         self, full_wave, flux_norm_cho, clip, spectra_clipped, is_codebook,
+    #         bound_ids, gt_flux, gt_wave, recon_flux, recon_wave
+    # ):
+    #     """ Collect data for spectrum plotting for the given spectra.
+    #     """
+    #     sub_dir = ""
+    #     plot_gt_spectrum = self.kwargs["plot_spectrum_with_gt"] \
+    #         and gt_flux is not None and not is_codebook
+
+    #     if clip or spectra_clipped: # clip spectra to plot range
+    #         if not spectra_clipped:
+    #             if is_codebook or bound_ids is not None: (lo, hi) = bound_ids
+    #             else: lo, hi = 0, recon_flux.shape[-1]
+    #             recon_flux = recon_flux[...,lo:hi]
+    #         sub_dir += "clipped_"
+
+    #     if recon_flux.ndim == 2: # average spectra over neighbours
+    #         if self.kwargs["average_neighbour_spectra"]:
+    #             recon_flux = np.mean(recon_flux, axis=0)
+    #         else: recon_flux = recon_flux[0]
+    #     else: assert(recon_flux.ndim == 1)
+
+    #     if not clip: # get wave (x-axis)
+    #         recon_wave = full_wave
+    #     elif is_codebook or recon_wave is not None:
+    #         recon_wave = recon_wave
+    #     else: recon_wave = full_wave
+
+    #     sub_dir, gt_flux, recon_flux = self.normalize_one_flux(
+    #         sub_dir, is_codebook, plot_gt_spectrum, flux_norm_cho, gt_flux, recon_flux
+    #     )
+    #     pargs = (sub_dir, gt_flux, gt_wave, recon_flux, recon_wave, plot_gt_spectrum)
+    #     return pargs
+
+    # def gather_spectrum_plotting_data(self, clip, is_codebook, mode):
+    #     full_wave = self.get_full_wave()     # [full_nsmpl]
+    #     gt_wave = self.get_gt_spectra_wave() # [nsmpl]
+    #     if mode == "pretrain_infer":
+    #         gt_fluxes = self.get_supervision_spectra()[1] # [n,nsmpl]
+    #     elif mode == "infer" or mode == "main_train":
+    #         gt_fluxes = self.get_validation_spectra()[1]  # [n,nsmpl]
+
+    #     if clip:
+    #         if is_codebook: clip_range = self.kwargs["codebook_spectra_clip_range"]
+    #         else:           clip_range = self.kwargs["recon_spectra_clip_range"]
+    #     else:               clip_range = (full_wave[0], full_wave[-1])
+
+    #     (id_lo, id_hi) = get_bound_id(clip_range, full_wave, within_bound=False)
+    #     recon_wave = np.arange(
+    #         full_wave[id_lo], full_wave[id_hi] + 1, self.wave_discretz_interval)
+    #     recon_wave_bound_ids = [id_lo, id_hi + 1]
+    #     return full_wave, gt_fluxes, gt_wave, recon_wave, recon_wave_bound_ids
+
+    # def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
+    #                   mode="pretrain_infer", clip=True,
+    #                   spectra_clipped=False, is_codebook=False,
+    #                   save_spectra=False, save_spectra_together=False,
+    #                   gt_spectra_ids=None, recon_spectra_ids=None
+    # ):
+    #     """ Plot all given spectra.
+    #         @Param
+    #           recon_flux: [num_spectra(,num_neighbours),full_num_smpl]
+    #                       in same lambda range as `full_wave`
+    #           ids: if not None, indicates selected spectra to plot
+    #                (when we have large amount of spectra, we only select some to plot)
+    #           clip: whether or not we plot spectra within certain range
+    #           spectra_clipped: whether or not `recon_spectra` is already clipped to
+    #     """
+    #     n = len(recon_fluxes)
+    #     if gt_spectra_ids is not None: n = min(n, len(gt_spectra_ids))
+    #     if recon_spectra_ids is not None: n = min(n, len(recon_spectra_ids))
+
+    #     full_wave, gt_fluxes, gt_wave, recon_wave, bound_ids = \
+    #         self.gather_spectrum_plotting_data(clip, is_codebook, mode)
+
+    #     if self.kwargs["plot_spectrum_together"]:
+    #         ncols = min(n, self.kwargs["num_spectra_plot_per_row"])
+    #         nrows = int(np.ceil(n / ncols))
+    #         fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
+
+    #     get_data = partial(self.gather_one_spectrum_plot_data,
+    #                        full_wave, flux_norm_cho, clip, spectra_clipped,
+    #                        is_codebook, bound_ids)
+    #     plot_and_save = partial(self.plot_and_save_one_spectrum,
+    #                             name, spectra_dir, fig, axs, nrows, ncols,
+    #                             save_spectra and not save_spectra_together)
+
+    #     if gt_spectra_ids is not None:
+    #         gt_fluxes = gt_fluxes[gt_spectra_ids]
+    #     if recon_spectra_ids is not None:
+    #         recon_fluxes = recon_fluxes[recon_spectra_ids]
+
+    #     for idx, (gt_flux, cur_flux) in enumerate(zip(gt_fluxes, recon_fluxes)):
+    #         pargs = get_data(gt_flux, gt_wave, cur_flux, recon_wave)
+    #         sub_dir = plot_and_save(idx, pargs)
+
+    #     if save_spectra_together:
+    #         fname = join(spectra_dir, name)
+    #         np.save(fname, recon_fluxes)
+
+    #     if self.kwargs["plot_spectrum_together"]:
+    #         fname = join(spectra_dir, sub_dir, f"all_spectra_{name}")
+    #         fig.tight_layout(); plt.savefig(fname); plt.close()
 
     def mark_spectra_on_img(self):
         assert 0

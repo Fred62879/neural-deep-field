@@ -315,7 +315,7 @@ class PatchData:
         """ Load spectra fluxes and redshift values for all pixels with gt spectra.
         """
         path = self.spectra_obj.get_processed_spectra_path()
-        cur_patch_spectra_fname = join(path, f"{self.patch_uid}_spectra.npy")
+        cur_patch_spectra_fname = join(path, f"{self.patch_uid}.npy")
         cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
         cur_patch_img_coords_fname = join(path, f"{self.patch_uid}_img_coords.npy")
         spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]

@@ -7,14 +7,16 @@ from astropy.visualization import ZScaleInterval
 from skimage.metrics import structural_similarity
 
 
-def calculate_emd(distrib1, distrib2, norm="l2"):
-    """ Calculate earth mover's distance between two distributions.
+def calculate_emd(distrib1, distrib2, norm="l2", mask=None):
+    """ Calculate (masked) earth mover's distance between two distributions.
         @Param
            distrib: [...,num_bins] (assume they sum to 1)
     """
     # assert(distrib1.shape == distrib2.shape)
-    n = distrib1.shape[-1]
     sub = distrib1 - distrib2
+    if mask is not None:
+        sub *= mask
+
     if norm == "l1":
         emd = torch.linalg.norm(sub, ord=1, dim=-1)
     elif norm == "l2":

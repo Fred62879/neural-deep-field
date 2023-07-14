@@ -434,21 +434,24 @@ class AstroDataset(Dataset):
         """
         return self.fits_dataset.restore_evaluate_tiles(recon_pixels, **re_args)
 
-    def plot_spectrum(self, spectra_dir, name, recon_fluxes, flux_norm_cho,
-                      clip=True, spectra_clipped=False, is_codebook=False,
+    def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
+                      wave, gt_fluxes, recon_fluxes,
+                      mode="pretrain_infer", is_codebook=False,
                       save_spectra=False, save_spectra_together=False,
-                      mode="pretrain_infer", gt_spectra_ids=None, recon_spectra_ids=None
+                      spectra_ids=None,
+                      #gt_spectra_ids=None, recon_spectra_ids=None,
+                      clip=False, masks=None, spectra_clipped=False,
     ):
         self.spectra_dataset.plot_spectrum(
-            spectra_dir, name, recon_fluxes, flux_norm_cho,
-            clip=clip,
-            mode=mode,
-            spectra_clipped=spectra_clipped,
-            is_codebook=is_codebook,
+            spectra_dir, name, flux_norm_cho,
+            wave, gt_fluxes, recon_fluxes,
+            mode=mode, is_codebook=is_codebook,
             save_spectra=save_spectra,
             save_spectra_together=save_spectra_together,
-            gt_spectra_ids=gt_spectra_ids,
-            recon_spectra_ids=recon_spectra_ids,
+            spectra_ids=spectra_ids,
+            #gt_spectra_ids=gt_spectra_ids,
+            #recon_spectra_ids=recon_spectra_ids,
+            clip=clip, masks=masks, spectra_clipped=spectra_clipped,
         )
 
     def log_spectra_pixel_values(self, spectra):
