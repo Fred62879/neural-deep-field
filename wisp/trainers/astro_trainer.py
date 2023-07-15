@@ -63,7 +63,7 @@ class AstroTrainer(BaseTrainer):
         self.init_optimizer()
 
         self.configure_dataset()
-        self.set_num_batches()
+        self.set_num_batches(max_bsz=512)
         self.init_dataloader()
 
         self.total_steps = 0
@@ -375,12 +375,11 @@ class AstroTrainer(BaseTrainer):
             self.save_data_to_local = True
             if self.save_scaler: self.scalers = []
             if self.save_latents: self.latents = []
-            if self.save_redshift:
-                self.redshift, self.gt_redshift = [], []
+            if self.save_redshift: self.redshift = [] # self.gt_redshift = []
             if self.save_codebook: self.codebook = None
             if self.plot_embed_map: self.embed_ids = []
             if self.save_qtz_weights: self.qtz_weights = []
-            if self.recon_img or self.recon_crop: self.smpl_pixels = []
+            if self.recon_img or self.recon_crop: self.recon_pixels = []
             if self.recon_gt_spectra:
                 self.recon_wave = []
                 self.recon_masks = []
@@ -391,7 +390,7 @@ class AstroTrainer(BaseTrainer):
             # re-init dataloader to make sure pixels are in order
             self.use_all_pixels = True
             self.shuffle_dataloader = False
-            self.set_num_batches(max_bsz=2048)
+            self.set_num_batches(max_bsz=512)
             self.dataset.toggle_wave_sampling(False)
 
             self.init_dataloader()
@@ -485,11 +484,11 @@ class AstroTrainer(BaseTrainer):
             if self.save_latents: self.latents.extend(ret["latents"])
             if self.save_redshift:
                 self.redshift.extend(ret["redshift"])
-                self.gt_redshift = data["spectra_sup_redshift"]
+                # self.gt_redshift = data["spectra_sup_redshift"]
             if self.plot_embed_map: self.embed_ids.extend(ret["embed_ids"])
             if self.save_qtz_weights: self.qtz_weights.extend(ret["qtz_weights"])
             if self.recon_img or self.recon_crop:
-                self.smpl_pixels.extend(ret["intensity"])
+                self.recon_pixels.extend(ret["intensity"])
             if self.save_codebook and self.codebook is None:
                 self.codebook = ret["codebook"]
 
@@ -727,6 +726,8 @@ class AstroTrainer(BaseTrainer):
 
         # iii) redshift loss
         redshift_loss = 0
+        print(self.redshift_semi_supervision, data["spectra_sup_redshift"])
+        assert 0
         if self.redshift_semi_supervision:
             gt_redshift = data["spectra_sup_redshift"]
 
@@ -846,7 +847,8 @@ class AstroTrainer(BaseTrainer):
     def _save_redshift(self):
         redshift = torch.stack(self.redshift).detach().cpu().numpy()
         redshift = redshift[self.val_spectra_map]
-        gt_redshift = self.gt_redshift.detach().cpu().numpy()
+        gt_redshift = self.cur_patch.get_spectra_pixel_redshift()
+        # gt_redshift = self.gt_redshift.detach().cpu().numpy()
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
         log.info(f"est redshift: {redshift}")
@@ -884,9 +886,6 @@ class AstroTrainer(BaseTrainer):
     def _recon_gt_spectra(self):
         num_spectra = self.cur_patch.get_num_spectra()
         sp = (num_spectra, self.spectra_n_neighb, -1)
-        #self.gt_wave = self.gt_wave.view(sp).detach().cpu().numpy()
-        #self.gt_masks = self.gt_masks.view(sp).detach().cpu().numpy()
-        #self.gt_fluxes = self.gt_fluxes.view(sp).detach().cpu().numpy()
         self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
         self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
         self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
@@ -923,25 +922,6 @@ class AstroTrainer(BaseTrainer):
             clip=self.extra_args["plot_clipped_spectrum"]
         )
 
-    def restore_evaluate_tiles(self):
-        self.smpl_pixels = torch.stack(self.smpl_pixels).detach().cpu().numpy()
-        re_args = {
-            "fname": self.epoch,
-            "dir": self.recon_dir,
-            "verbose": self.verbose,
-            "num_bands": self.extra_args["num_bands"],
-            "log_max": True,
-            "save_locally": True,
-            "plot_func": plot_horizontally,
-            "zscale": True,
-            "to_HDU": False,
-            "recon_flat_trans": False,
-            "calculate_metrics": False
-        }
-        _, _ = self.dataset.restore_evaluate_tiles(self.smpl_pixels, **re_args)
-        if self.recon_crop:
-            self.save_cropped_recon_locally(**re_args)
-
     def _recon_codebook_spectra_individ(self):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
         self.codebook_spectra = self.codebook_spectra[self.val_spectra_map]
@@ -963,6 +943,26 @@ class AstroTrainer(BaseTrainer):
                 is_codebook=True, save_spectra_together=True,
                 clip=self.extra_args["plot_clipped_spectrum"]
             )
+
+    def restore_evaluate_tiles(self):
+        self.recon_pixels = torch.stack(self.recon_pixels).detach().cpu().numpy()
+        re_args = {
+            "fname": self.epoch,
+            "dir": self.recon_dir,
+            "verbose": self.verbose,
+            "num_bands": self.extra_args["num_bands"],
+            "log_max": True,
+            "save_locally": True,
+            "plot_func": plot_horizontally,
+            "zscale": True,
+            "to_HDU": False,
+            "recon_flat_trans": False,
+            "calculate_metrics": False
+        }
+        _, _ = self.dataset.restore_evaluate_tiles(self.recon_pixels, **re_args)
+
+        if self.recon_crop:
+            self.save_cropped_recon_locally(**re_args)
 
     def save_cropped_recon_locally(self, **re_args):
         for index, fits_uid in enumerate(self.extra_args["recon_cutout_fits_uids"]):

@@ -770,7 +770,6 @@ class SpectraData:
     ):
         """ Normalize one pair of gt and recon flux.
         """
-        n, m = len(gt_flux), len(recon_flux)
         if not is_codebook:
             sub_dir += flux_norm_cho + "_"
             if flux_norm_cho == "max":
@@ -788,13 +787,11 @@ class SpectraData:
                 gt_flux = gt_flux / np.max(gt_flux)
             elif flux_norm_cho == "sum":
                 gt_flux = gt_flux / (np.sum(gt_flux) + 1e-10)
+                gt_flux * len(gt_flux) / len(recon_flux)
             elif flux_norm_cho == "scale_gt":
                 gt_flux = gt_flux / np.max(gt_flux) * recon_max
             elif flux_norm_cho == "scale_recon":
                 recon_flux = recon_flux / np.max(recon_flux) * np.max(gt_flux)
-
-        # gt_flux = gt_flux * m
-        # recon_flux = recon_flux * n
 
         return sub_dir, gt_flux, recon_flux
 
@@ -904,25 +901,16 @@ class SpectraData:
         # print(gt_wave.shape, gt_fluxes.shape, gt_masks.shape)
         # print(recon_wave.shape, recon_fluxes.shape, recon_masks.shape)
 
-        # if spectra_ids is not None:
-        #     if gt_wave is not None: gt_wave = gt_wave[spectra_ids]
-        #     if gt_masks is not None: gt_masks = gt_masks[spectra_ids]
-        #     if gt_fluxes is not None: gt_fluxes = gt_fluxes[spectra_ids]
-        #     recon_wave = recon_wave[spectra_ids]
-        #     recon_fluxes = recon_fluxes[spectra_ids]
-        #     if recon_masks is not None: recon_masks = recon_masks[spectra_ids]
+        n = len(recon_wave)
+        if gt_wave is None: gt_wave = [None]*n
+        if gt_masks is None: gt_masks = [None]*n
+        if gt_fluxes is None: gt_fluxes = [None]*n
+        if recon_masks is None: recon_masks = [None]*n
 
-        if gt_wave is None: gt_wave = [None]*len(wave)
-        if gt_masks is None: gt_masks = [None]*len(wave)
-        if gt_fluxes is None: gt_fluxes = [None]*len(wave)
-        if recon_masks is None: recon_masks = [None]*len(wave)
+        assert gt_fluxes is None or \
+            (len(gt_wave) == n and len(gt_fluxes) == n and len(gt_masks) == n)
+        assert len(recon_fluxes) == n and len(recon_masks) == n
 
-        assert(len(gt_wave) == len(gt_fluxes) and \
-               (gt_masks is None or len(gt_wave) == len(gt_masks)))
-        assert(len(recon_wave) == len(recon_fluxes) and \
-               (recon_masks is None or len(recon_wave) == len(recon_masks)))
-
-        n = len(recon_fluxes)
         if self.kwargs["plot_spectrum_together"]:
             ncols = min(n, self.kwargs["num_spectra_plot_per_row"])
             nrows = int(np.ceil(n / ncols))

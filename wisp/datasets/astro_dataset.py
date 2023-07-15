@@ -336,7 +336,7 @@ class AstroDataset(Dataset):
                 out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
 
     def get_redshift_data(self, out):
-        """ Get supervision redshift values (only when apply gt redshift directly).
+        """ Get supervision redshift values.
         """
         # out["spectra_sup_redshift"] = self.spectra_dataset.get_validation_redshift()
         # out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift()
@@ -346,8 +346,8 @@ class AstroDataset(Dataset):
             ids = ids[bin_map]
         #out["spectra_val_ids"] = ids
         out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
+        print(out["spectra_sup_redshift"])
         del out["spectra_id_map"]
-
 
     def __len__(self):
         """ Length of the dataset in number of coords.

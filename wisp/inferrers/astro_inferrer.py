@@ -603,10 +603,11 @@ class AstroInferrer(BaseInferrer):
 
     def pre_checkpoint_selected_coords_partial_model(self, model_id):
         self.reset_data_iterator()
-        self.gt_fluxes = []
         self.recon_fluxes = []
-        self.spectra_wave = []
-        self.spectra_masks = []
+        if self.pretrain_infer:
+            self.gt_fluxes = []
+            self.spectra_wave = []
+            self.spectra_masks = []
         if self.save_redshift_pre: self.redshift = []
         if self.save_qtz_weights: self.qtz_weights = []
 
@@ -616,24 +617,37 @@ class AstroInferrer(BaseInferrer):
         self.infer_spectra(model_id, checkpoint)
 
     def post_checkpoint_selected_coords_partial_model(self, model_id):
-        self.gt_fluxes = torch.stack(self.gt_fluxes).view(
-            self.dataset_length, -1).detach().cpu().numpy()
-        self.recon_fluxes = torch.stack(self.recon_fluxes).view(
+        if self.pretrain_infer:
+            gt_wave = torch.stack(self.spectra_wave).view(
+                self.dataset_length, -1).detach().cpu().numpy()
+            gt_masks = torch.stack(self.spectra_masks).bool().view(
+                self.dataset_length, -1).detach().cpu().numpy()
+            gt_fluxes = torch.stack(self.gt_fluxes).view(
+                self.dataset_length, -1).detach().cpu().numpy()
+            recon_wave = gt_wave
+            recon_masks = gt_masks
+        else:
+            num_spectra = self.cur_patch.get_num_spectra()
+            gt_wave = self.cur_patch.get_spectra_pixel_wave()
+            gt_masks = self.cur_patch.get_spectra_pixel_masks()
+            gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
+            recon_wave = np.tile(
+                self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
+            recon_masks = np.tile(
+                self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
+
+        recon_fluxes = torch.stack(self.recon_fluxes).view(
             self.dataset_length, self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()
-        self.spectra_wave = torch.stack(self.spectra_wave).view(
-            self.dataset_length, -1).detach().cpu().numpy()
-        self.spectra_masks = torch.stack(self.spectra_masks).bool().view(
-            self.dataset_length, -1).detach().cpu().numpy()
 
         self.dataset.plot_spectrum(
             self.spectra_dir, model_id, self.extra_args["flux_norm_cho"],
-            self.spectra_wave, self.gt_fluxes,
-            self.spectra_wave, self.recon_fluxes,
+            gt_wave, gt_fluxes,
+            recon_wave, recon_fluxes,
             mode=self.mode, save_spectra=True,
             clip=self.extra_args["plot_clipped_spectrum"],
-            gt_masks=self.spectra_masks,
-            recon_masks=self.spectra_masks,
+            gt_masks=gt_masks,
+            recon_masks=recon_masks,
             spectra_clipped=False
         )
 
@@ -655,8 +669,9 @@ class AstroInferrer(BaseInferrer):
     def pre_checkpoint_hardcode_coords_modified_model(self, model_id):
         self.reset_data_iterator()
         self.codebook_spectra = []
-        self.spectra_wave_c = []
-        self.spectra_masks_c = []
+        if self.pretrain_infer:
+            self.spectra_wave_c = []
+            self.spectra_masks_c = []
 
     def run_checkpoint_hardcode_coords_modified_model(self, model_id, checkpoint):
         if self.recon_codebook_spectra:
@@ -669,10 +684,19 @@ class AstroInferrer(BaseInferrer):
     def post_checkpoint_hardcode_coords_modified_model(self, model_id):
         # [(num_supervision_spectra,)num_embeds,nsmpl]
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
-        self.spectra_wave_c = torch.stack(self.spectra_wave_c).view(
-            self.dataset_length, -1).detach().cpu().numpy()
-        self.spectra_masks_c = torch.stack(self.spectra_masks_c).bool().view(
-            self.dataset_length, -1).detach().cpu().numpy()
+        if self.pretrain_infer:
+            spectra_wave = torch.stack(self.spectra_wave_c).view(
+                self.dataset_length, -1).detach().cpu().numpy()
+            spectra_masks = torch.stack(self.spectra_masks_c).bool().view(
+                self.dataset_length, -1).detach().cpu().numpy()
+        else:
+            num_spectra = self.cur_patch.get_num_spectra()
+            spectra_wave = np.tile(
+                self.dataset.get_full_wave(), num_spectra
+            ).reshape(num_spectra, -1)
+            spectra_masks = np.tile(
+                self.dataset.get_full_wave_masks(), num_spectra
+            ).reshape(num_spectra, -1)
 
         # if spectra is 2d, add dummy 1st dim to simplify code
         if self.recon_codebook_spectra:
@@ -681,7 +705,7 @@ class AstroInferrer(BaseInferrer):
         else: prefix = "individ-"
 
         for i, (wave, masks, codebook_spectra) in enumerate(
-                zip(self.spectra_wave_c, self.spectra_masks_c, self.codebook_spectra)
+                zip(spectra_wave, spectra_masks, self.codebook_spectra)
         ):
             # print(wave.shape, masks.shape, codebook_spectra.shape)
             cur_dir = join(self.codebook_spectra_dir, f"spectra-{i}")
@@ -788,9 +812,13 @@ class AstroInferrer(BaseInferrer):
                         save_qtz_weights=self.save_qtz_weights
                     )
 
-                self.spectra_masks.extend(data["spectra_sup_mask"])
-                self.spectra_wave.extend(data["spectra_sup_data"][:,0])
-                self.gt_fluxes.extend(data["spectra_sup_data"][:,1])
+                if self.pretrain_infer:
+                    self.spectra_masks.extend(data["spectra_sup_mask"])
+                    self.spectra_wave.extend(data["spectra_sup_data"][:,0])
+                    self.gt_fluxes.extend(data["spectra_sup_data"][:,1])
+                else: # self.main_infer
+                    # main inferrence spectra can be obtained at once
+                    pass
 
                 fluxes = ret["intensity"]
                 if fluxes.ndim == 3: # bandwise
@@ -836,10 +864,11 @@ class AstroInferrer(BaseInferrer):
                 elif self.recon_codebook_spectra_individ:
                     spectra = ret["codebook_spectra"]
                 else: assert 0
-
                 self.codebook_spectra.extend(spectra)
-                self.spectra_masks_c.extend(data["spectra_sup_mask"])
-                self.spectra_wave_c.extend(data["spectra_sup_data"][:,0])
+
+                if self.pretrain_infer:
+                    self.spectra_masks_c.extend(data["spectra_sup_mask"])
+                    self.spectra_wave_c.extend(data["spectra_sup_data"][:,0])
 
             except StopIteration:
                 log.info("codebook spectra forward done")

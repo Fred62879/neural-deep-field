@@ -26,8 +26,8 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    tasks: ['train','recon_gt_spectra_during_train','recon_img_during_train','save_qtz_weights_during_train','save_redshift_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
-    tasks: ['infer','recon_gt_spectra','recon_img','recon_codebook_spectra_individ','save_qtz_weights','save_redshift','save_scaler']
+    tasks: ['train'] #,'recon_gt_spectra_during_train','recon_img_during_train','save_qtz_weights_during_train','save_redshift_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
+    #tasks: ['infer','recon_gt_spectra','recon_img','recon_codebook_spectra_individ','save_qtz_weights','save_redshift','save_scaler']
 
 optimizer:
     optimizer_type: 'adam'
@@ -135,7 +135,7 @@ trainer:
     pixel_loss_cho: l1
     spectra_loss_cho: l2
     redshift_loss_cho: l2
-    num_epochs: 400
+    num_epochs: 800
     batch_size: 40960 #65536 #262144
     save_every: 400
     valid_every: -1
@@ -144,14 +144,14 @@ trainer:
     log_cli_every: 400
     log_gpu_every: -1
     plot_grad_every: -1
-    save_local_every: 400
+    save_local_every: -1
     save_as_new: True
 
     train_with_all_pixels: True
     train_pixel_ratio: .1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_data','spectra_sup_mask','spectra_sup_pixels','spectra_sup_redshift','spectra_val_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
-    pretrain_codebook: True          # these two conflict
+    pretrain_codebook: False          # these two conflict
     spectra_supervision: False       #  each other
 
     batched_pretrain: True
@@ -199,7 +199,7 @@ infer:
     # recon img
     to_HDU: False
     #infer_log_dir: '20230707-135011'
-    metric_options: [] #['mse','ssim','psnr']
+    metric_options: ['mse','ssim','psnr']
 
     recon_zoomed: False
     recon_cutout_patch_uids: ['981215'] #,'981217']
