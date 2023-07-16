@@ -150,7 +150,6 @@ class FitsData:
             self.data["spectra_bin_map"] = spectra_bin_map
             self.data["spectra_pixel_fluxes"] = spectra_pixel_fluxes
             self.data["spectra_pixel_redshift"] = spectra_pixel_redshift
-            print(self.data["spectra_pixel_redshift"])
 
     #############
     # Getters

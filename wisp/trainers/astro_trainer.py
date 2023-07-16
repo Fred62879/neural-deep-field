@@ -54,6 +54,7 @@ class AstroTrainer(BaseTrainer):
         self.pretrain_codebook = extra_args["pretrain_codebook"]
         self.use_all_pixels = extra_args["train_with_all_pixels"]
         self.spectra_n_neighb = extra_args["spectra_neighbour_size"]**2
+        assert self.use_all_pixels and extra_args["train_pixel_ratio"] == 1
 
         self.summarize_training_tasks()
         self.set_log_path()
@@ -63,7 +64,7 @@ class AstroTrainer(BaseTrainer):
         self.init_optimizer()
 
         self.configure_dataset()
-        self.set_num_batches(max_bsz=512)
+        self.set_num_batches() #max_bsz=512)
         self.init_dataloader()
 
         self.total_steps = 0
@@ -268,7 +269,7 @@ class AstroTrainer(BaseTrainer):
             self.resume_train()
 
         self.scene_state.optimization.running = True
-        log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
+        # log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
 
     def train(self):
         for i, (tract, patch) in enumerate(zip(
@@ -361,8 +362,6 @@ class AstroTrainer(BaseTrainer):
     #############
 
     def pre_epoch(self):
-        self.set_num_batches()
-
         self.loss_lods = list(range(0, self.extra_args["grid_num_lods"]))
 
         if self.extra_args["grow_every"] > 0:
@@ -375,7 +374,7 @@ class AstroTrainer(BaseTrainer):
             self.save_data_to_local = True
             if self.save_scaler: self.scalers = []
             if self.save_latents: self.latents = []
-            if self.save_redshift: self.redshift = [] # self.gt_redshift = []
+            if self.save_redshift: self.redshift = []
             if self.save_codebook: self.codebook = None
             if self.plot_embed_map: self.embed_ids = []
             if self.save_qtz_weights: self.qtz_weights = []
@@ -390,7 +389,7 @@ class AstroTrainer(BaseTrainer):
             # re-init dataloader to make sure pixels are in order
             self.use_all_pixels = True
             self.shuffle_dataloader = False
-            self.set_num_batches(max_bsz=512)
+            # self.set_num_batches(max_bsz=512)
             self.dataset.toggle_wave_sampling(False)
 
             self.init_dataloader()
@@ -430,7 +429,7 @@ class AstroTrainer(BaseTrainer):
             self.shuffle_dataloader = True
             self.save_data_to_local = False
             self.use_all_pixels = self.extra_args["train_with_all_pixels"]
-            self.set_num_batches(self.extra_args["batch_size"])
+            # self.set_num_batches(self.extra_args["batch_size"])
             self.dataset.toggle_wave_sampling(True)
 
             self.init_dataloader()
@@ -590,6 +589,8 @@ class AstroTrainer(BaseTrainer):
         else:
             self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))
 
+        log.info(f"num batches updated to: {self.num_iterations_cur_epoch}.")
+
     def get_dataset_length(self):
         """ Get length of dataset based on training tasks.
             If we do pixel supervision, we use #coords as length and don't
@@ -726,8 +727,7 @@ class AstroTrainer(BaseTrainer):
 
         # iii) redshift loss
         redshift_loss = 0
-        print(self.redshift_semi_supervision, data["spectra_sup_redshift"])
-        assert 0
+        # print(self.redshift_semi_supervision, data["spectra_sup_redshift"])
         if self.redshift_semi_supervision:
             gt_redshift = data["spectra_sup_redshift"]
 

@@ -341,12 +341,12 @@ class AstroDataset(Dataset):
         # out["spectra_sup_redshift"] = self.spectra_dataset.get_validation_redshift()
         # out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift()
         ids = out["spectra_id_map"]
-        bin_map = out["spectra_bin_map"]
         if not self.kwargs["train_spectra_pixels_only"]:
+            bin_map = out["spectra_bin_map"]
             ids = ids[bin_map]
         #out["spectra_val_ids"] = ids
         out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
-        print(out["spectra_sup_redshift"])
+        # print('*', out["spectra_sup_redshift"])
         del out["spectra_id_map"]
 
     def __len__(self):
