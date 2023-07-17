@@ -111,7 +111,7 @@ class AstroTrainer(BaseTrainer):
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
         self.dataset.set_mode("main_train")
-        self.dataset.toggle_wave_sampling(True)
+        self.dataset.toggle_wave_sampling(False)
         self.set_coords()
 
     def summarize_training_tasks(self):
@@ -390,7 +390,7 @@ class AstroTrainer(BaseTrainer):
             self.use_all_pixels = True
             self.shuffle_dataloader = False
             # self.set_num_batches(max_bsz=512)
-            self.dataset.toggle_wave_sampling(False)
+            # self.dataset.toggle_wave_sampling(False)
 
             self.init_dataloader()
             self.reset_data_iterator()
@@ -430,7 +430,7 @@ class AstroTrainer(BaseTrainer):
             self.save_data_to_local = False
             self.use_all_pixels = self.extra_args["train_with_all_pixels"]
             # self.set_num_batches(self.extra_args["batch_size"])
-            self.dataset.toggle_wave_sampling(True)
+            # self.dataset.toggle_wave_sampling(True)
 
             self.init_dataloader()
             self.reset_data_iterator()
@@ -564,10 +564,12 @@ class AstroTrainer(BaseTrainer):
             log.info(self.optimizer)
 
     def set_coords(self):
-        if self.extra_args["train_spectra_pixels_only"]:
+        if self.train_spectra_pixels_only:
             self.dataset.set_coords_source("spectra_coords")
             self.dataset.set_hardcode_data(
-                "spectra_coords", self.dataset.get_validation_spectra_coords())
+                "spectra_coords",
+                self.dataset.get_validation_spectra_norm_world_coords()
+            )
         else:
             self.dataset.set_coords_source("fits")
 
@@ -846,9 +848,9 @@ class AstroTrainer(BaseTrainer):
 
     def _save_redshift(self):
         redshift = torch.stack(self.redshift).detach().cpu().numpy()
-        redshift = redshift[self.val_spectra_map]
+        if not self.train_spectra_pixels_only:
+            redshift = redshift[self.val_spectra_map]
         gt_redshift = self.cur_patch.get_spectra_pixel_redshift()
-        # gt_redshift = self.gt_redshift.detach().cpu().numpy()
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
         log.info(f"est redshift: {redshift}")
@@ -880,7 +882,8 @@ class AstroTrainer(BaseTrainer):
 
     def log_qtz_weights(self):
         self.qtz_weights = torch.stack(self.qtz_weights).detach().cpu().numpy()[:,0]
-        self.qtz_weights = self.qtz_weights[self.val_spectra_map]
+        if not self.train_spectra_pixels_only:
+            self.qtz_weights = self.qtz_weights[self.val_spectra_map]
         log.info(f"est qtz weights: {self.qtz_weights}")
 
     def _recon_gt_spectra(self):
@@ -901,7 +904,8 @@ class AstroTrainer(BaseTrainer):
             #   only selected ones (incl. neighbours)
             self.recon_fluxes = self.recon_fluxes.view(
                 -1, self.recon_fluxes.shape[-1]) # [bsz,num_samples]
-            self.recon_fluxes = self.recon_fluxes[self.val_spectra_map]
+            if not self.train_spectra_pixels_only:
+                self.recon_fluxes = self.recon_fluxes[self.val_spectra_map]
         self.recon_fluxes = self.recon_fluxes.view(sp).detach().cpu().numpy()
 
         self.recon_wave = np.tile(
@@ -924,7 +928,8 @@ class AstroTrainer(BaseTrainer):
 
     def _recon_codebook_spectra_individ(self):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
-        self.codebook_spectra = self.codebook_spectra[self.val_spectra_map]
+        if not self.train_spectra_pixels_only:
+            self.codebook_spectra = self.codebook_spectra[self.val_spectra_map]
 
         # if spectra is 2d, add dummy 1st dim to simplify code
         if self.recon_codebook_spectra:

@@ -14,7 +14,8 @@ from wisp.utils.common import create_patch_uid
 from wisp.utils.numerical import normalize_coords
 from wisp.datasets.data_utils import add_dummy_dim, \
     set_input_path, patch_exists, get_bound_id, \
-    clip_data_to_ref_wave_range, get_wave_range_fname
+    clip_data_to_ref_wave_range, get_wave_range_fname, \
+    get_coords_range_fname
 
 from pathlib import Path
 from astropy.io import fits
@@ -47,18 +48,19 @@ class SpectraData:
         self.num_patches_c = len(self.all_patches_c)
         self.num_patches = len(self.all_patches_r)*len(self.all_patches_c)
 
-        self.smooth_sigma = kwargs["spectra_smooth_sigma"]
-        self.neighbour_size = kwargs["spectra_neighbour_size"]
-        self.download_source_spectra = kwargs["download_source_spectra"]
         self.source_spectra_link = kwargs["source_spectra_link"]
         self.spectra_data_source = kwargs["spectra_data_source"]
         self.spectra_data_format = kwargs["spectra_data_format"] # tbl or fits
+        self.download_source_spectra = kwargs["download_source_spectra"]
+        self.load_spectra_data_from_cache = kwargs["load_spectra_data_from_cache"]
+
+        self.smooth_sigma = kwargs["spectra_smooth_sigma"]
+        self.neighbour_size = kwargs["spectra_neighbour_size"]
         self.wave_discretz_interval = kwargs["trans_sample_interval"]
         self.trusted_wave_range = None if not kwargs["trusted_range_only"] \
             else [kwargs["spectra_supervision_wave_lo"],
                   kwargs["spectra_supervision_wave_hi"]]
-
-        self.load_spectra_data_from_cache = kwargs["load_spectra_data_from_cache"]
+        self.trans_range = self.trans_obj.get_wave_range()
 
         self.set_path(self.dataset_path)
         self.load_accessory_data()
@@ -122,7 +124,7 @@ class SpectraData:
 
         else: raise ValueError("Unsupported spectra data source choice.")
 
-        self.coords_range_fname = join(img_data_path, self.kwargs["coords_range_fname"])
+        self.coords_range_fname = get_coords_range_fname(**self.kwargs)
         self.gt_spectra_fname = join(processed_data_path, "gt_spectra.npy")
         self.gt_spectra_ids_fname = join(processed_data_path, "gt_spectra_ids.txt")
         self.gt_spectra_mask_fname = join(processed_data_path, "gt_spectra_mask.npy")
@@ -377,19 +379,21 @@ class SpectraData:
     def transform_data(self):
         self.to_tensor([
             "gt_spectra",
-            "gt_spectra_mask",
             "gt_spectra_pixels",
             "gt_spectra_redshift",
             "gt_spectra_world_coords"
-        ])
+        ], torch.float32)
+        self.to_tensor([
+            "gt_spectra_mask"
+        ], torch.bool)
 
     #############
     # Loading helpers
     #############
 
-    def to_tensor(self, fields):
+    def to_tensor(self, fields, dtype):
         for field in fields:
-            self.data[field] = torch.FloatTensor(self.data[field])
+            self.data[field] = torch.tensor(self.data[field], dtype=dtype)
 
     def split_spectra(self):
         ids = np.arange(self.num_gt_spectra)
@@ -489,6 +493,10 @@ class SpectraData:
             img_coords, axis=0).astype(np.int16) # [n,2]
         self.data["gt_spectra_world_coords"] = np.concatenate(
             world_coords, axis=0).astype(np.float32) # [n,n_neighbr,2]
+
+        norm_coords, _ = normalize_coords(
+            self.data["gt_spectra_world_coords"], coords_range=self.coords_range)
+        self.data["gt_spectra_norm_world_coords"] = norm_coords
 
         # print(self.data["gt_spectra"].shape, self.data["gt_spectra_redshift"].shape, self.data["gt_spectra_pixels"].shape, self.data["gt_spectra_img_coords"].shape, self.data["gt_spectra_world_coords"].shape)
 
@@ -719,17 +727,13 @@ class SpectraData:
             self.wave_discretz_interval,
             sigma=self.smooth_sigma,
             format=self.spectra_data_format,
+            trans_range=self.trans_range,
             trusted_range=self.trusted_wave_range,
-            max_spectra_len=self.kwargs["max_spectra_len"]
+            max_spectra_len=self.kwargs["max_spectra_len"],
+            trans_data=self.trans_obj.get_full_trans_data()
         )
         if gt_spectra is None: return
 
-        # clip to trusted range (data collected here is for main train supervision only)
-        # (id_lo, id_hi) = get_bound_id(
-        #     self.data["supervision_spectra_wave_bound"], gt_spectra[0], within_bound=True)
-        # cur_patch_spectra.append(gt_spectra[:,id_lo:id_hi+1])
-
-        # print(gt_spectra.shape, np.count_nonzero(mask))
         cur_patch_spectra.append(gt_spectra)
         cur_patch_spectra_mask.append(mask)
 
@@ -992,6 +996,47 @@ def is_in_patch(ra, dec, wcs, num_rows, num_cols):
     x, y = wcs.wcs_world2pix(ra, dec, 0)
     return x >= 0 and y >= 0 and x < num_cols and y < num_rows
 
+def interpolate_trans(trans_data, spectra_data):
+    """ Interpolate transmission data based on wave from spectra data.
+         sure we stick to the same range of wave)
+        @Param
+          trans_data: [nsmpl,1+nbands] (wave/trans)
+          spectra_data: [nsmpl,3] (wave,flux,ivar)
+        @Return
+          trans: interpolated transmission value
+          trans_mask: mask for trans (outside trans wave is 0)
+    """
+    trans_wave = trans_data[:,0]
+    trans = trans_data[:,1:].T
+    spectra_wave = spectra_data[:,0]
+    trans_wave_range = [min(trans_wave), max(trans_wave)]
+    print(trans_wave)
+    print(spectra_wave)
+    (id_lo, id_hi) = get_bound_id(trans_wave_range, spectra_wave)
+    print(id_lo, id_hi)
+    print(trans_wave)
+    print(trans_wave_range, spectra_wave[id_lo], spectra_wave[id_hi])
+    spectra_wave = spectra_wave[id_lo:id_hi+1]
+
+    interp_trans = []
+    for cur_trans in trans:
+        print(trans_wave.shape, trans.shape, cur_trans.shape)
+        f = interp1d(trans_wave, cur_trans)
+        interp_trans.append(f(spectra_wave))
+    print(interp_trans[0].shape)
+    interp_trans = np.concatenate(interp_trans)
+    print(interp_trans.shape)
+
+    n = spectra_data.shape[0]
+    trans = np.full((n,1),-1)
+    trans_mask = np.zeros((n,1))
+    trans[id_lo:id_hi+1] = interp_trans
+    trans_mask[id_lo:id_hi+1] = 1
+    ret = np.concatenate((trans, trans_mask), axis=-1)
+    print(trans)
+    print(trans_mask)
+    return ret
+
 def pad_spectra(spectra, max_len):
     """ Pad spectra if shorter than max_len.
         Create mask to ignore values in padded region.
@@ -1010,15 +1055,19 @@ def pad_spectra(spectra, max_len):
         spectra = ret
     return spectra, mask
 
-def mask_spectra_range(spectra, mask, trusted_range):
+def mask_spectra_range(spectra, mask, trans_range, trusted_range):
     """ Mask out spectra data beyond given wave range.
         @Param
-          spectra: [4,nsmpl] (wave,flux,ivar)
-          mask: [nsmpl]
-          lo, hi:  wave range
+          spectra: spectra data [3,nsmpl] (wave,flux,ivar)
+          mask: mask to be updated [nsmpl]
+          trans_range: transmission data wave range
+          trusted_range: spectra supervision wave range
     """
     m, n = spectra.shape
-    (id_lo, id_hi) = get_bound_id(trusted_range, spectra[0])
+    lo1, hi1 = trans_range
+    lo2, hi2 = trusted_range
+    wave_range = (max(lo1,lo2), min(hi1,hi2))
+    (id_lo, id_hi) = get_bound_id(wave_range, spectra[0])
     new_mask = np.zeros(n).astype(bool)
     new_mask[id_lo:id_hi+1] = 1
     mask &= new_mask
@@ -1032,9 +1081,11 @@ def clean_flux(flux):
 
 def process_gt_spectra(infname, spectra_fname, mask_fname,
                        full_wave, smpl_interval,
-                       sigma=-1, format="tbl", trusted_range=None,
-                       interpolate=False, save=True, plot=True,
-                       max_spectra_len=-1, validator=None):
+                       sigma=-1, format="tbl",
+                       trans_range=None, trusted_range=None,
+                       save=True, plot=True, trans_data=None,
+                       max_spectra_len=-1, validator=None
+):
     """ Load gt spectra wave and flux for spectra supervision and
           spectrum plotting. Also smooth the gt spectra.
         Note, the gt spectra has significantl larger discretization values than
@@ -1051,7 +1102,6 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
     """
     try:
         spectra = unpack_gt_spectra(infname, format=format)
-        # (wave, flux, ivar) = spectra
     except Exception as e:
         log.info(f"{e}")
         log.info(f"{infname}")
@@ -1064,28 +1114,13 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
         except Exception as e:
             log.info(e)
 
-    # lo, hi = min(spectra[0]), max(spectra[0])
-    # if interpolate:
-    #     f_gt = interp1d(spectra[0], spectra[1])
-    #     make sure wave range to interpolate stay within gt spectra wave range
-    #     full_wave is full transmission wave
-    #     if trusted_range is not None:
-    #         (lo, hi) = trusted_range
-    #     else:
-    #         (lo_id, hi_id) = get_bound_id((lo, hi), full_wave, within_bound=True)
-    #         lo = full_wave[lo_id] lo <= full_wave[lo_id]
-    #         hi = full_wave[hi_id] hi >= full_wave[hi_id]
-    #     new gt wave with same discretization value as transmission wave
-    #     wave = np.arange(lo, hi + 1, smpl_interval)
-    #     use new gt wave to get interpolated spectra
-    #     flux = f_gt(wave)
-    # flux = flux.astype(np.float32)
-    # spectra_data = np.concatenate((
-    #     wave[None,:], flux[None,:]), axis=0) # [2,nsmpl]
-
     spectra, mask = pad_spectra(spectra, max_spectra_len)
-    mask_spectra_range(spectra, mask, trusted_range)
+    mask_spectra_range(spectra, mask, trans_range, trusted_range)
     spectra = spectra.astype(np.float32)
+    if trans_data is not None:
+        interp_trans_data = interpolate_trans(trans_data, spectra)
+        spectra = np.concatenate((spectra, interp_trans_data), axis=-1)
+        assert 0
 
     if save:
         np.save(spectra_fname + ".npy", spectra)

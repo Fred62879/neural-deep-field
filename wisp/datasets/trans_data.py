@@ -124,6 +124,12 @@ class TransData:
     def get_full_wave(self):
         return self.data["full_wave"]
 
+    def get_wave_range(self):
+        return self.data["wave_range"]
+
+    def get_full_trans_data(self):
+        return self.data["trans_data"]
+
     def get_full_wave_masks(self):
         """ Get masks for supervised wave range.
         """
@@ -207,11 +213,13 @@ class TransData:
             Note if the wave range used to normalize transmission wave and
               the spectra wave should be the same.
         """
-        if exists(self.wave_range_fname): return
-        if self.kwargs["trans_sample_method"] == "hardcode":
-            wave_range = (min(self.data["hdcd_wave"]), max(self.data["hdcd_wave"]))
+        if exists(self.wave_range_fname):
+            wave_range = np.load(self.wave_range_fname)
         else:
-            wave_range = (min(self.data["full_wave"]), max(self.data["full_wave"]))
+            if self.kwargs["trans_sample_method"] == "hardcode":
+                wave_range = (min(self.data["hdcd_wave"]), max(self.data["hdcd_wave"]))
+            else:
+                wave_range = (min(self.data["full_wave"]), max(self.data["full_wave"]))
         self.data["wave_range"] = wave_range
         np.save(self.wave_range_fname, wave_range)
 
@@ -315,17 +323,12 @@ class TransData:
         """ Get trans data depending on sampling method.
         """
         if self.sample_method == "mixture":
-            #self.trans_data = (self.data["full_norm_wave"],self.data["full_trans"],
             self.trans_data = (self.data["full_wave"],self.data["full_trans"],
                                self.data["distrib"],self.data["encd_ids"])
-
         elif self.sample_method == "bandwise":
             self.trans_data = self.load_bandwise_wave_trans(norm_wave, trans)
-
         elif self.sample_method == "hardcode":
             self.trans_data = (self.data["hdcd_wave"], self.data["hdcd_trans"])
-            #self.trans_data = (self.data["hdcd_norm_wave"], self.data["hdcd_trans"])
-
         else:
             raise ValueError("Unrecognized transmission sampling method.")
 
@@ -364,21 +367,18 @@ class TransData:
             if self.learn_trusted_spectra:
                 full_wave_masks = np.load(self.full_wave_masks_fname)
 
-        lo, hi = min(full_wave), max(full_wave)
-        full_norm_wave = ((full_wave - lo) / (hi - lo))
-
         if self.uniform_sample:
             distrib = np.ones(len(full_wave)).astype(np.float64)
             distrib /= len(distrib)
 
-        self.data["full_wave"] = full_wave.astype('float32')
+        trans_data = np.concatenate((full_wave[:,None],full_trans.T),axis=-1)
+
+        self.data["trans_data"] = trans_data
         self.data["encd_ids"] = torch.FloatTensor(encd_ids)
+        self.data["full_wave"] = full_wave.astype('float32')
         self.data["full_trans"] = torch.FloatTensor(full_trans)
-        self.data["full_norm_wave"] = torch.FloatTensor(full_norm_wave)
-        if self.learn_trusted_spectra:
-            self.data["full_wave_masks"] = full_wave_masks
-        if not self.uniform_sample:
-            self.data["distrib"] = torch.FloatTensor(distrib)
+        if self.learn_trusted_spectra: self.data["full_wave_masks"] = full_wave_masks
+        if not self.uniform_sample: self.data["distrib"] = torch.FloatTensor(distrib)
         else: self.data["distrib"] = None
 
     def load_hdcd_wave_trans(self):
@@ -387,18 +387,16 @@ class TransData:
         if exists(self.hdcd_wave_fname + ".npy") and exists(self.hdcd_trans_fname + ".npy"):
             self.data["hdcd_wave"] = np.load(self.hdcd_wave_fname + ".npy")
             self.data["hdcd_trans"] = np.load(self.hdcd_trans_fname + ".npy")
-            self.data["hdcd_norm_wave"] = 2 * (
-                ( self.data["hdcd_wave"] - np.min(self.data["hdcd_wave"]) ) /
-                ( np.max(self.data["hdcd_wave"]) - np.min(self.data["hdcd_wave"]) )
-            ) - 1
-            plot_save(self.hdcd_trans_fname + ".jpg", self.data["hdcd_wave"], self.data["hdcd_trans"].T)
-
-            #self.data["hdcd_wave"] = self.data["hdcd_wave"][:,None,:].tile(1,
+            plot_save(self.hdcd_trans_fname + ".jpg",
+                      self.data["hdcd_wave"],
+                      self.data["hdcd_trans"].T)
             self.data["hdcd_wave"] = torch.FloatTensor(self.data["hdcd_wave"])
             self.data["hdcd_trans"] = torch.FloatTensor(self.data["hdcd_trans"])
             self.data["hdcd_nsmpl"] = torch.FloatTensor([self.kwargs["hardcode_num_trans_samples"]])
-
         else: assert(False)
+
+        self.data["trans_data"] = np.concatenate((
+            self.data["hdcd_wave"][:,None], self.data["hdcd_trans"].T), axis=-1)
 
     def load_bandwise_wave_trans(self, wave, trans):
         """ Load wave, trans, and distribution for bandwise sampling.
@@ -433,12 +431,8 @@ class TransData:
                 plt.plot(cur_wave, cur_distrib)
             plt.savefig(distrib_fn);plt.close()
 
-        norm_wave = [(cur_wave - min(cur_wave)) / (max(cur_wave) - min(cur_wave))
-                     for cur_wave in wave]
-
         wave = torch.FloatTensor(wave)
         trans = torch.FloatTensor(trans)
-        #wave = torch.FloatTensor(norm_wave)
         distrib = torch.FloatTensor(distrib)
         return wave, trans, distrib
 

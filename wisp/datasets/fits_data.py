@@ -19,7 +19,7 @@ from wisp.utils.numerical import normalize_coords, normalize, \
 
 from wisp.datasets.patch_data import PatchData
 from wisp.datasets.data_utils import set_input_path, add_dummy_dim, \
-    create_selected_patches_uid
+    create_selected_patches_uid, get_coords_range_fname
 
 
 class FitsData:
@@ -93,11 +93,11 @@ class FitsData:
             suffix = "_" + self.kwargs["patch_selection_cho"]
 
         norm_str = self.kwargs["train_pixels_norm"]
-        self.meta_data_fname = join(img_data_path, f"meta_data{suffix}.txt")
-        self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.coords_fname = join(img_data_path, f"coords{suffix}.npy")
+        self.coords_range_fname = get_coords_range_fname(**self.kwargs)
+        self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
+        self.meta_data_fname = join(img_data_path, f"meta_data{suffix}.txt")
         self.pixels_fname = join(img_data_path, f"pixels_{norm_str}{suffix}.npy")
-        self.coords_range_fname = join(img_data_path, self.kwargs["coords_range_fname"]+".npy")
         self.zscale_ranges_fname = join(img_data_path, f"zscale_ranges_{norm_str}{suffix}.npy")
         self.spectra_id_map_fname = join(img_data_path, f"spectra_id_map_{norm_str}{suffix}.npy")
         self.spectra_bin_map_fname = join(

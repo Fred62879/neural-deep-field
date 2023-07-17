@@ -37,9 +37,11 @@ def get_wave_range_fname(**kwargs):
     return fname
 
 def get_coords_range_fname(**kwargs):
-    assert 0
+    _, img_data_path = set_input_path(
+        kwargs["dataset_path"], kwargs["sensor_collection_name"]
+    )
     fname = join(
-        kwargs["dataset_path"], "input/", kwargs["coords_range_fname"])
+        img_data_path, kwargs["coords_range_fname"])
     return fname
 
 def create_patch_fname(tract, patch, band, megau=False, weights=False):
@@ -126,7 +128,7 @@ def batch_sample_torch(data, nsmpl, sample_method="uniform", distrib=None,
     return ret
 
 def get_bound_id(wave_bound, source_wave, within_bound=True):
-    """ Get id of lambda values in full wave that bounds or is bounded by given wave_bound
+    """ Get id of lambda values in source wave that bounds or is bounded by given wave_bound
         if `within_bound`
             source_wave[id_lo] >= wave_lo
             source_wave[id_hi] <= wave_hi
@@ -147,6 +149,7 @@ def get_bound_id(wave_bound, source_wave, within_bound=True):
         if wave_hi >= max(source_wave): id_hi = len(source_wave) - 1
         else: id_hi = np.argmax((source_wave > wave_hi)) - 1
 
+        # print('*', source_wave[id_lo], source_wave[id_hi])
         assert(source_wave[id_lo] >= wave_lo and source_wave[id_hi] <= wave_hi)
     else:
         if wave_lo <= min(source_wave): id_lo = 0
@@ -160,7 +163,6 @@ def get_bound_id(wave_bound, source_wave, within_bound=True):
     return [id_lo, id_hi]
 
 def get_mgrid_np(num_rows, num_cols, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
-    #def get_mgrid_np(self, sidelen, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
     """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version).
     """
     x = np.linspace(lo, hi, num=num_cols)
