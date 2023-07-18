@@ -1004,9 +1004,8 @@ def scale_trans(trans, source_trans):
     nbands = trans.shape[0]
     for i in range(nbands):
         cur_trans, cur_source_trans = trans[i], source_trans[i]
-        print('*', cur_trans, cur_trans.shape, np.sum(cur_trans))
-        trans[i] = trans[i] * np.sum(cur_source_trans) / np.sum(cur_trans)
-        assert 0
+        # if trans sum to 0, cur band is not covered
+        trans[i] = trans[i] * np.sum(cur_source_trans) / (np.sum(cur_trans) + 1e-10)
 
 def interpolate_trans(trans_data, spectra_data, fname=None, colors=None):
     """ Interpolate transmission data based on wave from spectra data.
@@ -1036,18 +1035,12 @@ def interpolate_trans(trans_data, spectra_data, fname=None, colors=None):
     spectra_trans = []
     for cur_source_trans in source_trans:
         f = interp1d(trans_wave, cur_source_trans)
-        print(cur_source_trans)
-        print(trans_wave.dtype, cur_source_trans.dtype)
         spectra_trans.append(f(spectra_wave))
-        a = f(spectra_wave)
-        print(np.count_nonzero(a))
-        assert 0
     spectra_trans = np.array(spectra_trans) # [nbands,n]
 
     # pad interpolated transmission to the same length as original spectra data
     trans = np.full((nbands, n), 0).astype(np.float32)
     # new trans: [0,0,...,interpolated trans,0,0]
-    print(id_lo, id_hi, spectra_trans.shape)
     trans[:,id_lo:id_hi+1] = spectra_trans
 
     # normalize new transmission data (sum to same value as before)

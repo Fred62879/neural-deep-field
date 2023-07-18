@@ -270,8 +270,10 @@ class AstroDataset(Dataset):
                 out["trans"] = out["spectra_sup_data"][:,4:4+self.num_bands]    # [bsz,nbands,nsmpl]
                 out["trans_mask"] = out["spectra_sup_data"][:,3]                # [bsz,nsmpl]
                 out["band_mask"] = out["spectra_sup_data"][:,4+self.num_bands:] # [bsz,nbands,nsmpl]
-                # print( torch.sum(out["band_mask"], dim=-1) )
-                out["nsmpl"] = torch.sum(out["band_mask"], dim=-1)
+                # num of sample within each band (replace 0 with 1 to avoid division by 0)
+                nsmpl = torch.sum(out["band_mask"], dim=-1)
+                nsmpl[nsmpl == 0] = 1
+                out["nsmpl"] = nsmpl
 
             out["wave"] = out["spectra_sup_data"][:,0][...,None] # [bsz,nsmpl,1]
 

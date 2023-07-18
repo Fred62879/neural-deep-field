@@ -134,7 +134,6 @@ class HyperSpectralIntegrator(nn.Module):
             dp = torch.einsum("ij,ilj->il", spectra, trans)
         else:
             raise Exception("wrong dimension of transmission when doing integration")
-
         dp /= nsmpl
         return dp
 

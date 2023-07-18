@@ -611,14 +611,17 @@ class CodebookTrainer(BaseTrainer):
         log.info(f"gt redshift values: {self.redshift}")
 
     def _save_pixel_values(self):
+        # print(self.selected_ids)
         gt_vals = torch.stack(self.gt_pixel_vals).detach().cpu().numpy()[self.selected_ids,0]
         recon_vals = torch.stack(self.recon_pixel_vals).detach().cpu().numpy()[self.selected_ids]
         # fname = join(self.pixel_val_dir, f"model-ep{self.epoch}-it{self.iteration}.pth")
         # np.save(fname, vals)
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
-        ratio = gt_vals / recon_vals
-        log.info(f"gt/recon ratio: {ratio}")
+        ratio = recon_vals / gt_vals
+        log.info(f"recon/gt ratio: {ratio}")
+        # log.info(gt_vals)
+        # log.info(recon_vals)
 
     def _save_qtz_weights(self):
         weights = torch.stack(self.qtz_weights).detach().cpu().numpy()
@@ -642,10 +645,6 @@ class CodebookTrainer(BaseTrainer):
             self.num_sup_spectra, -1).detach().cpu().numpy()[self.selected_ids]
         self.spectra_masks = torch.stack(self.spectra_masks).bool().view(
             self.num_sup_spectra, -1).detach().cpu().numpy()[self.selected_ids]
-
-        # print(self.gt_fluxes.shape, self.recon_fluxes.shape,
-        #       self.spectra_masks.shape, self.spectra_wave.shape)
-        # print(self.spectra_masks[0])
 
         fname = f"ep{self.epoch}-it{self.iteration}"
         self.dataset.plot_spectrum(
