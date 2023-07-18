@@ -40,50 +40,51 @@ class HyperSpectralIntegrator(nn.Module):
             "hardcode": {
                 "identity": self.identity,
                 "dot_prod": self.dot_prod_hdcd,
-                "trapezoid": self.trapezoid_hdcd,
-                "simpson": self.simpson_hdcd
+                #"trapezoid": self.trapezoid_hdcd,
+                #"simpson": self.simpson_hdcd
             },
             "bandwise": {
                 "identity": self.identity,
                 "dot_prod": self.dot_prod_bdws,
-                "trapezoid": self.trapezoid_bdws,
-                "simpson": self.simpson_bdws
+                #"trapezoid": self.trapezoid_bdws,
+                #"simpson": self.simpson_bdws
             },
             "mixture": {
                 "identity": self.identity,
                 "dot_prod": self.dot_prod_mix,
-                "trapezoid": self.trapezoid_mix,
-                "simpson": self.simpson_mix
+                #"trapezoid": self.trapezoid_mix,
+                #"simpson": self.simpson_mix
             }
         }
 
     def register_function(self):
         self.integrate = self.funcs[self.trans_sample_method][self.integration_method]
 
-    def forward(self, spectra, trans, nsmpl):
+    def forward(self, spectra, trans, trans_mask, nsmpl):
         """ @Param
               spectra: [bsz,nsmpl]
               trans:   train [bsz,nbands,nsmpl]
                        infer [nbands,nsmpl]
+              trans_mask: mask for trans
               nsmpl:   train [bsz,nbands]/[1,]
                        infer [nbands]/[1,]
             @Return
               pixl_val [bsz,nbands]
         """
-        return self.integrate(spectra, trans, nsmpl)
+        return self.integrate(spectra, trans, trans_mask, nsmpl)
 
     #############
     # Helper methods
     #############
 
-    def identity(self, spectra, trans, nsmpl):
+    def identity(self, spectra, trans, trans_mask, nsmpl):
         return spectra
 
     # @dot product
-    def dot_prod_hdcd(self, spectra, trans, nsmpl):
+    def dot_prod_hdcd(self, spectra, trans, trans_mask, nsmpl):
         return torch.einsum("ij,lj->il", spectra, trans) / nsmpl
 
-    def dot_prod_nonuniform_bdws(self, spectra, trans, nsmpl):
+    def dot_prod_nonuniform_bdws(self, spectra, trans, trans_mask, nsmpl):
         """ Wave is sampled according to the transmission function
               thus only need to sum up spectra values.
         """
@@ -107,7 +108,7 @@ class HyperSpectralIntegrator(nn.Module):
             raise ValueError("Wrong transmission dimension when doing integration.")
         return res
 
-    def dot_prod_uniform_bdws(self, spectra, trans):
+    def dot_prod_uniform_bdws(self, spectra, trans, trans_mask):
         if trans.ndim == 2:   # infer (img & spectra)
             res = torch.einsum("ij,kj->ik", spectra, trans)
         elif trans.ndim == 3: # train
@@ -119,45 +120,50 @@ class HyperSpectralIntegrator(nn.Module):
         res /= kwargs["nsmpl_within_each_band"]  # average pixel value
         return res
 
-    def dot_prod_bdws(self, spectra, trans, nsmpl):
+    def dot_prod_bdws(self, spectra, trans, trans_mask, nsmpl):
         if self.unismpl: res = self.dot_prod_uniform_bdws(spectra, kwargs)
         else: res = self.dot_prod_nonuniform_bdws(spectra, kwargs)
         return res
 
-    def dot_prod_mix(self, spectra, trans, nsmpl):
+    def dot_prod_mix(self, spectra, trans, trans_mask, nsmpl):
+        if trans_mask is not None:
+            print(trans.shape, trans_mask.shape, nsmpl)
+            assert 0
+            trans = trans * trans_mask
         if trans.ndim == 2:   # infer
             dp = torch.einsum("ij,kj->ik", spectra, trans)
         elif trans.ndim == 3: # train
             dp = torch.einsum("ij,ilj->il", spectra, trans)
         else:
             raise Exception("wrong dimension of transmission when doing integration")
+
         dp /= nsmpl
         return dp
 
-    # @trapezoid
-    def trapezoid_hdcd(self, spectra, trans, nsmpl):
-        return torch.stack([torch.trapezoid(spectra * trans)
-                            for trans in transms]).T  / self.nsmpl
+    # # @trapezoid
+    # def trapezoid_hdcd(self, spectra, trans, nsmpl):
+    #     return torch.stack([torch.trapezoid(spectra * trans)
+    #                         for trans in transms]).T  / self.nsmpl
 
-    def trapezoid_bdws(self, spectra, trans, nsmpl):
-        return torch.stack([torch.trapezoid(spectra[:,band] * trans[:,band])
-                            for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]
+    # def trapezoid_bdws(self, spectra, trans, nsmpl):
+    #     return torch.stack([torch.trapezoid(spectra[:,band] * trans[:,band])
+    #                         for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]
 
-    def trapezoid_mix(self, spectra, trans, nsmpl):
-        return torch.stack([torch.trapezoid(spectra * kwargs["trans"][:,band])
-                            for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]
-    # @simpsons
-    def simpson_hdcd(self, spectra, trans, nsmpl):
-        # integration across all channels
-        return torch.stack([self.simpson(spectra * trans)
-                            for trans in transms]).T  / self.nsmpl
+    # def trapezoid_mix(self, spectra, trans, nsmpl):
+    #     return torch.stack([torch.trapezoid(spectra * kwargs["trans"][:,band])
+    #                         for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]
+    # # @simpsons
+    # def simpson_hdcd(self, spectra, trans, nsmpl):
+    #     # integration across all channels
+    #     return torch.stack([self.simpson(spectra * trans)
+    #                         for trans in transms]).T  / self.nsmpl
 
-    def simpson_bdws(self, spectra, trans, nsmpl):
-        # integration across all channels
-        return torch.stack([self.simpson(spectra[:,band] * trans[:,band])
-                            for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]
+    # def simpson_bdws(self, spectra, trans, nsmpl):
+    #     # integration across all channels
+    #     return torch.stack([self.simpson(spectra[:,band] * trans[:,band])
+    #                         for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]
 
-    def simpson_mix(self, spectra, trans, nsmpl):
-        # integration across all channels
-        return torch.stack([self.simpson(spectra * kwargs["trans"][:,band])
-                            for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]
+    # def simpson_mix(self, spectra, trans, nsmpl):
+    #     # integration across all channels
+    #     return torch.stack([self.simpson(spectra * kwargs["trans"][:,band])
+    #                         for band in range(self.num_bands)]).T / kwargs["nsmpl_within_each_band"]

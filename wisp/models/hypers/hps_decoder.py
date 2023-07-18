@@ -89,6 +89,7 @@ class HyperSpectralDecoder(nn.Module):
 
     def forward(self, latents,
                 wave, trans, nsmpl, full_wave_bound,
+                trans_mask=None,
                 full_wave=None, num_spectra_coords=-1,
                 codebook=None, qtz_args=None, ret=None):
         """ @Param
@@ -140,6 +141,6 @@ class HyperSpectralDecoder(nn.Module):
             codebook, qtz_args)
         timer.check("hps_decoder::spectra reconstruced")
 
-        intensity = self.inte(ret["spectra"], trans, nsmpl)
+        intensity = self.inte(ret["spectra"], trans, trans_mask, nsmpl)
         ret["intensity"] = intensity
         timer.check("hps_decoder::integration done")

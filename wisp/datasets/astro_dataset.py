@@ -36,6 +36,7 @@ class AstroDataset(Dataset):
 
         self.root = kwargs["dataset_path"]
         self.space_dim = kwargs["space_dim"]
+        self.num_bands = kwargs["num_bands"]
 
         if self.space_dim == 3:
             self.unbatched_fields = {
@@ -236,8 +237,6 @@ class AstroDataset(Dataset):
         elif field == "spectra_sup_redshift":
             data = self.spectra_dataset.get_supervision_redshift()
             data = self.index_selected_data(data, idx)
-        # elif field == "spectra_sup_wave_bound_ids":
-        #     data = self.spectra_dataset.get_supervision_wave_bound_ids()
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
         else:
@@ -250,9 +249,8 @@ class AstroDataset(Dataset):
         out["wave_range"] = self.get_wave_range()
 
         if self.wave_source == "spectra":
-            if self.perform_integration:
-                # TODO: interpolate transmission
-                assert 0
+            # spectra_sup_data: [bsz,4+2*nbands,nsmpl]
+            #  (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
 
             if self.sample_wave:
                 # sample from spectra data (wave, flux, ivar, and interpolated trans)
@@ -260,11 +258,19 @@ class AstroDataset(Dataset):
                 out["spectra_sup_data"], sample_ids = batch_sample_torch(
                     out["spectra_sup_data"], self.kwargs["pretrain_num_wave_samples"],
                     keep_sample_ids=True)
-                out["spectra_sup_mask"] = batch_uniform_sample_torch(
+                out["spectra_sup_mask"] = batch_sample_torch(
                     out["spectra_sup_mask"], self.kwargs["pretrain_num_wave_samples"],
                     sample_ids=sample_ids)
+                print(sample_ids.shape)
+            # else: sample_ids =
 
-            out["wave"] = out["spectra_sup_data"][:,0][...,None] # [bsz,nsmpl]
+            if self.perform_integration:
+                out["trans"] = out["spectra_sup_data"][:,4:4 + self.num_bands]
+                out["trans_mask"] = out["spectra_sup_data"][:,3]
+                out["band_mask"] = out["spectra_sup_data"][:,4 + self.num_bands:]
+
+
+            out["wave"] = out["spectra_sup_data"][:,0][...,None] # [bsz,nsmpl,1]
 
         elif self.wave_source == "trans":
             # These are not batched, we do sampling at every step.

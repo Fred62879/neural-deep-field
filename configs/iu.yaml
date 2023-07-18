@@ -26,7 +26,7 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    tasks: ['train','save_redshift_during_train','recon_gt_spectra_during_train','recon_img_during_train','save_qtz_weights_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
+    #tasks: ['train','save_redshift_during_train','recon_gt_spectra_during_train','recon_img_during_train','save_qtz_weights_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
     #tasks: ['infer','recon_gt_spectra','recon_img','recon_codebook_spectra_individ','save_qtz_weights','save_redshift','save_scaler']
 
 optimizer:
@@ -156,7 +156,7 @@ trainer:
 
     batched_pretrain: True
     learn_spectra_within_wave_range: True
-    codebook_pretrain_pixel_supervision: False
+    codebook_pretrain_pixel_supervision: True
 
     pixel_supervision: False          # these two conflict
     train_spectra_pixels_only: True #  each other
@@ -187,7 +187,7 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 50
+    num_supervision_spectra: 20
     spectra_neighbour_size: 1
 
 infer:
@@ -298,7 +298,7 @@ dataset:
 
     spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
     spectra_patches_r: ['1'] #['0','1','2','3','4','5','6','7','8']
-    spectra_patches_c: ['2','5'] #['0','1','2','3','4','5','6','7','8']
+    spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
     processed_spectra_cho: "test" #"wave_6000_to_8000"

@@ -48,31 +48,33 @@ class CodebookPretrainNerf(BaseNeuralField):
             _model_redshift=self.model_redshift,
             **self.kwargs)
 
-    def pretrain(self, coords, wave, wave_range, trans=None,
-                 nsmpl=None, qtz_args=None, specz=None
+    def pretrain(self, coords, wave, wave_range,
+                 trans=None, trans_mask=None, nsmpl=None, qtz_args=None, specz=None
     ):
         """ Pretrain codebook.
             @Param
               coords: trainable latent variable [num_supervision_spectra,1,latent_dim]
-              wave:   full wave [bsz,nsmpl,1]
+              wave:   lambda values [bsz,nsmpl,1]
+              wave_range: range of lambda used for linear norm [2] (min/max)
+              trans:  transmission values (padded with -1 at two ends)
+              trans_mask: mask for trans (0 for padded region, 1 for actual trans region)
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.check("forward starts")
-        # ids = torch.tensor([8,3,45,1,47,7,9 ,14 ,20 ,19 ,11 ,42 ,23 ,26 ,12  ,5 ,40 ,33, 38, 48])
-        # print(wave.shape, wave[...,0][ids])
 
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]
         coords = coords[:,None]
-        # print(wave.shape, wave[...,0])
+
         # `latents` is either logits or qtz latents or latents
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)
         timer.check("spatial decoding done")
 
         self.hps_decoder(
             latents, wave, trans, nsmpl, wave_range,
-            codebook=self.codebook, qtz_args=qtz_args, ret=ret)
-
+            trans_mask=trans_mask,
+            codebook=self.codebook,
+            qtz_args=qtz_args, ret=ret
+        )
         timer.check("hps decoding done")
-
         return ret

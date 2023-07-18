@@ -225,7 +225,7 @@ class TransData:
 
     def load_source_wave_trans(self):
         """ Load source lambda and transmission data.
-            Assume sensors are in the following ordered:
+            Assume sensors are in the following order:
               ['g','r','i','z','y','nb387','nb816','nb921','u','u*']
             (NOTE: this function should be called locally to create
               base_wave and base_trans. the unagi_filters package on
@@ -351,7 +351,6 @@ class TransData:
                 (lo, hi) = get_bound_id(self.trusted_wave_bound, full_wave)
                 full_wave_masks = np.zeros(len(full_wave)).astype(bool)
                 full_wave_masks[lo:hi+1] = 1
-                # print(full_wave[full_wave_masks])
 
             np.save(self.encd_ids_fname, encd_ids)
             np.save(self.full_wave_fname, full_wave)
@@ -689,7 +688,7 @@ def interpolate_u_band(wave, trans, full_wave, smpl_interval):
 
 def scale_trans(trans, source_trans, bands):
     """ Scale transmission value for each band s.t. integration of transmission
-          before and after scaling remains the same.
+          before and after interpolation remains the same.
     """
     for band in bands:
         cur_trans, cur_source_trans = trans[band], source_trans[band]

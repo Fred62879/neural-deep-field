@@ -140,7 +140,7 @@ def get_bound_id(wave_bound, source_wave, within_bound=True):
         source_wave = source_wave.numpy()
 
     wave_lo, wave_hi = wave_bound
-    wave_hi = int(min(wave_hi, int(max(source_wave))))
+    # wave_hi = int(min(wave_hi, int(max(source_wave))))
 
     if within_bound:
         if wave_lo <= min(source_wave): id_lo = 0
@@ -149,7 +149,6 @@ def get_bound_id(wave_bound, source_wave, within_bound=True):
         if wave_hi >= max(source_wave): id_hi = len(source_wave) - 1
         else: id_hi = np.argmax((source_wave > wave_hi)) - 1
 
-        # print('*', source_wave[id_lo], source_wave[id_hi])
         assert(source_wave[id_lo] >= wave_lo and source_wave[id_hi] <= wave_hi)
     else:
         if wave_lo <= min(source_wave): id_lo = 0

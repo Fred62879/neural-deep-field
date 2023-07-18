@@ -485,7 +485,10 @@ class SpectraData:
             world_coords.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["world_coord_fname"])))
 
-        self.data["gt_spectra"] = np.array(spectra).astype(np.float32) # [n,3,nsmpl]
+        # [n_spectra,4+2*nbands,nsmpl]
+        #  (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
+        self.data["gt_spectra"] = np.array(spectra).astype(np.float32)
+
         self.data["gt_spectra_mask"] = np.array(masks).astype(bool)
         self.data["gt_spectra_pixels"] = np.concatenate(pixels, axis=0).astype(np.float32)
         self.data["gt_spectra_redshift"] = np.array(redshift).astype(np.float32) # [n,]
@@ -730,6 +733,7 @@ class SpectraData:
             trans_range=self.trans_range,
             trusted_range=self.trusted_wave_range,
             max_spectra_len=self.kwargs["max_spectra_len"],
+            colors=self.kwargs["plot_colors"],
             trans_data=self.trans_obj.get_full_trans_data()
         )
         if gt_spectra is None: return
@@ -996,45 +1000,74 @@ def is_in_patch(ra, dec, wcs, num_rows, num_cols):
     x, y = wcs.wcs_world2pix(ra, dec, 0)
     return x >= 0 and y >= 0 and x < num_cols and y < num_rows
 
-def interpolate_trans(trans_data, spectra_data):
+def scale_trans(trans, source_trans):
+    nbands = trans.shape[0]
+    for i in range(nbands):
+        cur_trans, cur_source_trans = trans[i], source_trans[i]
+        trans[i] = trans[i] * np.sum(cur_source_trans) / np.sum(cur_trans)
+
+def interpolate_trans(trans_data, spectra_data, fname=None, colors=None):
     """ Interpolate transmission data based on wave from spectra data.
-         sure we stick to the same range of wave)
+        Discretization interval for trans data is 10, which is way larger
+          than that of spectra_data.
         @Param
-          trans_data: [nsmpl,1+nbands] (wave/trans)
-          spectra_data: [nsmpl,3] (wave,flux,ivar)
+          trans_data: [nsmpl_t,1+nbands] (wave/trans)
+          spectra_data: [3,nsmpl_s] (wave,flux,ivar)
         @Return
-          trans: interpolated transmission value
           trans_mask: mask for trans (outside trans wave is 0)
+          trans: interpolated transmission value
+          band_mask: mask for trans of each band (outside band cover range is 0)
     """
+    n = spectra_data.shape[1]
+    nbands = trans_data.shape[1] - 1
+
+    source_trans = trans_data[:,1:].T
     trans_wave = trans_data[:,0]
-    trans = trans_data[:,1:].T
-    spectra_wave = spectra_data[:,0]
+    spectra_wave = spectra_data[0]
+
+    # clip spectra wave to be within transmission wave range
     trans_wave_range = [min(trans_wave), max(trans_wave)]
-    print(trans_wave)
-    print(spectra_wave)
     (id_lo, id_hi) = get_bound_id(trans_wave_range, spectra_wave)
-    print(id_lo, id_hi)
-    print(trans_wave)
-    print(trans_wave_range, spectra_wave[id_lo], spectra_wave[id_hi])
     spectra_wave = spectra_wave[id_lo:id_hi+1]
 
-    interp_trans = []
-    for cur_trans in trans:
-        print(trans_wave.shape, trans.shape, cur_trans.shape)
-        f = interp1d(trans_wave, cur_trans)
-        interp_trans.append(f(spectra_wave))
-    print(interp_trans[0].shape)
-    interp_trans = np.concatenate(interp_trans)
-    print(interp_trans.shape)
+    # interpolate source transmission to same discretization value as spectra wave
+    spectra_trans = []
+    for cur_source_trans in source_trans:
+        f = interp1d(trans_wave, cur_source_trans)
+        spectra_trans.append(f(spectra_wave))
+    spectra_trans = np.array(spectra_trans) # [nbands,n]
 
-    n = spectra_data.shape[0]
-    trans = np.full((n,1),-1)
-    trans_mask = np.zeros((n,1))
-    trans[id_lo:id_hi+1] = interp_trans
+    # pad interpolated transmission to the same length as original spectra data
+    trans = np.full((nbands, n), 0).astype(np.float32)
+    # new trans: [0,0,...,interpolated trans,0,0]
+    trans[:,id_lo:id_hi+1] = spectra_trans
+
+    # normalize new transmission data (sum to same value as before)
+    # for i in range(nbands): print(sum(trans[i]))
+    scale_trans(trans, source_trans)
+    # for i in range(nbands): print(sum(trans[i]))
+
+    trans_mask = np.zeros(n)
+    # trans mask: [0,0,1(interpolated trans range)1,0,0]
     trans_mask[id_lo:id_hi+1] = 1
-    ret = np.concatenate((trans, trans_mask), axis=-1)
-    print(trans)
-    print(trans_mask)
+
+    band_mask = np.zeros((nbands, n))
+    for i in range(nbands):
+        band_mask[i][trans[i] != 0] = 1
+
+    if fname is not None:
+        plt.plot(spectra_data[0], trans_mask, label="trans_mask")
+        for j in range(nbands):
+            plt.plot(spectra_data[0], trans[j], color=colors[j])
+        plt.savefig(fname + "_trans_mask.png")
+        plt.close()
+
+        for j in range(nbands):
+            plt.plot(spectra_data[0], band_mask[j], color=colors[j])
+        plt.savefig(fname + "_band_mask.png")
+        plt.close()
+
+    ret = np.array([trans_mask] + list(trans) + list(band_mask))
     return ret
 
 def pad_spectra(spectra, max_len):
@@ -1083,7 +1116,8 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
                        full_wave, smpl_interval,
                        sigma=-1, format="tbl",
                        trans_range=None, trusted_range=None,
-                       save=True, plot=True, trans_data=None,
+                       save=True, plot=True,
+                       colors=None, trans_data=None,
                        max_spectra_len=-1, validator=None
 ):
     """ Load gt spectra wave and flux for spectra supervision and
@@ -1118,9 +1152,11 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
     mask_spectra_range(spectra, mask, trans_range, trusted_range)
     spectra = spectra.astype(np.float32)
     if trans_data is not None:
-        interp_trans_data = interpolate_trans(trans_data, spectra)
-        spectra = np.concatenate((spectra, interp_trans_data), axis=-1)
-        assert 0
+        interp_trans_data = interpolate_trans(
+            trans_data, spectra, fname=spectra_fname, colors=colors
+        )
+        spectra = np.concatenate((spectra, interp_trans_data), axis=0)
+        # [4+2*nbands,nsmpl] (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
 
     if save:
         np.save(spectra_fname + ".npy", spectra)
