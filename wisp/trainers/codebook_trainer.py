@@ -360,7 +360,7 @@ class CodebookTrainer(BaseTrainer):
             # re-init dataloader to make sure pixels are in order
             self.shuffle_dataloader = False
             self.use_all_pixels = True
-            self.sample_wave = False
+            self.sample_wave = True
             self.dataset.toggle_wave_sampling(self.sample_wave)
             self.set_num_batches()
             self.init_dataloader()

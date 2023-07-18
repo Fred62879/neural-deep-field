@@ -197,6 +197,7 @@ def forward(
         if perform_integration:
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
+            net_args["trans_mask"] = data["trans_mask"]
         if spectra_supervision:
             net_args["full_wave"] = data["full_wave"]
             # num of coords for gt, dummy (incl. neighbours) spectra

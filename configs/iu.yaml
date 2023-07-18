@@ -8,7 +8,7 @@ global:
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_redshift_during_train','save_qtz_weights_during_train']
+    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_pixel_values_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_redshift_during_train','save_qtz_weights_during_train']
     #tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ'] #,'save_redshift','save_qtz_weights']
 
     #tasks: ['infer','recon_img']
@@ -187,7 +187,7 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 20
+    num_supervision_spectra: 1000
     spectra_neighbour_size: 1
 
 infer:
@@ -211,7 +211,7 @@ infer:
     infer_selected: True
     pretrain_num_infer: 50
 
-    flux_norm_cho: "max"
+    flux_norm_cho: "sum"
     spectra_smooth_sigma: 50
     # spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]
     spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]
@@ -297,11 +297,11 @@ dataset:
     #gt_spectra_ids: [0] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
 
     spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['1'] #['0','1','2','3','4','5','6','7','8']
+    spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
-    processed_spectra_cho: "test" #"wave_6000_to_8000"
+    processed_spectra_cho: "v7_table"
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
     load_spectra_data_from_cache: True
