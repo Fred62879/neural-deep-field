@@ -15,7 +15,7 @@ def calculate_emd(distrib1, distrib2, norm="l2", mask=None, precision=None):
     # assert(distrib1.shape == distrib2.shape)
     sub = distrib1 - distrib2
     if mask is not None: sub *= mask
-    if precision is not None: sub *= precision
+    # if precision is not None: sub *= precision
 
     if norm == "l1":
         emd = torch.linalg.norm(sub, ord=1, dim=-1)

@@ -8,7 +8,7 @@ global:
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train'] #,'save_pixel_values_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
+    tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_redshift_during_train'] #,'save_pixel_values_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
     #tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ'] #,'save_redshift','save_qtz_weights']
 
     #tasks: ['infer','recon_img']
@@ -99,7 +99,7 @@ decoder:
 qtz:
     quantization_strategy: 'soft'
     qtz_latent_dim: 16
-    qtz_num_embed: 30
+    qtz_num_embed: 20
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
@@ -135,7 +135,7 @@ trainer:
     pixel_loss_cho: l1
     spectra_loss_cho: l2
     redshift_loss_cho: l2
-    num_epochs: 2000
+    num_epochs: 4000
     batch_size: 40960 #65536 #262144
     save_every: 400
     valid_every: -1
@@ -156,7 +156,7 @@ trainer:
 
     batched_pretrain: True
     learn_spectra_within_wave_range: True
-    codebook_pretrain_pixel_supervision: True
+    codebook_pretrain_pixel_supervision: False
 
     pixel_supervision: False          # these two conflict
     train_spectra_pixels_only: True #  each other
@@ -181,7 +181,7 @@ trainer:
     pretrain_log_dir: '20230714-115005' #'20230710-181343_pretrain_50_spectra_2k'
     pretrained_model_name: 'model-ep1200-it1.pth'
 
-    pretrain_num_wave_samples: 819
+    pretrain_num_wave_samples: 1000
     main_train_num_wave_samples: 40
     uniform_sample_wave: True
     mixture_avg_per_band: True
@@ -209,7 +209,7 @@ infer:
 
     # recon spectra
     infer_selected: True
-    pretrain_num_infer: 50
+    pretrain_num_infer: 20
 
     flux_norm_cho: "sum"
     spectra_smooth_sigma: 50
@@ -297,7 +297,7 @@ dataset:
     #gt_spectra_ids: [0] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
 
     spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['0','1'] #['0','1','2','3','4','5','6','7','8']
+    spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load

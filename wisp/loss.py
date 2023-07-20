@@ -10,6 +10,19 @@ def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     emd = torch.mean(torch.abs(emd))
     return emd
 
+def plotspectra(spectra):
+    spectra = spectra.detach().cpu().numpy()
+    import matplotlib.pyplot as plt
+    n,m = spectra.shape
+    x = np.arange(m)
+    fig, axs = plt.subplots(2,10,figsize=(50,10))
+    for i in range(n):
+        axis = axs[i//10,i%10]
+        axis.plot(x,spectra[i])
+    fig.tight_layout()
+    plt.savefig('tmp.png')
+    plt.close()
+
 def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
     ''' Loss function for spectra supervision
         @Param
@@ -24,6 +37,8 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
     #   if we save spectra later on the spectra will be inaccurate
     gt_flux = gt_spectra[:,1] / (torch.sum(gt_spectra[:,1]*mask, dim=-1)[...,None] + 1e-10)
     recon_flux = recon_flux / (torch.sum(recon_flux*mask, dim=-1)[...,None] + 1e-10)
+    # print(gt_flux.shape, recon_flux.shape)
+    # plotspectra(gt_flux)
 
     # sanity check, sum of unmasked flux should be same as bsz
     # gt_flux = torch.masked_select(gt_flux, mask.bool())
