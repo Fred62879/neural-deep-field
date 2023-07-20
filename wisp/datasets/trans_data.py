@@ -34,7 +34,7 @@ class TransData:
         self.wave_lo = kwargs["wave_lo"]
         self.wave_hi = kwargs["wave_hi"]
         self.u_scale = kwargs["u_band_scale"]
-        self.trans_threshold = kwargs["trans_threshold"]
+        # self.trans_threshold = kwargs["trans_threshold"]
         self.smpl_interval = kwargs["trans_sample_interval"]
         assert(self.smpl_interval == 10)
 
@@ -46,6 +46,19 @@ class TransData:
     #############
 
     def init_trans(self):
+        # hardcoded transmission range
+        self.trans_range = {
+            "g": [7,194],
+            "r": [6,214],
+            "i": [0,220],
+            "z": [5,150],
+            "y": [2,191],
+            "nb387": [0,17],
+            "nb816": [95,141],
+            "nb921": [0,51],
+            "u" : [0,48],
+            "u*": [1,210]
+        }
         self.data = {}
         if self.learn_trusted_spectra:
             self.trusted_wave_bound = [
@@ -276,8 +289,10 @@ class TransData:
             plt.plot(source_wave[i], source_trans[i])
         plt.savefig(self.source_trans_fname[:-4]+'.png'); plt.close()
 
-        source_wave =  { filter:source_wave[i]  for filter, i in zip(self.filters,self.filter_ids) }
-        source_trans = { filter:source_trans[i] for filter, i in zip(self.filters,self.filter_ids) }
+        source_wave =  { filter:source_wave[i]
+                         for filter, i in zip(self.filters,self.filter_ids) }
+        source_trans = { filter:source_trans[i]
+                         for filter, i in zip(self.filters,self.filter_ids) }
         return source_wave, source_trans
 
     def preprocess_wave_trans(self):
@@ -291,21 +306,25 @@ class TransData:
         else:
             source_wave, source_trans = self.load_source_wave_trans()
 
-            # transmission trimming
-            wave, trans = trim_wave_trans(
-                source_wave, source_trans, self.filters, self.trans_threshold)
+            wave, trans = remove_zero_pad(
+                source_wave, source_trans, self.filters, self.trans_range)
 
             # unify discretization interval for all bands
             unify_discretization_interval(wave, trans, self.filters, self.smpl_interval)
             scale_trans(trans, source_trans, self.filters)
             wave, trans = map2list(wave, trans, self.filters)
 
+            with open(self.processed_wave_fname, "wb") as fp:
+                pickle.dump(wave, fp)
+            with open(self.processed_trans_fname, "wb") as fp:
+                pickle.dump(trans, fp)
+
         # coverage range of lambda (in angstrom) for each band [nbands]
         band_coverage_range = [cur_wave[-1] - cur_wave[0] for cur_wave in wave]
         np.save(self.band_coverage_range_fname, band_coverage_range)
 
         # number of lambda samples for each band [nbands]
-        nsmpl_within_bands = count_avg_nsmpl(wave, trans, self.trans_threshold)
+        nsmpl_within_bands = count_avg_nsmpl(self.trans_range.values())
         np.save(self.nsmpl_within_bands_fname, nsmpl_within_bands)
 
         integration = integrate_trans(wave, trans)
@@ -615,24 +634,73 @@ def get_bandwise_prob(unagi_wave_fn, unagi_trans_fn, threshold):
     rela_prob = prob/max(prob)
     return rela_prob
 
-def trim_wave_trans(wave, trans, bands, trans_threshold):
-    """ Trim away range where transmission value < threshold for each band.
+def remove_zero_pad(wave, trans, bands, trans_range):
+    """ Remove zero transmission values from two ends (hardcoded).
     """
     trimmed_wave, trimmed_trans = {}, {}
-
+    print(wave.keys())
     for band in bands:
         cur_wave, cur_trans = wave[band], trans[band]
-        start, n = -1, len(cur_wave)
-        for i in range(n):
-            if start == -1:
-                if cur_trans[i] > trans_threshold: start = i
-            else:
-                if cur_trans[i] <= trans_threshold or i == n - 1:
-                    trimmed_wave[band] = cur_wave[start:i]
-                    trimmed_trans[band] = cur_trans[start:i]
-                    break
-
+        (lo, hi) = trans_range[band]
+        if hi is None: hi = len(cur_trans)
+        trimmed_wave[band] = cur_wave[lo:hi]
+        trimmed_trans[band] = cur_trans[lo:hi]
     return trimmed_wave, trimmed_trans
+
+def count_avg_nsmpl(trans_range):
+    return np.array([measure_one_band(cur_range) for cur_range in trans_range])
+
+# def count_avg_nsmpl(wave, trans, threshold):
+#     """ For each band, count # of wave samples with above-thresh trans val.
+#     """
+#     return np.array([measure_one_band(cur_wave, cur_trans, threshold, 0)
+#                      for cur_wave, cur_trans in zip(wave, trans)])
+
+def measure_one_band(trans_range):
+    lo, hi = trans_range
+    return hi - lo
+
+# def measure_one_band(wave, trans, threshold, cho):
+#     """ Measure num/range of lambda where band has above-thresh trans val.
+#     """
+#     start, n = -1, len(trans)
+#     for i in range(n):
+#         if start == -1:
+#             if trans[i] > threshold: start = i
+#         else:
+#             if trans[i] < threshold or i == n - 1:
+#                 if cho == 0: val = int(i - start)
+#                 else: val = int(wave[i] - wave[start])
+#                 return val
+#     assert(False)
+
+# def measure_all_bands(wave, trans, threshold):
+#     """ For each band, measure num/range of lambda with above-thresh trans val.
+#     """
+#     return np.array([measure_one_band(wave, trans, threshold, 1)
+#                      for cur_wave, cur_trans in zip(wave, trans)])
+
+def measure_all_bands(trans_range):
+    """ For each band, measure num/range of lambda with above-thresh trans val.
+    """
+    return np.array([measure_one_band(cur_range) for cur_range in trans_range])
+
+# def trim_wave_trans(wave, trans, bands, trans_threshold):
+#     """ Trim away range where transmission value < threshold for each band.
+#     """
+#     trimmed_wave, trimmed_trans = {}, {}
+#     for band in bands:
+#         cur_wave, cur_trans = wave[band], trans[band]
+#         start, n = -1, len(cur_wave)
+#         for i in range(n):
+#             if start == -1:
+#                 if cur_trans[i] > trans_threshold: start = i
+#             else:
+#                 if cur_trans[i] <= trans_threshold or i == n - 1:
+#                     trimmed_wave[band] = cur_wave[start:i]
+#                     trimmed_trans[band] = cur_trans[start:i]
+#                     break
+#     return trimmed_wave, trimmed_trans
 
 def unify_discretization_interval(wave, trans, bands, new_smpl_interval):
     """ Make sample interval the same for all bands.
@@ -725,12 +793,6 @@ def integrate_trans(wave, trans, cho=0):
     else: raise Exception("Unsupported integration choice")
     return np.array(inte)
 
-def count_avg_nsmpl(wave, trans, threshold):
-    """ For each band, count # of wave samples with above-thresh trans val.
-    """
-    return np.array([measure_one_band(cur_wave, cur_trans, threshold, 0)
-                     for cur_wave, cur_trans in zip(wave, trans)])
-
 def convert_to_dict(wave, trans):
     dicts = []
     for cur_wave, cur_trans in zip(wave, trans):
@@ -774,26 +836,6 @@ def integrate_enrgy(wave, trans, width):
     inte = sum(np.array(trans) * np.array(wave)/1000)
     inte = width * inte / len(trans)
     return round(inte, 2)
-
-def measure_one_band(wave, trans, threshold, cho):
-    """ Measure num/range of lambda where band has above-thresh trans val.
-    """
-    start, n = -1, len(trans)
-    for i in range(n):
-        if start == -1:
-            if trans[i] > threshold: start = i
-        else:
-            if trans[i] < threshold or i == n - 1:
-                if cho == 0: val = int(i - start)
-                else: val = int(wave[i] - wave[start])
-                return val
-    assert(False)
-
-def measure_all_bands(wave, trans, threshold):
-    """ For each band, measure num/range of lambda with above-thresh trans val.
-    """
-    return np.array([measure_one_band(wave, trans, threshold, 1)
-                     for cur_wave, cur_trans in zip(wave, trans)])
 
 def average(wave, trans):
     """ Calculate mixture sampling distribution function.

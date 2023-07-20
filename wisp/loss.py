@@ -15,7 +15,8 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
         @Param
           loss: l1/l2 as specified in config
           mask:       [bsz,num_smpls]
-          gt_spectra: [bsz,3,num_smpls] (wave/flux/ivar)
+          gt_spectra: [bsz,4+2*nbanbds,num_smpls]
+                      (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
           recon_flux: [bsz,num_smpls]
     '''
     # norm spectra each so they sum to 1 (earth movers distance)
@@ -29,7 +30,7 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
     # recon_flux = torch.masked_select(recon_flux, mask.bool())
     # print(torch.sum(gt_flux), torch.sum(recon_flux))
 
-    emd = calculate_emd(gt_flux, recon_flux, mask=mask)
+    emd = calculate_emd(gt_flux, recon_flux, mask=mask, precision=gt_spectra[:,2])
     emd = torch.mean(torch.abs(emd))
     return emd
 

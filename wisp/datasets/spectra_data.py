@@ -417,6 +417,8 @@ class SpectraData:
         supervision_ids = np.array(list(set(ids) - set(validation_ids))).astype(int)
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra"]]
+        print(supervision_ids)
+        # print(self.data["gt_spectra_ids"])
 
         self.num_validation_spectra = len(validation_ids)
         self.num_supervision_spectra = len(supervision_ids)
@@ -431,6 +433,7 @@ class SpectraData:
         self.data["supervision_spectra"] = self.data["gt_spectra"][sup_ids]
         self.data["supervision_mask"] = self.data["gt_spectra_mask"][sup_ids]
         self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][sup_ids]
+        print('*', self.data["gt_spectra_redshift"][sup_ids])
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][sup_ids]
 
@@ -722,21 +725,24 @@ class SpectraData:
         np.save(join(self.processed_spectra_path, world_coord_fname), world_coords)
 
         # process source spectra and save locally
-        gt_spectra, mask = process_gt_spectra(
-            join(self.source_spectra_path, spectra_fname),
-            join(self.processed_spectra_path, fname),
-            join(self.processed_spectra_path, mask_fname),
-            self.full_wave,
-            self.wave_discretz_interval,
-            sigma=self.smooth_sigma,
-            format=self.spectra_data_format,
-            trans_range=self.trans_range,
-            trusted_range=self.trusted_wave_range,
-            max_spectra_len=self.kwargs["max_spectra_len"],
-            colors=self.kwargs["plot_colors"],
-            trans_data=self.trans_obj.get_full_trans_data()
-        )
-        if gt_spectra is None: return
+        try:
+            gt_spectra, mask = process_gt_spectra(
+                join(self.source_spectra_path, spectra_fname),
+                join(self.processed_spectra_path, fname),
+                join(self.processed_spectra_path, mask_fname),
+                self.full_wave,
+                self.wave_discretz_interval,
+                sigma=self.smooth_sigma,
+                format=self.spectra_data_format,
+                trans_range=self.trans_range,
+                trusted_range=self.trusted_wave_range,
+                max_spectra_len=self.kwargs["max_spectra_len"],
+                colors=self.kwargs["plot_colors"],
+                trans_data=self.trans_obj.get_full_trans_data()
+            )
+        except Exception as e:
+            log.info(e)
+        # if gt_spectra is None: return
 
         cur_patch_spectra.append(gt_spectra)
         cur_patch_spectra_mask.append(mask)
@@ -1071,22 +1077,45 @@ def interpolate_trans(trans_data, spectra_data, fname=None, colors=None):
     ret = np.array([trans_mask] + list(trans) + list(band_mask))
     return ret
 
-def pad_spectra(spectra, max_len):
+def convolve_spectra(spectra, std=140, border=True):
+    """ Smooth gt spectra with given std.
+        If border is True, we add 1 padding at two ends when convolving.
+    """
+    if std <= 0: return
+    kernel = Gaussian1DKernel(stddev=std)
+    if border:
+        nume = convolve(spectra[1], kernel)
+        denom = convolve(np.ones(spectra.shape[1]), kernel)
+        spectra[1] = nume / denom
+    spectra[1] = convolve(spectra[1], kernel)
+    return spectra
+
+def create_spectra_mask(spectra, max_spectra_len):
+    m, n = spectra.shape
+    if n == max_spectra_len: mask = np.ones(n).astype(bool)
+    else: mask = np.zeros(n).astype(bool)
+    return mask
+
+def clean_flux(spectra, mask):
+    """ Replace `inf` `-inf` `nan` in flux with 0 and mask out.
+    """
+    ids = np.isnan(spectra[1])
+    ids = ids | (spectra[1] == np.inf)
+    ids = ids | (spectra[1] == -np.inf)
+    mask[ids] = 0
+    spectra[1][ids] = 0
+    return spectra, mask
+
+def pad_spectra(spectra, mask, max_len):
     """ Pad spectra if shorter than max_len.
         Create mask to ignore values in padded region.
     """
     m, n = spectra.shape
-    if n == max_len:
-        mask = np.ones(n).astype(bool)
-    else:
-        assert n < max_len
-        mask = np.zeros(n).astype(bool)
-        offset = max_len - n
-        ret = np.full((m,max_len),-1)
-
-        mask[offset//2:offset//2+n] = 1
-        ret[:,offset//2:offset//2+n] = spectra
-        spectra = ret
+    offset = max_len - n
+    ret = np.full((m,max_len),-1)
+    mask[offset//2:offset//2+n] = 1
+    ret[:,offset//2:offset//2+n] = spectra
+    spectra = ret
     return spectra, mask
 
 def mask_spectra_range(spectra, mask, trans_range, trusted_range):
@@ -1105,13 +1134,7 @@ def mask_spectra_range(spectra, mask, trans_range, trusted_range):
     new_mask = np.zeros(n).astype(bool)
     new_mask[id_lo:id_hi+1] = 1
     mask &= new_mask
-
-def clean_flux(flux):
-    """ Replace `inf` `-inf` `nan` in flux with 0.
-    """
-    flux[np.isnan(flux)] = 0
-    flux[flux == np.inf] = 0
-    flux[flux == -np.inf] = 0
+    return spectra, mask
 
 def process_gt_spectra(infname, spectra_fname, mask_fname,
                        full_wave, smpl_interval,
@@ -1123,35 +1146,26 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
 ):
     """ Load gt spectra wave and flux for spectra supervision and
           spectrum plotting. Also smooth the gt spectra.
-        Note, the gt spectra has significantl larger discretization values than
-          the transmission data. If requried, interpolate with same discretization.
+        Note, the gt spectra has significantly larger discretization values than
+          the transmission data.
 
         @Param
           infname: filename of np array that stores the gt spectra data.
           spectra_fname: output filename to store processed gt spectra (wave & flux)
           mask_fname: output filename to store processed gt spectra (wave & flux)
-          full_wave: all lambda values for the transmission data.
-          smpl_interval: discretization values of the transmission data.
         @Save
           gt_wave/spectra: spectra data with the corresponding lambda values.
     """
-    try:
-        spectra = unpack_gt_spectra(infname, format=format)
-    except Exception as e:
-        log.info(f"{e}")
-        log.info(f"{infname}")
-        return None, None
+    spectra = unpack_gt_spectra(infname, format=format) # [4+2*nbands,nsmpl]
+    assert spectra.shape[1] <= max_spectra_len
+    mask = create_spectra_mask(spectra, max_spectra_len)
 
-    clean_flux(spectra[1])
-    if sigma > 0: # smooth spectra
-        try:
-            spectra[1] = convolve_spectra(spectra[1], std=sigma)
-        except Exception as e:
-            log.info(e)
-
-    spectra, mask = pad_spectra(spectra, max_spectra_len)
-    mask_spectra_range(spectra, mask, trans_range, trusted_range)
+    spectra, mask = clean_flux(spectra, mask)
+    spectra = convolve_spectra(spectra, std=sigma)
+    spectra, mask = pad_spectra(spectra, mask, max_spectra_len)
+    spectra, mask = mask_spectra_range(spectra, mask, trans_range, trusted_range)
     spectra = spectra.astype(np.float32)
+
     if trans_data is not None:
         interp_trans_data = interpolate_trans(
             trans_data, spectra, fname=spectra_fname, colors=colors
@@ -1171,17 +1185,6 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
     if validator is not None and not validator(spectra_data):
         return None, None
     return spectra, mask
-
-def convolve_spectra(spectra, std=140, border=True):
-    """ Smooth gt spectra with given std.
-        If border is True, we add 1 padding at two ends when convolving.
-    """
-    kernel = Gaussian1DKernel(stddev=std)
-    if border:
-        nume = convolve(spectra, kernel)
-        denom = convolve(np.ones(spectra.shape), kernel)
-        return nume / denom
-    return convolve(spectra, kernel)
 
 def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
     gt = np.load(gt_fn)
@@ -1278,7 +1281,6 @@ def unpack_gt_spectra(fname, format="tbl"):
         wave, flux, ivar = data[wave_id], data[flux_id], data[ivar_id]
     else:
         raise ValueError(f"invalid spectra data format: {format}")
-
     spectra = np.array([wave, flux, ivar])
     return spectra
 

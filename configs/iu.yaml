@@ -8,7 +8,7 @@ global:
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_pixel_values_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_redshift_during_train','save_qtz_weights_during_train']
+    tasks: ['codebook_pretrain','recon_gt_spectra_during_train','save_redshift_during_train'] #,'save_pixel_values_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
     #tasks: ['pretrain_infer','recon_gt_spectra'] #,'recon_codebook_spectra_individ'] #,'save_redshift','save_qtz_weights']
 
     #tasks: ['infer','recon_img']
@@ -99,7 +99,7 @@ decoder:
 qtz:
     quantization_strategy: 'soft'
     qtz_latent_dim: 16
-    qtz_num_embed: 10
+    qtz_num_embed: 30
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
@@ -135,7 +135,7 @@ trainer:
     pixel_loss_cho: l1
     spectra_loss_cho: l2
     redshift_loss_cho: l2
-    num_epochs: 800
+    num_epochs: 2000
     batch_size: 40960 #65536 #262144
     save_every: 400
     valid_every: -1
@@ -187,7 +187,7 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 1000
+    num_supervision_spectra: 20
     spectra_neighbour_size: 1
 
 infer:
@@ -284,7 +284,7 @@ dataset:
 
     plot_trans: True
     trans_sample_method: 'mixture'
-    trans_threshold: 1e-3
+    trans_threshold: 1e-4
     hardcode_num_trans_samples: 12
     trans_sample_interval: 10
 
@@ -297,7 +297,7 @@ dataset:
     #gt_spectra_ids: [0] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
 
     spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
+    spectra_patches_r: ['0','1'] #['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
