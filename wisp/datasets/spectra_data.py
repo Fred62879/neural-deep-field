@@ -1106,17 +1106,23 @@ def clean_flux(spectra, mask):
     spectra[1][ids] = 0
     return spectra, mask
 
+def plotspectra(spectra, fname):
+    plt.plot(spectra[0], spectra[1])
+    plt.savefig(fname)
+    plt.close()
+
 def pad_spectra(spectra, mask, max_len):
     """ Pad spectra if shorter than max_len.
         Create mask to ignore values in padded region.
     """
     m, n = spectra.shape
     offset = max_len - n
-    ret = np.full((m,max_len),-1)
+    ret = np.full((m,max_len),-1).astype(spectra.dtype)
     mask[offset//2:offset//2+n] = 1
+    plotspectra(spectra, "tmp2.1.png")
     ret[:,offset//2:offset//2+n] = spectra
-    spectra = ret
-    return spectra, mask
+    plotspectra(ret, "tmp2.2.png")
+    return ret, mask
 
 def mask_spectra_range(spectra, mask, trans_range, trusted_range):
     """ Mask out spectra data beyond given wave range.
@@ -1156,15 +1162,27 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
         @Save
           gt_wave/spectra: spectra data with the corresponding lambda values.
     """
-    spectra = unpack_gt_spectra(infname, format=format) # [4+2*nbands,nsmpl]
+    def plotspectra(spectra, fname):
+        plt.plot(spectra[0], spectra[1])
+        plt.savefig(fname)
+        plt.close()
+
+    spectra = unpack_gt_spectra(infname, format=format) # [3,nsmpl]
     assert spectra.shape[1] <= max_spectra_len
     mask = create_spectra_mask(spectra, max_spectra_len)
+    plotspectra(spectra, "tmp0.png")
 
     spectra, mask = clean_flux(spectra, mask)
+    plotspectra(spectra, "tmp1.png")
     spectra = convolve_spectra(spectra, std=sigma)
+    plotspectra(spectra, "tmp2.png")
     spectra, mask = pad_spectra(spectra, mask, max_spectra_len)
+    plotspectra(spectra, "tmp3.png")
     spectra, mask = mask_spectra_range(spectra, mask, trans_range, trusted_range)
+    plotspectra(spectra, "tmp4.png")
     spectra = spectra.astype(np.float32)
+    plotspectra(spectra, "tmp5.png")
+    assert 0
 
     if trans_data is not None:
         interp_trans_data = interpolate_trans(
