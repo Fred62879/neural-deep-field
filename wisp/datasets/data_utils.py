@@ -119,6 +119,7 @@ def batch_sample_torch(data, nsmpl, sample_method="uniform", distrib=None,
         row_ids = torch.repeat_interleave(torch.arange(sp[0]), nsmpl).view(sp[0],nsmpl)
         sample_ids = torch.cat((row_ids[...,None],sample_ids[...,None]), dim=-1)
 
+    # print(sample_ids[0], sample_ids.shape)
     ret = data[sample_ids[...,0],...,sample_ids[...,1]]
     mid_axis = list(np.arange(2,len(sp)))
     reorded_axis = [0] + mid_axis + [1]

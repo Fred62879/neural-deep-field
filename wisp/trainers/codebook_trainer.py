@@ -652,11 +652,9 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["flux_norm_cho"],
             self.spectra_wave, self.gt_fluxes,
             self.spectra_wave, self.recon_fluxes,
-            save_spectra=True,
             clip=self.extra_args["plot_clipped_spectrum"],
             gt_masks=self.spectra_masks,
-            recon_masks=self.spectra_masks,
-            spectra_clipped=False,
+            recon_masks=self.spectra_masks
         )
 
     def _recon_codebook_spectra_individ(self):

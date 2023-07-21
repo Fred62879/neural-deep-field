@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_redshift_during_train'] #,'save_pixel_values_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra','save_qtz_weights'] #,'recon_codebook_spectra_individ'] #,'save_redshift']
+    #tasks: ['pretrain_infer','recon_gt_spectra','save_qtz_weights'] #,'recon_codebook_spectra_individ'] #,'save_redshift']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -58,7 +58,7 @@ embedder:
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 16
+    wave_embed_dim: 20
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -85,8 +85,8 @@ grid:
     codebook_bitwidth: 20
 
 decoder:
-    decoder_num_hidden_layers: 1
-    decoder_hidden_dim: 64
+    decoder_num_hidden_layers: 5
+    decoder_hidden_dim: 128
     decoder_layer_type: 'none'
     decoder_activation_type: "relu"
     decoder_skip_layers: []
@@ -99,8 +99,8 @@ decoder:
 
 qtz:
     quantization_strategy: 'soft'
-    qtz_latent_dim: 16
-    qtz_num_embed: 20
+    qtz_latent_dim: 20
+    qtz_num_embed: 6
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
@@ -139,7 +139,7 @@ trainer:
     pixel_loss_cho: l1
     spectra_loss_cho: l2
     redshift_loss_cho: l2
-    num_epochs: 20000
+    num_epochs: 4000
     batch_size: 75 #40960 #65536 #262144
     save_every: 400
     valid_every: -1
@@ -185,13 +185,13 @@ trainer:
     pretrain_log_dir: '20230714-115005' #'20230710-181343_pretrain_50_spectra_2k'
     pretrained_model_name: 'model-ep1200-it1.pth'
 
-    pretrain_num_wave_samples: 400
+    pretrain_num_wave_samples: 100
     main_train_num_wave_samples: 40
     uniform_sample_wave: True
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 20
+    num_supervision_spectra: 6
     spectra_neighbour_size: 1
 
 infer:
@@ -213,9 +213,9 @@ infer:
 
     # recon spectra
     infer_selected: True
-    pretrain_num_infer: 20
+    pretrain_num_infer: 6
 
-    flux_norm_cho: "none"
+    flux_norm_cho: "sum"
     spectra_smooth_sigma: 50
     # spectra_markers: ["o","v","^","<",">","1","2","3","4","+","x"]
     spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]
@@ -301,12 +301,12 @@ dataset:
     #gt_spectra_ids: [0] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
 
     spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
+    spectra_patches_r: ['0','1'] #['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
     source_spectra_cho: "" #"6000_to_8000"
-    processed_spectra_cho: "v7_table"
+    processed_spectra_cho: "debug2" #"v7_table" #"test"
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
     load_spectra_data_from_cache: True

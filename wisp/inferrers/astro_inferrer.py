@@ -644,11 +644,10 @@ class AstroInferrer(BaseInferrer):
             self.spectra_dir, model_id, self.extra_args["flux_norm_cho"],
             gt_wave, gt_fluxes,
             recon_wave, recon_fluxes,
-            mode=self.mode, save_spectra=True,
+            mode=self.mode,
             clip=self.extra_args["plot_clipped_spectrum"],
             gt_masks=gt_masks,
             recon_masks=recon_masks,
-            spectra_clipped=False
         )
 
         if self.log_pixel_value:

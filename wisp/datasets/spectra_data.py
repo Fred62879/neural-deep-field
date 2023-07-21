@@ -430,8 +430,6 @@ class SpectraData:
         supervision_ids = np.array(list(set(ids) - set(validation_ids))).astype(int)
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra"]]
-        # print(supervision_ids)
-        # print(self.data["gt_spectra_ids"])
 
         self.num_validation_spectra = len(validation_ids)
         self.num_supervision_spectra = len(supervision_ids)
@@ -1142,6 +1140,11 @@ def clean_flux(spectra, mask):
     spectra[1][ids] = 0
     return spectra, mask
 
+def mask_negative_flux(spectra, mask):
+    ids = (spectra[1] < 0)
+    mask[ids] = 0
+    return mask
+
 def mask_spectra_range(spectra, mask, trans_range, trusted_range):
     """ Mask out spectra data beyond given wave range.
         @Param
@@ -1166,7 +1169,8 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
                        trans_range=None, trusted_range=None,
                        save=True, plot=True,
                        colors=None, trans_data=None,
-                       max_spectra_len=-1, validator=None
+                       max_spectra_len=-1, validator=None,
+                       interpolate=False
 ):
     """ Load gt spectra wave and flux for spectra supervision and
           spectrum plotting. Also smooth the gt spectra.
@@ -1189,6 +1193,7 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
     spectra, mask = clean_flux(spectra, mask)
     spectra = convolve_spectra(spectra, std=sigma, bound=bound)
     spectra, mask = mask_spectra_range(spectra, mask, trans_range, trusted_range)
+    mask = mask_negative_flux(spectra, mask)
     spectra = spectra.astype(np.float32)
 
     if trans_data is not None:
@@ -1203,8 +1208,11 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
         np.save(mask_fname, mask)
     if plot:
         plt.plot(spectra[0], spectra[1])
-        plt.plot(spectra[0], mask)
         plt.savefig(spectra_fname + ".png")
+        plt.close()
+
+        plt.plot(spectra[0], mask)
+        plt.savefig(spectra_fname + "_mask.png")
         plt.close()
 
     if validator is not None and not validator(spectra_data):
