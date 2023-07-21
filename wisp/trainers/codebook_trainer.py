@@ -74,7 +74,7 @@ class CodebookTrainer(BaseTrainer):
             self.num_sup_spectra,
             self.extra_args["codebook_pretrain_latent_dim"]
         )
-        # log.info(self.train_pipeline)
+        log.info(self.train_pipeline)
         # log.info(self.infer_pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.train_pipeline.parameters()))

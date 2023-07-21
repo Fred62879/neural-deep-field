@@ -4,10 +4,11 @@ import torch.nn as nn
 
 from wisp.utils import PerfTimer
 from wisp.utils.common import print_shape
-from wisp.models.decoders import Decoder
-from wisp.models.layers import Normalization, Quantization
+from wisp.models.decoders import Decoder, BasicDecoder
+from wisp.models.activations import get_activation_class
 from wisp.models.hypers.hps_converter import HyperSpectralConverter
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
+from wisp.models.layers import Normalization, Quantization, get_layer_class
 
 
 class HyperSpectralDecoder(nn.Module):
@@ -23,11 +24,62 @@ class HyperSpectralDecoder(nn.Module):
         self.convert = HyperSpectralConverter(
             redshift_supervision=redshift_supervision, **kwargs
         )
-        self.spectra_decoder = Decoder(**kwargs)
+        self.init_decoder()
         self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
         if self.qtz_spectra:
             self.qtz = Quantization(False, **kwargs)
+
+    def get_input_dim(self):
+        if self.kwargs["space_dim"] == 2:
+
+            if self.kwargs["coords_encode_method"] == "positional_encoding":
+                assert(self.kwargs["decoder_activation_type"] == "relu")
+                input_dim = self.kwargs["coords_embed_dim"]
+
+            elif self.kwargs["coords_encode_method"] == "grid":
+                assert(self.kwargs["decoder_activation_type"] == "relu")
+                input_dim = get_input_latents_dim(**self.kwargs)
+            else:
+                assert(self.kwargs["decoder_activation_type"] == "sin")
+                input_dim = self.kwargs["space_dim"]
+
+        else: #if kwargs["space_dim"] == 3:
+            if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
+                latents_dim = self.kwargs["qtz_latent_dim"]
+            elif self.kwargs["decode_spatial_embedding"]:
+                latents_dim = self.kwargs["spatial_decod_output_dim"]
+            else:
+                latents_dim = get_input_latents_dim(**self.kwargs)
+
+            if self.kwargs["encode_wave"]:
+                if self.kwargs["hps_combine_method"] == "add":
+                    assert(self.kwargs["wave_embed_dim"] == latents_dim)
+                    input_dim = self.kwargs["wave_embed_dim"]
+                elif self.kwargs["hps_combine_method"] == "concat":
+                    input_dim = self.kwargs["wave_embed_dim"] + latents_dim
+
+            else: # coords and wave are not encoded
+                input_dim = 3
+        return input_dim
+
+    def get_output_dim(self):
+        if self.kwargs["space_dim"] == 2:
+            return self.kwargs["num_bands"]
+        return 1
+
+    def init_decoder(self):
+        input_dim = self.get_input_dim()
+        output_dim = self.get_output_dim()
+        # self.spectra_decoder = Decoder(**kwargs)
+        self.spectra_decoder = BasicDecoder(
+            input_dim, output_dim,
+            get_activation_class(self.kwargs["decoder_activation_type"]),
+            bias=True, layer=get_layer_class(self.kwargs["decoder_layer_type"]),
+            num_layers=self.kwargs["decoder_num_hidden_layers"] + 1,
+            hidden_dim=self.kwargs["decoder_hidden_dim"],
+            skip=self.kwargs["decoder_skip_layers"]
+        )
 
     def reconstruct_spectra(self, input, wave, scaler, redshift, wave_bound, ret,
                             codebook, qtz_args):

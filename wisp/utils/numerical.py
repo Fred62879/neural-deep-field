@@ -14,6 +14,7 @@ def calculate_emd(distrib1, distrib2, norm="l2", mask=None, precision=None):
     """
     # assert(distrib1.shape == distrib2.shape)
     sub = distrib1 - distrib2
+    n = sub.shape[-1]
     if mask is not None: sub *= mask
     # if precision is not None: sub *= precision
 
@@ -23,7 +24,7 @@ def calculate_emd(distrib1, distrib2, norm="l2", mask=None, precision=None):
         emd = torch.linalg.norm(sub, dim=-1)
     else:
         raise ValueError("Unsupported norm choice for emd calculation")
-    return emd
+    return emd / n
 
 def find_closest_tensor(tensor1, tensor2):
     ''' Calculate L2-normalized distance between the each tensor from tensor1 and

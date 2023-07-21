@@ -216,18 +216,18 @@ def define_cmd_line_args():
     decoder_group = parser.add_argument_group("decoder")
 
     decoder_group.add_argument("--decoder-layer-type", type=str, default="none",
-                            choices=["none", "spectral_norm", "frobenius_norm", "l_1_norm", "l_inf_norm"])
+                               choices=["none", "spectral_norm", "frobenius_norm",
+                                        "l_1_norm", "l_inf_norm"])
     decoder_group.add_argument("--decoder-activation-type", type=str,
-                           default="relu", choices=["relu", "sin"])
+                               default="relu", choices=["relu", "sin"])
     decoder_group.add_argument("--decoder-decoder-type", type=str,
-                           default="basic", choices=["none", "basic"])
-
-    decoder_group.add_argument("--decoder-num-layers", type=int, default=1,
-                           help="Number of layers for the decoder")
+                               default="basic", choices=["none", "basic"])
+    decoder_group.add_argument("--decoder-num-hidden-layers", type=int, default=1,
+                               help="Number of layers for the decoder")
     decoder_group.add_argument("--decoder-hidden-dim", type=int, default=128,
-                           help="Network width")
-    decoder_group.add_argument("--decoder-skip", type=int, default=None,
-                           help="Layer to have skip connection.")
+                               help="Network width")
+    decoder_group.add_argument("--decoder-skip-layers", nargs="+", type=int,
+                               help="Layer to have skip connection.")
 
     decoder_group.add_argument("--siren-seed", type=int, default=1)
     decoder_group.add_argument("--siren-first-w0", type=int, default=30)
@@ -265,6 +265,8 @@ def define_cmd_line_args():
                                               "l_1_norm", "l_inf_norm"])
     spatial_decod_group.add_argument("--spatial-decod-activation-type", type=str,
                                      default="relu", choices=["relu", "sin"])
+    spatial_decod_group.add_argument("--spatial-decod-skip-layers", nargs="+", type=int,
+                                     help="Layer to have skip connection.")
 
     spatial_decod_group.add_argument("--scaler-decod-hidden-dim", type=int)
     spatial_decod_group.add_argument("--scaler-decod-num-hidden-layers", type=int)
@@ -273,6 +275,8 @@ def define_cmd_line_args():
                                               "l_1_norm", "l_inf_norm"])
     spatial_decod_group.add_argument("--scaler-decod-activation-type", type=str,
                                      default="relu", choices=["relu", "sin"])
+    spatial_decod_group.add_argument("--scaler-decod-skip-layers", nargs="+", type=int,
+                                     help="Layer to have skip connection.")
 
     spatial_decod_group.add_argument("--redshift-decod-hidden-dim", type=int)
     spatial_decod_group.add_argument("--redshift-decod-num-hidden-layers", type=int)
@@ -281,6 +285,8 @@ def define_cmd_line_args():
                                               "l_1_norm", "l_inf_norm"])
     spatial_decod_group.add_argument("--redshift-decod-activation-type", type=str,
                                      default="relu", choices=["relu", "sin"])
+    spatial_decod_group.add_argument("--redshift-decod-skip-layers", nargs="+", type=int,
+                                     help="Layer to have skip connection.")
 
     ###################
     # Hyperspectral arguments
@@ -361,6 +367,7 @@ def define_cmd_line_args():
 
     # spectra data
     data_group.add_argument("--download-source-spectra", action="store_true")
+    data_group.add_argument("--interpolate-trans", action="store_true")
     data_group.add_argument("--source-spectra-fname", type=str)
     data_group.add_argument("--source-spectra-link", type=str)
     data_group.add_argument("--spectra-data-format", type=str)
@@ -384,6 +391,7 @@ def define_cmd_line_args():
                             help="plot gt spectra within trusted range only")
 
     data_group.add_argument("--num-gt-spectra", type=int)
+    data_group.add_argument("--source-spectra-cho", type=str)
     data_group.add_argument("--processed-spectra-cho", type=str)
     data_group.add_argument("--spectra-supervision-wave-lo", type=int)
     data_group.add_argument("--spectra-supervision-wave-hi", type=int)

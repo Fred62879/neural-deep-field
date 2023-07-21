@@ -79,21 +79,23 @@ class BasicDecoder(nn.Module):
         self.make()
 
     def make(self):
-        """Builds the actual MLP.
+        """ Builds the actual MLP.
         """
         layers = []
         for i in range(self.num_layers):
             if i == 0:
                 layers.append(self.layer(self.input_dim, self.hidden_dim, bias=self.bias))
             elif i in self.skip:
-                layers.append(self.layer(self.hidden_dim+input_dim, self.hidden_dim, bias=self.bias))
+                layers.append(
+                    self.layer(self.hidden_dim + self.input_dim, self.hidden_dim, bias=self.bias)
+                )
             else:
                 layers.append(self.layer(self.hidden_dim, self.hidden_dim, bias=self.bias))
         self.layers = nn.ModuleList(layers)
         self.lout = self.layer(self.hidden_dim, self.output_dim, bias=self.bias)
 
     def forward(self, x, return_h=False):
-        """Run the MLP!
+        """ Run the MLP!
 
         Args:
             x (torch.FloatTensor): Some tensor of shape [batch, ..., input_dim]
@@ -109,8 +111,8 @@ class BasicDecoder(nn.Module):
             if i == 0:
                 h = self.activation(l(x))
             elif i in self.skip:
-                h = self.activation(l(h))
                 h = torch.cat([x, h], dim=-1)
+                h = self.activation(l(h))
             else:
                 h = self.activation(l(h))
 

@@ -50,7 +50,7 @@ class AstroInferrer(BaseInferrer):
             self.num_sup_spectra = dataset.get_num_supervision_spectra()
         else: self.num_val_spectra = dataset.get_num_validation_spectra()
 
-        self.set_log_path()
+        self.set_path()
         self.select_models()
         self.init_model(pipelines)
         self.summarize_inferrence_tasks()
@@ -60,7 +60,7 @@ class AstroInferrer(BaseInferrer):
     # Initializations
     #############
 
-    def set_log_path(self):
+    def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         if self.verbose: log.info(f"logging to {self.log_dir}")
 
@@ -664,6 +664,8 @@ class AstroInferrer(BaseInferrer):
             weights = torch.stack(self.qtz_weights).detach().cpu().numpy()[:,0]
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
+            fname = join(self.qtz_weights_dir, str(model_id))
+            np.save(fname, weights)
             log.info(f"qtz weights (patrtial): {weights}")
 
     def pre_checkpoint_hardcode_coords_modified_model(self, model_id):

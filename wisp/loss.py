@@ -49,6 +49,10 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
     emd = torch.mean(torch.abs(emd))
     return emd
 
+    # nsmpl = recon_flux.shape[1]
+    # ret = loss(gt_spectra[:,1], recon_flux) / nsmpl
+    # return ret
+
 def redshift_supervision_loss(loss, gt_redshift, recon_redshift, mask=None):
     ''' Loss function for few-shot redshift supervision
         @Param

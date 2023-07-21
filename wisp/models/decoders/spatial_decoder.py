@@ -26,6 +26,7 @@ class SpatialDecoder(nn.Module):
 
         self.qtz_calculate_loss = qtz_calculate_loss
         self.quantization_strategy = kwargs["quantization_strategy"]
+        self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
 
         self.output_scaler = self.qtz and output_scaler
 
@@ -37,8 +38,6 @@ class SpatialDecoder(nn.Module):
         self.model_redshift = kwargs["model_redshift"] and self.qtz
         self.apply_gt_redshift = self.model_redshift and \
             kwargs["apply_gt_redshift"] and self.qtz
-
-        self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
 
         self.input_dim = get_input_latents_dim(**kwargs)
         self.init_model()
@@ -53,7 +52,7 @@ class SpatialDecoder(nn.Module):
         if self.output_scaler:
             self.init_scaler_decoder()
 
-        if self.model_redshift:
+        if not self.apply_gt_redshift:
             self.init_redshift_decoder()
 
     def init_scaler_decoder(self):
@@ -62,11 +61,9 @@ class SpatialDecoder(nn.Module):
             get_activation_class(self.kwargs["scaler_decod_activation_type"]),
             bias=True, layer=get_layer_class(self.kwargs["scaler_decod_layer_type"]),
             num_layers=self.kwargs["scaler_decod_num_hidden_layers"] + 1,
-            hidden_dim=self.kwargs["scaler_decod_hidden_dim"], skip=[])
-        # self.scaler_decoder = MLP(
-        #     self.input_dim, 1,
-        #     self.kwargs["scaler_decod_num_hidden_layers"],
-        #     self.kwargs["scaler_decod_hidden_dim"])
+            hidden_dim=self.kwargs["scaler_decod_hidden_dim"],
+            skip=self.kwargs["scaler_decod_skip_layers"]
+        )
 
     def init_redshift_decoder(self):
         self.redshift_decoder = BasicDecoder(
@@ -74,11 +71,9 @@ class SpatialDecoder(nn.Module):
             get_activation_class(self.kwargs["redshift_decod_activation_type"]),
             bias=True, layer=get_layer_class(self.kwargs["redshift_decod_layer_type"]),
             num_layers=self.kwargs["redshift_decod_num_hidden_layers"] + 1,
-            hidden_dim=self.kwargs["redshift_decod_hidden_dim"], skip=[])
-        # self.redshift_decoder = MLP(
-        #     self.input_dim, 1,
-        #     self.kwargs["redshift_decod_num_hidden_layers"],
-        #     self.kwargs["redshift_decod_hidden_dim"])
+            hidden_dim=self.kwargs["redshift_decod_hidden_dim"],
+            skip=self.kwargs["redshift_decod_skip_layers"]
+        )
         self.redshift_adjust = nn.ReLU(inplace=True)
 
     def init_decoder(self):
@@ -101,11 +96,9 @@ class SpatialDecoder(nn.Module):
             get_activation_class(self.kwargs["spatial_decod_activation_type"]),
             bias=True, layer=get_layer_class(self.kwargs["spatial_decod_layer_type"]),
             num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
-            hidden_dim=self.kwargs["spatial_decod_hidden_dim"], skip=[])
-        # self.decode = MLP(
-        #     self.input_dim, output_dim,
-        #     self.kwargs["spatial_decod_num_hidden_layers"],
-        #     self.kwargs["spatial_decod_hidden_dim"])
+            hidden_dim=self.kwargs["spatial_decod_hidden_dim"],
+            skip=self.kwargs["spatial_decod_skip_layers"]
+        )
 
     def forward(self, z, codebook, qtz_args, ret, specz=None, sup_id=None):
         """ Decode latent variables
@@ -117,11 +110,13 @@ class SpatialDecoder(nn.Module):
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.reset()
 
+        # forward scaler
         if self.output_scaler:
             scaler = self.scaler_decoder(z[:,0])[...,0]
         else: scaler = None
         timer.check("spatial_decod::scaler done")
 
+        # forward redshift
         if self.apply_gt_redshift:   # dont generate redshift
             assert specz is not None
             redshift = specz
@@ -133,6 +128,7 @@ class SpatialDecoder(nn.Module):
             redshift = None
         timer.check("spatial_decod::redshift done")
 
+        # quantization
         if self.quantize_spectra:
             logits = self.decode(z)
         else:

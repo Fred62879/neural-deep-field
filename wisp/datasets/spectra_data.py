@@ -98,6 +98,9 @@ class SpectraData:
             dataset_path, self.kwargs["sensor_collection_name"])
         spectra_path = join(dataset_path, "input/spectra")
 
+        suffix = self.kwargs["source_spectra_cho"]
+        if suffix != "": suffix = "_" + suffix
+
         self.wave_range_fname = get_wave_range_fname(**self.kwargs)
 
         if self.spectra_data_source == "manual":
@@ -106,19 +109,29 @@ class SpectraData:
 
         elif self.spectra_data_source == "deimos":
             path = join(spectra_path, "deimos")
-            self.source_spectra_path = join(path, f"source_spectra_{self.spectra_data_format}")
-            self.source_metadata_table_fname = join(path, self.kwargs["source_spectra_fname"])
-            processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
-            self.processed_spectra_path = join(processed_data_path, "processed_spectra")
+            self.source_spectra_path = join(
+                path, f"source_spectra_{self.spectra_data_format}{suffix}")
+            self.source_metadata_table_fname = join(
+                path, self.kwargs["source_spectra_fname"])
+
+            processed_data_path = join(
+                path, "processed_" + self.kwargs["processed_spectra_cho"] + suffix)
+            self.processed_spectra_path = join(
+                processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(
                 processed_data_path, "processed_deimos_table.tbl")
 
         elif self.spectra_data_source == "zcosmos":
             path = join(spectra_path, "zcosmos")
-            self.source_spectra_path = join(path, f"source_spectra_{self.spectra_data_format}")
-            self.source_metadata_table_fname = join(path, "source_zcosmos_table.fits")
-            processed_data_path = join(path, "processed_"+self.kwargs["processed_spectra_cho"])
-            self.processed_spectra_path = join(processed_data_path, "processed_spectra")
+            self.source_spectra_path = join(
+                path, f"source_spectra_{self.spectra_data_format}{suffix}")
+            self.source_metadata_table_fname = join(
+                path, "source_zcosmos_table.fits")
+
+            processed_data_path = join(
+                path, "processed_" + self.kwargs["processed_spectra_cho"] + suffix)
+            self.processed_spectra_path = join(
+                processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(
                 processed_data_path, "processed_zcosmos_table.fits")
 
@@ -504,8 +517,6 @@ class SpectraData:
             self.data["gt_spectra_world_coords"], coords_range=self.coords_range)
         self.data["gt_spectra_norm_world_coords"] = norm_coords
 
-        # print(self.data["gt_spectra"].shape, self.data["gt_spectra_redshift"].shape, self.data["gt_spectra_pixels"].shape, self.data["gt_spectra_img_coords"].shape, self.data["gt_spectra_world_coords"].shape)
-
         # save data for all spectra together
         np.save(self.gt_spectra_fname, self.data["gt_spectra"])
         np.save(self.gt_spectra_mask_fname, self.data["gt_spectra_mask"])
@@ -528,6 +539,10 @@ class SpectraData:
             download_deimos_data_parallel(
                 self.source_spectra_link, self.source_spectra_path, spectra_fnames)
             log.info("spectra-data::download complete")
+
+        if self.kwargs["codebook_pretrain_pixel_supervision"]:
+            self.trans_data = self.trans_obj.get_full_trans_data()
+        else: self.trans_data = None
 
         header_wcs, headers = self.load_headers(df)
         spectra_ids, spectra_to_drop = self.localize_spectra(df, header_wcs, headers)
@@ -725,25 +740,20 @@ class SpectraData:
         np.save(join(self.processed_spectra_path, world_coord_fname), world_coords)
 
         # process source spectra and save locally
-        try:
-            gt_spectra, mask = process_gt_spectra(
-                join(self.source_spectra_path, spectra_fname),
-                join(self.processed_spectra_path, fname),
-                join(self.processed_spectra_path, mask_fname),
-                self.full_wave,
-                self.wave_discretz_interval,
-                sigma=self.smooth_sigma,
-                format=self.spectra_data_format,
-                trans_range=self.trans_range,
-                trusted_range=self.trusted_wave_range,
-                max_spectra_len=self.kwargs["max_spectra_len"],
-                colors=self.kwargs["plot_colors"],
-                trans_data=self.trans_obj.get_full_trans_data()
-            )
-        except Exception as e:
-            log.info(e)
-        # if gt_spectra is None: return
-
+        gt_spectra, mask = process_gt_spectra(
+            join(self.source_spectra_path, spectra_fname),
+            join(self.processed_spectra_path, fname),
+            join(self.processed_spectra_path, mask_fname),
+            self.full_wave,
+            self.wave_discretz_interval,
+            sigma=self.smooth_sigma,
+            format=self.spectra_data_format,
+            trans_range=self.trans_range,
+            trusted_range=self.trusted_wave_range,
+            max_spectra_len=self.kwargs["max_spectra_len"],
+            colors=self.kwargs["plot_colors"],
+            trans_data=self.trans_data
+        )
         cur_patch_spectra.append(gt_spectra)
         cur_patch_spectra_mask.append(mask)
 
@@ -1077,24 +1087,50 @@ def interpolate_trans(trans_data, spectra_data, fname=None, colors=None):
     ret = np.array([trans_mask] + list(trans) + list(band_mask))
     return ret
 
-def convolve_spectra(spectra, std=140, border=True):
+def convolve_spectra(spectra, std=140, border=True, bound=None):
     """ Smooth gt spectra with given std.
         If border is True, we add 1 padding at two ends when convolving.
+        If bound is not None, only convolve within given bound.
     """
     if std <= 0: return
+
+    if bound is not None: lo, hi = bound
+    else: lo, hi = 0, spectra.shape[1]
+    n = hi - lo
+
     kernel = Gaussian1DKernel(stddev=std)
     if border:
-        nume = convolve(spectra[1], kernel)
-        denom = convolve(np.ones(spectra.shape[1]), kernel)
-        spectra[1] = nume / denom
-    spectra[1] = convolve(spectra[1], kernel)
+        nume = convolve(spectra[1][lo:hi], kernel)
+        denom = convolve(np.ones(n), kernel)
+        spectra[1][lo:hi] = nume / denom
+    spectra[1][lo:hi] = convolve(spectra[1][lo:hi], kernel)
     return spectra
 
 def create_spectra_mask(spectra, max_spectra_len):
+    """ Mask out padded region of spectra.
+    """
     m, n = spectra.shape
-    if n == max_spectra_len: mask = np.ones(n).astype(bool)
-    else: mask = np.zeros(n).astype(bool)
+    if n == max_spectra_len: mask = np.ones(max_spectra_len).astype(bool)
+    else: mask = np.zeros(max_spectra_len).astype(bool)
     return mask
+
+def wave_based_sort(spectra):
+    """ Sort spectra and mask based on wave.
+    """
+    ids = np.argsort(spectra[0])
+    return spectra[:,ids]
+
+def pad_spectra(spectra, mask, max_len):
+    """ Pad spectra if shorter than max_len.
+        Create mask to ignore values in padded region.
+    """
+    m, n = spectra.shape
+    offset = max_len - n
+    ret = np.full((m,max_len),-1).astype(spectra.dtype)
+    lo, hi = offset//2, offset//2+n
+    mask[lo:hi] = 1
+    ret[:,lo:hi] = spectra
+    return ret, mask, (lo, hi)
 
 def clean_flux(spectra, mask):
     """ Replace `inf` `-inf` `nan` in flux with 0 and mask out.
@@ -1105,17 +1141,6 @@ def clean_flux(spectra, mask):
     mask[ids] = 0
     spectra[1][ids] = 0
     return spectra, mask
-
-def pad_spectra(spectra, mask, max_len):
-    """ Pad spectra if shorter than max_len.
-        Create mask to ignore values in padded region.
-    """
-    m, n = spectra.shape
-    offset = max_len - n
-    ret = np.full((m,max_len),-1).astype(spectra.dtype)
-    mask[offset//2:offset//2+n] = 1
-    ret[:,offset//2:offset//2+n] = spectra
-    return ret, mask
 
 def mask_spectra_range(spectra, mask, trans_range, trusted_range):
     """ Mask out spectra data beyond given wave range.
@@ -1159,9 +1184,10 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
     assert spectra.shape[1] <= max_spectra_len
     mask = create_spectra_mask(spectra, max_spectra_len)
 
+    spectra = wave_based_sort(spectra)
+    spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
     spectra, mask = clean_flux(spectra, mask)
-    spectra = convolve_spectra(spectra, std=sigma)
-    spectra, mask = pad_spectra(spectra, mask, max_spectra_len)
+    spectra = convolve_spectra(spectra, std=sigma, bound=bound)
     spectra, mask = mask_spectra_range(spectra, mask, trans_range, trusted_range)
     spectra = spectra.astype(np.float32)
 
