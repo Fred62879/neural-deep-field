@@ -26,7 +26,7 @@ class HyperSpectralDecoder(nn.Module):
             _model_redshift=_model_redshift, **kwargs
         )
         self.init_decoder()
-        self.norm = Normalization(kwargs["mlp_output_norm_method"])
+        # self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
         if self.qtz_spectra:
             self.qtz = Quantization(False, **kwargs)
@@ -89,9 +89,6 @@ class HyperSpectralDecoder(nn.Module):
                input: logits if qtz_spectra
                       latents o.w.
         """
-        #timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
-        #timer.reset()
-
         if self.qtz_spectra:
             bsz = wave.shape[0]
             # each input coord has #num_code spectra generated
@@ -101,22 +98,19 @@ class HyperSpectralDecoder(nn.Module):
             ], dim=0) # [num_code,bsz,nsmpl,dim]
         else:
             latents = self.convert(wave, input, redshift, wave_bound)
-        # timer.check("recon_spectra::hps converted")
 
         spectra = self.spectra_decoder(latents)[...,0]
-        # timer.check("recon_spectra::spectra decoded")
 
         if self.qtz_spectra:
             # input here is logits, spectra is codebook spectra for each coord
             _, spectra = self.qtz(input, spectra, ret, qtz_args)
             spectra = spectra[:,0] # [bsz,nsmpl]
-        # timer.check("recon_spectra::spectra qtz")
 
-        if self.scale and scaler is not None:
+        if self.scale:
+            assert scaler is not None
             spectra = (scaler * spectra.T).T
 
-        spectra = self.norm(spectra)
-        #timer.check("recon_spectra::spectra norm")
+        # spectra = self.norm(spectra)
         ret["spectra"] = spectra
 
     def forward_with_full_wave(self, latents, full_wave, full_wave_bound,

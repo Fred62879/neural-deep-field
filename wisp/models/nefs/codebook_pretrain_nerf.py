@@ -5,6 +5,7 @@ import torch.nn as nn
 from wisp.utils import PerfTimer
 from collections import defaultdict
 from wisp.models.nefs import BaseNeuralField
+from wisp.models.embedders.encoder import Encoder
 from wisp.models.hypers import HyperSpectralDecoder
 from wisp.models.decoders import BasicDecoder, SpatialDecoder
 from wisp.models.layers import get_layer_class, init_codebook, Quantization
@@ -17,6 +18,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         self.kwargs = kwargs
         self.model_redshift = _model_redshift
         self.pixel_supervision = pretrain_pixel_supervision
+        self.init_encoder() # debug
         self.init_model()
 
     def get_nef_type(self):
@@ -27,6 +29,24 @@ class CodebookPretrainNerf(BaseNeuralField):
         """
         channels = ["intensity","spectra","redshift","qtz_weights","codebook_spectra"]
         self._register_forward_function(self.pretrain, channels)
+
+    # init encoder added for debug purpose
+    def init_encoder(self):
+        if not self.kwargs["encode_coords"]: return
+        embedder_args = (
+            2,
+            self.kwargs["coords_embed_dim"],
+            self.kwargs["coords_embed_omega"],
+            self.kwargs["coords_embed_sigma"],
+            self.kwargs["coords_embed_bias"],
+            self.kwargs["coords_embed_seed"]
+        )
+        self.spatial_encoder = Encoder(
+            input_dim=2,
+            encode_method=self.kwargs["coords_encode_method"],
+            embedder_args=embedder_args,
+            **self.kwargs
+        )
 
     def init_model(self):
         if self.kwargs["quantize_latent"]:
@@ -69,6 +89,8 @@ class CodebookPretrainNerf(BaseNeuralField):
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]
         coords = coords[:,None]
+
+        coords = self.spatial_encoder(coords)
 
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)

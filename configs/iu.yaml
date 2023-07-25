@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_redshift_during_train'] #,'save_pixel_values_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra_individ'] #,'save_redshift']
+    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra_individ'] #,'save_redshift']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -46,13 +46,13 @@ net:
     model_redshift: True
     encode_wave: True
     encode_coords: True
-    coords_encode_method: 'grid' #'positional_encoding'
+    coords_encode_method: 'positional_encoding' #'grid'
     wave_encode_method: 'positional_encoding'
     mlp_output_norm_method: 'sinh'
 
 embedder:
     coords_embed_bias: True
-    coords_embed_dim: 1000
+    coords_embed_dim: 16
     coords_embed_omega: 8
     coords_embed_sigma: 1.0
     coords_embed_seed: 2
@@ -104,7 +104,7 @@ qtz:
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
-    codebook_pretrain_latent_dim: 32
+    codebook_pretrain_latent_dim: 2 #32
 
 spatial_decod:
     generate_scaler: True
