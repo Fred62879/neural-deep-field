@@ -446,7 +446,7 @@ class SpectraData:
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra"]]
         # supervision_ids = np.array([14,22,31])
-        supervision_ids = np.array([14]) #,31]) # 14 fail /31 succeed
+        supervision_ids = np.array([14,31]) # 14 fail /31 succeed
 
         self.num_validation_spectra = len(validation_ids)
         self.num_supervision_spectra = len(supervision_ids)

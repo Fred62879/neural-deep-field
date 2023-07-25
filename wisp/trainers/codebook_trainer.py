@@ -51,7 +51,6 @@ class CodebookTrainer(BaseTrainer):
         self.save_data_to_local = False
         self.shuffle_dataloader = False
         self.dataloader_drop_last = False
-        self.pretrain_with_coords = extra_args["pretrain_with_coords"]
 
         self.summarize_training_tasks()
         self.set_path()
@@ -72,11 +71,10 @@ class CodebookTrainer(BaseTrainer):
         self.train_pipeline = self.pipeline[0]
         self.infer_pipeline = self.pipeline[1]
 
-        if not self.pretrain_with_coords:
-            self.latents = nn.Embedding(
-                self.num_sup_spectra,
-                self.extra_args["codebook_pretrain_latent_dim"]
-            )
+        self.latents = nn.Embedding(
+            self.num_sup_spectra,
+            self.extra_args["codebook_pretrain_latent_dim"]
+        )
 
         log.info(self.train_pipeline)
         # log.info(self.infer_pipeline)
@@ -110,15 +108,7 @@ class CodebookTrainer(BaseTrainer):
 
         # set input latents for codebook net
         self.dataset.set_coords_source("spectra_latents")
-        if self.pretrain_with_coords:
-            coords = torch.rand(self.num_sup_spectra, 2)
-            self.dataset.set_hardcode_data(
-                "spectra_latents",
-                coords
-                # self.dataset.get_supervision_spectra_coords()
-            )
-        else:
-            self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
+        self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
 
         self.dataset.toggle_wave_sampling(self.sample_wave)
         self.dataset.toggle_integration(self.pixel_supervision)
@@ -128,12 +118,10 @@ class CodebookTrainer(BaseTrainer):
                 self.extra_args["spectra_supervision_wave_hi"])
 
         self.dataset.set_length(self.num_sup_spectra)
-
         self.selected_ids = select_inferrence_ids(
             self.num_sup_spectra,
             self.extra_args["pretrain_num_infer"]
         )
-        # print(self.selected_ids)
 
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
@@ -221,8 +209,8 @@ class CodebookTrainer(BaseTrainer):
     def init_dataloader(self):
         """ (Re-)Initialize dataloader.
         """
-        if self.shuffle_dataloader: sampler_cls = RandomSampler
-        else: sampler_cls = SequentialSampler
+        # if self.shuffle_dataloader: sampler_cls = RandomSampler
+        # else: sampler_cls = SequentialSampler
         sampler_cls = SequentialSampler
         # sampler_cls = RandomSampler
 
@@ -242,10 +230,9 @@ class CodebookTrainer(BaseTrainer):
 
     def init_optimizer(self):
         # collect all parameters from network and trainable latents
-        if not self.pretrain_with_coords:
-            self.params_dict = {
-                "spectra_latents": param for _, param in self.latents.named_parameters() }
-        else: self.params_dict = {}
+        self.params_dict = {
+            "spectra_latents": param for _, param in self.latents.named_parameters()
+        }
 
         for name, param in self.train_pipeline.named_parameters():
             self.params_dict[name] = param
@@ -253,7 +240,6 @@ class CodebookTrainer(BaseTrainer):
         params, net_params, latents = [], [], []
         for name in self.params_dict:
             if "spectra_latents" in name:
-                assert not self.pretrain_with_coords
                 latents.append(self.params_dict[name])
             else:
                 net_params.append(self.params_dict[name])
@@ -435,6 +421,10 @@ class CodebookTrainer(BaseTrainer):
         self.log_dict["spectra_loss"] = 0.0
 
     def pre_step(self):
+        # since we are optimizing latents which are inputs for the pipeline
+        # we should also update the input each time
+        # however since dataset receives a reference to the latents,
+        # we don't need to update dataset with updated latents manually
         # self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
         pass
 
@@ -506,8 +496,7 @@ class CodebookTrainer(BaseTrainer):
 
             self.train_pipeline.load_state_dict(checkpoint["model_state_dict"])
             self.train_pipeline.eval()
-            if not self.pretrain_with_coords:
-                self.latents.load_state_dict(checkpoint["latents"])
+            self.latents.load_state_dict(checkpoint["latents"])
 
             if "cuda" in str(self.device):
                 self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
@@ -600,9 +589,7 @@ class CodebookTrainer(BaseTrainer):
             "model_state_dict": self.train_pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
         }
-
-        if not self.pretrain_with_coords:
-            checkpoint["latents"] = self.latents
+        checkpoint["latents"] = self.latents
 
         torch.save(checkpoint, model_fname)
         return checkpoint

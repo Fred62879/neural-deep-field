@@ -286,10 +286,9 @@ class AstroDataset(Dataset):
             out["wave"] = out["spectra_sup_data"][:,0][...,None] # [bsz,nsmpl,1]
 
             # test code
-            out["spectra_sup_data"][:,1] += 6
+            # out["spectra_sup_data"][:,1] += 6
             # print(out["spectra_sup_redshift"])
-            out["spectra_sup_redshift"] = torch.FloatTensor([0])
-            # print(out["spectra_sup_redshift"])
+            out["spectra_sup_redshift"] = torch.FloatTensor([0,0])
             # code ends here
 
         elif self.wave_source == "trans":
