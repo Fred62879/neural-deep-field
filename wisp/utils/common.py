@@ -36,6 +36,7 @@ def get_input_latents_dim(**kwargs):
     """ Get the dimension of the input RA/DEC coordinate for MLP.
     """
     if kwargs["pretrain_codebook"] and \
+       not kwargs["pretrain_with_coords"] and \
          ("codebook_pretrain" in kwargs["tasks"] or \
           "pretrain_infer" in kwargs["tasks"]):
         latents_dim = kwargs["codebook_pretrain_latent_dim"]

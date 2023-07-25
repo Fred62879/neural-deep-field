@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_redshift_during_train'] #,'save_pixel_values_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra_individ'] #,'save_redshift']
+    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra_individ'] #,'save_redshift']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -157,6 +157,8 @@ trainer:
 
     pretrain_codebook: True          # these two conflict
     spectra_supervision: False       #  each other
+
+    pretrain_with_coords: False
 
     batched_pretrain: True
     learn_spectra_within_wave_range: True

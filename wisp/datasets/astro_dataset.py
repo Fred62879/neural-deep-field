@@ -162,6 +162,9 @@ class AstroDataset(Dataset):
     def get_validation_spectra_pixels(self, idx=None):
         return self.spectra_dataset.get_validation_pixels(idx)
 
+    def get_supervision_spectra_coords(self):
+        return self.spectra_dataset.get_supervision_norm_world_coords()
+
     def get_supervision_spectra_pixels(self):
         return self.spectra_dataset.get_supervision_pixels()
 
@@ -286,8 +289,7 @@ class AstroDataset(Dataset):
             out["spectra_sup_data"][:,1] += 6
             # print(out["spectra_sup_redshift"])
             out["spectra_sup_redshift"] = torch.FloatTensor([0])
-            # a = torch.abs(out["spectra_sup_data"][:,1])
-            # out["spectra_sup_data"][:,1] = a
+            # print(out["spectra_sup_redshift"])
             # code ends here
 
         elif self.wave_source == "trans":

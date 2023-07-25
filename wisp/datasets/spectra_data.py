@@ -246,6 +246,11 @@ class SpectraData:
             return self.data["supervision_redshift"]
         return self.data["supervision_redshift"][idx]
 
+    def get_supervision_norm_world_coords(self, idx=None):
+        if idx is not None:
+            return self.data["supervision_norm_world_coords"][idx]
+        return self.data["supervision_norm_world_coords"]
+
 
     def get_validation_spectra_ids(self, patch_uid=None):
         """ Get id of validation spectra in given patch.
@@ -460,6 +465,7 @@ class SpectraData:
         self.data["supervision_plot_mask"] = self.data["gt_spectra_plot_mask"][sup_ids]
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][sup_ids]
+        self.data["supervision_norm_world_coords"] = self.data["gt_spectra_norm_world_coords"][sup_ids]
 
         # print(self.data["supervision_redshift"])
 

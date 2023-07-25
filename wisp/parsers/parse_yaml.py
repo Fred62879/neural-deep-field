@@ -471,6 +471,8 @@ def define_cmd_line_args():
     train_group.add_argument("--pretrain-codebook", action="store_true")
     train_group.add_argument("--learn-spectra-within-wave-range", action="store_true")
     train_group.add_argument("--codebook-pretrain-pixel-supervision", action="store_true")
+    train_group.add_argument("--pretrain-with-coords", action="store_true",
+                             help="performe pretraining with 2d coords instead of optimizing latent variables")
     train_group.add_argument("--weight-train", action="store_true")
     train_group.add_argument("--train-use-all-wave", action="store_true")
     train_group.add_argument("--infer-during-train", action="store_true")
