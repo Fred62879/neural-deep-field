@@ -92,6 +92,7 @@ class CodebookTrainer(BaseTrainer):
                 "spectra_sup_data",
                 "spectra_sup_mask",
                 "spectra_sup_redshift",
+                "spectra_sup_plot_mask"
             ])
             if self.pixel_supervision:
                 fields.append("spectra_sup_pixels")
@@ -452,13 +453,13 @@ class CodebookTrainer(BaseTrainer):
             if self.recon_gt_spectra:
                 self.recon_fluxes.extend(ret["spectra"])
                 self.gt_fluxes.extend(data["spectra_sup_data"][:,1])
-                self.spectra_masks.extend(data["spectra_sup_mask"])
                 self.spectra_wave.extend(data["spectra_sup_data"][:,0])
+                self.spectra_masks.extend(data["spectra_sup_plot_mask"])
 
             if self.recon_codebook_spectra_individ:
                 self.codebook_spectra.extend(ret["codebook_spectra"])
-                self.spectra_masks_c.extend(data["spectra_sup_mask"])
                 self.spectra_wave_c.extend(data["spectra_sup_data"][:,0])
+                self.spectra_masks_c.extend(data["spectra_sup_plot_mask"])
 
     def post_step(self):
         pass
@@ -532,7 +533,7 @@ class CodebookTrainer(BaseTrainer):
         spectra_loss = 0
         recon_flux = ret["spectra"]
         gt_spectra = data["spectra_sup_data"]
-        spectra_masks = data["spectra_sup_mask"]
+        spectra_masks = data["spectra_sup_plot_mask"]
 
         if len(recon_flux) == 0:
             spectra_loss = 0
@@ -632,12 +633,26 @@ class CodebookTrainer(BaseTrainer):
         w = weights[self.selected_ids,0]
         log.info(f"Qtz weights {w}")
 
+    def plotspectra(self,spectra):
+        import matplotlib.pyplot as plt
+        n,m = spectra.shape
+        x = np.arange(m)
+        fig, axs = plt.subplots(2,10,figsize=(50,10))
+        for i in range(n):
+            axis = axs[i//10,i%10]
+            axis.plot(x,spectra[i])
+        fig.tight_layout()
+        plt.savefig('tmp.png')
+        plt.close()
+
     def _recon_gt_spectra(self):
         log.info("reconstructing gt spectrum")
 
         self.gt_fluxes = torch.stack(self.gt_fluxes).view(
             self.num_sup_spectra, -1).detach().cpu().numpy()[self.selected_ids]
         # [n_spectra,nsmpl]
+        # self.plotspectra(self.gt_fluxes)
+
         self.recon_fluxes = torch.stack(self.recon_fluxes).view(
             self.num_sup_spectra, self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()[self.selected_ids]

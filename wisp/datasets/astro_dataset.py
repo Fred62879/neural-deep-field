@@ -231,6 +231,9 @@ class AstroDataset(Dataset):
         elif field == "spectra_sup_mask":
             data = self.spectra_dataset.get_supervision_mask()
             data = self.index_selected_data(data, idx)
+        elif field == "spectra_sup_plot_mask":
+            data = self.spectra_dataset.get_supervision_plot_mask()
+            data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_pixels":
             data = self.spectra_dataset.get_supervision_pixels()
             data = self.index_selected_data(data, idx)
@@ -261,6 +264,9 @@ class AstroDataset(Dataset):
                 out["spectra_sup_mask"] = batch_sample_torch(
                     out["spectra_sup_mask"], self.kwargs["pretrain_num_wave_samples"],
                     sample_ids=sample_ids)
+                out["spectra_sup_plot_mask"] = batch_sample_torch(
+                    out["spectra_sup_plot_mask"], self.kwargs["pretrain_num_wave_samples"],
+                    sample_ids=sample_ids)
                 # sample_ids [bsz,nsmpl,2]
 
             if self.perform_integration:
@@ -273,6 +279,14 @@ class AstroDataset(Dataset):
                 out["nsmpl"] = nsmpl
 
             out["wave"] = out["spectra_sup_data"][:,0][...,None] # [bsz,nsmpl,1]
+
+            # test code
+            # out["spectra_sup_data"][:,1] += 6
+            # print(out["spectra_sup_redshift"])
+            out["spectra_sup_redshift"] = torch.FloatTensor([0])
+            # a = torch.abs(out["spectra_sup_data"][:,1])
+            # out["spectra_sup_data"][:,1] = a
+            # code ends here
 
         elif self.wave_source == "trans":
             # These are not batched, we do sampling at every step.

@@ -16,10 +16,6 @@ def calculate_emd(distrib1, distrib2, norm="l2", mask=None, precision=None):
     sub = distrib1 - distrib2
     n = sub.shape[-1]
 
-    ids = mask[-1] == 0
-    print(distrib1[-1])
-    print(mask[-1])
-    assert 0
     if mask is not None: sub *= mask
     # if precision is not None: sub *= precision
 

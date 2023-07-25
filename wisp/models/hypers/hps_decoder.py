@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import print_shape
+from wisp.utils.common import print_shape, get_input_latents_dim
+
 from wisp.models.decoders import Decoder, BasicDecoder
 from wisp.models.activations import get_activation_class
 from wisp.models.hypers.hps_converter import HyperSpectralConverter
@@ -13,7 +14,7 @@ from wisp.models.layers import Normalization, Quantization, get_layer_class
 
 class HyperSpectralDecoder(nn.Module):
 
-    def __init__(self, integrate=True, scale=True, redshift_supervision=True, **kwargs):
+    def __init__(self, integrate=True, scale=True, _model_redshift=True, **kwargs):
 
         super(HyperSpectralDecoder, self).__init__()
 
@@ -22,7 +23,7 @@ class HyperSpectralDecoder(nn.Module):
         self.qtz_spectra = kwargs["quantize_spectra"]
 
         self.convert = HyperSpectralConverter(
-            redshift_supervision=redshift_supervision, **kwargs
+            _model_redshift=_model_redshift, **kwargs
         )
         self.init_decoder()
         self.norm = Normalization(kwargs["mlp_output_norm_method"])

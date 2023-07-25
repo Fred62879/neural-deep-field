@@ -313,8 +313,8 @@ class AstroInferrer(BaseInferrer):
         if self.pretrain_infer:
             self.requested_fields.extend([
                 "spectra_sup_data",
-                "spectra_sup_mask",
-                "spectra_sup_redshift"
+                "spectra_sup_redshift",
+                "spectra_sup_plot_mask"
             ])
             self.wave_source = "spectra"
             self.coords_source = "spectra_train"
@@ -358,8 +358,8 @@ class AstroInferrer(BaseInferrer):
                 self.coords_source = "codebook_latents"
                 self.requested_fields.extend([
                     "spectra_sup_data",
-                    "spectra_sup_mask",
-                    "spectra_sup_redshift"
+                    "spectra_sup_redshift",
+                    "spectra_sup_plot_mask"
                 ])
 
                 if self.infer_selected:
@@ -814,9 +814,9 @@ class AstroInferrer(BaseInferrer):
                     )
 
                 if self.pretrain_infer:
-                    self.spectra_masks.extend(data["spectra_sup_mask"])
-                    self.spectra_wave.extend(data["spectra_sup_data"][:,0])
                     self.gt_fluxes.extend(data["spectra_sup_data"][:,1])
+                    self.spectra_wave.extend(data["spectra_sup_data"][:,0])
+                    self.spectra_masks.extend(data["spectra_sup_plot_mask"])
                 else: # self.main_infer
                     # main inferrence spectra can be obtained at once
                     pass
@@ -868,8 +868,8 @@ class AstroInferrer(BaseInferrer):
                 self.codebook_spectra.extend(spectra)
 
                 if self.pretrain_infer:
-                    self.spectra_masks_c.extend(data["spectra_sup_mask"])
                     self.spectra_wave_c.extend(data["spectra_sup_data"][:,0])
+                    self.spectra_masks_c.extend(data["spectra_sup_plot_mask"])
 
             except StopIteration:
                 log.info("codebook spectra forward done")

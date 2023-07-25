@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_redshift_during_train'] #,'save_pixel_values_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    #tasks: ['pretrain_infer','recon_gt_spectra','save_qtz_weights'] #,'recon_codebook_spectra_individ'] #,'save_redshift']
+    tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra_individ'] #,'save_redshift']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -58,7 +58,7 @@ embedder:
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 20
+    wave_embed_dim: 16
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -85,8 +85,8 @@ grid:
     codebook_bitwidth: 20
 
 decoder:
-    decoder_num_hidden_layers: 5
-    decoder_hidden_dim: 128
+    decoder_num_hidden_layers: 1
+    decoder_hidden_dim: 64
     decoder_layer_type: 'none'
     decoder_activation_type: "relu"
     decoder_skip_layers: []
@@ -99,8 +99,8 @@ decoder:
 
 qtz:
     quantization_strategy: 'soft'
-    qtz_latent_dim: 20
-    qtz_num_embed: 6
+    qtz_latent_dim: 16
+    qtz_num_embed: 1
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
@@ -153,7 +153,7 @@ trainer:
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_data','spectra_sup_mask','spectra_sup_pixels','spectra_sup_redshift','spectra_val_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_data','spectra_sup_mask','spectra_sup_plot_mask','spectra_sup_pixels','spectra_sup_redshift','spectra_val_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
     pretrain_codebook: True          # these two conflict
     spectra_supervision: False       #  each other
@@ -175,9 +175,9 @@ trainer:
     pretrain_redshift_beta: 0.1
     spectra_supervision_start_epoch: 0
 
-    decode_spatial_embedding: False
+    decode_spatial_embedding: True
     quantize_latent: False
-    quantize_spectra: True
+    quantize_spectra: False
     weight_train: False
     train_use_all_wave: False
     resume_train: False
@@ -191,12 +191,12 @@ trainer:
     mixture_avg_per_band: True
 
     # spectra supervision
-    num_supervision_spectra: 6
+    num_supervision_spectra: 1
     spectra_neighbour_size: 1
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_batch_size: 100 #4096 #20000 #36864
+    infer_batch_size: 10 #4096 #20000 #36864
     infer_use_all_wave: True # enforced
     infer_last_model_only: True
 
@@ -213,7 +213,7 @@ infer:
 
     # recon spectra
     infer_selected: True
-    pretrain_num_infer: 6
+    pretrain_num_infer: 1
 
     flux_norm_cho: "sum"
     spectra_smooth_sigma: 50
@@ -253,7 +253,7 @@ dataset:
     # if don't use full patch, we can select cutout from tiles
     # the order of the following 5 fields corresponds to each other
     tracts: ['9812']
-    patches: ['1,5']
+    patches: ['0,2'] #['1,5']
     patch_selection_cho: "test"
     patch_cutout_num_rows: [4000] #[64]
     patch_cutout_num_cols: [4000] #[64]
@@ -301,15 +301,18 @@ dataset:
     #gt_spectra_ids: [0] #[5,6,7,8,9] #[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] #,18,19] #[0,1,3,5,7,2,4,6,8,9] #[0,1,2,3,4,5,6,7,8,9]
 
     spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['0','1'] #['0','1','2','3','4','5','6','7','8']
-    spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
+    spectra_patches_r: ['0'] #,'1'] #['0','1','2','3','4','5','6','7','8']
+    spectra_patches_c: ['2'] #['0','1','2'] #,'3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
     source_spectra_cho: "" #"6000_to_8000"
-    processed_spectra_cho: "debug2" #"v7_table" #"test"
-    spectra_supervision_wave_lo: 6000
+    processed_spectra_cho: "debug3" #"v7_table" #"test"
+    spectra_supervision_wave_lo: 7500
     spectra_supervision_wave_hi: 8000
     load_spectra_data_from_cache: True
+    # debug3: 7500-8000
+    # debug4: 7500-7600
+    # debug5: 7700-7800
 
 inpaint:
     inpaint_cho: 'no_inpaint' #'spectral_inpaint'

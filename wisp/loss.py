@@ -10,17 +10,19 @@ def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     emd = torch.mean(torch.abs(emd))
     return emd
 
-def plotspectra(spectra):
+def plotspectra(spectra, fname):
     spectra = spectra.detach().cpu().numpy()
     import matplotlib.pyplot as plt
     n,m = spectra.shape
     x = np.arange(m)
-    fig, axs = plt.subplots(2,10,figsize=(50,10))
+    # fig, axs = plt.subplots(2,10,figsize=(50,10))
+    fig, axs = plt.subplots(1,1,figsize=(50,10))
     for i in range(n):
-        axis = axs[i//10,i%10]
+        # axis = axs[i//10,i%10]
+        axis = axs
         axis.plot(x,spectra[i])
     fig.tight_layout()
-    plt.savefig('tmp.png')
+    plt.savefig(fname)
     plt.close()
 
 def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
@@ -35,10 +37,14 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
     # norm spectra each so they sum to 1 (earth movers distance)
     # DON'T use /= or spectra will be modified in place and
     #   if we save spectra later on the spectra will be inaccurate
+    #plotspectra(gt_spectra[:,1], 'tmp.png')
+    #plotspectra(gt_spectra[:,1]*mask, 'tmp_masked.png')
+
+    # emd
     gt_flux = gt_spectra[:,1] / (torch.sum(gt_spectra[:,1]*mask, dim=-1)[...,None] + 1e-10)
     recon_flux = recon_flux / (torch.sum(recon_flux*mask, dim=-1)[...,None] + 1e-10)
     # print(gt_flux.shape, recon_flux.shape)
-    # plotspectra(gt_flux)
+    # plotspectra(gt_spectra[:,1]*mask, 'tmp_masked_pmf.png')
 
     # sanity check, sum of unmasked flux should be same as bsz
     # gt_flux = torch.masked_select(gt_flux, mask.bool())
@@ -49,8 +55,8 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
     emd = torch.mean(torch.abs(emd))
     return emd
 
-    # nsmpl = recon_flux.shape[1]
-    # ret = loss(gt_spectra[:,1], recon_flux) / nsmpl
+    # l1/2 loss
+    # ret = loss(gt_spectra[:,1], recon_flux) # / recon_flux.shape[1]
     # return ret
 
 def redshift_supervision_loss(loss, gt_redshift, recon_redshift, mask=None):

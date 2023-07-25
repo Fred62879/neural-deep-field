@@ -29,8 +29,12 @@ class CodebookPretrainNerf(BaseNeuralField):
         self._register_forward_function(self.pretrain, channels)
 
     def init_model(self):
-        self.codebook = init_codebook(
-            self.kwargs["qtz_seed"], self.kwargs["qtz_num_embed"], self.kwargs["qtz_latent_dim"])
+        if self.kwargs["quantize_latent"]:
+            self.codebook = init_codebook(
+                self.kwargs["qtz_seed"],
+                self.kwargs["qtz_num_embed"],
+                self.kwargs["qtz_latent_dim"])
+        else: self.codebook = None
 
         assert self.kwargs["model_redshift"] and \
             self.kwargs["apply_gt_redshift"] and \
@@ -66,7 +70,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         bsz = coords.shape[0]
         coords = coords[:,None]
 
-        # `latents` is either logits or qtz latents or latents
+        # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)
         timer.check("spatial decoding done")
 

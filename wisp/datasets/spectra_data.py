@@ -140,9 +140,10 @@ class SpectraData:
         self.coords_range_fname = get_coords_range_fname(**self.kwargs)
         self.gt_spectra_fname = join(processed_data_path, "gt_spectra.npy")
         self.gt_spectra_ids_fname = join(processed_data_path, "gt_spectra_ids.txt")
-        self.gt_spectra_mask_fname = join(processed_data_path, "gt_spectra_mask.npy")
         self.gt_spectra_pixels_fname = join(processed_data_path, "gt_spectra_pixels.npy")
         self.gt_spectra_redshift_fname = join(processed_data_path, "gt_spectra_redshift.npy")
+        self.gt_spectra_sup_mask_fname = join(processed_data_path, "gt_spectra_sup_mask.npy")
+        self.gt_spectra_plot_mask_fname = join(processed_data_path, "gt_spectra_plot_mask.npy")
         self.gt_spectra_img_coords_fname = join(processed_data_path, "gt_spectra_img_coords.npy")
         self.gt_spectra_world_coords_fname = join(processed_data_path, "gt_spectra_world_coords.npy")
 
@@ -215,6 +216,12 @@ class SpectraData:
     #     """ Get ids of boundary lambda of spectra supervision. """
     #     return self.data["supervision_wave_bound_ids"]
 
+    def get_supervision_plot_mask(self, idx=None):
+        """ Get mask for plotting. """
+        if idx is None:
+            return self.data["supervision_plot_mask"]
+        return self.data["supervision_plot_mask"][idx]
+
     def get_supervision_data(self, idx=None):
         """ Get gt spectra (with same wave range as recon) used for supervision. """
         if idx is None:
@@ -224,8 +231,8 @@ class SpectraData:
     def get_supervision_mask(self, idx=None):
         """ Get mask for pixels used for spectra supervision. """
         if idx is None:
-            return self.data["supervision_mask"]
-        return self.data["supervision_mask"][idx]
+            return self.data["supervision_sup_mask"]
+        return self.data["supervision_sup_mask"][idx]
 
     def get_supervision_pixels(self, idx=None):
         """ Get pix values for pixels used for spectra supervision. """
@@ -369,9 +376,10 @@ class SpectraData:
         if not self.load_spectra_data_from_cache or \
            not exists(self.gt_spectra_ids_fname) or \
            not exists(self.gt_spectra_fname) or \
-           not exists(self.gt_spectra_mask_fname) or \
            not exists(self.gt_spectra_pixels_fname) or \
            not exists(self.gt_spectra_redshift_fname) or \
+           not exists(self.gt_spectra_sup_mask_fname) or \
+           not exists(self.gt_spectra_plot_mask_fname) or \
            not exists(self.gt_spectra_img_coords_fname) or \
            not exists(self.gt_spectra_world_coords_fname):
 
@@ -397,7 +405,8 @@ class SpectraData:
             "gt_spectra_world_coords"
         ], torch.float32)
         self.to_tensor([
-            "gt_spectra_mask"
+            "gt_spectra_sup_mask",
+            "gt_spectra_plot_mask",
         ], torch.bool)
 
     #############
@@ -417,36 +426,42 @@ class SpectraData:
         # supervision_ids = ids[:n]
         # validation_ids = ids[n:]
 
-        acc, validation_ids, validation_patch_ids = 0, [], {}
-        for tract, patch in zip(self.kwargs["tracts"], self.kwargs["patches"]):
-            patch_uid = create_patch_uid(tract, patch)
-            cur_spectra_ids = self.data["gt_spectra_ids"][patch_uid]
-            validation_ids.extend(cur_spectra_ids)
-            validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
-            acc += len(cur_spectra_ids)
-        validation_ids = np.array(validation_ids)
+        # acc, validation_ids, validation_patch_ids = 0, [], {}
+        # for tract, patch in zip(self.kwargs["tracts"], self.kwargs["patches"]):
+        #     patch_uid = create_patch_uid(tract, patch)
+        #     cur_spectra_ids = self.data["gt_spectra_ids"][patch_uid]
+        #     validation_ids.extend(cur_spectra_ids)
+        #     validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
+        #     acc += len(cur_spectra_ids)
+        # validation_ids = np.array(validation_ids)
+        validation_ids = np.array([0])
 
         # get supervision ids
         supervision_ids = np.array(list(set(ids) - set(validation_ids))).astype(int)
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra"]]
+        # supervision_ids = np.array([14,22,31])
+        supervision_ids = np.array([14]) #,31])
 
         self.num_validation_spectra = len(validation_ids)
         self.num_supervision_spectra = len(supervision_ids)
-        self.data["validation_patch_ids"] = validation_patch_ids
+        #self.data["validation_patch_ids"] = validation_patch_ids
         return supervision_ids, validation_ids
 
     def train_valid_split(self):
         sup_ids, val_ids = self.split_spectra()
         log.info(f"spectra train/valid {len(sup_ids)}/{len(val_ids)}")
+        print(sup_ids)
 
         # supervision spectra data (used during pretrain)
         self.data["supervision_spectra"] = self.data["gt_spectra"][sup_ids]
-        self.data["supervision_mask"] = self.data["gt_spectra_mask"][sup_ids]
         self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][sup_ids]
-        # print('*', self.data["gt_spectra_redshift"][sup_ids])
+        self.data["supervision_sup_mask"] = self.data["gt_spectra_sup_mask"][sup_ids]
+        self.data["supervision_plot_mask"] = self.data["gt_spectra_plot_mask"][sup_ids]
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][sup_ids]
+
+        # print(self.data["supervision_redshift"])
 
         # valiation(and semi sup) spectra data (used during main train)
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
@@ -465,9 +480,10 @@ class SpectraData:
         self.data["gt_spectra_ids"] = defaultdict(list, ids)
 
         self.data["gt_spectra"] = np.load(self.gt_spectra_fname)
-        self.data["gt_spectra_mask"] = np.load(self.gt_spectra_mask_fname)
         self.data["gt_spectra_pixels"] = np.load(self.gt_spectra_pixels_fname)
         self.data["gt_spectra_redshift"] = np.load(self.gt_spectra_redshift_fname)
+        self.data["gt_spectra_sup_mask"] = np.load(self.gt_spectra_sup_mask_fname)
+        self.data["gt_spectra_plot_mask"] = np.load(self.gt_spectra_plot_mask_fname)
         self.data["gt_spectra_img_coords"] = np.load(self.gt_spectra_img_coords_fname)
         self.data["gt_spectra_world_coords"] = np.load(self.gt_spectra_world_coords_fname)
 
@@ -483,17 +499,20 @@ class SpectraData:
             ids = pickle.load(fp)
         self.data["gt_spectra_ids"] = defaultdict(list, ids)
 
-        masks, redshift, pixels, img_coords, world_coords, spectra = [], [], [], [], [], []
+        img_coords, world_coords, spectra = [], [], []
+        plot_masks, sup_masks, redshift, pixels = [], [], [], []
 
         n = len(df)
         for i in range(n):
             redshift.append(df.iloc[i]["zspec"])
             pixels.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["pix_fname"])))
-            masks.append(
-                np.load(join(self.processed_spectra_path, df.iloc[i]["mask_fname"])))
             spectra.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["spectra_fname"])))
+            sup_masks.append(
+                np.load(join(self.processed_spectra_path, df.iloc[i]["sup_mask_fname"])))
+            plot_masks.append(
+                np.load(join(self.processed_spectra_path, df.iloc[i]["plot_mask_fname"])))
             img_coords.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["img_coord_fname"])))
             world_coords.append(
@@ -503,7 +522,8 @@ class SpectraData:
         #  (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
         self.data["gt_spectra"] = np.array(spectra).astype(np.float32)
 
-        self.data["gt_spectra_mask"] = np.array(masks).astype(bool)
+        self.data["gt_spectra_sup_mask"] = np.array(sup_masks).astype(bool)
+        self.data["gt_spectra_plot_mask"] = np.array(plot_masks).astype(bool)
         self.data["gt_spectra_pixels"] = np.concatenate(pixels, axis=0).astype(np.float32)
         self.data["gt_spectra_redshift"] = np.array(redshift).astype(np.float32) # [n,]
         self.data["gt_spectra_img_coords"] = np.concatenate(
@@ -517,9 +537,10 @@ class SpectraData:
 
         # save data for all spectra together
         np.save(self.gt_spectra_fname, self.data["gt_spectra"])
-        np.save(self.gt_spectra_mask_fname, self.data["gt_spectra_mask"])
         np.save(self.gt_spectra_pixels_fname, self.data["gt_spectra_pixels"])
         np.save(self.gt_spectra_redshift_fname, self.data["gt_spectra_redshift"])
+        np.save(self.gt_spectra_sup_mask_fname, self.data["gt_spectra_sup_mask"])
+        np.save(self.gt_spectra_plot_mask_fname, self.data["gt_spectra_plot_mask"])
         np.save(self.gt_spectra_img_coords_fname, self.data["gt_spectra_img_coords"])
         np.save(self.gt_spectra_world_coords_fname, self.data["gt_spectra_world_coords"])
 
@@ -528,8 +549,8 @@ class SpectraData:
         df = self.load_source_metadata().iloc[:upper_bound]
         log.info(f"found {len(df)} source spectra")
 
-        for field in ["tract","patch","pix_fname","mask_fname",
-                      "img_coord_fname","world_coord_fname"]:
+        for field in ["tract","patch","pix_fname","sup_mask_fname",
+                      "plot_mask_fname","img_coord_fname","world_coord_fname"]:
             df[field] = "None"
 
         if self.download_source_spectra:
@@ -676,16 +697,23 @@ class SpectraData:
         world_coords = wcs.all_pix2world(img_coords, 0) # [n,2]
         img_coords = img_coords[:,::-1] # xy coords to rc coords
 
-        cur_patch_spectra, cur_patch_spectra_mask = [], []
-        process_one_spectra = partial(self.process_one_spectra,
-                                      cur_patch_spectra, cur_patch_spectra_mask, df, patch)
+        cur_patch_spectra = []
+        cur_patch_spectra_sup_mask = []
+        cur_patch_spectra_plot_mask = []
+        process_one_spectra = partial(
+            self.process_one_spectra,
+            cur_patch_spectra, cur_patch_spectra_sup_mask,
+            cur_patch_spectra_plot_mask, df, patch)
+
         for i, (idx, img_coord) in enumerate(zip(spectra_ids, img_coords)):
             process_one_spectra(idx, img_coord)
 
         cur_patch_spectra_fname = join(
             self.processed_spectra_path, f"{patch_uid}.npy")
-        cur_patch_mask_fname = join(
-            self.processed_spectra_path, f"{patch_uid}_mask.npy")
+        cur_patch_sup_mask_fname = join(
+            self.processed_spectra_path, f"{patch_uid}_sup_mask.npy")
+        cur_patch_plot_mask_fname = join(
+            self.processed_spectra_path, f"{patch_uid}_plot_mask.npy")
         cur_patch_redshift_fname = join(
             self.processed_spectra_path, f"{patch_uid}_redshift.npy")
         cur_patch_img_coords_fname = join(
@@ -697,10 +725,14 @@ class SpectraData:
         np.save(cur_patch_img_coords_fname, img_coords)     # excl neighbours
         np.save(cur_patch_world_coords_fname, world_coords) # excl neighbours
         np.save(cur_patch_spectra_fname, np.array(cur_patch_spectra))
-        np.save(cur_patch_mask_fname, np.array(cur_patch_spectra_mask))
+        np.save(cur_patch_sup_mask_fname, np.array(cur_patch_spectra_sup_mask))
+        np.save(cur_patch_plot_mask_fname, np.array(cur_patch_spectra_plot_mask))
 
-    def process_one_spectra(self, cur_patch_spectra, cur_patch_spectra_mask,
-                            df, patch, idx, img_coord):
+    def process_one_spectra(self, cur_patch_spectra,
+                            cur_patch_spectra_sup_mask,
+                            cur_patch_spectra_plot_mask,
+                            df, patch, idx, img_coord
+    ):
         """ Get pixel and normalized coord and
               process spectra data for one spectra.
             @Params
@@ -717,12 +749,14 @@ class SpectraData:
         else: raise ValueError("Unsupported spectra data source")
 
         pix_fname = f"{fname}_pix.npy"
-        mask_fname = f"{fname}_mask.npy"
+        sup_mask_fname = f"{fname}_sup_mask.npy"
+        plot_mask_fname = f"{fname}_plot_mask.npy"
         img_coord_fname = f"{fname}_img_coord.npy"
         world_coord_fname = f"{fname}_world_coord.npy"
         df.at[idx,"pix_fname"] = pix_fname
-        df.at[idx,"mask_fname"] = mask_fname
         df.at[idx,"spectra_fname"] = f"{fname}.npy"
+        df.at[idx,"sup_mask_fname"] = sup_mask_fname
+        df.at[idx,"plot_mask_fname"] = plot_mask_fname
         df.at[idx,"img_coord_fname"] = img_coord_fname
         df.at[idx,"world_coord_fname"] = world_coord_fname
 
@@ -738,10 +772,11 @@ class SpectraData:
         np.save(join(self.processed_spectra_path, world_coord_fname), world_coords)
 
         # process source spectra and save locally
-        gt_spectra, mask = process_gt_spectra(
+        gt_spectra, plot_mask, sup_mask = process_gt_spectra(
             join(self.source_spectra_path, spectra_fname),
             join(self.processed_spectra_path, fname),
-            join(self.processed_spectra_path, mask_fname),
+            join(self.processed_spectra_path, sup_mask_fname),
+            join(self.processed_spectra_path, plot_mask_fname),
             self.full_wave,
             self.wave_discretz_interval,
             sigma=self.smooth_sigma,
@@ -753,7 +788,8 @@ class SpectraData:
             trans_data=self.trans_data
         )
         cur_patch_spectra.append(gt_spectra)
-        cur_patch_spectra_mask.append(mask)
+        cur_patch_spectra_sup_mask.append(sup_mask)
+        cur_patch_spectra_plot_mask.append(plot_mask)
 
     def load_source_metadata(self):
         if self.spectra_data_source == "manual":
@@ -858,8 +894,6 @@ class SpectraData:
     def process_spectrum_plot_data(
             self, flux_norm_cho, is_codebook,
             clip, spectra_clipped, data):
-            #gt_mask, gt_wave, gt_flux,
-            #recon_mask, recon_wave, recon_flux
         """ Collect data for spectrum plotting for the given spectra.
         """
         (gt_wave, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux) = data
@@ -1142,6 +1176,7 @@ def clean_flux(spectra, mask):
 
 def mask_negative_flux(spectra, mask):
     ids = (spectra[1] < 0)
+    mask = mask.copy()
     mask[ids] = 0
     return mask
 
@@ -1163,7 +1198,8 @@ def mask_spectra_range(spectra, mask, trans_range, trusted_range):
     mask &= new_mask
     return spectra, mask
 
-def process_gt_spectra(infname, spectra_fname, mask_fname,
+def process_gt_spectra(infname, spectra_fname,
+                       sup_mask_fname, plot_mask_fname,
                        full_wave, smpl_interval,
                        sigma=-1, format="tbl",
                        trans_range=None, trusted_range=None,
@@ -1193,7 +1229,7 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
     spectra, mask = clean_flux(spectra, mask)
     spectra = convolve_spectra(spectra, std=sigma, bound=bound)
     spectra, mask = mask_spectra_range(spectra, mask, trans_range, trusted_range)
-    mask = mask_negative_flux(spectra, mask)
+    sup_mask = mask_negative_flux(spectra, mask) # supervision mask
     spectra = spectra.astype(np.float32)
 
     if trans_data is not None:
@@ -1205,19 +1241,24 @@ def process_gt_spectra(infname, spectra_fname, mask_fname,
 
     if save:
         np.save(spectra_fname + ".npy", spectra)
-        np.save(mask_fname, mask)
+        np.save(sup_mask_fname, sup_mask)
+        np.save(plot_mask_fname, mask)
     if plot:
         plt.plot(spectra[0], spectra[1])
         plt.savefig(spectra_fname + ".png")
         plt.close()
 
+        plt.plot(spectra[0], sup_mask)
+        plt.savefig(spectra_fname + "_sup_mask.png")
+        plt.close()
+
         plt.plot(spectra[0], mask)
-        plt.savefig(spectra_fname + "_mask.png")
+        plt.savefig(spectra_fname + "_plot_mask.png")
         plt.close()
 
     if validator is not None and not validator(spectra_data):
         return None, None
-    return spectra, mask
+    return spectra, mask, sup_mask
 
 def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
     gt = np.load(gt_fn)

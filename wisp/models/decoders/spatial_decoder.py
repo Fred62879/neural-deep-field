@@ -35,9 +35,8 @@ class SpatialDecoder(nn.Module):
                     kwargs["redshift_unsupervision"],
                     kwargs["redshift_semi_supervision"]]) <= 1
 
-        self.model_redshift = kwargs["model_redshift"] and self.qtz
-        self.apply_gt_redshift = self.model_redshift and \
-            kwargs["apply_gt_redshift"] and self.qtz
+        self.model_redshift = kwargs["model_redshift"] # and self.qtz
+        self.apply_gt_redshift = self.model_redshift and kwargs["apply_gt_redshift"]
 
         self.input_dim = get_input_latents_dim(**kwargs)
         self.init_model()
@@ -128,14 +127,13 @@ class SpatialDecoder(nn.Module):
             redshift = None
         timer.check("spatial_decod::redshift done")
 
-        # quantization
+        # decode/quantize
         if self.quantize_spectra:
             logits = self.decode(z)
-        else:
-            if self.decode_spatial_embedding:
-                z = self.decode(z)
-            if self.quantize_z:
-                z, z_q = self.qtz(z, codebook.weight, ret, qtz_args)
+        elif self.quantize_z:
+            z, z_q = self.qtz(z, codebook.weight, ret, qtz_args)
+        elif self.decode_spatial_embedding:
+            z = self.decode(z)
         timer.check("spatial_decod::qtz done")
 
         ret["latents"] = z
