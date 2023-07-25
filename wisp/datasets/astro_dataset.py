@@ -230,9 +230,9 @@ class AstroDataset(Dataset):
         elif field == "spectra_sup_data":
             data = self.spectra_dataset.get_supervision_data()
             data = self.index_selected_data(data, idx)
-        # elif field == "spectra_sup_mask":
-        #     data = self.spectra_dataset.get_supervision_mask()
-        #     data = self.index_selected_data(data, idx)
+        elif field == "spectra_sup_mask":
+            data = self.spectra_dataset.get_supervision_mask()
+            data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_plot_mask":
             data = self.spectra_dataset.get_supervision_plot_mask()
             data = self.index_selected_data(data, idx)
@@ -259,21 +259,21 @@ class AstroDataset(Dataset):
 
             if self.sample_wave:
                 # sample from spectra data (wave, flux, ivar, and interpolated trans)
+                # sample_ids [bsz,nsmpl,2]
                 assert self.kwargs["uniform_sample_wave"]
                 out["spectra_sup_data"], sample_ids = batch_sample_torch(
                     out["spectra_sup_data"], self.kwargs["pretrain_num_wave_samples"],
                     keep_sample_ids=True)
-                # out["spectra_sup_mask"] = batch_sample_torch(
-                #     out["spectra_sup_mask"], self.kwargs["pretrain_num_wave_samples"],
-                #     sample_ids=sample_ids)
+                out["spectra_sup_mask"] = batch_sample_torch(
+                    out["spectra_sup_mask"], self.kwargs["pretrain_num_wave_samples"],
+                    sample_ids=sample_ids)
                 out["spectra_sup_plot_mask"] = batch_sample_torch(
                     out["spectra_sup_plot_mask"], self.kwargs["pretrain_num_wave_samples"],
                     sample_ids=sample_ids)
-                # sample_ids [bsz,nsmpl,2]
 
             if self.perform_integration:
-                out["trans"] = out["spectra_sup_data"][:,4:4+self.num_bands]    # [bsz,nbands,nsmpl]
                 out["trans_mask"] = out["spectra_sup_data"][:,3]                # [bsz,nsmpl]
+                out["trans"] = out["spectra_sup_data"][:,4:4+self.num_bands]    # [bsz,nbands,nsmpl]
                 out["band_mask"] = out["spectra_sup_data"][:,4+self.num_bands:] # [bsz,nbands,nsmpl]
                 # num of sample within each band (replace 0 with 1 to avoid division by 0)
                 nsmpl = torch.sum(out["band_mask"], dim=-1)

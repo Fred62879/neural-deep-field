@@ -90,7 +90,7 @@ class CodebookTrainer(BaseTrainer):
         if self.extra_args["batched_pretrain"]:
             fields.extend([
                 "spectra_sup_data",
-                #"spectra_sup_mask",
+                "spectra_sup_mask",
                 "spectra_sup_redshift",
                 "spectra_sup_plot_mask"
             ])
@@ -243,8 +243,8 @@ class CodebookTrainer(BaseTrainer):
             else:
                 net_params.append(self.params_dict[name])
 
-        # params.append({"params": latents,
-        #                "lr": self.extra_args["codebook_pretrain_lr"]})
+        params.append({"params": latents,
+                       "lr": self.extra_args["codebook_pretrain_lr"]})
         params.append({"params": net_params,
                        "lr": self.extra_args["codebook_pretrain_lr"]})
         self.optimizer = self.optim_cls(params, **self.optim_params)

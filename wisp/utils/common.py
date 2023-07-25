@@ -33,9 +33,13 @@ def print_shape(data):
         else: print(n, p.shape, p.dtype)
 
 def get_input_latents_dim(**kwargs):
-    """ Infer the dimension of the input RA/DEC coordinate for MLP.
+    """ Get the dimension of the input RA/DEC coordinate for MLP.
     """
-    if kwargs["coords_encode_method"] == "positional_encoding":
+    if kwargs["pretrain_codebook"] and \
+         ("codebook_pretrain" in kwargs["tasks"] or \
+          "pretrain_infer" in kwargs["tasks"]):
+        latents_dim = kwargs["codebook_pretrain_latent_dim"]
+    elif kwargs["coords_encode_method"] == "positional_encoding":
         latents_dim = kwargs["coords_embed_dim"]
     elif kwargs["coords_encode_method"] == "grid":
         latents_dim = kwargs["grid_feature_dim"]
@@ -43,10 +47,6 @@ def get_input_latents_dim(**kwargs):
             latents_dim *= kwargs["grid_num_lods"]
     else:
         latents_dim = 2
-
-    # if kwargs["pretrain_codebook"] and "codebook_pretrain" in kwargs["tasks"]:
-    #     latents_dim += 3
-
     return latents_dim
 
 def add_to_device(data, valid_fields, device):

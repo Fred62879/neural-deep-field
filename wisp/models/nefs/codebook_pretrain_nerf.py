@@ -17,8 +17,8 @@ class CodebookPretrainNerf(BaseNeuralField):
 
         self.kwargs = kwargs
         self.model_redshift = _model_redshift
+        self.encode_coords = kwargs["encode_coords"]
         self.pixel_supervision = pretrain_pixel_supervision
-        self.init_encoder() # debug
         self.init_model()
 
     def get_nef_type(self):
@@ -32,7 +32,6 @@ class CodebookPretrainNerf(BaseNeuralField):
 
     # init encoder added for debug purpose
     def init_encoder(self):
-        if not self.kwargs["encode_coords"]: return
         embedder_args = (
             2,
             self.kwargs["coords_embed_dim"],
@@ -60,6 +59,9 @@ class CodebookPretrainNerf(BaseNeuralField):
             self.kwargs["apply_gt_redshift"] and \
             not self.kwargs["redshift_unsupervision"] and \
             not self.kwargs["redshift_semi_supervision"]
+
+        if self.encode_coords:
+            self.init_encoder() # debug
 
         self.spatial_decoder = SpatialDecoder(
             output_scaler=False,
@@ -90,7 +92,9 @@ class CodebookPretrainNerf(BaseNeuralField):
         bsz = coords.shape[0]
         coords = coords[:,None]
 
-        coords = self.spatial_encoder(coords)
+        # add for debug purpose
+        if self.encode_coords:
+            coords = self.spatial_encoder(coords)
 
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)

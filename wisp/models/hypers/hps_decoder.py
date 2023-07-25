@@ -26,7 +26,7 @@ class HyperSpectralDecoder(nn.Module):
             _model_redshift=_model_redshift, **kwargs
         )
         self.init_decoder()
-        # self.norm = Normalization(kwargs["mlp_output_norm_method"])
+        self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
         if self.qtz_spectra:
             self.qtz = Quantization(False, **kwargs)
@@ -110,7 +110,7 @@ class HyperSpectralDecoder(nn.Module):
             assert scaler is not None
             spectra = (scaler * spectra.T).T
 
-        # spectra = self.norm(spectra)
+        spectra = self.norm(spectra)
         ret["spectra"] = spectra
 
     def forward_with_full_wave(self, latents, full_wave, full_wave_bound,
