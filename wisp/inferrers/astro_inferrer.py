@@ -267,7 +267,6 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.append("pixels")
             if self.save_redshift_main:
                 self.requested_fields.append("redshift_data")
-                # self.requested_fields.append("spectra_bin_map")
             if self.redshift_semi_supervision:
                 self.requested_fields.extend(["spectra_id_map","spectra_bin_map"])
 
@@ -402,7 +401,9 @@ class AstroInferrer(BaseInferrer):
         if self.save_scaler: self.scalers = []
         if self.plot_embed_map: self.embed_ids = []
         if self.plot_latent_embed: self.latents = []
-        if self.save_redshift_main: self.redshift = []
+        if self.save_redshift_main:
+            self.redshift = []
+            self.gt_redshift = []
         if self.save_qtz_weights: self.qtz_weights = []
         if self.recon_img_pretrain: self.recon_pixels = []
         if self.recon_synthetic_band: self.recon_synthetic_pixels = []
@@ -545,7 +546,7 @@ class AstroInferrer(BaseInferrer):
             if self.extra_args["pretrain_codebook"]:
                 redshift = torch.stack(self.redshift).detach().cpu().numpy()
                 redshift = redshift[self.val_spectra_map]
-                gt_redshift = self.gt_redshift.detach().cpu().numpy()
+                gt_redshift = torch.stack(self.gt_redshift).detach().cpu().numpy()
                 np.set_printoptions(suppress=True)
                 np.set_printoptions(precision=3)
                 log.info(f"est redshift (full): {redshift}")
@@ -608,7 +609,9 @@ class AstroInferrer(BaseInferrer):
             self.gt_fluxes = []
             self.spectra_wave = []
             self.spectra_masks = []
-        if self.save_redshift_pre: self.redshift = []
+        if self.save_redshift_pre:
+            self.redshift = []
+            self.gt_redshift = []
         if self.save_qtz_weights: self.qtz_weights = []
 
     def run_checkpoint_selected_coords_partial_model(self, model_id, checkpoint):
@@ -655,9 +658,12 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_redshift_pre:
             redshift = torch.stack(self.redshift).detach().cpu().numpy()
+            gt_redshift = torch.stack(self.gt_redshift).detach().cpu().numpy()
+
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
             log.info(f"redshift (patrtial): {redshift}")
+            log.info(f"GT. redshift (patrtial): {gt_redshift}")
 
         if self.save_qtz_weights:
             weights = torch.stack(self.qtz_weights).detach().cpu().numpy()[:,0]
@@ -782,7 +788,7 @@ class AstroInferrer(BaseInferrer):
                 if self.save_redshift_main:
                     self.redshift.extend(ret["redshift"])
                     if self.extra_args["pretrain_codebook"]:
-                        self.gt_redshift = data["spectra_sup_redshift"]
+                        self.gt_redshift.extend(data["spectra_sup_redshift"])
 
             except StopIteration:
                 log.info("all coords inferrence done")

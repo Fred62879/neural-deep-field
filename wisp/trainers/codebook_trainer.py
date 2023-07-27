@@ -19,7 +19,8 @@ from torch.utils.data import BatchSampler, \
 from wisp.utils import PerfTimer
 from wisp.trainers import BaseTrainer
 from wisp.utils.plot import plot_grad_flow
-from wisp.loss import spectra_supervision_loss, pretrain_pixel_loss
+from wisp.loss import spectra_supervision_loss, \
+    spectra_supervision_emd_loss, pretrain_pixel_loss
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     select_inferrence_ids, load_embed, load_model_weights, forward
 
@@ -191,16 +192,25 @@ class CodebookTrainer(BaseTrainer):
                 self.pretrained_model_fname = join(pretrained_model_dir, fnames[-1])
 
     def get_loss(self, cho):
-        if cho == "l1":
-            loss = nn.L1Loss() if not self.cuda else nn.L1Loss().cuda()
-        elif cho == "l2":
-            loss = nn.MSELoss() if not self.cuda else nn.MSELoss().cuda()
-        else: raise Exception("Unsupported loss choice")
+        if cho == "l1_mean":
+            loss = nn.L1Loss()
+        elif cho == "l1_sum":
+            loss = nn.L1Loss(reduction="sum")
+        elif cho == "l2_mean":
+            loss = nn.MSELoss()
+        elif cho == "l2_sum":
+            loss = nn.MSELoss(reduction="sum")
+        else:
+            raise Exception("Unsupported loss choice")
+        if self.cuda: loss = loss.cuda()
         return loss
 
     def init_loss(self):
-        loss = self.get_loss(self.extra_args["spectra_loss_cho"])
-        self.spectra_loss = partial(spectra_supervision_loss, loss)
+        if self.extra_args["spectra_loss_cho"] == "emd":
+            self.spectra_loss = spectra_supervision_emd_loss
+        else:
+            loss = self.get_loss(self.extra_args["spectra_loss_cho"])
+            self.spectra_loss = partial(spectra_supervision_loss, loss)
 
         if self.pixel_supervision:
             loss = self.get_loss(self.extra_args["pixel_loss_cho"])
@@ -211,8 +221,8 @@ class CodebookTrainer(BaseTrainer):
         """
         # if self.shuffle_dataloader: sampler_cls = RandomSampler
         # else: sampler_cls = SequentialSampler
-        sampler_cls = SequentialSampler
-        # sampler_cls = RandomSampler
+        # sampler_cls = SequentialSampler
+        sampler_cls = RandomSampler
 
         sampler = BatchSampler(
             sampler_cls(self.dataset),
@@ -244,8 +254,8 @@ class CodebookTrainer(BaseTrainer):
             else:
                 net_params.append(self.params_dict[name])
 
-        params.append({"params": latents,
-                       "lr": self.extra_args["codebook_pretrain_lr"]})
+        #params.append({"params": latents,
+        #               "lr": self.extra_args["codebook_pretrain_lr"]})
         params.append({"params": net_params,
                        "lr": self.extra_args["codebook_pretrain_lr"]})
         self.optimizer = self.optim_cls(params, **self.optim_params)
@@ -480,7 +490,7 @@ class CodebookTrainer(BaseTrainer):
               iterating thru all data.
         """
         length = len(self.dataset)
-        self.batch_size = min(self.extra_args["batch_size"], length)
+        self.batch_size = min(self.extra_args["pretrain_batch_size"], length)
 
         if self.dataloader_drop_last:
             self.num_iterations_cur_epoch = int(length // self.batch_size)

@@ -24,7 +24,7 @@ def get_pretrain_pipelines(pipelines, tasks, args):
     if not args.pretrain_codebook: return
 
     if "codebook_pretrain" in tasks:
-        # assert(args.quantize_latent or args.quantize_spectra)
+        assert(args.quantize_latent or args.quantize_spectra)
         pretrain_nef = CodebookPretrainNerf(
             args.codebook_pretrain_pixel_supervision,
             _model_redshift=args.model_redshift,

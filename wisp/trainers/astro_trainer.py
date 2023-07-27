@@ -76,8 +76,7 @@ class AstroTrainer(BaseTrainer):
     def init_net(self):
         if self.pretrain_codebook:
             self.load_pretrained_model()
-
-        # log.info(self.pipeline)
+        log.info(self.pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.pipeline.parameters()))
         )
@@ -111,7 +110,7 @@ class AstroTrainer(BaseTrainer):
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
         self.dataset.set_mode("main_train")
-        self.dataset.toggle_wave_sampling(False)
+        self.dataset.toggle_wave_sampling(True)
         self.set_coords()
 
     def summarize_training_tasks(self):

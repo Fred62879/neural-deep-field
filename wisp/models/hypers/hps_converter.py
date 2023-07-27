@@ -67,7 +67,7 @@ class HyperSpectralConverter(nn.Module):
 
     def linear_norm_wave(self, wave, wave_bound):
         (lo, hi) = wave_bound # 3940, 10870
-        return (wave - lo) / (hi - lo)
+        return 10*(wave - lo) / (hi - lo)
         # return 2*(wave - lo) / (hi - lo)-1
 
     def shift_wave(self, wave, redshift):
@@ -75,15 +75,16 @@ class HyperSpectralConverter(nn.Module):
         """
         wave = wave.permute(1,2,0)
 
-        # print(wave.shape, redshift.shape)
+        #print(wave[:,0,:].T, redshift)
         if wave.ndim == 3: # [nsmpl,1,bsz]
             wave = wave / (1 + redshift) # dont use `/=` this will change wave object
         elif wave.ndim == 4: # [nbands,nsmpl,1,bsz]
             wave = wave / (1 + redshift)
         else:
             raise Exception("Wrong wave dimension when doing wave shifting.")
+        #print(wave[:,0,:].T)
 
-        del redshift
+        # del redshift
         wave = wave.permute(2,0,1)
         return wave
 
@@ -123,7 +124,9 @@ class HyperSpectralConverter(nn.Module):
         if redshift is None:
             assert not self._model_redshift
         else: wave = self.shift_wave(wave, redshift)
+        #print(wave_bound)
         wave = self.linear_norm_wave(wave, wave_bound)
+        #print(wave[:,:,0])
 
         if self.encode_wave:
             assert(coords_encode_dim != self.kwargs["space_dim"])

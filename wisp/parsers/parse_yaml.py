@@ -387,8 +387,6 @@ def define_cmd_line_args():
     data_group.add_argument("--flux-norm-cho",type=str,
                             choices=["max","sum","scale_gt","scale_recon"],
                             help="0- divide with max, 1-divide with sum")
-    data_group.add_argument("--trusted-range-only", action="store_true",
-                            help="plot gt spectra within trusted range only")
 
     data_group.add_argument("--num-gt-spectra", type=int)
     data_group.add_argument("--source-spectra-cho", type=str)
@@ -428,6 +426,7 @@ def define_cmd_line_args():
                              help="Number of epochs to run the training.")
     train_group.add_argument("--batch-size", type=int, default=512,
                              help="Batch size for the training.")
+    train_group.add_argument("--pretrain-batch-size", type=int, default=512)
     train_group.add_argument("--resample", action="store_true",
                              help="Resample the dataset after every epoch.")
     train_group.add_argument("--only-last", action="store_true",
@@ -593,6 +592,7 @@ def define_cmd_line_args():
     infer_group.add_argument("--average-neighbour-spectra", action="store_true")
     infer_group.add_argument("--plot-clipped-spectrum", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-gt", action="store_true")
+    infer_group.add_argument("--plot-spectrum-with-recon", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-trans", action="store_true")
     infer_group.add_argument("--plot-spectrum-together", action="store_true")
     infer_group.add_argument("--infer-spectra-individually", action="store_true")

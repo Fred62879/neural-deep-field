@@ -201,10 +201,10 @@ class PatchData:
             return self.data["spectra_pixel_wave"][idx]
         return self.data["spectra_pixel_wave"]
 
-    # def get_spectra_pixel_masks(self, idx=None):
-    #     if idx is not None:
-    #         return self.data["spectra_pixel_masks"][idx]
-    #     return self.data["spectra_pixel_masks"]
+    def get_spectra_pixel_masks(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_pixel_plot_masks"][idx]
+        return self.data["spectra_pixel_plot_masks"]
 
     def get_spectra_pixel_fluxes(self, idx=None):
         if idx is not None:
@@ -323,6 +323,9 @@ class PatchData:
 
     def load_spectra_data(self):
         """ Load spectra fluxes and redshift values for all pixels with gt spectra.
+            TODO: previously sup_mask is different from plot_mask in that it also
+                  masks negative flux region. now we normalize all flux to positive
+                  these two are duplicate and we can leave only one.
         """
         path = self.spectra_obj.get_processed_spectra_path()
         cur_patch_spectra_fname = join(path, f"{self.patch_uid}.npy")

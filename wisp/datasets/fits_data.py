@@ -216,11 +216,6 @@ class FitsData:
             zscale_ranges = zscale_ranges[id]
         return zscale_ranges
 
-    # def get_redshift(self, idx=None):
-    #     if idx is not None:
-    #         return self.data["redshift"][idx]
-    #     return self.data["redshift"]
-
     ############
     # Utilities
     ############
@@ -541,6 +536,7 @@ class FitsData:
         if self.load_coords:
             coords = np.load(self.coords_fname)
             coords_range = np.load(self.coords_range_fname)
+            # print(self.coords_fname, self.coords_range_fname, coords_range)
             coords, _ = normalize_coords(coords, coords_range=coords_range)
         if self.load_weights:
             weights = np.load(self.weights_fname)

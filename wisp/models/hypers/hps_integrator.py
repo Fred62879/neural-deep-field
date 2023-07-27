@@ -126,8 +126,7 @@ class HyperSpectralIntegrator(nn.Module):
         return res
 
     def dot_prod_mix(self, spectra, trans, trans_mask, nsmpl):
-        # we actually don't need trans_mask
-        # trans values in masked region are all 0
+        # we actually don't need trans_mask, trans values in masked region are all 0
         if trans.ndim == 2:   # infer
             dp = torch.einsum("ij,kj->ik", spectra, trans)
         elif trans.ndim == 3: # train

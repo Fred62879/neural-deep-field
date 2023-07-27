@@ -21,7 +21,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         self.init_model()
 
     def get_nef_type(self):
-        return 'codebook_pretrain'
+        return "codebook_pretrain"
 
     def register_forward_functions(self):
         """ Register forward functions with the channels that they output.
@@ -70,6 +70,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]
         coords = coords[:,None]
+        # print(coords)
 
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)

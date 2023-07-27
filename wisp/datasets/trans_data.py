@@ -34,7 +34,6 @@ class TransData:
         self.wave_lo = kwargs["wave_lo"]
         self.wave_hi = kwargs["wave_hi"]
         self.u_scale = kwargs["u_band_scale"]
-        # self.trans_threshold = kwargs["trans_threshold"]
         self.smpl_interval = kwargs["trans_sample_interval"]
         assert(self.smpl_interval == 10)
 
@@ -44,34 +43,6 @@ class TransData:
     #############
     # Initializations
     #############
-
-    def init_trans(self):
-        # hardcoded transmission range
-        self.trans_range = {
-            "g": [7,194],
-            "r": [6,214],
-            "i": [0,220],
-            "z": [5,150],
-            "y": [2,191],
-            "nb387": [0,17],
-            "nb816": [95,141],
-            "nb921": [0,51],
-            "u" : [0,48],
-            "u*": [1,210]
-        }
-        self.data = {}
-        if self.learn_trusted_spectra:
-            self.trusted_wave_bound = [
-                self.kwargs["spectra_supervision_wave_lo"],
-                self.kwargs["spectra_supervision_wave_hi"]
-            ]
-        self.preprocess_wave_trans()
-        if self.kwargs["trans_sample_method"] == "mixture":
-            self.load_full_wave_trans()
-        elif self.kwargs["trans_sample_method"] == "hardcode":
-            self.load_hdcd_wave_trans()
-        self.load_sampling_trans_data()
-        self.set_wave_range()
 
     def set_path(self, dataset_path):
         input_path = join(dataset_path, "input")
@@ -115,6 +86,35 @@ class TransData:
         for path in [source_wave_path, self.trans_dir]:
             Path(path).mkdir(parents=True, exist_ok=True)
 
+    def init_trans(self):
+        # hardcoded transmission range
+        self.trans_range = {
+            "g": [7,194],
+            "r": [6,214],
+            "i": [0,220],
+            "z": [5,150],
+            "y": [2,191],
+            "nb387": [0,17],
+            "nb816": [95,141],
+            "nb921": [0,51],
+            "u" : [0,48],
+            "u*": [1,210]
+        }
+
+        if self.learn_trusted_spectra:
+            self.trusted_wave_bound = [
+                self.kwargs["spectra_supervision_wave_lo"],
+                self.kwargs["spectra_supervision_wave_hi"]]
+
+        self.data = {}
+        self.process_wave_trans()
+        if self.kwargs["trans_sample_method"] == "mixture":
+            self.load_full_wave_trans()
+        elif self.kwargs["trans_sample_method"] == "hardcode":
+            self.load_hdcd_wave_trans()
+        self.load_sampling_trans_data()
+        self.set_wave_range()
+
     #############
     # getters
     #############
@@ -154,13 +154,6 @@ class TransData:
 
     def get_band_coverage_range(self):
         return np.load(self.band_coverage_range_fname)
-
-    # def get_full_wave_bound(self):
-    #     if self.kwargs["trans_sample_method"] == "hardcode":
-    #         hdcd_wave = self.data["hdcd_wave"]
-    #         return (min(hdcd_wave), max(hdcd_wave))
-    #     return ( min(self.data["full_wave"]), max(self.data["full_wave"]) )
-    #     # return ( 0, max(self.data["full_wave"]) )
 
     def sample_wave(self, batch_size, num_samples, use_full_wave=False):
         """ Sample lambda and transmission data for given sampling methods.
@@ -295,8 +288,8 @@ class TransData:
                          for filter, i in zip(self.filters,self.filter_ids) }
         return source_wave, source_trans
 
-    def preprocess_wave_trans(self):
-        """ Preprocess source wave and transmission.
+    def process_wave_trans(self):
+        """ Process source wave and transmission.
         """
         if exists(self.processed_wave_fname) and exists(self.processed_trans_fname):
             with open(self.processed_wave_fname, "rb") as fp:
@@ -324,7 +317,9 @@ class TransData:
         np.save(self.band_coverage_range_fname, band_coverage_range)
 
         # number of lambda samples for each band [nbands]
-        nsmpl_within_bands = count_avg_nsmpl(self.trans_range.values())
+        cur_trans_range = [v for k,v in self.trans_range.items()
+                           if k in self.kwargs["filters"]]
+        nsmpl_within_bands = count_avg_nsmpl(cur_trans_range)
         np.save(self.nsmpl_within_bands_fname, nsmpl_within_bands)
 
         integration = integrate_trans(wave, trans)
@@ -499,13 +494,13 @@ def batch_sample_wave(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, *
         @Param  wave        [nsmpl_full]
                 trans       [nbands,nsmpl_full]
                 distrib     [nsmpl_full]
-                encd_ids    [nbands,nsmpl_full] if mixture o.w. None
+                band_masks  [nbands,nsmpl_full] if mixture o.w. None
         @Return smpl_wave   [bsz,nsmpl,1]
                 smpl_trans  [bsz,nbands,nsmpl]
                 avg_nsmpl   [nbands]
                 ids         [bsz,nsmpls]
     """
-    (wave, trans, distrib, encd_ids) = trans_data
+    (wave, trans, distrib, band_mask) = trans_data
     (nbands, nsmpl_full) = trans.shape
 
     '''
@@ -522,26 +517,24 @@ def batch_sample_wave(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, *
     '''
 
     if use_all_wave:
-        # use all lambda [bsz,nsmpl_full]
         ids = torch.arange(nsmpl_full)
         ids = ids[None,:].tile((bsz,1))
     elif kwargs["uniform_sample_wave"]:
         ids = torch.zeros(bsz,nsmpls).uniform_(0,nsmpl_full).to(torch.long)
     else:
-        # sample #nsmpl lambda [bsz,nsmpl]
         distrib = distrib[None,:].tile(bsz,1)
         ids = torch.multinomial(distrib, nsmpls, replacement=True)
 
-    if encd_ids is None:
+    if band_mask is None:
         avg_nsmpl = torch.zeros(bsz, nbands).type(trans.dtype)
     elif kwargs["mixture_avg_per_band"]:
         # count number of samples falling within response range of each band
-        avg_nsmpl = [torch.sum(encd_id[ids], dim=1) for encd_id in encd_ids]
+        avg_nsmpl = [torch.sum(band_mask[ids], dim=1) for band_mask in band_mask]
         avg_nsmpl = torch.stack(avg_nsmpl).T # [bsz,nbands]
         avg_nsmpl[avg_nsmpl==0] = 1 # avoid dividing by 0
     elif use_all_wave:
         assert(False)
-        # TODO: we probably should use covr_rnge of each band if we train with all wave for mixture
+        # TODO: should use covr_rnge of each band if train with all wave for mixture
         avg_nsmpl = torch.full((bsz, nbands), nsmpl_full)
     else:
         avg_nsmpl = nsmpls

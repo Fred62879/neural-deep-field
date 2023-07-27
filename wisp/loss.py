@@ -25,10 +25,9 @@ def plotspectra(spectra, fname):
     plt.savefig(fname)
     plt.close()
 
-def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
+def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux):
     ''' Loss function for spectra supervision
         @Param
-          loss: l1/l2 as specified in config
           mask:       [bsz,num_smpls]
           gt_spectra: [bsz,4+2*nbanbds,num_smpls]
                       (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
@@ -37,14 +36,10 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
     # norm spectra each so they sum to 1 (earth movers distance)
     # DON'T use /= or spectra will be modified in place and
     #   if we save spectra later on the spectra will be inaccurate
-    #plotspectra(gt_spectra[:,1], 'tmp.png')
-    #plotspectra(gt_spectra[:,1]*mask, 'tmp_masked.png')
 
-    # emd
+    # conver to pmf
     gt_flux = gt_spectra[:,1] / (torch.sum(gt_spectra[:,1]*mask, dim=-1)[...,None] + 1e-10)
     recon_flux = recon_flux / (torch.sum(recon_flux*mask, dim=-1)[...,None] + 1e-10)
-    # print(gt_flux.shape, recon_flux.shape)
-    # plotspectra(gt_spectra[:,1]*mask, 'tmp_masked_pmf.png')
 
     # sanity check, sum of unmasked flux should be same as bsz
     # gt_flux = torch.masked_select(gt_flux, mask.bool())
@@ -55,9 +50,17 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
     emd = torch.mean(torch.abs(emd))
     return emd
 
-    # l1/2 loss
-    # ret = loss(gt_spectra[:,1], recon_flux) # / recon_flux.shape[1]
-    # return ret
+def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
+    ''' Loss function for spectra supervision
+        @Param
+          loss: l1/l2 as specified in config
+          mask:       [bsz,num_smpls]
+          gt_spectra: [bsz,4+2*nbanbds,num_smpls]
+                      (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
+          recon_flux: [bsz,num_smpls]
+    '''
+    ret = loss(gt_spectra[:,1]*mask, recon_flux*mask)
+    return ret
 
 def redshift_supervision_loss(loss, gt_redshift, recon_redshift, mask=None):
     ''' Loss function for few-shot redshift supervision

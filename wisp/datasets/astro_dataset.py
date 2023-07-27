@@ -111,9 +111,6 @@ class AstroDataset(Dataset):
         self.sample_wave = sample_wave
         self.use_full_wave = not sample_wave
 
-    # def toggle_within_wave_range(self, use_wave_range: bool):
-    #     self.use_predefined_wave_range = use_wave_range
-
     ############
     # Getters
     ############
@@ -275,7 +272,7 @@ class AstroDataset(Dataset):
                     sample_ids=sample_ids)
 
             if self.perform_integration:
-                out["trans_mask"] = out["spectra_sup_data"][:,3]                # [bsz,nsmpl]
+                # out["trans_mask"] = out["spectra_sup_data"][:,3]                # [bsz,nsmpl]
                 out["trans"] = out["spectra_sup_data"][:,4:4+self.num_bands]    # [bsz,nbands,nsmpl]
                 out["band_mask"] = out["spectra_sup_data"][:,4+self.num_bands:] # [bsz,nbands,nsmpl]
                 # num of sample within each band (replace 0 with 1 to avoid division by 0)
@@ -285,14 +282,8 @@ class AstroDataset(Dataset):
 
             out["wave"] = out["spectra_sup_data"][:,0][...,None] # [bsz,nsmpl,1]
 
-            # test code
-            # out["spectra_sup_data"][:,1] += 6
-            # print(out["spectra_sup_redshift"])
-            out["spectra_sup_redshift"] = torch.FloatTensor([0,0])
-            # code ends here
-
         elif self.wave_source == "trans":
-            # These are not batched, we do sampling at every step.
+            # trans wave are not batched, we sample at every step
             if self.perform_integration:
                 if self.kwargs["trans_sample_method"] == "hardcode":
                     out["wave"] = self.trans_dataset.get_hdcd_wave()
@@ -363,15 +354,11 @@ class AstroDataset(Dataset):
     def get_redshift_data(self, out):
         """ Get supervision redshift values.
         """
-        # out["spectra_sup_redshift"] = self.spectra_dataset.get_validation_redshift()
-        # out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift()
         ids = out["spectra_id_map"]
         if not self.kwargs["train_spectra_pixels_only"]:
             bin_map = out["spectra_bin_map"]
             ids = ids[bin_map]
-        #out["spectra_val_ids"] = ids
         out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
-        # print('*', out["spectra_sup_redshift"])
         del out["spectra_id_map"]
 
     def __len__(self):

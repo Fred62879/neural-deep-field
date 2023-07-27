@@ -57,7 +57,7 @@ class SpectraData:
         self.smooth_sigma = kwargs["spectra_smooth_sigma"]
         self.neighbour_size = kwargs["spectra_neighbour_size"]
         self.wave_discretz_interval = kwargs["trans_sample_interval"]
-        self.trusted_wave_range = None if not kwargs["trusted_range_only"] \
+        self.trusted_wave_range = None if not kwargs["learn_spectra_within_wave_range"] \
             else [kwargs["spectra_supervision_wave_lo"],
                   kwargs["spectra_supervision_wave_hi"]]
         self.trans_range = self.trans_obj.get_wave_range()
@@ -431,22 +431,21 @@ class SpectraData:
         # supervision_ids = ids[:n]
         # validation_ids = ids[n:]
 
-        # acc, validation_ids, validation_patch_ids = 0, [], {}
-        # for tract, patch in zip(self.kwargs["tracts"], self.kwargs["patches"]):
-        #     patch_uid = create_patch_uid(tract, patch)
-        #     cur_spectra_ids = self.data["gt_spectra_ids"][patch_uid]
-        #     validation_ids.extend(cur_spectra_ids)
-        #     validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
-        #     acc += len(cur_spectra_ids)
-        # validation_ids = np.array(validation_ids)
-        validation_ids = np.array([0])
+        acc, validation_ids, validation_patch_ids = 0, [], {}
+        for tract, patch in zip(self.kwargs["tracts"], self.kwargs["patches"]):
+            patch_uid = create_patch_uid(tract, patch)
+            cur_spectra_ids = self.data["gt_spectra_ids"][patch_uid]
+            validation_ids.extend(cur_spectra_ids)
+            validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
+            acc += len(cur_spectra_ids)
+        validation_ids = np.array(validation_ids)
+        # validation_ids = np.array([0])
 
         # get supervision ids
         supervision_ids = np.array(list(set(ids) - set(validation_ids))).astype(int)
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra"]]
-        # supervision_ids = np.array([14,22,31])
-        supervision_ids = np.array([14,31]) # 14 fail /31 succeed
+        # supervision_ids = np.array([14,22,31]) # 14,22 fail /31 succeed
 
         self.num_validation_spectra = len(validation_ids)
         self.num_supervision_spectra = len(supervision_ids)
@@ -456,7 +455,7 @@ class SpectraData:
     def train_valid_split(self):
         sup_ids, val_ids = self.split_spectra()
         log.info(f"spectra train/valid {len(sup_ids)}/{len(val_ids)}")
-        print(sup_ids)
+        # print(sup_ids)
 
         # supervision spectra data (used during pretrain)
         self.data["supervision_spectra"] = self.data["gt_spectra"][sup_ids]
@@ -834,8 +833,9 @@ class SpectraData:
     ):
         """ Normalize one pair of gt and recon flux.
         """
+        sub_dir += flux_norm_cho + "_"
         if not is_codebook:
-            sub_dir += flux_norm_cho + "_"
+            sub_dir += "with_recon_"
             if flux_norm_cho == "max":
                 recon_flux = recon_flux / np.max(recon_flux)
             elif flux_norm_cho == "sum":
@@ -851,7 +851,7 @@ class SpectraData:
                 gt_flux = gt_flux / np.max(gt_flux)
             elif flux_norm_cho == "sum":
                 gt_flux = gt_flux / (np.sum(gt_flux) + 1e-10)
-                gt_flux * len(gt_flux) / len(recon_flux)
+                gt_flux = gt_flux * len(gt_flux) / len(recon_flux)
             elif flux_norm_cho == "scale_gt":
                 gt_flux = gt_flux / np.max(gt_flux) * recon_max
             elif flux_norm_cho == "scale_recon":
@@ -864,7 +864,7 @@ class SpectraData:
     ):
         """ Plot one spectrum and save as required.
         """
-        sub_dir, gt_wave, gt_flux, recon_wave, recon_flux, plot_gt_spectrum = pargs
+        sub_dir, gt_wave, gt_flux, recon_wave, recon_flux, plot_gt_spectrum, plot_recon_spectrum = pargs
 
         if self.kwargs["plot_spectrum_together"]:
             if nrows == 1: axis = axs if ncols == 1 else axs[idx%ncols]
@@ -878,7 +878,8 @@ class SpectraData:
         axis.set_title(idx)
         if plot_gt_spectrum:
             axis.plot(gt_wave, gt_flux, color="blue", label="GT")
-        axis.plot(recon_wave, recon_flux, color="black", label="Recon.")
+        if plot_recon_spectrum:
+            axis.plot(recon_wave, recon_flux, color="black", label="Recon.")
 
         if sub_dir != "":
             if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]
@@ -907,6 +908,7 @@ class SpectraData:
         sub_dir = ""
         plot_gt_spectrum = self.kwargs["plot_spectrum_with_gt"] \
             and gt_flux is not None and not is_codebook
+        plot_recon_spectrum = self.kwargs["plot_spectrum_with_recon"]
 
         # average spectra over neighbours
         if recon_flux.ndim == 2:
@@ -927,7 +929,8 @@ class SpectraData:
         sub_dir, gt_flux, recon_flux = self.normalize_one_flux(
             sub_dir, is_codebook, plot_gt_spectrum, flux_norm_cho, gt_flux, recon_flux
         )
-        pargs = (sub_dir, gt_wave, gt_flux, recon_wave, recon_flux, plot_gt_spectrum)
+        pargs = (sub_dir, gt_wave, gt_flux, recon_wave, recon_flux,
+                 plot_gt_spectrum, plot_recon_spectrum)
         return pargs
 
     def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
@@ -960,8 +963,6 @@ class SpectraData:
               spectra_clipped: whether or not spectra is already clipped to
         """
         assert not clip or (recon_masks is not None or spectra_clipped)
-        # print(gt_wave.shape, gt_fluxes.shape, gt_masks.shape)
-        # print(recon_wave.shape, recon_fluxes.shape, recon_masks.shape)
 
         n = len(recon_wave)
         if gt_wave is None: gt_wave = [None]*n
@@ -1141,7 +1142,13 @@ def convolve_spectra(spectra, std=140, border=True, bound=None):
         nume = convolve(spectra[1][lo:hi], kernel)
         denom = convolve(np.ones(n), kernel)
         spectra[1][lo:hi] = nume / denom
-    spectra[1][lo:hi] = convolve(spectra[1][lo:hi], kernel)
+    else:
+        spectra[1][lo:hi] = convolve(spectra[1][lo:hi], kernel)
+    return spectra
+
+def normalize_spectra(spectra):
+    lo, hi = min(spectra[1]), max(spectra[1])
+    spectra[1] = (spectra[1] - lo) / (hi - lo)
     return spectra
 
 def create_spectra_mask(spectra, max_spectra_len):
@@ -1229,10 +1236,10 @@ def process_gt_spectra(infname, spectra_fname,
     spectra = unpack_gt_spectra(infname, format=format) # [3,nsmpl]
     assert spectra.shape[1] <= max_spectra_len
     mask = create_spectra_mask(spectra, max_spectra_len)
-
     spectra = wave_based_sort(spectra)
     spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
     spectra, mask = clean_flux(spectra, mask)
+    spectra = normalize_spectra(spectra)
     spectra = convolve_spectra(spectra, std=sigma, bound=bound)
     spectra, mask = mask_spectra_range(spectra, mask, trans_range, trusted_range)
     sup_mask = mask_negative_flux(spectra, mask) # supervision mask

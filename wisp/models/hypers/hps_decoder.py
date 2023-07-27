@@ -110,7 +110,7 @@ class HyperSpectralDecoder(nn.Module):
             assert scaler is not None
             spectra = (scaler * spectra.T).T
 
-        spectra = self.norm(spectra)
+        # spectra = self.norm(spectra)
         ret["spectra"] = spectra
 
     def forward_with_full_wave(self, latents, full_wave, full_wave_bound,
