@@ -159,17 +159,9 @@ class SpectraData:
         """ Load gt and/or dummy spectra data.
         """
         self.data = defaultdict(lambda: [])
-
         self.load_gt_spectra_data()
-
-        if self.recon_dummy_spectra:
-            self.load_dummy_spectra_data()
-
-        self.load_spectrum_plotting_data()
-
         self.set_wave_range()
-        # if self.recon_gt_spectra:
-        #     self.mark_spectra_on_img()
+        # self.mark_spectra_on_img()
 
     #############
     # Getters
@@ -192,31 +184,6 @@ class SpectraData:
     def get_num_validation_spectra(self):
         """ Get #validation spectra (doesn't count neighbours). """
         return self.num_validation_spectra
-
-    # def get_gt_spectra_ids(self):
-    #     return self.data["gt_spectra_ids"]
-
-    # def get_gt_spectra_wave(self):
-    #     """ Get gt spectra wave (all gt spectra are clipped to the same wave range).
-    #     """
-    #     return self.data["gt_spectra_wave"]
-
-    # def get_gt_spectra_fluxes(self):
-    #     """ Get gt spectra flux (trusted range only) for plotting. """
-    #     return self.data["gt_spectra_fluxes"]
-
-    # def get_gt_spectra_pixels(self):
-    #     return self.data["gt_spectra_pixels"]
-
-    # def get_gt_spectra_redshift(self):
-    #     return self.data["gt_spectra_redshift"]
-
-    # def get_gt_spectra_img_coords(self):
-    #     return self.data["gt_spectra_img_coords"]
-
-    # def get_supervision_wave_bound_ids(self):
-    #     """ Get ids of boundary lambda of spectra supervision. """
-    #     return self.data["supervision_wave_bound_ids"]
 
     def get_supervision_plot_mask(self, idx=None):
         """ Get mask for plotting. """
@@ -300,73 +267,6 @@ class SpectraData:
             int(np.floor(np.min(wave))), int(np.ceil(np.max(wave)))
         ])
         np.save(self.wave_range_fname, self.data["wave_range"])
-
-    def load_spectrum_plotting_data(self):
-
-        # if self.kwargs["plot_clipped_spectrum"]:
-        #     recon_spectra_wave_bound = [
-        #         self.kwargs["spectrum_plot_wave_lo"],
-        #         self.kwargs["spectrum_plot_wave_hi"]]
-        # else: recon_spectra_wave_bound = [self.full_wave[0], self.full_wave[-1]]
-
-        # (id_lo, id_hi) = get_bound_id(
-        #     recon_spectra_wave_bound, self.full_wave, within_bound=False)
-
-        # self.data["spectrum_recon_wave"] = np.arange(
-        #     self.full_wave[id_lo], self.full_wave[id_hi] + 1, self.wave_discretz_interval)
-        # self.data["spectrum_recon_wave_bound_ids"] = [id_lo, id_hi + 1]
-        pass
-
-        # wave = []
-        # if self.recon_gt_spectra: # and self.kwargs["plot_spectrum_with_gt"]):
-        #     wave.extend(self.data["gt_recon_wave"])
-
-        # if self.recon_dummy_spectra:
-        #     wave.extend(self.data["dummy_recon_wave"])
-
-        # self.data["recon_wave"] = wave
-
-        # # get all spectra (gt and dummy) (grid and img) coords for inferrence
-        # ids, grid_coords, img_coords = [], [], []
-
-        # if self.recon_gt_spectra or self.spectra_supervision_train or self.require_spectra_coords:
-        #     ids.extend(self.data["gt_spectra_coord_ids"])
-        #     grid_coords.extend(self.data["gt_spectra_grid_coords"])
-        #     img_coords.extend(self.data["gt_spectra_img_coords"])
-
-        # if self.recon_dummy_spectra:
-        #     grid_coords.extend(self.data["dummy_spectra_grid_coords"])
-
-        # if len(ids) != 0:         self.data["spectra_coord_ids"] = np.array(ids)
-        # if len(img_coords) != 0:  self.data["spectra_img_coords"] = np.array(img_coords)
-        # if len(grid_coords) != 0: self.data["spectra_grid_coords"] = torch.stack(grid_coords)
-
-    def load_dummy_spectra_data(self):
-        """ Load hardcoded spectra positions for pixels without gt spectra.
-            Can be used to compare with codebook spectrum.
-        """
-        self.data["dummy_spectra_grid_coords"] = torch.stack([
-            torch.FloatTensor([0.0159,0.0159]),
-            torch.FloatTensor([-1,1]),
-            torch.FloatTensor([-0.9,0.12]),
-            torch.FloatTensor([0.11,0.5]),
-            torch.FloatTensor([0.7,-0.2]),
-            torch.FloatTensor([0.45,-0.9]),
-            torch.FloatTensor([1,1])])
-
-        n = len( self.data["dummy_spectra_grid_coords"])
-
-        self.data["dummy_spectra_grid_coords"] = add_dummy_dim(
-            self.data["dummy_spectra_grid_coords"], **self.kwargs)
-
-        recon_spectra_wave_bound = self.kwargs["dummy_spectra_clip_range"]
-        id_lo, id_hi = get_bound_id(
-            recon_spectra_wave_bound, self.full_wave, within_bound=False)
-        self.data["spectra_recon_wave_bound_ids"].extend([[id_lo, id_hi + 1]] * n)
-        self.data["dummy_recon_wave"].extend(
-            [np.arange(self.full_wave[id_lo], self.full_wave[id_hi] + 1,
-                       self.kwargs["trans_sample_interval"])] * n
-        )
 
     def load_gt_spectra_data(self):
         """ Load gt spectra data.
