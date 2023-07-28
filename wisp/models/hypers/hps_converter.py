@@ -68,7 +68,6 @@ class HyperSpectralConverter(nn.Module):
     def linear_norm_wave(self, wave, wave_bound):
         (lo, hi) = wave_bound # 3940, 10870
         return 10*(wave - lo) / (hi - lo)
-        # return 2*(wave - lo) / (hi - lo)-1
 
     def shift_wave(self, wave, redshift):
         """ Convert observed lambda to emitted lambda.

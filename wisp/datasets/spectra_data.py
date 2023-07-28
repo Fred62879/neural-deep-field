@@ -440,22 +440,22 @@ class SpectraData:
             acc += len(cur_spectra_ids)
         validation_ids = np.array(validation_ids)
         # validation_ids = np.array([0])
+        log.info(f"validation spectra ids: {validation_ids}")
 
         # get supervision ids
         supervision_ids = np.array(list(set(ids) - set(validation_ids))).astype(int)
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra"]]
         # supervision_ids = np.array([14,22,31]) # 14,22 fail /31 succeed
+        log.info(f"supervision spectra ids: {supervision_ids}")
 
         self.num_validation_spectra = len(validation_ids)
         self.num_supervision_spectra = len(supervision_ids)
-        #self.data["validation_patch_ids"] = validation_patch_ids
         return supervision_ids, validation_ids
 
     def train_valid_split(self):
         sup_ids, val_ids = self.split_spectra()
         log.info(f"spectra train/valid {len(sup_ids)}/{len(val_ids)}")
-        # print(sup_ids)
 
         # supervision spectra data (used during pretrain)
         self.data["supervision_spectra"] = self.data["gt_spectra"][sup_ids]
@@ -465,8 +465,6 @@ class SpectraData:
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][sup_ids]
         self.data["supervision_norm_world_coords"] = self.data["gt_spectra_norm_world_coords"][sup_ids]
-
-        # print(self.data["supervision_redshift"])
 
         # valiation(and semi sup) spectra data (used during main train)
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
@@ -564,9 +562,7 @@ class SpectraData:
                 self.source_spectra_link, self.source_spectra_path, spectra_fnames)
             log.info("spectra-data::download complete")
 
-        if self.kwargs["codebook_pretrain_pixel_supervision"]:
-            self.trans_data = self.trans_obj.get_full_trans_data()
-        else: self.trans_data = None
+        self.trans_data = self.trans_obj.get_full_trans_data()
 
         header_wcs, headers = self.load_headers(df)
         spectra_ids, spectra_to_drop = self.localize_spectra(df, header_wcs, headers)
@@ -975,7 +971,7 @@ class SpectraData:
         assert len(recon_fluxes) == n and len(recon_masks) == n
 
         if self.kwargs["plot_spectrum_together"]:
-            ncols = min(n, self.kwargs["num_spectra_plot_per_row"])
+            ncols = min(n, self.kwargs["num_spectrum_per_row"])
             nrows = int(np.ceil(n / ncols))
             fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
 
@@ -1018,19 +1014,6 @@ class SpectraData:
             # mark on the corresponding tile
             self.fits_obj.mark_on_img(
                 np.array(cur_coords), cur_markers, fits_id)
-
-    def log_spectra_pixel_values(self, spectra):
-        assert 0
-        # gt_pixel_ids = self.get_spectra_coord_ids().flatten()
-        # gt_pixels = self.fits_obj.get_pixels(idx=gt_pixel_ids).numpy()
-        gt_pixels = self.data[""] # todo
-        gt_pixels = np.round(gt_pixels, 2)
-        np.set_printoptions(suppress = True)
-        log.info(f"spectra-data::GT spectra pixel values: {gt_pixels}")
-
-        recon_pixels = self.trans_obj.integrate(spectra)
-        recon_pixels = np.round(recon_pixels, 2)
-        log.info(f"spectra-data::Recon. spectra pixel values: {recon_pixels}")
 
 # SpectraData class ends
 #############
@@ -1245,12 +1228,11 @@ def process_gt_spectra(infname, spectra_fname,
     sup_mask = mask_negative_flux(spectra, mask) # supervision mask
     spectra = spectra.astype(np.float32)
 
-    if trans_data is not None:
-        interp_trans_data = interpolate_trans(
-            trans_data, spectra, fname=spectra_fname, colors=colors
-        )
-        spectra = np.concatenate((spectra, interp_trans_data), axis=0)
-        # [4+2*nbands,nsmpl] (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
+    interp_trans_data = interpolate_trans(
+        trans_data, spectra, fname=spectra_fname, colors=colors
+    )
+    spectra = np.concatenate((spectra, interp_trans_data), axis=0)
+    # [4+2*nbands,nsmpl] (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
 
     if save:
         np.save(spectra_fname + ".npy", spectra)

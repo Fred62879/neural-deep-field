@@ -26,7 +26,7 @@ class HyperSpectralDecoder(nn.Module):
             _model_redshift=_model_redshift, **kwargs
         )
         self.init_decoder()
-        self.norm = Normalization(kwargs["mlp_output_norm_method"])
+        # self.norm = Normalization(kwargs["mlp_output_norm_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
         if self.qtz_spectra:
             self.qtz = Quantization(False, **kwargs)

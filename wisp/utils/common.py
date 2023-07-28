@@ -14,7 +14,7 @@ from astropy.coordinates import SkyCoord
 
 
 def select_inferrence_ids(n, m):
-    np.random.seed(48)
+    # np.random.seed(48)
     ids = np.arange(n)
     np.random.shuffle(ids)
     ids = ids[:m]

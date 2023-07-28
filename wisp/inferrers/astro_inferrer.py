@@ -99,6 +99,7 @@ class AstroInferrer(BaseInferrer):
 
         self.main_infer = self.mode == "infer"
         self.pretrain_infer = self.mode == "pretrain_infer"
+        assert (self.main_infer ^ self.pretrain_infer)
         self.infer_selected = self.extra_args["infer_selected"]
 
         # quantization setups
@@ -119,19 +120,21 @@ class AstroInferrer(BaseInferrer):
         self.redshift_semi_supervision = self.model_redshift and \
             self.extra_args["redshift_semi_supervision"]
         if self.pretrain_infer: assert self.apply_gt_redshift
-        #else: assert self.redshift_semi_supervision
+        else: assert self.redshift_semi_supervision
 
-        # infer all coords using original model
+        # i) infer all coords using original model
         self.trans_sample_method = self.extra_args["trans_sample_method"]
         self.recon_img = False
-        self.recon_img_pretrain = False
+        self.recon_img_sup_spectra = False
         self.recon_img_valid_spectra = False
         self.recon_HSI = "recon_HSI" in tasks
         self.recon_synthetic_band = "recon_synthetic_band" in tasks
         self.recon_spectra_pixels_only = self.extra_args["train_spectra_pixels_only"]
         if "recon_img" in tasks:
             if self.pretrain_infer:
-                self.recon_img_pretrain = self.extra_args["codebook_pretrain_pixel_supervision"]
+                self.recon_img_sup_spectra = \
+                    self.extra_args["codebook_pretrain_pixel_supervision"]
+                # save spectra pixel values, doing same job as `save_pixel_values`
             else: # self.main_infer
                 if self.recon_spectra_pixels_only:
                     self.recon_img_valid_spectra = True
@@ -152,17 +155,20 @@ class AstroInferrer(BaseInferrer):
         self.save_redshift_pre = self.save_redshift and self.pretrain_infer
         self.save_redshift_main = self.save_redshift and self.main_infer
 
-        # infer all coords using modified model (recon codebook spectra)
+        # ii) infer selected coords using partial model
+        self.recon_gt_spectra = "recon_gt_spectra" in tasks and self.space_dim == 3
+        self.recon_dummy_spectra = "recon_dummy_spectra" in tasks and self.space_dim == 3
+        # save spectra pixel values, doing same job as
+        #   `recon_img_sup_spectra` during pretran infer &
+        #   `recon_img_val_spectra` during main train infer
+        self.save_pixel_values = "save_pixel_values" in tasks
+
+        # iii) infer all coords using modified model (recon codebook spectra)
         #   either we have the codebook spectra for all coords
         #   or we recon codebook spectra individually for each coord (when generate redshift)
         self.recon_codebook_spectra = "recon_codebook_spectra" in tasks and self.qtz
         self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ" in tasks and self.qtz and self.model_redshift
         assert not (self.recon_codebook_spectra and self.recon_codebook_spectra_individ)
-
-        # infer selected coords using partial model
-        self.log_pixel_value = "log_pixel_value" in tasks # log spectra pixel value
-        self.recon_gt_spectra = "recon_gt_spectra" in tasks and self.space_dim == 3
-        self.recon_dummy_spectra = "recon_dummy_spectra" in tasks and self.space_dim == 3
 
         # keep only tasks required to perform
         self.group_tasks = []
@@ -170,7 +176,7 @@ class AstroInferrer(BaseInferrer):
         if self.recon_HSI or self.recon_synthetic_band or \
            self.plot_embed_map or self.plot_latent_embed or \
            self.save_qtz_weights or self.save_redshift_main or self.save_scaler or \
-           self.recon_img or self.recon_img_pretrain or self.recon_img_valid_spectra:
+           self.recon_img or self.recon_img_sup_spectra or self.recon_img_valid_spectra:
             self.group_tasks.append("infer_all_coords_full_model")
 
         if self.recon_dummy_spectra or self.recon_gt_spectra or \
@@ -238,8 +244,8 @@ class AstroInferrer(BaseInferrer):
 
         self.use_full_wave = True
         self.calculate_metrics = False
-        self.perform_integration = self.recon_img or self.recon_img_pretrain or \
-            self.recon_img_valid_spectra
+        self.perform_integration = self.recon_img or \
+            self.recon_img_sup_spectra or self.recon_img_valid_spectra
 
         self.requested_fields = ["coords"]
 
@@ -249,7 +255,7 @@ class AstroInferrer(BaseInferrer):
             self.coords_source = "spectra_latents"
 
             self.requested_fields.append("spectra_sup_data")
-            if self.recon_img_pretrain:
+            if self.recon_img_sup_spectra:
                 self.requested_fields.append("pixels")
             if self.apply_gt_redshift:
                 self.requested_fields.append("spectra_sup_redshift")
@@ -364,6 +370,7 @@ class AstroInferrer(BaseInferrer):
                 if self.infer_selected:
                     self.dataset_length = self.extra_args["pretrain_num_infer"]
                 else:
+                    input("plot codebook spectra for all spectra, press Enter to confirm...")
                     self.dataset_length = self.num_sup_spectra
             else: # self.main_infer
                 self.coords_source = "spectra_valid"
@@ -405,7 +412,7 @@ class AstroInferrer(BaseInferrer):
             self.redshift = []
             self.gt_redshift = []
         if self.save_qtz_weights: self.qtz_weights = []
-        if self.recon_img_pretrain: self.recon_pixels = []
+        if self.recon_img_sup_spectra: self.recon_pixels = []
         if self.recon_synthetic_band: self.recon_synthetic_pixels = []
 
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
@@ -447,18 +454,21 @@ class AstroInferrer(BaseInferrer):
                 self.metrics_zscale = np.concatenate((
                     self.metrics_zscale, cur_metrics_zscale[:,None]), axis=1)
 
-        elif self.recon_img_pretrain:
+        elif self.recon_img_sup_spectra:
             assert(self.pretrain_infer)
-            vals = torch.stack(self.recon_pixels).detach().cpu().numpy()
+            recon_vals = torch.stack(self.recon_pixels).detach().cpu().numpy()
+            gt_vals = self.dataset.get_supervision_spectra_pixels()[:,0]
             fname = join(self.recon_dir, f"{model_id}.pth")
-            np.save(fname, vals)
+            np.save(fname, recon_vals)
+
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
-            # log.info(f"Recon vals {vals}")
-            gt_vals = self.dataset.get_supervision_spectra_pixels()[:,0]
-            # log.info(f"GT vals {gt_vals}")
-            ratio = gt_vals / vals
-            log.info(f"gt/recon ratio: {ratio}")
+            if self.extra_args["log_pixel_ratio"]:
+                ratio = recon_vals / gt_vals
+                log.info(f"Recon./GT. ratio (full): {ratio}")
+            else:
+                log.info(f"GT. vals (full) {gt_vals}")
+                log.info(f"Recon. vals (full) {recon_vals}")
 
         elif self.recon_img_valid_spectra:
             vals = torch.stack(self.recon_pixels).detach().cpu().numpy()
@@ -609,6 +619,8 @@ class AstroInferrer(BaseInferrer):
             self.gt_fluxes = []
             self.spectra_wave = []
             self.spectra_masks = []
+        if self.save_pixel_values:
+            self.spectra_trans = []
         if self.save_redshift_pre:
             self.redshift = []
             self.gt_redshift = []
@@ -643,18 +655,43 @@ class AstroInferrer(BaseInferrer):
             self.dataset_length, self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()
 
-        self.dataset.plot_spectrum(
-            self.spectra_dir, model_id, self.extra_args["flux_norm_cho"],
-            gt_wave, gt_fluxes,
-            recon_wave, recon_fluxes,
-            mode=self.mode,
-            clip=self.extra_args["plot_clipped_spectrum"],
-            gt_masks=gt_masks,
-            recon_masks=recon_masks,
-        )
+        # plot spectrum in multiple figures, each figure contains several spectrum
+        n_spectrum = self.dataset_length
+        n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
+        n_figs = int(np.ceil(n_spectrum / n_spectrum_per_fig))
 
-        if self.log_pixel_value:
-            self.dataset.log_spectra_pixel_values(self.recon_spectra)
+        for i in range(n_figs):
+            fname = f"model{model_id}-plot{i}"
+            lo = i * n_spectrum_per_fig
+            hi = min(lo + n_spectrum_per_fig, n_spectrum)
+
+            self.dataset.plot_spectrum(
+                self.spectra_dir, fname,
+                self.extra_args["flux_norm_cho"],
+                gt_wave[lo:hi], gt_fluxes[lo:hi],
+                recon_wave[lo:hi], recon_fluxes[lo:hi],
+                mode=self.mode,
+                clip=self.extra_args["plot_clipped_spectrum"],
+                gt_masks=gt_masks[lo:hi],
+                recon_masks=recon_masks[lo:hi])
+
+        log.info("spectrum plotting done")
+
+        if self.save_pixel_values:
+            assert 0
+            # vals = self.trans_obj.integrate(recon_fluxes)
+            if self.pretrain_infer:
+                gt_vals = self.dataset.get_supervision_spectra_pixels()[:,0]
+            else: gt_vals = self.dataset.get_supervision_validation_pixels()[:,0]
+
+            np.set_printoptions(suppress=True)
+            np.set_printoptions(precision=3)
+            if self.extra_args["log_pixel_ratio"]:
+                ratio = vals / gt_vals
+                log.info(f"Recon./GT. ratio (partial): {ratio}")
+            else:
+                log.info(f"GT. vals (partial) {gt_vals}")
+                log.info(f"Recon. vals (partial) {vals}")
 
         if self.save_redshift_pre:
             redshift = torch.stack(self.redshift).detach().cpu().numpy()
@@ -770,7 +807,7 @@ class AstroInferrer(BaseInferrer):
                         save_redshift=self.save_redshift_main,
                     )
 
-                if self.recon_img or self.recon_img_pretrain:
+                if self.recon_img or self.recon_img_sup_spectra:
                     # artifically generated transmission function (last channel)
                     if self.recon_synthetic_band:
                         self.recon_synthetic_pixels.extend(ret["intensity"][...,-1:])

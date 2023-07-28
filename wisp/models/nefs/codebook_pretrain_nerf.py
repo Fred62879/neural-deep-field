@@ -49,7 +49,7 @@ class CodebookPretrainNerf(BaseNeuralField):
 
         self.hps_decoder = HyperSpectralDecoder(
             integrate=self.pixel_supervision,
-            scale=self.pixel_supervision,
+            scale=False,
             _model_redshift=self.model_redshift,
             **self.kwargs)
 

@@ -168,6 +168,7 @@ class AstroDataset(Dataset):
     def get_supervision_spectra_redshift(self):
         return self.spectra_dataset.get_supervision_redshift()
 
+
     def get_num_gt_spectra(self):
         return self.spectra_dataset.get_num_gt_spectra()
 
@@ -249,7 +250,7 @@ class AstroDataset(Dataset):
         return data
 
     def get_wave_data(self, batch_size, out):
-        """ Get wave (lambda) (and transmission) data depending on data source.
+        """ Get wave (lambda and transmission) data depending on data source.
         """
         out["wave_range"] = self.get_wave_range()
 
@@ -424,6 +425,3 @@ class AstroDataset(Dataset):
             gt_masks=gt_masks, recon_masks=recon_masks,
             clip=clip, spectra_clipped=spectra_clipped,
         )
-
-    def log_spectra_pixel_values(self, spectra):
-        return self.spectra_dataset.log_spectra_pixel_values(spectra)

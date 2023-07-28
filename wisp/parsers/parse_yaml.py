@@ -438,8 +438,6 @@ def define_cmd_line_args():
                              help="Format in which to save models.")
     train_group.add_argument("--save-as-new", action="store_true",
                              help="Save the model at every epoch (no overwrite).")
-    train_group.add_argument("--save-every", type=int, default=200,
-                             help="Save the model at every N epoch.")
     train_group.add_argument("--render-tb-every", type=int, default=100,
                                 help="Render every N iterations")
     train_group.add_argument("--log-tb-every", type=int, default=100,
@@ -448,8 +446,10 @@ def define_cmd_line_args():
                              help="Log to command line at every N epoch.")
     train_group.add_argument("--log-gpu-every", type=int, default=100,
                              help="Log to cli gpu usage at every N epoch.")
-    train_group.add_argument("--save-local-every", type=int, default=100,
-                             help="Save data to local every N epoch.")
+    train_group.add_argument("--save-model-every", type=int, default=200,
+                             help="Save the model at every N epoch.")
+    train_group.add_argument("--save-data-every", type=int, default=100,
+                             help="Save data locally every N epoch.")
     train_group.add_argument("--plot-grad-every", type=int, default=20,
                              help="Plot gradient at every N epoch.")
     train_group.add_argument("--using-wandb", action="store_true")
@@ -568,6 +568,8 @@ def define_cmd_line_args():
                              help="generate HDU files for reconstructed image")
     infer_group.add_argument("--recon-norm", action="store_true", default=False)
     infer_group.add_argument("--recon-restore", action="store_true", default=False)
+    infer_group.add_argument("--log-pixel-ratio", action="store_true", default=False,
+                             help="print ratio of recon over GT pixel val")
     infer_group.add_argument("--metric-options", nargs="+", choices=["mse","psnr","ssim"])
 
     infer_group.add_argument("--infer-selected", action="store_true", default=False,
@@ -597,7 +599,11 @@ def define_cmd_line_args():
     infer_group.add_argument("--plot-spectrum-together", action="store_true")
     infer_group.add_argument("--infer-spectra-individually", action="store_true")
     infer_group.add_argument("--codebook-spectra-clip-range", nargs="+")
-    infer_group.add_argument("--num-spectra-plot-per-row", type=int)
+
+    infer_group.add_argument("--num-spectrum-per-fig", type=int,
+                             help="number of spectrum in each figure.")
+    infer_group.add_argument("--num-spectrum-per-row", type=int,
+                             help="number of spectrum in each row in each plot.")
 
     infer_group.add_argument("--plot-labels", nargs="+", type=str)
     infer_group.add_argument("--plot-colors", nargs="+", type=str)

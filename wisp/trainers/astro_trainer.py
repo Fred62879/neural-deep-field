@@ -47,7 +47,7 @@ class AstroTrainer(BaseTrainer):
         self.spectra_beta = self.extra_args["spectra_beta"]
         self.redshift_beta = self.extra_args["redshift_beta"]
 
-        self.save_data_to_local = False
+        self.save_data = False
         self.shuffle_dataloader = True
         self.dataloader_drop_last = extra_args["dataloader_drop_last"]
 
@@ -369,8 +369,8 @@ class AstroTrainer(BaseTrainer):
         if self.extra_args["only_last"]:
             self.loss_lods = self.loss_lods[-1:]
 
-        if self.save_local_every > -1 and self.epoch % self.save_local_every == 0:
-            self.save_data_to_local = True
+        if self.save_data_every > -1 and self.epoch % self.save_data_every == 0:
+            self.save_data = True
             if self.save_scaler: self.scalers = []
             if self.save_latents: self.latents = []
             if self.save_redshift: self.redshift = []
@@ -409,9 +409,6 @@ class AstroTrainer(BaseTrainer):
         if self.plot_loss:
             self.losses.append(total_loss)
 
-        if self.save_every > -1 and self.epoch % self.save_every == 0:
-            self.save_model()
-
         if self.log_tb_every > -1 and self.epoch % self.log_tb_every == 0:
             self.log_tb()
 
@@ -421,12 +418,15 @@ class AstroTrainer(BaseTrainer):
         if self.render_tb_every > -1 and self.epoch % self.render_tb_every == 0:
             self.render_tb()
 
-        if self.save_data_to_local:
+        if self.save_model_every > -1 and self.epoch % self.save_model_every == 0:
+            self.save_model()
+
+        if self.save_data:
             self.save_local()
 
             # restore trainer state
             self.shuffle_dataloader = True
-            self.save_data_to_local = False
+            self.save_data = False
             self.use_all_pixels = self.extra_args["train_with_all_pixels"]
             # self.set_num_batches(self.extra_args["batch_size"])
             # self.dataset.toggle_wave_sampling(True)
@@ -477,7 +477,7 @@ class AstroTrainer(BaseTrainer):
         self.optimizer.step()
         self.timer.check("backward and step")
 
-        if self.save_data_to_local:
+        if self.save_data:
             if self.save_scaler: self.scalers.extend(ret["scaler"])
             if self.save_latents: self.latents.extend(ret["latents"])
             if self.save_redshift:
@@ -675,16 +675,16 @@ class AstroTrainer(BaseTrainer):
                       perform_integration=self.perform_integration,
                       trans_sample_method=self.trans_sample_method,
                       spectra_supervision=self.spectra_supervision,
-                      save_scaler=self.save_data_to_local and self.save_scaler,
-                      save_latents=self.save_data_to_local and self.save_latents,
-                      save_codebook=self.save_data_to_local and self.save_codebook,
+                      save_scaler=self.save_data and self.save_scaler,
+                      save_latents=self.save_data and self.save_latents,
+                      save_codebook=self.save_data and self.save_codebook,
                       save_redshift=self.redshift_semi_supervision or \
-                                    self.save_data_to_local and self.save_redshift,
-                      save_embed_ids=self.save_data_to_local and self.plot_embed_map,
-                      save_spectra=self.save_data_to_local and self.recon_gt_spectra,
-                      save_codebook_loss=self.save_data_to_local and self.cal_codebook_loss,
-                      save_qtz_weights=self.save_data_to_local and self.save_qtz_weights,
-                      save_codebook_spectra=self.save_data_to_local and \
+                                    self.save_data and self.save_redshift,
+                      save_embed_ids=self.save_data and self.plot_embed_map,
+                      save_spectra=self.save_data and self.recon_gt_spectra,
+                      save_codebook_loss=self.save_data and self.cal_codebook_loss,
+                      save_qtz_weights=self.save_data and self.save_qtz_weights,
+                      save_codebook_spectra=self.save_data and \
                                             self.recon_codebook_spectra_individ
         )
         self.timer.check('forward')

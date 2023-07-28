@@ -16,8 +16,8 @@ import numpy as np
 
 
 def set_seed(seed: int = 42) -> None:
-    np.random.seed(seed)
     random.seed(seed)
+    np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     # When running on the CuDNN backend, two further options must be set

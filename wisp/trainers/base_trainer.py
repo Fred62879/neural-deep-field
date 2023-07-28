@@ -115,13 +115,13 @@ class BaseTrainer(ABC):
         # self.writer.add_text('Info', self.info)
         self.using_wandb = extra_args["using_wandb"]
 
-        self.save_every = extra_args["save_every"]
         self.valid_every = extra_args["valid_every"]
         self.log_tb_every = extra_args["log_tb_every"]
         self.log_cli_every = extra_args["log_cli_every"]
         self.plot_grad_every = extra_args["plot_grad_every"]
         self.render_tb_every = extra_args["render_tb_every"]
-        self.save_local_every = extra_args["save_local_every"]
+        self.save_data_every = extra_args["save_data_every"]
+        self.save_model_every = extra_args["save_model_every"]
         # self.timer.check('set_logger')
 
         if self.using_wandb:
@@ -454,9 +454,15 @@ class BaseTrainer(ABC):
     ################
 
     def get_loss(self, cho):
-        if cho == "l1":
-            loss = nn.L1Loss() if not self.cuda else nn.L1Loss().cuda()
-        elif cho == "l2":
-            loss = nn.MSELoss() if not self.cuda else nn.MSELoss().cuda()
-        else: raise Exception("Unsupported loss choice")
+        if cho == "l1_mean":
+            loss = nn.L1Loss()
+        elif cho == "l1_sum":
+            loss = nn.L1Loss(reduction="sum")
+        elif cho == "l2_mean":
+            loss = nn.MSELoss()
+        elif cho == "l2_sum":
+            loss = nn.MSELoss(reduction="sum")
+        else:
+            raise Exception("Unsupported loss choice")
+        if self.cuda: loss = loss.cuda()
         return loss
