@@ -7,7 +7,7 @@ from astropy.visualization import ZScaleInterval
 from skimage.metrics import structural_similarity
 
 
-def calculate_emd(distrib1, distrib2, norm="l2", mask=None, precision=None):
+def calculate_emd(distrib1, distrib2, norm="l2", mask=None, weight=None, precision=None):
     """ Calculate (masked) earth mover's distance between two distributions.
         @Param
            distrib: [...,num_bins] (assume they sum to 1)
@@ -17,6 +17,7 @@ def calculate_emd(distrib1, distrib2, norm="l2", mask=None, precision=None):
     n = sub.shape[-1]
 
     if mask is not None: sub *= mask
+    if weight is not None: sub *= weight
     # if precision is not None: sub *= precision
 
     if norm == "l1":

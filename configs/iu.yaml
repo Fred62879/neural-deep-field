@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'save_pixel_values_during_train','recon_gt_spectra_during_train'] #,'save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    # tasks: ['pretrain_infer','recon_img','recon_gt_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #,'save_qtz_weights'] #,'save_redshift']
+    #tasks: ['pretrain_infer','recon_img','recon_gt_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #,'save_qtz_weights'] #,'save_redshift']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -165,7 +165,7 @@ trainer:
     learn_spectra_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
 
-    num_supervision_spectra: 300
+    num_supervision_spectra: 20
     spectra_neighbour_size: 1
 
     pixel_supervision: True          # these two conflict
@@ -215,7 +215,7 @@ infer:
     recon_cutout_start_pos: [ [[256,256]], [[86,188]] ]
 
     # recon spectra
-    infer_selected: True
+    infer_selected: False
     pretrain_num_infer: 35
 
     flux_norm_cho: "sum"
@@ -252,7 +252,7 @@ patch_data:
     # if don't use full patch, we can select cutout from tiles
     # the order of the following 5 fields corresponds to each other
     tracts: ['9812']
-    patches: ['1,5']
+    patches: ['0,0'] #['1,5']
     patch_selection_cho: "test"
     patch_cutout_num_rows: [64]
     patch_cutout_num_cols: [64]
@@ -303,12 +303,12 @@ spectra_data:
     spectra_smooth_sigma: 50
 
     spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['0','1'] #,'2','3','4','5','6','7','8']
-    spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
+    spectra_patches_r: ['0'] #,'1'] #,'2','3','4','5','6','7','8']
+    spectra_patches_c: ['0','1','2'] #,'3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
     source_spectra_cho: "" #"6000_to_8000"
-    processed_spectra_cho: "debug2" #"v7_table"
+    processed_spectra_cho: "debug5" #"v7_table"
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
     load_spectra_data_from_cache: True
@@ -316,7 +316,7 @@ spectra_data:
     # debug2: 300 spectra [9812][0,1][0-8] normed
     # debug3: 30 spectra [9812][0][0,1,2] unnormed (7500-8000)
     # debug4: 30 spectra [9812][0][0,1,2] normed (7500-8000)
-    # debug5: 7700-7800
+    # debug5: 30 spectra [9812][0][0,1,2] normed (6000-8000)
     # debug6: 7500-8000, normed
 
 inpaint:

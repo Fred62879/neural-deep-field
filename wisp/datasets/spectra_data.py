@@ -138,7 +138,11 @@ class SpectraData:
         else: raise ValueError("Unsupported spectra data source choice.")
 
         self.coords_range_fname = get_coords_range_fname(**self.kwargs)
-        self.wave_coverage_fname = join(processed_data_path, "wave_coverage.npy")
+        self.emit_wave_coverage_fname = join(
+            processed_data_path,
+            "emit_wave_coverage_" +
+            str(self.kwargs["spectra_supervision_wave_lo"]) + "_" +
+            str(self.kwargs["spectra_supervision_wave_hi"]))
 
         self.gt_spectra_fname = join(processed_data_path, "gt_spectra.npy")
         self.gt_spectra_ids_fname = join(processed_data_path, "gt_spectra_ids.txt")
@@ -281,8 +285,9 @@ class SpectraData:
         self.coords_range = np.load(self.coords_range_fname)
 
         if not self.load_spectra_data_from_cache or \
-           not exists(self.gt_spectra_ids_fname) or \
+           not exists(self.emit_wave_coverage_fname) or \
            not exists(self.gt_spectra_fname) or \
+           not exists(self.gt_spectra_ids_fname) or \
            not exists(self.gt_spectra_pixels_fname) or \
            not exists(self.gt_spectra_redshift_fname) or \
            not exists(self.gt_spectra_sup_mask_fname) or \
@@ -292,6 +297,7 @@ class SpectraData:
 
             # process and save data for each spectra individually
             if not exists(self.gt_spectra_ids_fname) or \
+               not exists(self.emit_wave_coverage_fname) or \
                not exists(self.processed_metadata_table_fname):
                 self.process_spectra()
             # load data for each individual spectra and save together
@@ -466,9 +472,14 @@ class SpectraData:
 
         self.trans_data = self.trans_obj.get_full_trans_data()
 
+        if not exists(self.emit_wave_coverage_fname):
+            emit_wave_coverage = self.calculate_emitted_wave_coverage(df)
+        else: emit_wave_coverage = np.load(self.emit_wave_coverage_fname)
+        emit_wave_distrib = interp1d(emit_wave_coverage[0], emit_wave_coverage[1])
+
         header_wcs, headers = self.load_headers(df)
         spectra_ids, spectra_to_drop = self.localize_spectra(df, header_wcs, headers)
-        self.load_spectra_patch_wise(df, spectra_ids)
+        self.load_spectra_patch_wise(df, spectra_ids, emit_wave_distrib)
 
         df.drop(spectra_to_drop, inplace=True)   # drop nonexist spectra
         df.reset_index(inplace=True)
@@ -480,6 +491,35 @@ class SpectraData:
         df.drop(columns=["index"], inplace=True) # drop extra index added by `reset_index`
 
         df.to_pickle(self.processed_metadata_table_fname)
+
+    def calculate_emitted_wave_coverage(self, df):
+        """ Calculate coverage of emitted wave based on
+              given observed wave supervision range.
+        """
+        redshift = list(df['zspec'])
+        lo = self.kwargs["spectra_supervision_wave_lo"]
+        hi = self.kwargs["spectra_supervision_wave_hi"]
+        min_emit_wave = int(lo / (1 + max(redshift)))
+        max_emit_wave = int(np.ceil(hi / (1 + min(redshift))))
+        n = max_emit_wave - min_emit_wave + 1
+
+        x = np.arange(min_emit_wave, max_emit_wave + 1)
+        distrib = np.zeros(n).astype(np.int32)
+
+        def accumulate(cur_redshift):
+            distrib[ int(lo/(1+cur_redshift)) - min_emit_wave:
+                     int(hi/(1+cur_redshift)) - min_emit_wave ] += 1
+
+        _= [accumulate(cur_redshift) for cur_redshift in redshift]
+        distrib = np.array(distrib / sum(distrib))
+
+        plt.plot(x,distrib)
+        plt.savefig(self.emit_wave_coverage_fname + ".png")
+        plt.close()
+
+        emit_wave_coverage = np.concatenate((x[None,:], distrib[None,:]), axis=0)
+        np.save(self.emit_wave_coverage_fname + ".npy", emit_wave_coverage)
+        return emit_wave_coverage
 
     def load_headers(self, df):
         """ Load headers of all image patches we have to localize each spectra later on.
@@ -553,10 +593,10 @@ class SpectraData:
             pickle.dump(dict(spectra_ids), fp)
         return spectra_ids, spectra_to_drop
 
-    def load_spectra_patch_wise(self, df, spectra_ids):
+    def load_spectra_patch_wise(self, df, spectra_ids, emit_wave_distrib):
         """ Load pixels and coords for each spectra in patch-wise order.
         """
-        process_each_patch = partial(self.process_spectra_in_one_patch, df)
+        process_each_patch = partial(self.process_spectra_in_one_patch, df, emit_wave_distrib)
 
         for i, tract in enumerate(self.all_tracts):
             for j, patch_r in enumerate(self.all_patches_r):
@@ -574,7 +614,9 @@ class SpectraData:
                         **self.kwargs)
                     process_each_patch(patch_uid, cur_patch, spectra_ids[patch_uid])
 
-    def process_spectra_in_one_patch(self, df, patch_uid, patch, spectra_ids):
+    def process_spectra_in_one_patch(self, df, emit_wave_distrib,
+                                     patch_uid, patch, spectra_ids
+    ):
         """ Get coords and pixel values for all spectra (specified by spectra_ids)
               within the given patch.
             @Params
@@ -603,10 +645,11 @@ class SpectraData:
         cur_patch_spectra = []
         cur_patch_spectra_sup_mask = []
         cur_patch_spectra_plot_mask = []
-        process_one_spectra = partial(
-            self.process_one_spectra,
-            cur_patch_spectra, cur_patch_spectra_sup_mask,
-            cur_patch_spectra_plot_mask, df, patch)
+        process_one_spectra = partial(self.process_one_spectra,
+                                      cur_patch_spectra,
+                                      cur_patch_spectra_sup_mask,
+                                      cur_patch_spectra_plot_mask,
+                                      df, patch, emit_wave_distrib)
 
         for i, (idx, img_coord) in enumerate(zip(spectra_ids, img_coords)):
             process_one_spectra(idx, img_coord)
@@ -634,7 +677,8 @@ class SpectraData:
     def process_one_spectra(self, cur_patch_spectra,
                             cur_patch_spectra_sup_mask,
                             cur_patch_spectra_plot_mask,
-                            df, patch, idx, img_coord
+                            df, patch, emit_wave_distrib,
+                            idx, img_coord
     ):
         """ Get pixel and normalized coord and
               process spectra data for one spectra.
@@ -680,8 +724,8 @@ class SpectraData:
             join(self.processed_spectra_path, fname),
             join(self.processed_spectra_path, sup_mask_fname),
             join(self.processed_spectra_path, plot_mask_fname),
-            self.full_wave,
-            self.wave_discretz_interval,
+            df.loc[idx,"zspec"],
+            emit_wave_distrib,
             sigma=self.smooth_sigma,
             format=self.spectra_data_format,
             trans_range=self.trans_range,
@@ -953,7 +997,7 @@ def interpolate_trans(trans_data, spectra_data, fname=None, colors=None):
           than that of spectra_data.
         @Param
           trans_data: [nsmpl_t,1+nbands] (wave/trans)
-          spectra_data: [3,nsmpl_s] (wave,flux,ivar)
+          spectra_data: [4,nsmpl_s] (wave,flux,ivar,weight)
         @Return
           trans_mask: mask for trans (outside trans wave is 0)
           trans: interpolated transmission value
@@ -988,10 +1032,13 @@ def interpolate_trans(trans_data, spectra_data, fname=None, colors=None):
     scale_trans(trans, source_trans)
     # for i in range(nbands): print(sum(trans[i]))
 
+    # if spectra wave goes beyond trans wave, then we cannot interpolate
+    #  for the out of bound spectra wave. we mask with 0
     trans_mask = np.zeros(n)
     # trans mask: [0,0,1(interpolated trans range)1,0,0]
     trans_mask[id_lo:id_hi+1] = 1
 
+    # for each band, we mask wave range not covered by the band with 0
     band_mask = np.zeros((nbands, n))
     for i in range(nbands):
         band_mask[i][trans[i] != 0] = 1
@@ -1096,15 +1143,23 @@ def mask_spectra_range(spectra, mask, trans_range, trusted_range):
     mask &= new_mask
     return spectra, mask
 
+def get_wave_weight(spectra, redshift, emit_wave_distrib):
+    print(spectra.shape)
+    obs_wave = spectra[1]
+    print(min(obs_wave), max(obs_wave), redshift)
+    emit_wave = obs_wave / (1 + redshift)
+    print(min(emit_wave), max(emit_wave))
+    weight = 1 / (emit_wave_distrib(emit_wave) + 1e-10)
+    return weight
+
 def process_gt_spectra(infname, spectra_fname,
                        sup_mask_fname, plot_mask_fname,
-                       full_wave, smpl_interval,
+                       redshift, emit_wave_distrib,
                        sigma=-1, format="tbl",
                        trans_range=None, trusted_range=None,
                        save=True, plot=True,
                        colors=None, trans_data=None,
-                       max_spectra_len=-1, validator=None,
-                       interpolate=False
+                       max_spectra_len=-1, validator=None
 ):
     """ Load gt spectra wave and flux for spectra supervision and
           spectrum plotting. Also smooth the gt spectra.
@@ -1115,8 +1170,12 @@ def process_gt_spectra(infname, spectra_fname,
           infname: filename of np array that stores the gt spectra data.
           spectra_fname: output filename to store processed gt spectra (wave & flux)
           mask_fname: output filename to store processed gt spectra (wave & flux)
-        @Save
-          gt_wave/spectra: spectra data with the corresponding lambda values.
+          emit_wave_distrib: histogram distribution of emitted wave (interpolated function)
+        @Return
+          spectra:  spectra data [5+2*nbands,nsmpl]
+                    (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
+          mask:     mask out bad flux values
+          sup_mask: DUPLICATE of mask
     """
     spectra = unpack_gt_spectra(infname, format=format) # [3,nsmpl]
     assert spectra.shape[1] <= max_spectra_len
@@ -1130,11 +1189,12 @@ def process_gt_spectra(infname, spectra_fname,
     sup_mask = mask_negative_flux(spectra, mask) # supervision mask
     spectra = spectra.astype(np.float32)
 
+    weight = get_wave_weight(spectra, redshift, emit_wave_distrib)
+    spectra = np.concatenate((spectra, weight[None,:]), axis=0)
+
     interp_trans_data = interpolate_trans(
-        trans_data, spectra, fname=spectra_fname, colors=colors
-    )
+        trans_data, spectra, fname=spectra_fname, colors=colors)
     spectra = np.concatenate((spectra, interp_trans_data), axis=0)
-    # [4+2*nbands,nsmpl] (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
 
     if save:
         np.save(spectra_fname + ".npy", spectra)

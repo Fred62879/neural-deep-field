@@ -256,7 +256,7 @@ class AstroDataset(Dataset):
 
         if self.wave_source == "spectra":
             # spectra_sup_data: [bsz,4+2*nbands,nsmpl]
-            #  (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
+            #  (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
 
             if self.sample_wave:
                 # sample from spectra data (wave, flux, ivar, and interpolated trans)
