@@ -1,7 +1,10 @@
 
 import re
 import os
+import sys
 import torch
+import random
+import logging
 import nvidia_smi
 import numpy as np
 
@@ -13,11 +16,35 @@ from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
+def set_seed(seed: int = 42) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    # When running on the CuDNN backend, two further options must be set
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    # Set a fixed value for the hash seed
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    logging.info(f"Random seed set as {seed}")
+
+def default_log_setup(level=logging.INFO):
+    """ Sets up default logging, always logging to stdout.
+        :param level: logging level, e.g. logging.INFO
+    """
+    handlers = [logging.StreamHandler(sys.stdout)]
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s|%(levelname)8s| %(message)s',
+        handlers=handlers
+    )
+
 def select_inferrence_ids(n, m):
-    # np.random.seed(48)
+    set_seed()
     ids = np.arange(n)
     np.random.shuffle(ids)
     ids = ids[:m]
+    print(ids)
     return ids
 
 def create_patch_uid(tract, patch):

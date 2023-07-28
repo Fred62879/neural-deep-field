@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.nn.functional import one_hot
+from wisp.utils.common import set_seed
 from wisp.utils.numerical import find_closest_tensor
 
 
@@ -113,7 +114,7 @@ def get_layer_class(layer_type):
         assert(False and "layer type does not exist")
 
 def init_codebook(seed, num_embed, latent_dim):
-    torch.manual_seed(seed)
+    set_seed()
     qtz_codebook = nn.Embedding(num_embed, latent_dim)
     qtz_codebook.weight.data.uniform_(
         -1.0 / latent_dim, 1.0 / latent_dim)

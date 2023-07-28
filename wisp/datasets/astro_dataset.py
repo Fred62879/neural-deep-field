@@ -246,7 +246,7 @@ class AstroDataset(Dataset):
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
         else:
-            raise ValueError("Unrecognized data field.")
+            raise ValueError(f"Unrecognized data field: {field}.")
         return data
 
     def get_wave_data(self, batch_size, out):

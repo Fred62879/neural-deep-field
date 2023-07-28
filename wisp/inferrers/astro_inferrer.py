@@ -81,7 +81,7 @@ class AstroInferrer(BaseInferrer):
         self.model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames = sort_alphanumeric(self.model_fnames)
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames[-1:]
+            self.selected_model_fnames = self.selected_model_fnames #[-5:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -457,7 +457,9 @@ class AstroInferrer(BaseInferrer):
         elif self.recon_img_sup_spectra:
             assert(self.pretrain_infer)
             recon_vals = torch.stack(self.recon_pixels).detach().cpu().numpy()
-            gt_vals = self.dataset.get_supervision_spectra_pixels()[:,0]
+            gt_vals = self.dataset.get_supervision_spectra_pixels().numpy()[:,0]
+            if self.infer_selected:
+                gt_vals = gt_vals[self.dataset.get_selected_ids()]
             fname = join(self.recon_dir, f"{model_id}.pth")
             np.save(fname, recon_vals)
 
@@ -477,7 +479,7 @@ class AstroInferrer(BaseInferrer):
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
             log.info(f"Recon vals {vals}")
-            gt_vals = self.dataset.get_supervision_spectra_pixels()[:,0]
+            gt_vals = self.dataset.get_supervision_spectra_pixels().numpy()[:,0]
             log.info(f"GT vals {gt_vals}")
 
         if self.recon_synthetic_band:
@@ -681,8 +683,8 @@ class AstroInferrer(BaseInferrer):
             assert 0
             # vals = self.trans_obj.integrate(recon_fluxes)
             if self.pretrain_infer:
-                gt_vals = self.dataset.get_supervision_spectra_pixels()[:,0]
-            else: gt_vals = self.dataset.get_supervision_validation_pixels()[:,0]
+                gt_vals = self.dataset.get_supervision_spectra_pixels().numpy()[:,0]
+            else: gt_vals = self.dataset.get_supervision_validation_pixels().numpy()[:,0]
 
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
@@ -861,7 +863,8 @@ class AstroInferrer(BaseInferrer):
                     self.spectra_wave.extend(data["spectra_sup_data"][:,0])
                     self.spectra_masks.extend(data["spectra_sup_plot_mask"])
                 else: # self.main_infer
-                    # main inferrence spectra can be obtained at once
+                    # during main inferrence, validation spectra can be obtained
+                    # from patch data object
                     pass
 
                 fluxes = ret["intensity"]

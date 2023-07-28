@@ -7,6 +7,7 @@ import logging as log
 from pathlib import Path
 from os.path import exists, join
 from collections import defaultdict
+from wisp.utils.common import set_seed
 from wisp.utils.plot import plot_horizontally
 from wisp.datasets.data_utils import create_selected_patches_uid
 
@@ -118,7 +119,7 @@ class MaskData:
                  which is pixel id within all selected patches)
         """
         ids = np.arange(n)
-        random.seed(seed)
+        set_seed(seed)
         random.shuffle(ids)
         offset = int(ratio*n)
         mask = np.zeros(n)

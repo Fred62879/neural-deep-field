@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'save_pixel_values_during_train','recon_gt_spectra_during_train'] #,'save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    #tasks: ['pretrain_infer','recon_img'] #,'recon_gt_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #,'save_qtz_weights'] #,'save_redshift']
+    # tasks: ['pretrain_infer','recon_img','recon_gt_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #,'save_qtz_weights'] #,'save_redshift']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -163,7 +163,7 @@ trainer:
 
     batched_pretrain: True
     learn_spectra_within_wave_range: True
-    codebook_pretrain_pixel_supervision: True
+    codebook_pretrain_pixel_supervision: False
 
     num_supervision_spectra: 300
     spectra_neighbour_size: 1
@@ -177,7 +177,7 @@ trainer:
 
     spectra_beta: 1
     redshift_beta: 1
-    pretrain_pixel_beta: 0.1
+    pretrain_pixel_beta: 1
     pretrain_redshift_beta: 0.1
     spectra_supervision_start_epoch: 0
 
@@ -204,7 +204,7 @@ infer:
 
     # recon img
     to_HDU: False
-    #infer_log_dir: '20230726-132843'
+    # infer_log_dir: '20230727-201327_30k_pixel_beta_0.1' #'20230727-225647_30k_pixel_beta_1'
     metric_options: ['mse','ssim','psnr']
     log_pixel_ratio: True
 
@@ -215,8 +215,8 @@ infer:
     recon_cutout_start_pos: [ [[256,256]], [[86,188]] ]
 
     # recon spectra
-    infer_selected: False
-    pretrain_num_infer: 1000
+    infer_selected: True
+    pretrain_num_infer: 35
 
     flux_norm_cho: "sum"
     spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]

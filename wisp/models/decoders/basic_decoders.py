@@ -12,14 +12,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from scipy.stats import ortho_group
-from wisp.utils.common import get_gpu_info, query_GPU_mem
+from wisp.utils.common import get_gpu_info, query_GPU_mem, set_seed
 
 class MLP(nn.Module):
     def __init__(self, input_dim, output_dim, num_layers=1, hidden_dim=128, seed=0):
         super(MLP, self).__init__()
 
         def block(dim_in, dim_out, seed=0, activate=True):
-            # torch.manual_seed(seed)
+            set_seed()
             block = [ nn.Linear(dim_in, dim_out) ]
             if activate:
                 block.append(nn.ReLU(inplace=True))

@@ -138,6 +138,8 @@ class SpectraData:
         else: raise ValueError("Unsupported spectra data source choice.")
 
         self.coords_range_fname = get_coords_range_fname(**self.kwargs)
+        self.wave_coverage_fname = join(processed_data_path, "wave_coverage.npy")
+
         self.gt_spectra_fname = join(processed_data_path, "gt_spectra.npy")
         self.gt_spectra_ids_fname = join(processed_data_path, "gt_spectra_ids.txt")
         self.gt_spectra_pixels_fname = join(processed_data_path, "gt_spectra_pixels.npy")
