@@ -273,7 +273,7 @@ class AstroDataset(Dataset):
                     sample_ids=sample_ids)
 
             if self.perform_integration:
-                # out["trans_mask"] = out["spectra_sup_data"][:,3]                # [bsz,nsmpl]
+                # out["trans_mask"] = out["spectra_sup_data"][:,3]              # [bsz,nsmpl]
                 out["trans"] = out["spectra_sup_data"][:,4:4+self.num_bands]    # [bsz,nbands,nsmpl]
                 out["band_mask"] = out["spectra_sup_data"][:,4+self.num_bands:] # [bsz,nbands,nsmpl]
                 # num of sample within each band (replace 0 with 1 to avoid division by 0)

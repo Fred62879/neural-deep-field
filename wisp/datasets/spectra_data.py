@@ -281,7 +281,7 @@ class SpectraData:
                   them together and save all data together.
               iii) finally we do necessary transformations.
         """
-        self.find_full_wave_bound_ids()
+        # self.find_full_wave_bound_ids()
         self.coords_range = np.load(self.coords_range_fname)
 
         if not self.load_spectra_data_from_cache or \
@@ -750,21 +750,21 @@ class SpectraData:
         else: raise ValueError("Unsupported spectra data source")
         return source_spectra_data
 
-    def find_full_wave_bound_ids(self):
-        """ Find id of min and max wave of supervision range in terms of
-              the transmission wave (full_wave).
-            Since the min and max wave for the supervision range may not
-              coincide exactly with the trans wave, we find closest trans wave to replace
-        """
-        supervision_spectra_wave_bound = [
-            self.kwargs["spectra_supervision_wave_lo"],
-            self.kwargs["spectra_supervision_wave_hi"]
-        ]
-        (id_lo, id_hi) = get_bound_id(
-            supervision_spectra_wave_bound, self.full_wave, within_bound=False)
-        self.data["supervision_wave_bound_ids"] = [id_lo, id_hi + 1]
-        self.data["supervision_spectra_wave_bound"] = [
-            self.full_wave[id_lo], self.full_wave[id_hi]]
+    # def find_full_wave_bound_ids(self):
+    #     """ Find id of min and max wave of supervision range in terms of
+    #           the transmission wave (full_wave).
+    #         Since the min and max wave for the supervision range may not
+    #           coincide exactly with the trans wave, we find closest trans wave to replace
+    #     """
+    #     supervision_spectra_wave_bound = [
+    #         self.kwargs["spectra_supervision_wave_lo"],
+    #         self.kwargs["spectra_supervision_wave_hi"]
+    #     ]
+    #     (id_lo, id_hi) = get_bound_id(
+    #         supervision_spectra_wave_bound, self.full_wave, within_bound=False)
+    #     self.data["supervision_wave_bound_ids"] = [id_lo, id_hi + 1]
+    #     self.data["supervision_spectra_wave_bound"] = [
+    #         self.full_wave[id_lo], self.full_wave[id_hi]]
 
     #############
     # Utilities
@@ -941,25 +941,21 @@ class SpectraData:
             fname = join(spectra_dir, sub_dir, f"all_spectra_{name}")
             fig.tight_layout(); plt.savefig(fname); plt.close()
 
-    def mark_spectra_on_img(self):
-        assert 0
-        markers = self.kwargs["spectra_markers"]
-        spectra_img_coords = self.get_spectra_img_coords()
-        spectra_fits_ids = set(spectra_img_coords[:,-1])
-
-        for fits_id in spectra_fits_ids:
-            # collect spectra in the same tile
-            cur_coords, cur_markers = [], []
-            for i, (r, c, cur_fits_id) in zip(
-                    self.kwargs["gt_spectra_ids"], spectra_img_coords):
-
-                if cur_fits_id == fits_id:
-                    cur_coords.append([r,c])
-                    cur_markers.append(markers[i])
-
-            # mark on the corresponding tile
-            self.fits_obj.mark_on_img(
-                np.array(cur_coords), cur_markers, fits_id)
+    # def mark_spectra_on_img(self):
+    #     markers = self.kwargs["spectra_markers"]
+    #     spectra_img_coords = self.get_spectra_img_coords()
+    #     spectra_fits_ids = set(spectra_img_coords[:,-1])
+    #     for fits_id in spectra_fits_ids:
+    #         # collect spectra in the same tile
+    #         cur_coords, cur_markers = [], []
+    #         for i, (r, c, cur_fits_id) in zip(
+    #                 self.kwargs["gt_spectra_ids"], spectra_img_coords):
+    #             if cur_fits_id == fits_id:
+    #                 cur_coords.append([r,c])
+    #                 cur_markers.append(markers[i])
+    #         # mark on the corresponding tile
+    #         self.fits_obj.mark_on_img(
+    #             np.array(cur_coords), cur_markers, fits_id)
 
 # SpectraData class ends
 #############
@@ -1058,31 +1054,6 @@ def interpolate_trans(trans_data, spectra_data, fname=None, colors=None):
     ret = np.array([trans_mask] + list(trans) + list(band_mask))
     return ret
 
-def convolve_spectra(spectra, std=140, border=True, bound=None):
-    """ Smooth gt spectra with given std.
-        If border is True, we add 1 padding at two ends when convolving.
-        If bound is not None, only convolve within given bound.
-    """
-    if std <= 0: return
-
-    if bound is not None: lo, hi = bound
-    else: lo, hi = 0, spectra.shape[1]
-    n = hi - lo
-
-    kernel = Gaussian1DKernel(stddev=std)
-    if border:
-        nume = convolve(spectra[1][lo:hi], kernel)
-        denom = convolve(np.ones(n), kernel)
-        spectra[1][lo:hi] = nume / denom
-    else:
-        spectra[1][lo:hi] = convolve(spectra[1][lo:hi], kernel)
-    return spectra
-
-def normalize_spectra(spectra):
-    lo, hi = min(spectra[1]), max(spectra[1])
-    spectra[1] = (spectra[1] - lo) / (hi - lo)
-    return spectra
-
 def create_spectra_mask(spectra, max_spectra_len):
     """ Mask out padded region of spectra.
     """
@@ -1119,11 +1090,30 @@ def clean_flux(spectra, mask):
     spectra[1][ids] = 0
     return spectra, mask
 
-def mask_negative_flux(spectra, mask):
-    ids = (spectra[1] < 0)
-    mask = mask.copy()
-    mask[ids] = 0
-    return mask
+def normalize_spectra(spectra):
+    lo, hi = min(spectra[1]), max(spectra[1])
+    spectra[1] = (spectra[1] - lo) / (hi - lo)
+    return spectra
+
+def convolve_spectra(spectra, std=5, border=True, bound=None):
+    """ Smooth gt spectra with given std.
+        If border is True, we add 1 padding at two ends when convolving.
+        If bound is not None, only convolve within given bound.
+    """
+    if std <= 0: return
+
+    if bound is not None: lo, hi = bound
+    else: lo, hi = 0, spectra.shape[1]
+    n = hi - lo
+
+    kernel = Gaussian1DKernel(stddev=std)
+    if border:
+        nume = convolve(spectra[1][lo:hi], kernel)
+        denom = convolve(np.ones(n), kernel)
+        spectra[1][lo:hi] = nume / denom
+    else:
+        spectra[1][lo:hi] = convolve(spectra[1][lo:hi], kernel)
+    return spectra
 
 def mask_spectra_range(spectra, mask, trans_range, trusted_range):
     """ Mask out spectra data beyond given wave range.
@@ -1141,15 +1131,28 @@ def mask_spectra_range(spectra, mask, trans_range, trusted_range):
     new_mask = np.zeros(n).astype(bool)
     new_mask[id_lo:id_hi+1] = 1
     mask &= new_mask
-    return spectra, mask
+    bound = (id_lo, id_hi)
+    return spectra, mask, bound
 
-def get_wave_weight(spectra, redshift, emit_wave_distrib):
-    print(spectra.shape)
-    obs_wave = spectra[1]
-    print(min(obs_wave), max(obs_wave), redshift)
+def mask_negative_flux(spectra, mask):
+    ids = (spectra[1] < 0)
+    mask = mask.copy()
+    mask[ids] = 0
+    return mask
+
+def get_wave_weight(spectra, redshift, emit_wave_distrib, bound):
+    """ Get sampling weight for spectra wave (in unmasked range).
+    """
+    (lo, hi) = bound
+    n = spectra.shape[1]
+    print(min(spectra[0]), max(spectra[0]), len(spectra[0]), lo, hi)
+    obs_wave = spectra[0][lo:hi+1]
+    weight = np.zeros(n)
+    print(min(obs_wave), max(obs_wave))
     emit_wave = obs_wave / (1 + redshift)
     print(min(emit_wave), max(emit_wave))
-    weight = 1 / (emit_wave_distrib(emit_wave) + 1e-10)
+    bound_weight = 1 / (emit_wave_distrib(emit_wave) + 1e-10)
+    weight[lo:hi+1] = bound_weight
     return weight
 
 def process_gt_spectra(infname, spectra_fname,
@@ -1185,11 +1188,11 @@ def process_gt_spectra(infname, spectra_fname,
     spectra, mask = clean_flux(spectra, mask)
     spectra = normalize_spectra(spectra)
     spectra = convolve_spectra(spectra, std=sigma, bound=bound)
-    spectra, mask = mask_spectra_range(spectra, mask, trans_range, trusted_range)
+    spectra, mask, bound = mask_spectra_range(spectra, mask, trans_range, trusted_range)
     sup_mask = mask_negative_flux(spectra, mask) # supervision mask
     spectra = spectra.astype(np.float32)
 
-    weight = get_wave_weight(spectra, redshift, emit_wave_distrib)
+    weight = get_wave_weight(spectra, redshift, emit_wave_distrib, bound)
     spectra = np.concatenate((spectra, weight[None,:]), axis=0)
 
     interp_trans_data = interpolate_trans(
