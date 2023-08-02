@@ -17,6 +17,7 @@ class HyperSpectralConverter(nn.Module):
 
         self.kwargs = kwargs
         self._model_redshift = _model_redshift
+        self.wave_multiplier = kwargs["wave_multiplier"]
 
         self.encode_wave = kwargs["encode_wave"]
         self.quantize_spectra = kwargs["quantize_spectra"]
@@ -67,14 +68,15 @@ class HyperSpectralConverter(nn.Module):
 
     def linear_norm_wave(self, wave, wave_bound):
         (lo, hi) = wave_bound # 3940, 10870
-        return 10*(wave - lo) / (hi - lo)
+        return self.wave_multiplier * (wave - lo) / (hi - lo)
 
     def shift_wave(self, wave, redshift):
         """ Convert observed lambda to emitted lambda.
         """
         wave = wave.permute(1,2,0)
 
-        #print(wave[:,0,:].T, redshift)
+        # print(wave[:,0,:].T, redshift)
+        # print(wave.shape, redshift.shape)
         if wave.ndim == 3: # [nsmpl,1,bsz]
             wave = wave / (1 + redshift) # dont use `/=` this will change wave object
         elif wave.ndim == 4: # [nbands,nsmpl,1,bsz]
