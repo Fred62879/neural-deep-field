@@ -71,7 +71,6 @@ class CodebookTrainer(BaseTrainer):
 
     def init_net(self):
         self.train_pipeline = self.pipeline[0]
-        self.infer_pipeline = self.pipeline[1]
 
         self.latents = nn.Embedding(
             self.num_sup_spectra,
@@ -79,7 +78,6 @@ class CodebookTrainer(BaseTrainer):
         )
 
         log.info(self.train_pipeline)
-        # log.info(self.infer_pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.train_pipeline.parameters()))
         )
@@ -94,7 +92,6 @@ class CodebookTrainer(BaseTrainer):
         if self.extra_args["batched_pretrain"]:
             fields.extend([
                 "spectra_sup_data",
-                "spectra_sup_mask",
                 "spectra_sup_redshift",
                 "spectra_sup_plot_mask"
             ])
@@ -550,7 +547,9 @@ class CodebookTrainer(BaseTrainer):
             spectra_loss = 0
         else:
             spectra_loss = self.spectra_loss(
-                spectra_masks, gt_spectra, recon_flux)
+                spectra_masks, gt_spectra, recon_flux,
+                weight_by_wave_coverage=self.extra_args["weight_by_wave_coverage"]
+            )
             self.log_dict["spectra_loss"] += spectra_loss.item()
 
         # ii) pixel supervision loss

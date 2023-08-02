@@ -117,6 +117,7 @@ def define_cmd_line_args():
                                        "infer",
                                        "recon_img","recon_synthetic","recon_gt_spectra",
                                        "recon_dummy_spectra","recon_codebook_spectra",
+                                       "recon_codebook_spectra_individ",
                                        "plot_embed_map","plot_latent_embed",
                                        "plot_redshift","plot_save_scaler"])
 
@@ -386,7 +387,7 @@ def define_cmd_line_args():
                             help="marker to plot each spectra.")
     data_group.add_argument("--spectra-smooth-sigma",type=int, default=5)
     data_group.add_argument("--flux-norm-cho",type=str,
-                            choices=["max","sum","scale_gt","scale_recon"],
+                            choices=["max","sum","linr","scale_gt","scale_recon"],
                             help="0- divide with max, 1-divide with sum")
 
     data_group.add_argument("--num-gt-spectra", type=int)
@@ -474,6 +475,9 @@ def define_cmd_line_args():
     train_group.add_argument("--pretrain-with-coords", action="store_true",
                              help="performe pretraining with 2d coords instead of optimizing latent variables")
     train_group.add_argument("--weight-train", action="store_true")
+    train_group.add_argument("--weight-by-wave-coverage", action="store_true",
+                             help="spectra loss weighted by emitted lambda coverage or not.")
+
     train_group.add_argument("--train-use-all-wave", action="store_true")
     train_group.add_argument("--infer-during-train", action="store_true")
     train_group.add_argument("--train-spectra-pixels-only", action="store_true")

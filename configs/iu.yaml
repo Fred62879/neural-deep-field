@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'save_pixel_values_during_train','recon_gt_spectra_during_train'] #,'save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    #tasks: ['pretrain_infer','recon_img','recon_gt_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #,'save_qtz_weights'] #,'save_redshift']
+    tasks: ['pretrain_infer','recon_codebook_spectra'] #'recon_gt_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #,'save_qtz_weights'] #,'save_redshift','recon_img']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -110,7 +110,8 @@ qtz:
     qtz_temperature_scale: 0.01
 
 spatial_decod:
-    generate_scaler: True
+    decode_bias: True
+    decode_scaler: True
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1
     spatial_decod_output_dim: 16
@@ -157,7 +158,7 @@ trainer:
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_data','spectra_sup_mask','spectra_sup_plot_mask','spectra_sup_pixels','spectra_sup_redshift','spectra_val_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_data','spectra_sup_plot_mask','spectra_sup_pixels','spectra_sup_redshift','spectra_val_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
     pretrain_codebook: True          # these two conflict
     spectra_supervision: False       #  each other
@@ -166,7 +167,7 @@ trainer:
     learn_spectra_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
 
-    num_supervision_spectra: 1000
+    num_supervision_spectra: 20
     spectra_neighbour_size: 1
 
     pixel_supervision: True          # these two conflict
@@ -186,6 +187,7 @@ trainer:
     quantize_latent: False
     quantize_spectra: True
     weight_train: False
+    weight_by_wave_coverage: True
     train_use_all_wave: False
     resume_train: False
     #resume_log_dir: '20230726-175816_main_train_1000_epochs'
@@ -217,9 +219,9 @@ infer:
 
     # recon spectra
     infer_selected: False
-    pretrain_num_infer: 70
+    pretrain_num_infer: 20
 
-    flux_norm_cho: "sum"
+    flux_norm_cho: "linr"
     spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]
     mark_spectra: True
     plot_clipped_spectrum: True
@@ -253,7 +255,7 @@ patch_data:
     # if don't use full patch, we can select cutout from tiles
     # the order of the following 5 fields corresponds to each other
     tracts: ['9812']
-    patches: ['1,5'] #['0,1']
+    patches: ['0,1'] #['1,5']
     patch_selection_cho: "test"
     patch_cutout_num_rows: [64]
     patch_cutout_num_cols: [64]
@@ -303,13 +305,13 @@ spectra_data:
 
     spectra_smooth_sigma: 50
 
-    spectra_tracts: ['9813'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['3'] #['0','1','2','3','4','5','6','7','8']
-    spectra_patches_c: ['2'] #['0','1','2','3','4','5','6','7','8']
+    spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
+    spectra_patches_r: ['0'] #,'1'] #,'2','3','4','5','6','7','8']
+    spectra_patches_c: ['0','1','2'] #,'3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
     source_spectra_cho: "" #"6000_to_8000"
-    processed_spectra_cho: "v7_table"
+    processed_spectra_cho: "debug5" #"v7_table"
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
     load_spectra_data_from_cache: True

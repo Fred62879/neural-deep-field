@@ -109,7 +109,7 @@ class AstroInferrer(BaseInferrer):
         self.qtz = self.qtz_latent or self.qtz_spectra
         self.qtz_n_embd = self.extra_args["qtz_num_embed"]
         self.qtz_strategy = self.extra_args["quantization_strategy"]
-        self.generate_scaler = self.qtz and self.extra_args["generate_scaler"]
+        self.generate_scaler = self.qtz and self.extra_args["decode_scaler"]
 
         # redshift setups
         self.model_redshift = self.extra_args["model_redshift"]

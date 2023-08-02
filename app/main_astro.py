@@ -20,7 +20,7 @@ if __name__ == "__main__":
         optim_cls, optim_params = get_optimizer_from_config(args)
         trainer = get_trainer_from_config(
             CodebookTrainer,
-            [ pipelines["codebook_net"], pipelines["codebook"] ],
+            [ pipelines["codebook_net"] ],
             dataset, optim_cls, optim_params, device, args
         )
         trainer.train()

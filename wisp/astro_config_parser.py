@@ -30,9 +30,9 @@ def get_pretrain_pipelines(pipelines, tasks, args):
             _model_redshift=args.model_redshift,
             **vars(args)
         )
-        codebook_nef = CodebookNef(integrate=False, **vars(args))
         pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
-        pipelines["codebook"] = AstroPipeline(codebook_nef)
+        # codebook_nef = CodebookNef(integrate=False, **vars(args))
+        # pipelines["codebook"] = AstroPipeline(codebook_nef)
 
     # pipeline for codebook pretrain inferrence
     if "pretrain_infer" in tasks:
@@ -44,7 +44,10 @@ def get_pretrain_pipelines(pipelines, tasks, args):
             spectra_nef = CodebookPretrainNerf(False, **vars(args))
             pipelines["spectra_infer"] = AstroPipeline(spectra_nef)
 
-        if "recon_codebook_spectra_individ" in tasks:
+        if "recon_codebook_spectra" in tasks:
+            codebook_nef = CodebookNef(integrate=False, **vars(args))
+            pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_nef)
+        elif "recon_codebook_spectra_individ" in tasks:
             codebook_spectra_nef = CodebookPretrainNerf(False, **vars(args))
             pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_spectra_nef)
 

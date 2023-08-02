@@ -338,7 +338,7 @@ class SpectraData:
             validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
             acc += len(cur_spectra_ids)
         validation_ids = np.array(validation_ids)
-        # validation_ids = np.array([0])
+        validation_ids = np.array([0])
         log.info(f"validation spectra ids: {validation_ids}")
 
         # get supervision ids
@@ -757,6 +757,9 @@ class SpectraData:
                 recon_flux = recon_flux / np.max(recon_flux)
             elif flux_norm_cho == "sum":
                 recon_flux = recon_flux / np.sum(recon_flux)
+            elif flux_norm_cho == "linr":
+                lo, hi = min(recon_flux), max(recon_flux)
+                recon_flux = (recon_flux - lo) / (hi - lo)
             elif flux_norm_cho == "scale_gt":
                 # scale gt spectra s.t. its max is same as recon
                 recon_max = np.max(recon_flux)
@@ -769,6 +772,9 @@ class SpectraData:
             elif flux_norm_cho == "sum":
                 gt_flux = gt_flux / (np.sum(gt_flux) + 1e-10)
                 gt_flux = gt_flux * len(gt_flux) / len(recon_flux)
+            elif flux_norm_cho == "linr":
+                lo, hi = min(gt_flux), max(gt_flux)
+                gt_flux = (gt_flux - lo) / (hi - lo)
             elif flux_norm_cho == "scale_gt":
                 gt_flux = gt_flux / np.max(gt_flux) * recon_max
             elif flux_norm_cho == "scale_recon":

@@ -492,7 +492,6 @@ class AstroTrainer(BaseTrainer):
 
             if self.recon_gt_spectra:
                 #self.gt_wave.extend()
-                #self.gt_masks.extend(data["spectra_sup_mask"])
                 #self.gt_fluxes.extend(data["spectra_sup_data"][:,1])
                 self.recon_fluxes.extend(ret["spectra"])
 

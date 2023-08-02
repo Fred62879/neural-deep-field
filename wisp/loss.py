@@ -25,7 +25,7 @@ def plotspectra(spectra, fname):
     plt.savefig(fname)
     plt.close()
 
-def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux):
+def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):
     ''' Loss function for spectra supervision
         @Param
           mask:       [bsz,num_smpls]
@@ -46,12 +46,16 @@ def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux):
     # recon_flux = torch.masked_select(recon_flux, mask.bool())
     # print(torch.sum(gt_flux), torch.sum(recon_flux))
 
+    if weight_by_wave_coverage:
+        weight = gt_spectra[:,3]
+    else: weight = None
+
     emd = calculate_emd(gt_flux, recon_flux, mask=mask,
-                        weight=gt_spectra[:,3], precision=gt_spectra[:,2])
+                        weight=weight, precision=gt_spectra[:,2])
     emd = torch.mean(torch.abs(emd))
     return emd
 
-def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
+def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):
     ''' Loss function for spectra supervision
         @Param
           loss: l1/l2 as specified in config
@@ -60,8 +64,10 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux):
                       (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
           recon_flux: [bsz,num_smpls]
     '''
-    weight = gt_spectra[:,3]
-    ret = loss(gt_spectra[:,1]*mask*weight, recon_flux*mask*weight)
+    if weight_by_wave_coverage:
+        weight = gt_spectra[:,3]
+        ret = loss(gt_spectra[:,1]*mask*weight, recon_flux*mask*weight)
+    else: ret = loss(gt_spectra[:,1]*mask, recon_flux*mask)
     return ret
 
 def redshift_supervision_loss(loss, gt_redshift, recon_redshift, mask=None):
@@ -74,7 +80,6 @@ def redshift_supervision_loss(loss, gt_redshift, recon_redshift, mask=None):
     '''
     if mask is None:
         return loss(gt_redshift, recon_redshift)
-    # print(gt_redshift, recon_redshift[mask])
     return loss(gt_redshift, recon_redshift[mask])
 
 def spectral_masking_loss(loss, relative_train_bands, relative_inpaint_bands,

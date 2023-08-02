@@ -323,27 +323,21 @@ class PatchData:
 
     def load_spectra_data(self):
         """ Load spectra fluxes and redshift values for all pixels with gt spectra.
-            TODO: previously sup_mask is different from plot_mask in that it also
-                  masks negative flux region. now we normalize all flux to positive
-                  these two are duplicate and we can leave only one.
         """
         path = self.spectra_obj.get_processed_spectra_path()
         cur_patch_spectra_fname = join(path, f"{self.patch_uid}.npy")
         cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
         cur_patch_img_coords_fname = join(path, f"{self.patch_uid}_img_coords.npy")
-        cur_patch_spectra_sup_masks_fname = join(path, f"{self.patch_uid}_sup_mask.npy")
         cur_patch_spectra_plot_masks_fname = join(path, f"{self.patch_uid}_plot_mask.npy")
 
         spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]
         redshift = np.load(cur_patch_redshift_fname)
         img_coords = np.load(cur_patch_img_coords_fname)
-        sup_masks = np.load(cur_patch_spectra_sup_masks_fname)
         plot_masks = np.load(cur_patch_spectra_plot_masks_fname)
 
         valid_spectra_ids = self.filter_spectra(img_coords)
         spectra = spectra[valid_spectra_ids]
         redshift = redshift[valid_spectra_ids]
-        sup_masks = sup_masks[valid_spectra_ids]
         plot_masks = plot_masks[valid_spectra_ids]
         img_coords = img_coords[valid_spectra_ids]
         pixel_ids = self.get_pixel_ids(img_coords[:,0], img_coords[:,1])
@@ -372,7 +366,6 @@ class PatchData:
         self.data["spectra_pixel_redshift"] = redshift
         self.data["spectra_pixel_wave"] = spectra[:,0]
         self.data["spectra_pixel_fluxes"] = spectra[:,1]
-        self.data["spectra_pixel_sup_masks"] = sup_masks
         self.data["spectra_pixel_plot_masks"] = plot_masks
 
     def get_world_coords(self):

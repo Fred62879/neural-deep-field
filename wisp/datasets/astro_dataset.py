@@ -231,9 +231,6 @@ class AstroDataset(Dataset):
         elif field == "spectra_sup_data":
             data = self.spectra_dataset.get_supervision_data()
             data = self.index_selected_data(data, idx)
-        elif field == "spectra_sup_mask":
-            data = self.spectra_dataset.get_supervision_mask()
-            data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_plot_mask":
             data = self.spectra_dataset.get_supervision_plot_mask()
             data = self.index_selected_data(data, idx)
@@ -265,9 +262,6 @@ class AstroDataset(Dataset):
                 out["spectra_sup_data"], sample_ids = batch_sample_torch(
                     out["spectra_sup_data"], self.kwargs["pretrain_num_wave_samples"],
                     keep_sample_ids=True)
-                out["spectra_sup_mask"] = batch_sample_torch(
-                    out["spectra_sup_mask"], self.kwargs["pretrain_num_wave_samples"],
-                    sample_ids=sample_ids)
                 out["spectra_sup_plot_mask"] = batch_sample_torch(
                     out["spectra_sup_plot_mask"], self.kwargs["pretrain_num_wave_samples"],
                     sample_ids=sample_ids)
