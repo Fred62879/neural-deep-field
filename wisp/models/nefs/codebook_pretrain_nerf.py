@@ -43,13 +43,15 @@ class CodebookPretrainNerf(BaseNeuralField):
             not self.kwargs["redshift_semi_supervision"]
 
         self.spatial_decoder = SpatialDecoder(
+            output_bias=False,
             output_scaler=False,
             qtz_calculate_loss=False,
             **self.kwargs)
 
         self.hps_decoder = HyperSpectralDecoder(
-            integrate=self.pixel_supervision,
             scale=False,
+            add_bias=False,
+            integrate=self.pixel_supervision,
             _model_redshift=self.model_redshift,
             **self.kwargs)
 

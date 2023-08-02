@@ -21,7 +21,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         Different from how the base_nef works,
           here we use either the positional encoding or the grid for encoding.
     """
-    def __init__(self, integrate=True, scale=True,
+    def __init__(self, integrate=True, scale=True, add_bias=True
                  qtz_calculate_loss=True, _model_redshfit=True, **kwargs):
         self.kwargs = kwargs
 
@@ -61,13 +61,16 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             **self.kwargs
         )
 
-    def init_decoder(self, integrate, scale, calculate_loss, _model_redshift):
+    def init_decoder(self, integrate, scale, add_bias, calculate_loss, _model_redshift):
         self.spatial_decoder = SpatialDecoder(
-            output_scaler=self.kwargs["generate_scaler"],
+            output_bias=add_bias,
+            output_scaler=scale,
             qtz_calculate_loss=calculate_loss, **self.kwargs
         )
         self.hps_decoder = HyperSpectralDecoder(
-            integrate=integrate, scale=scale,
+            scale=scale,
+            add_bias=add_bias,
+            integrate=integrate,
             _model_redshift=_model_redshift, **self.kwargs
         )
 

@@ -255,8 +255,8 @@ def define_cmd_line_args():
     ###################
     spatial_decod_group = parser.add_argument_group("quantization")
 
-    spatial_decod_group.add_argument("--generate-scaler", action="store_true")
-    # spatial_decod_group.add_argument("--generate-redshift", action="store_true")
+    spatial_decod_group.add_argument("--decode-bias", action="store_true")
+    spatial_decod_group.add_argument("--decode-scaler", action="store_true")
 
     spatial_decod_group.add_argument("--spatial-decod-hidden-dim", type=int)
     spatial_decod_group.add_argument("--spatial-decod-num-hidden-layers", type=int)

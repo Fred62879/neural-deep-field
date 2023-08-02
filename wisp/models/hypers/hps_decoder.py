@@ -14,12 +14,15 @@ from wisp.models.layers import Normalization, Quantization, get_layer_class
 
 class HyperSpectralDecoder(nn.Module):
 
-    def __init__(self, integrate=True, scale=True, _model_redshift=True, **kwargs):
+    def __init__(self, scale=True, add_bias=True, integrate=True,
+                 _model_redshift=True, **kwargs
+    ):
 
         super(HyperSpectralDecoder, self).__init__()
 
         self.kwargs = kwargs
         self.scale = scale
+        self.add_bias = add_bias
         self.qtz_spectra = kwargs["quantize_spectra"]
 
         self.convert = HyperSpectralConverter(
@@ -82,8 +85,9 @@ class HyperSpectralDecoder(nn.Module):
             skip=self.kwargs["decoder_skip_layers"]
         )
 
-    def reconstruct_spectra(self, input, wave, scaler, redshift, wave_bound, ret,
-                            codebook, qtz_args):
+    def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
+                            wave_bound, ret, codebook, qtz_args
+    ):
         """ Reconstruct spectra under given wave.
             @Param
                input: logits if qtz_spectra
@@ -110,6 +114,10 @@ class HyperSpectralDecoder(nn.Module):
             assert scaler is not None
             spectra = (scaler * spectra.T).T
 
+        if self.add_bias:
+            assert bias is not None
+            spectra = spectra + bias
+
         # spectra = self.norm(spectra)
         ret["spectra"] = spectra
 
@@ -121,14 +129,18 @@ class HyperSpectralDecoder(nn.Module):
             Latents that require full wave are placed at the end of the tensor.
         """
         latents = latents[-num_spectra_coords:]
+        bias = None if ret["bias"] is None else ret["bias"][-num_spectra_coords:]
         scaler = None if ret["scaler"] is None else ret["scaler"][-num_spectra_coords:]
         redshift = None if ret["redshift"] is None else ret["redshift"][-num_spectra_coords:]
         full_wave = full_wave[None,:,None].tile(num_spectra_coords,1,1)
 
         ret["spectra"] = self.reconstruct_spectra(
-            latents, full_wave, scaler, redshift, full_wave_bound, ret,
-            codebook, qtz_args)
+            latents, full_wave, scaler, bias, redshift,
+            full_wave_bound, ret, codebook, qtz_args
+        )
 
+        if ret["bias"] is not None:
+            ret["bias"] = ret["bias"][:-num_spectra_coords]
         if ret["scaler"] is not None:
             ret["scaler"] = ret["scaler"][:-num_spectra_coords]
         if ret["redshift"] is not None:
@@ -184,8 +196,8 @@ class HyperSpectralDecoder(nn.Module):
             if latents.shape[0] == 0: return
 
         self.reconstruct_spectra(
-            latents, wave, ret["scaler"], ret["redshift"], full_wave_bound, ret,
-            codebook, qtz_args)
+            latents, wave, ret["scaler"], ret["bias"], ret["redshift"],
+            full_wave_bound, ret, codebook, qtz_args)
         timer.check("hps_decoder::spectra reconstruced")
 
         intensity = self.inte(ret["spectra"], trans, trans_mask, nsmpl)

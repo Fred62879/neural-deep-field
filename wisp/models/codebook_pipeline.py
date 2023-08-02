@@ -19,13 +19,17 @@ class CodebookPipeline(nn.Module):
             self.kwargs["qtz_seed"], self.kwargs["qtz_num_embed"], self.kwargs["qtz_latent_dim"])
 
         self.spatial_decoder = SpatialDecoder(
+            output_bias=False,
             output_scaler=False,
             qtz_calculate_loss=False,
             output_redshift=self.kwargs["model_redshift"],
             **self.kwargs)
 
         self.hps_decoder = HyperSpectralDecoder(
-            integrate=False, scale=False, **self.kwargs)
+            scale=False,
+            add_bias=False,
+            integrate=False,
+            **self.kwargs)
 
     def forward(self, latents, wave, trans, nsmpl, full_wave_bound, codebook, qtz_args, ret):
         latents = self.spatial_decoder(latents, self.codebook, qtz_args, ret)
