@@ -6,7 +6,7 @@ from wisp.utils import PerfTimer
 from wisp.models.embedders import Encoder
 from wisp.models.decoders import Decoder
 from wisp.models.nefs import BaseNeuralField
-from wisp.models.layers import Normalization
+from wisp.models.layers import Intensifier
 
 
 class AstroNerf(BaseNeuralField):
@@ -29,7 +29,7 @@ class AstroNerf(BaseNeuralField):
 
         self.init_encoder()
         self.decoder = Decoder(**kwargs)
-        self.norm = Normalization(kwargs["mlp_output_norm_method"])
+        self.norm = Intensifier(kwargs["intensify_method"])
 
         torch.cuda.empty_cache()
 

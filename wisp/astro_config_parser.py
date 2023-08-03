@@ -31,10 +31,7 @@ def get_pretrain_pipelines(pipelines, tasks, args):
             **vars(args)
         )
         pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
-        # codebook_nef = CodebookNef(integrate=False, **vars(args))
-        # pipelines["codebook"] = AstroPipeline(codebook_nef)
 
-    # pipeline for codebook pretrain inferrence
     if "pretrain_infer" in tasks:
         pretrain_nef = CodebookPretrainNerf(
             args.codebook_pretrain_pixel_supervision, **vars(args))
@@ -45,7 +42,7 @@ def get_pretrain_pipelines(pipelines, tasks, args):
             pipelines["spectra_infer"] = AstroPipeline(spectra_nef)
 
         if "recon_codebook_spectra" in tasks:
-            codebook_nef = CodebookNef(integrate=False, **vars(args))
+            codebook_nef = CodebookNef(**vars(args))
             pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_nef)
         elif "recon_codebook_spectra_individ" in tasks:
             codebook_spectra_nef = CodebookPretrainNerf(False, **vars(args))
@@ -72,7 +69,7 @@ def get_main_train_pipelines(pipelines, tasks, args):
 
         # pipeline for codebook spectra inferrence
         if "recon_codebook_spectra" in tasks:
-            codebook_nef = CodebookNef(integrate=False, **vars(args))
+            codebook_nef = CodebookNef(**vars(args))
             pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_nef)
         elif "recon_codebook_spectra_individ" in tasks:
             codebook_nef = globals()[args.nef_type](

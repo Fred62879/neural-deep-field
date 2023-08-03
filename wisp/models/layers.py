@@ -120,23 +120,23 @@ def init_codebook(seed, num_embed, latent_dim):
         -1.0 / latent_dim, 1.0 / latent_dim)
     return qtz_codebook
 
-class Normalization(nn.Module):
-    def __init__(self, norm_method):
-        super(Normalization, self).__init__()
-        self.init_norm_layer(norm_method)
+class Intensifier(nn.Module):
+    def __init__(self, intensification_method):
+        super(Intensifier, self).__init__()
+        self.init_norm_layer(intensification_method)
 
-    def init_norm_layer(self, norm_method):
-        if norm_method == 'identity':
-            self.norm = nn.Identity()
-        elif norm_method == 'arcsinh':
-            self.norm = Fn(torch.arcsinh)
-        elif norm_method == 'sinh':
-            self.norm = Fn(torch.sinh)
+    def init_norm_layer(self, intensification_method):
+        if intensification_method == 'identity':
+            self.intensifier = nn.Identity()
+        elif intensification_method == 'arcsinh':
+            self.intensifier = Fn(torch.arcsinh)
+        elif intensification_method == 'sinh':
+            self.intensifier = Fn(torch.sinh)
         else:
-            raise ValueError('Unsupported normalization method.')
+            raise ValueError('Unsupported intensification method.')
 
     def forward(self, input):
-        return self.norm(input)
+        return self.intensifier(input)
 
 class Fn(nn.Module):
     def __init__(self, fn):

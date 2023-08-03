@@ -350,7 +350,9 @@ class AstroInferrer(BaseInferrer):
         self.perform_integration = False
         self.requested_fields = ["coords"]
 
-        if self.pretrain_infer:
+        if self.recon_codebook_spectra:
+            self.wave_source = "full_spectra"
+        elif self.pretrain_infer:
             self.wave_source = "spectra"
         else: self.wave_source = "trans"
 
@@ -360,7 +362,7 @@ class AstroInferrer(BaseInferrer):
 
         elif self.recon_codebook_spectra_individ:
             if self.pretrain_infer:
-                self.coords_source = "codebook_latents"
+                self.coords_source = "spectra_latents"
                 self.requested_fields.extend([
                     "spectra_sup_data",
                     "spectra_sup_redshift",
@@ -729,12 +731,20 @@ class AstroInferrer(BaseInferrer):
 
     def post_checkpoint_hardcode_coords_modified_model(self, model_id):
         # [(num_supervision_spectra,)num_embeds,nsmpl]
-        self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
-        if self.pretrain_infer:
+        self.codebook_spectra = torch.stack(
+            self.codebook_spectra).detach().cpu().numpy()
+
+        if self.recon_codebook_spectra:
+            n = self.extra_args["qtz_num_embed"]
+            spectra_wave =self.dataset.get_full_spectra_wave_coverage()
+            spectra_wave = spectra_wave[None,:].tile(n).reshape(n,-1)
+            enum = zip(spectra_wave, self.codebook_spectra)
+        elif self.pretrain_infer:
             spectra_wave = torch.stack(self.spectra_wave_c).view(
                 self.dataset_length, -1).detach().cpu().numpy()
             spectra_masks = torch.stack(self.spectra_masks_c).bool().view(
                 self.dataset_length, -1).detach().cpu().numpy()
+            enum = zip(spectra_wave, self.codebook_spectra, spectra_masks)
         else:
             num_spectra = self.cur_patch.get_num_spectra()
             spectra_wave = np.tile(
@@ -743,23 +753,30 @@ class AstroInferrer(BaseInferrer):
             spectra_masks = np.tile(
                 self.dataset.get_full_wave_masks(), num_spectra
             ).reshape(num_spectra, -1)
+            enum = zip(spectra_wave, self.codebook_spectra, spectra_masks)
 
-        # if spectra is 2d, add dummy 1st dim to simplify code
+        print(spectra_wave.shape, self.codebook_spectra.shape)
         if self.recon_codebook_spectra:
+            # if spectra is 2d, add dummy 1st dim to simplify code
             self.codebook_spectra = [self.codebook_spectra]
             prefix = ""
         else: prefix = "individ-"
 
-        for i, (wave, masks, codebook_spectra) in enumerate(
-                zip(spectra_wave, spectra_masks, self.codebook_spectra)
-        ):
-            # print(wave.shape, masks.shape, codebook_spectra.shape)
+        for i, obj in enumerate(enum):
+            if len(obj) == 3:
+                (wave, codebook_spectra, masks) = obj
+            else:
+                (wave, codebook_spectra) = obj
+                masks = None
+
             cur_dir = join(self.codebook_spectra_dir, f"spectra-{i}")
             Path(cur_dir).mkdir(parents=True, exist_ok=True)
 
             fname = f"{prefix}{model_id}"
-            wave = np.tile(wave, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
-            masks = np.tile(masks, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
+            if self.recon_codebook_spectra_individ:
+                wave = np.tile(wave, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
+                if masks is not None:
+                    masks = np.tile(masks, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
 
             self.dataset.plot_spectrum(
                 cur_dir, fname, self.extra_args["flux_norm_cho"],
@@ -767,7 +784,6 @@ class AstroInferrer(BaseInferrer):
                 mode=self.mode,
                 is_codebook=True,
                 save_spectra_together=True,
-                clip=self.extra_args["plot_clipped_spectrum"],
                 recon_masks=masks
             )
 
@@ -902,18 +918,19 @@ class AstroInferrer(BaseInferrer):
                         self.space_dim,
                         qtz=self.qtz,
                         qtz_strategy=self.qtz_strategy,
-                        apply_gt_redshift=self.apply_gt_redshift,
+                        apply_gt_redshift=self.recon_codebook_spectra_individ and \
+                                          self.apply_gt_redshift,
+                        save_spectra=self.recon_codebook_spectra,
                         save_codebook_spectra=self.recon_codebook_spectra_individ
                     )
 
                 if self.recon_codebook_spectra:
-                    spectra = ret["intensity"]
+                    spectra = ret["spectra"]
                 elif self.recon_codebook_spectra_individ:
                     spectra = ret["codebook_spectra"]
-                else: assert 0
                 self.codebook_spectra.extend(spectra)
 
-                if self.pretrain_infer:
+                if self.pretrain_infer and self.recon_codebook_spectra_individ:
                     self.spectra_wave_c.extend(data["spectra_sup_data"][:,0])
                     self.spectra_masks_c.extend(data["spectra_sup_plot_mask"])
 
@@ -948,7 +965,7 @@ class AstroInferrer(BaseInferrer):
             self.dataset.set_hardcode_data("selected_ids", ids)
 
     def _set_dataset_coords_pretrain(self, checkpoint):
-        """ Set spectra latent vars as input coords (for pretrain infer only).
+        """ Set spectra trainable latents as input coords (for pretrain infer only).
         """
         latents = checkpoint["latents"].weight
         self.dataset.set_hardcode_data(self.coords_source, latents)
@@ -957,7 +974,7 @@ class AstroInferrer(BaseInferrer):
         """ Set codebook weights as input coords (for codebook spectra recon only).
         """
         codebook_latents = load_layer_weights(
-            checkpoint['model_state_dict'], lambda n: "grid" not in n and "codebook" in n)
+            checkpoint["model_state_dict"], lambda n: "grid" not in n and "codebook" in n)
         codebook_latents = codebook_latents[:,None] # [num_embd, 1, latent_dim]
         codebook_latents = codebook_latents.detach().cpu().numpy()
         self.dataset.set_hardcode_data(self.coords_source, codebook_latents)
@@ -966,7 +983,6 @@ class AstroInferrer(BaseInferrer):
         # cur_patch_spectra_ids = self.dataset.get_validation_spectra_ids(self.cur_patch_uid)
         # cur_val_coords = self.dataset.get_validation_spectra_norm_world_coords(cur_patch_spectra_ids)
         cur_val_coords = self.dataset.get_coords()[self.val_spectra_map]
-        # print(cur_val_coords)
         self.dataset.set_hardcode_data(self.coords_source, cur_val_coords)
         self.num_cur_val_coords = len(cur_val_coords)
 

@@ -9,30 +9,36 @@ from wisp.models.decoders import Decoder, BasicDecoder
 from wisp.models.activations import get_activation_class
 from wisp.models.hypers.hps_converter import HyperSpectralConverter
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
-from wisp.models.layers import Normalization, Quantization, get_layer_class
+from wisp.models.layers import Intensifier, Quantization, get_layer_class
 
 
 class HyperSpectralDecoder(nn.Module):
 
-    def __init__(self, scale=True, add_bias=True, integrate=True,
-                 _model_redshift=True, **kwargs
+    def __init__(self, scale=True,
+                 add_bias=True,
+                 integrate=True,
+                 intensify=True,
+                 qtz_spectra=True,
+                 _model_redshift=True,
+                 **kwargs
     ):
-
         super(HyperSpectralDecoder, self).__init__()
 
         self.kwargs = kwargs
         self.scale = scale
         self.add_bias = add_bias
-        self.qtz_spectra = kwargs["quantize_spectra"]
+        self.intensify = intensify
+        self.qtz_spectra = qtz_spectra
 
         self.convert = HyperSpectralConverter(
             _model_redshift=_model_redshift, **kwargs
         )
         self.init_decoder()
-        # self.norm = Normalization(kwargs["mlp_output_norm_method"])
-        self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
         if self.qtz_spectra:
             self.qtz = Quantization(False, **kwargs)
+        if self.intensify:
+            self.intensifier = Intensifier(kwargs["intensification_method"])
+        self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
 
     def get_input_dim(self):
         if self.kwargs["space_dim"] == 2:
@@ -73,9 +79,9 @@ class HyperSpectralDecoder(nn.Module):
         return 1
 
     def init_decoder(self):
+        # self.spectra_decoder = Decoder(**kwargs)
         input_dim = self.get_input_dim()
         output_dim = self.get_output_dim()
-        # self.spectra_decoder = Decoder(**kwargs)
         self.spectra_decoder = BasicDecoder(
             input_dim, output_dim,
             get_activation_class(self.kwargs["decoder_activation_type"]),
@@ -113,12 +119,12 @@ class HyperSpectralDecoder(nn.Module):
         if self.scale:
             assert scaler is not None
             spectra = (scaler * spectra.T).T
-
         if self.add_bias:
             assert bias is not None
             spectra = spectra + bias
+        if self.intensify:
+            spectra = self.intensifier(spectra)
 
-        # spectra = self.norm(spectra)
         ret["spectra"] = spectra
 
     def forward_with_full_wave(self, latents, full_wave, full_wave_bound,

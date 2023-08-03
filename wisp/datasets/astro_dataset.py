@@ -141,6 +141,9 @@ class AstroDataset(Dataset):
     # def get_spectra_coord_ids(self):
     #     return self.spectra_dataset.get_spectra_coord_ids()
 
+    def get_full_spectra_wave_coverage(self):
+        return self.spectra_dataset.get_full_wave_coverage()
+
     def get_spectra_img_coords(self):
         return self.spectra_dataset.get_gt_spectra_img_coords()
 
@@ -251,7 +254,12 @@ class AstroDataset(Dataset):
         """
         out["wave_range"] = self.get_wave_range()
 
-        if self.wave_source == "spectra":
+        if self.wave_source == "full_spectra":
+            # for codebook spectra recon
+            bsz = out["coords"].shape[0]
+            out["wave"] = self.get_full_spectra_wave_coverage()[None,:,None].tile(bsz,1,1)
+
+        elif self.wave_source == "spectra":
             # spectra_sup_data: [bsz,4+2*nbands,nsmpl]
             #  (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
 

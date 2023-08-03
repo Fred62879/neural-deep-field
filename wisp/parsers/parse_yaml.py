@@ -128,8 +128,6 @@ def define_cmd_line_args():
 
     net_group.add_argument("--nef-type", type=str,
                            help="The neural field class to be used.")
-    net_group.add_argument("--mlp-output-norm-method", type=str,
-                           choices=["identity","arcsinh","sinh"])
 
     net_group.add_argument("--model-redshift", action="store_true",
                            help="whether the arch model redshift or not.")
@@ -299,6 +297,10 @@ def define_cmd_line_args():
                            help="method to combine ra/dec coordinate with lambda.")
     hps_group.add_argument("--integration-method", type=str,
                             choices=["identity","dot_prod","trapezoid","simpson"])
+    hps_group.add_argument("--intensify-intensity", action="store_true",
+                           help="intensify pixel value with to capture high dynamic range.")
+    hps_group.add_argument("--intensification-method", type=str,
+                           choices=["identity","arcsinh","sinh"])
 
     ###################
     # Arguments for dataset

@@ -21,8 +21,14 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         Different from how the base_nef works,
           here we use either the positional encoding or the grid for encoding.
     """
-    def __init__(self, integrate=True, scale=True, add_bias=True,
-                 qtz_calculate_loss=True, _model_redshfit=True, **kwargs):
+    def __init__(self, integrate=True,
+                 scale=True,
+                 add_bias=True,
+                 intensify=True,
+                 qtz_calculate_loss=True,
+                 _model_redshfit=True,
+                 **kwargs
+    ):
         self.kwargs = kwargs
 
         super(AstroHyperSpectralNerf, self).__init__()
@@ -30,7 +36,8 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         self.init_codebook()
         self.init_encoder()
         self.init_decoder(
-            integrate, scale, qtz_calculate_loss, _model_redshfit)
+            scale, add_bias, integrate, intensify, qtz_calculate_loss, _model_redshfit
+        )
         torch.cuda.empty_cache()
 
     def init_codebook(self):
@@ -61,7 +68,9 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             **self.kwargs
         )
 
-    def init_decoder(self, integrate, scale, add_bias, calculate_loss, _model_redshift):
+    def init_decoder(self, scale, add_bias, integrate,
+                     intensify, calculate_loss, _model_redshift
+    ):
         self.spatial_decoder = SpatialDecoder(
             output_bias=add_bias,
             output_scaler=scale,
@@ -71,7 +80,10 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             scale=scale,
             add_bias=add_bias,
             integrate=integrate,
-            _model_redshift=_model_redshift, **self.kwargs
+            intensify=intensify,
+            qtz_spectra=self.kwargs["quantize_spectra"],
+            _model_redshift=_model_redshift,
+            **self.kwargs
         )
 
     def get_nef_type(self):

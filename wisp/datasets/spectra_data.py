@@ -170,6 +170,11 @@ class SpectraData:
     # Getters
     #############
 
+    def get_full_wave_coverage(self):
+        """ Get full coverage range of emitted wave.
+        """
+        return self.data["full_emit_wave"]
+
     def get_processed_spectra_path(self):
         return self.processed_spectra_path
 
@@ -304,6 +309,7 @@ class SpectraData:
 
     def transform_data(self):
         self.to_tensor([
+            "full_emit_wave",
             "gt_spectra",
             "gt_spectra_pixels",
             "gt_spectra_redshift",
@@ -380,6 +386,8 @@ class SpectraData:
             ids = pickle.load(fp)
         self.data["gt_spectra_ids"] = defaultdict(list, ids)
 
+        self.data["full_emit_wave"] = np.load(self.emit_wave_coverage_fname)[0]
+
         self.data["gt_spectra"] = np.load(self.gt_spectra_fname)
         self.data["gt_spectra_pixels"] = np.load(self.gt_spectra_pixels_fname)
         self.data["gt_spectra_redshift"] = np.load(self.gt_spectra_redshift_fname)
@@ -415,6 +423,8 @@ class SpectraData:
                 np.load(join(self.processed_spectra_path, df.iloc[i]["img_coord_fname"])))
             world_coords.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["world_coord_fname"])))
+
+        self.data["full_emit_wave"] = np.load(self.emit_wave_coverage_fname)[0]
 
         # [n_spectra,4+2*nbands,nsmpl]
         #  (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
@@ -887,15 +897,18 @@ class SpectraData:
         """
         assert not clip or (recon_masks is not None or spectra_clipped)
 
+        print(recon_wave.shape, recon_fluxes.shape)
+
         n = len(recon_wave)
         if gt_wave is None: gt_wave = [None]*n
         if gt_masks is None: gt_masks = [None]*n
         if gt_fluxes is None: gt_fluxes = [None]*n
         if recon_masks is None: recon_masks = [None]*n
 
-        assert gt_fluxes is None or \
+        assert gt_fluxes[0] is None or \
             (len(gt_wave) == n and len(gt_fluxes) == n and len(gt_masks) == n)
-        assert len(recon_fluxes) == n and len(recon_masks) == n
+        assert recon_masks[0] is None or \
+            (len(recon_fluxes) == n and len(recon_masks) == n)
 
         if self.kwargs["plot_spectrum_together"]:
             ncols = min(n, self.kwargs["num_spectrum_per_row"])

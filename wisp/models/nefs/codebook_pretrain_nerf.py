@@ -52,6 +52,8 @@ class CodebookPretrainNerf(BaseNeuralField):
             scale=False,
             add_bias=False,
             integrate=self.pixel_supervision,
+            intensify=False,
+            qtz_spectra=self.kwargs["quantize_spectra"],
             _model_redshift=self.model_redshift,
             **self.kwargs)
 

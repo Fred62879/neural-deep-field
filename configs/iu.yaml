@@ -48,7 +48,6 @@ net:
     encode_coords: True
     coords_encode_method: 'grid' #'positional_encoding'
     wave_encode_method: 'positional_encoding'
-    mlp_output_norm_method: 'sinh'
     wave_multiplier: 10
 
 embedder:
@@ -134,6 +133,8 @@ spatial_decod:
 hyperspectral:
     hps_combine_method: 'concat'
     integration_method: 'dot_prod'
+    intensify_intensity: False
+    intensification_method: 'sinh'
 
 trainer:
     trainer_type: 'AstroTrainer'
@@ -201,7 +202,7 @@ trainer:
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_batch_size: 10 #4096 #20000 #36864
+    infer_batch_size: 4096 #20000 #36864
     infer_use_all_wave: True # enforced
     infer_last_model_only: True
 
