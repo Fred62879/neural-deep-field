@@ -175,6 +175,11 @@ class SpectraData:
         """
         return self.data["full_emit_wave"]
 
+    def get_full_wave_mask(self):
+        """ Get mask for full (used for codebook spectra plotting).
+        """
+        return self.data["full_emit_wave_mask"]
+
     def get_processed_spectra_path(self):
         return self.processed_spectra_path
 
@@ -303,6 +308,7 @@ class SpectraData:
             # data for all spectra are saved together (small amount of spectra)
             self.load_cached_spectra_data()
 
+        self.get_full_emit_wave_mask()
         self.num_gt_spectra = len(self.data["gt_spectra"])
         self.transform_data()
         self.train_valid_split()
@@ -316,6 +322,7 @@ class SpectraData:
             "gt_spectra_world_coords"
         ], torch.float32)
         self.to_tensor([
+            "full_emit_wave_mask",
             "gt_spectra_plot_mask",
         ], torch.bool)
 
@@ -378,6 +385,18 @@ class SpectraData:
         self.data["validation_norm_world_coords"] = self.data["gt_spectra_norm_world_coords"][val_ids]
         if self.kwargs["redshift_semi_supervision"]:
             self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
+
+    def get_full_emit_wave_mask(self):
+        """ Generate mask for codebook spectra plot.
+        """
+        n = len(self.data["full_emit_wave"])
+        self.data["full_emit_wave_mask"] = np.zeros(n)
+        (id_lo, id_hi) = get_bound_id(
+            (self.kwargs["codebook_spectra_plot_wave_lo"],
+             self.kwargs["codebook_spectra_plot_wave_hi"]),
+            self.data["full_emit_wave"]
+        )
+        self.data["full_emit_wave_mask"][id_lo:id_hi+1] = 1
 
     def load_cached_spectra_data(self):
         """ Load spectra data (which are saved together).
@@ -896,8 +915,6 @@ class SpectraData:
               spectra_clipped: whether or not spectra is already clipped to
         """
         assert not clip or (recon_masks is not None or spectra_clipped)
-
-        print(recon_wave.shape, recon_fluxes.shape)
 
         n = len(recon_wave)
         if gt_wave is None: gt_wave = [None]*n

@@ -12,7 +12,7 @@ from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
 from wisp.datasets.data_utils import clip_data_to_ref_wave_range, \
-    get_wave_range_fname, batch_sample_torch
+    get_wave_range_fname, batch_sample_torch, get_bound_id
 
 
 class AstroDataset(Dataset):
@@ -141,6 +141,9 @@ class AstroDataset(Dataset):
     # def get_spectra_coord_ids(self):
     #     return self.spectra_dataset.get_spectra_coord_ids()
 
+    def get_full_spectra_wave_mask(self):
+        return self.spectra_dataset.get_full_wave_mask()
+
     def get_full_spectra_wave_coverage(self):
         return self.spectra_dataset.get_full_wave_coverage()
 
@@ -256,8 +259,12 @@ class AstroDataset(Dataset):
 
         if self.wave_source == "full_spectra":
             # for codebook spectra recon
+            mask = self.get_full_spectra_wave_mask()
+            full_wave = self.get_full_spectra_wave_coverage()
+
             bsz = out["coords"].shape[0]
-            out["wave"] = self.get_full_spectra_wave_coverage()[None,:,None].tile(bsz,1,1)
+            out["wave"] = full_wave[None,:,None].tile(bsz,1,1)
+            out["spectra_sup_plot_mask"] = mask[None,:].tile(bsz,1)
 
         elif self.wave_source == "spectra":
             # spectra_sup_data: [bsz,4+2*nbands,nsmpl]

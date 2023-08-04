@@ -293,9 +293,15 @@ class CodebookTrainer(BaseTrainer):
 
         if self.plot_loss:
             x = np.arange(len(self.losses))
-            plt.plot(x, self.losses)
+            plt.plot(x, self.losses); plt.title("Loss")
             plt.savefig(self.loss_fname + ".png")
+            plt.close()
             np.save(self.loss_fname + ".npy", np.array(self.losses))
+
+            plt.plot(x, np.log10(np.array(self.losses)))
+            plt.title("Log10 loss")
+            plt.savefig(self.loss_fname + "_log10.png")
+            plt.close()
 
         if self.extra_args["log_gpu_every"] != -1:
             nvidia_smi.nvmlShutdown()

@@ -397,6 +397,8 @@ def define_cmd_line_args():
     data_group.add_argument("--processed-spectra-cho", type=str)
     data_group.add_argument("--spectra-supervision-wave-lo", type=int)
     data_group.add_argument("--spectra-supervision-wave-hi", type=int)
+    data_group.add_argument("--codebook-spectra-plot-wave-lo", type=int)
+    data_group.add_argument("--codebook-spectra-plot-wave-hi", type=int)
     data_group.add_argument("--load-spectra-data-from-cache", action="store_true")
 
     ###################

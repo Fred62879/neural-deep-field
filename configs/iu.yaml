@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'save_pixel_values_during_train','recon_gt_spectra_during_train'] #,'save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_codebook_spectra'] #'recon_gt_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #,'save_qtz_weights'] #,'save_redshift','recon_img']
+    tasks: ['pretrain_infer','recon_codebook_spectra','recon_gt_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #,'save_qtz_weights','save_redshift','recon_img']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -144,17 +144,17 @@ trainer:
     pixel_loss_cho: l1_mean
     spectra_loss_cho: l2_mean
     redshift_loss_cho: l2_mean
-    num_epochs: 3000
+    num_epochs: 10000
     batch_size: 40960 #65536 #262144
-    pretrain_batch_size: 300
+    pretrain_batch_size: 1000
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 300
+    log_cli_every: 1000
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 300
+    save_model_every: 1000
     save_as_new: True
 
     train_with_all_pixels: True
@@ -315,6 +315,8 @@ spectra_data:
     processed_spectra_cho: "debug5" #"v7_table"
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
+    codebook_spectra_plot_wave_lo: 2000
+    codebook_spectra_plot_wave_hi: 10000
     load_spectra_data_from_cache: True
     # debug1: 300 spectra [9812][0,1][0-8] unnormed
     # debug2: 300 spectra [9812][0,1][0-8] normed

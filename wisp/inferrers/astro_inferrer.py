@@ -66,10 +66,12 @@ class AstroInferrer(BaseInferrer):
 
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","recon_synthetic_dir","metric_dir", "spectra_dir",
-                 "codebook_spectra_dir", "embed_map_dir","latent_dir",
+                 "codebook_spectra_dir", "codebook_spectra_individ_dir",
+                 "embed_map_dir","latent_dir",
                  "redshift_dir","latent_embed_dir","zoomed_recon_dir",
                  "scaler_dir","pixel_distrib_dir","qtz_weights_dir"],
-                ["models","recons","recon_synthetic","metrics","spectra","codebook_spectra",
+                ["models","recons","recon_synthetic","metrics","spectra",
+                 "codebook_spectra","codebook_spectra_individ",
                  "embed_map","latents","redshift","latent_embed","zoomed_recon",
                  "scaler","pixel_distrib","qtz_weights"]
         ):
@@ -716,10 +718,14 @@ class AstroInferrer(BaseInferrer):
 
     def pre_checkpoint_hardcode_coords_modified_model(self, model_id):
         self.reset_data_iterator()
+        self.redshift = [] # for debug purpose
         self.codebook_spectra = []
-        if self.pretrain_infer:
+        if self.recon_codebook_spectra:
             self.spectra_wave_c = []
             self.spectra_masks_c = []
+        if self.recon_codebook_spectra_individ and self.pretrain_infer:
+            self.spectra_wave_ci = []
+            self.spectra_masks_ci = []
 
     def run_checkpoint_hardcode_coords_modified_model(self, model_id, checkpoint):
         if self.recon_codebook_spectra:
@@ -734,17 +740,33 @@ class AstroInferrer(BaseInferrer):
         self.codebook_spectra = torch.stack(
             self.codebook_spectra).detach().cpu().numpy()
 
+        if self.recon_codebook_spectra_individ: # debug purpose
+            self.redshift = torch.stack(self.redshift).detach().cpu().numpy()
+            print(self.redshift)
+
         if self.recon_codebook_spectra:
-            n = self.extra_args["qtz_num_embed"]
-            spectra_wave =self.dataset.get_full_spectra_wave_coverage()
-            spectra_wave = spectra_wave[None,:].tile(n).reshape(n,-1)
-            enum = zip(spectra_wave, self.codebook_spectra)
-        elif self.pretrain_infer:
             spectra_wave = torch.stack(self.spectra_wave_c).view(
                 self.dataset_length, -1).detach().cpu().numpy()
             spectra_masks = torch.stack(self.spectra_masks_c).bool().view(
                 self.dataset_length, -1).detach().cpu().numpy()
+
+            # if spectra is 2d, add dummy 1st dim to simplify code
+            enum = zip([spectra_wave], [self.codebook_spectra], [spectra_masks])
+            dir = self.codebook_spectra_dir
+            fname = str(model_id) + "_" + \
+                str(self.extra_args["codebook_spectra_plot_wave_lo"]) + "_" + \
+                str(self.extra_args["codebook_spectra_plot_wave_hi"])
+
+        elif self.pretrain_infer:
+            spectra_wave = torch.stack(self.spectra_wave_ci).view(
+                self.dataset_length, -1).detach().cpu().numpy()
+            spectra_masks = torch.stack(self.spectra_masks_ci).bool().view(
+                self.dataset_length, -1).detach().cpu().numpy()
+
             enum = zip(spectra_wave, self.codebook_spectra, spectra_masks)
+            dir = self.codebook_spectra_individ_dir
+            fname = f"{model_id}"
+
         else:
             num_spectra = self.cur_patch.get_num_spectra()
             spectra_wave = np.tile(
@@ -753,38 +775,28 @@ class AstroInferrer(BaseInferrer):
             spectra_masks = np.tile(
                 self.dataset.get_full_wave_masks(), num_spectra
             ).reshape(num_spectra, -1)
-            enum = zip(spectra_wave, self.codebook_spectra, spectra_masks)
 
-        print(spectra_wave.shape, self.codebook_spectra.shape)
-        if self.recon_codebook_spectra:
-            # if spectra is 2d, add dummy 1st dim to simplify code
-            self.codebook_spectra = [self.codebook_spectra]
-            prefix = ""
-        else: prefix = "individ-"
+            enum = zip(spectra_wave, self.codebook_spectra, spectra_masks)
+            dir = self.codebook_spectra_individ_dir
+            fname = f"{model_id}"
 
         for i, obj in enumerate(enum):
-            if len(obj) == 3:
-                (wave, codebook_spectra, masks) = obj
-            else:
-                (wave, codebook_spectra) = obj
-                masks = None
-
-            cur_dir = join(self.codebook_spectra_dir, f"spectra-{i}")
-            Path(cur_dir).mkdir(parents=True, exist_ok=True)
-
-            fname = f"{prefix}{model_id}"
+            (wave, codebook_spectra, masks) = obj
             if self.recon_codebook_spectra_individ:
                 wave = np.tile(wave, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
                 if masks is not None:
                     masks = np.tile(masks, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
 
+            cur_dir = join(dir, f"spectra-{i}")
+            Path(cur_dir).mkdir(parents=True, exist_ok=True)
             self.dataset.plot_spectrum(
                 cur_dir, fname, self.extra_args["flux_norm_cho"],
                 None, None, wave, codebook_spectra,
                 mode=self.mode,
                 is_codebook=True,
                 save_spectra_together=True,
-                recon_masks=masks
+                recon_masks=masks,
+                clip=self.extra_args["plot_clipped_spectrum"]
             )
 
     #############
@@ -930,9 +942,15 @@ class AstroInferrer(BaseInferrer):
                     spectra = ret["codebook_spectra"]
                 self.codebook_spectra.extend(spectra)
 
-                if self.pretrain_infer and self.recon_codebook_spectra_individ:
-                    self.spectra_wave_c.extend(data["spectra_sup_data"][:,0])
+                if self.recon_codebook_spectra:
+                    self.spectra_wave_c.extend(data["wave"])
                     self.spectra_masks_c.extend(data["spectra_sup_plot_mask"])
+                else: # if self.recon_codebook_spectra_individ:
+                    if self.pretrain_infer:
+                        # self.spectra_wave_ci.extend(data["spectra_sup_data"][:,0])
+                        self.spectra_wave_ci.extend(data["wave"])
+                        self.spectra_masks_ci.extend(data["spectra_sup_plot_mask"])
+                        self.redshift.extend(data["spectra_sup_redshift"])
 
             except StopIteration:
                 log.info("codebook spectra forward done")
