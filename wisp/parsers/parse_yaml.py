@@ -241,6 +241,7 @@ def define_cmd_line_args():
     qtz_group = parser.add_argument_group("quantization")
 
     qtz_group.add_argument("--quantization-strategy", type=str)
+    qtz_group.add_argument("--quantization-calculate-loss", action="store_true")
     qtz_group.add_argument("--qtz-latent-dim", type=int)
     qtz_group.add_argument("--qtz-num-embed", type=int)
     qtz_group.add_argument("--qtz-beta", type=float, help="codebook loss weight")

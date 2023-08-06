@@ -18,10 +18,14 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
 
 from wisp.datasets import default_collate
 from wisp.datasets.patch_data import PatchData
+from wisp.datasets.data_utils import get_coords_range_fname
+
+from wisp.utils.numerical import normalize_coords
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
-from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     load_pretrained_model_weights, forward, print_shape, create_patch_uid
+
+from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
 
@@ -57,7 +61,7 @@ class AstroTrainer(BaseTrainer):
         assert self.use_all_pixels and extra_args["train_pixel_ratio"] == 1
 
         self.summarize_training_tasks()
-        self.set_log_path()
+        self.set_path()
 
         self.init_net()
         self.init_loss()
@@ -160,7 +164,7 @@ class AstroTrainer(BaseTrainer):
         self.save_latents = self.pixel_supervision and self.qtz and \
             ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
         self.save_scaler = self.pixel_supervision and self.qtz and \
-            self.extra_args["generate_scaler"] and "save_scaler_during_train" in tasks
+            self.extra_args["decode_scaler"] and "save_scaler_during_train" in tasks
         self.save_redshift =  self.qtz and self.extra_args["model_redshift"] and \
             "save_redshift_during_train" in tasks
 
@@ -184,7 +188,7 @@ class AstroTrainer(BaseTrainer):
         if self.spectra_supervision:
             self.num_supervision_spectra = self.extra_args["num_supervision_spectra"]
 
-    def set_log_path(self):
+    def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         log.info(f"logging to {self.log_dir}")
 
@@ -201,6 +205,7 @@ class AstroTrainer(BaseTrainer):
             Path(path).mkdir(parents=True, exist_ok=True)
 
         self.grad_fname = join(self.log_dir, "grad.png")
+        self.coords_range_fname = get_coords_range_fname(**self.extra_args)
 
         if self.plot_loss:
             self.loss_fname = join(self.log_dir, "loss")
@@ -306,8 +311,14 @@ class AstroTrainer(BaseTrainer):
 
         if self.plot_loss:
             x = np.arange(len(self.losses))
-            plt.plot(x, self.losses)
+            plt.plot(x, self.losses); plt.title("Loss")
             plt.savefig(self.loss_fname + ".png")
+            plt.close()
+
+            plt.plot(x, np.log10(self.losses)); plt.title("Log10 loss")
+            plt.savefig(self.loss_fname + "_1og10.png")
+            plt.close()
+
             np.save(self.loss_fname + ".npy", self.losses)
 
         if self.extra_args["log_gpu_every"] != -1:
@@ -563,11 +574,13 @@ class AstroTrainer(BaseTrainer):
 
     def set_coords(self):
         if self.train_spectra_pixels_only:
-            self.dataset.set_coords_source("spectra_coords")
-            self.dataset.set_hardcode_data(
-                "spectra_coords",
-                self.dataset.get_validation_spectra_norm_world_coords()
+            coords_range = np.load(self.coords_range_fname)
+            world_coords = self.dataset.get_validation_spectra_world_coords()
+            norm_world_coords, _ = normalize_coords(
+                world_coords, coords_range=coords_range
             )
+            self.dataset.set_coords_source("spectra_coords")
+            self.dataset.set_hardcode_data("spectra_coords", norm_world_coords)
         else:
             self.dataset.set_coords_source("fits")
 

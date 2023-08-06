@@ -23,7 +23,8 @@ from wisp.datasets.data_utils import set_input_path, add_dummy_dim, \
 
 
 class FitsData:
-    """ Data class for all selected patches. """
+    """ Data class for all selected patches.
+    """
     def __init__(self, device, spectra_obj=None, **kwargs):
         self.kwargs = kwargs
         self.qtz = kwargs["quantize_latent"] or kwargs["quantize_spectra"]
@@ -645,29 +646,6 @@ class FitsData:
             spectra_bin_map.append(cur_patch.get_spectra_bin_map())
             spectra_pixel_fluxes.append(cur_patch.get_spectra_pixel_fluxes())
             spectra_pixel_redshift.append(cur_patch.get_spectra_pixel_redshift())
-
-    ##############
-    # Load redshift
-    ##############
-
-    # def get_redshift_one_patch(self, id, patch_uid):
-    #     if self.use_full_patch:
-    #         num_rows, num_cols = self.num_rows[patch_uid], self.num_cols[patch_uid]
-    #         redshift = -1 * np.ones((num_rows, num_cols))
-    #     else:
-    #         num_rows = self.patch_cutout_num_rows[index]
-    #         num_cols = self.patch_cutout_num_cols[index]
-    #         redshift = -1 * np.ones((num_rows, num_cols))
-
-    #     return redshift
-
-    # def get_redshift_all_patch(self):
-    #     """ Load dummy redshift values for now.
-    #     """
-    #     redshift = [ self.get_redshift_one_patch(id, patch_uid)
-    #                  for id, patch_uid in enumerate(self.patch_uids) ]
-    #     redshift = np.array(redshift).flatten()
-    #     self.data["redshift"] = torch.FloatTensor(redshift)
 
 # PATCH class ends
 #################

@@ -12,11 +12,10 @@ from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
 class CodebookPretrainNerf(BaseNeuralField):
-    def __init__(self, pretrain_pixel_supervision, _model_redshift=True, **kwargs):
+    def __init__(self, pretrain_pixel_supervision, **kwargs):
         super(CodebookPretrainNerf, self).__init__()
 
         self.kwargs = kwargs
-        self.model_redshift = _model_redshift
         self.pixel_supervision = pretrain_pixel_supervision
         self.init_model()
 
@@ -54,7 +53,7 @@ class CodebookPretrainNerf(BaseNeuralField):
             integrate=self.pixel_supervision,
             intensify=False,
             qtz_spectra=self.kwargs["quantize_spectra"],
-            _model_redshift=self.model_redshift,
+            _model_redshift=self.kwargs["model_redshift"],
             **self.kwargs)
 
     def pretrain(self, coords, wave, wave_range,

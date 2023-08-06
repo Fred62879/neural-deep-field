@@ -121,7 +121,7 @@ class HyperSpectralDecoder(nn.Module):
             spectra = (scaler * spectra.T).T
         if self.add_bias:
             assert bias is not None
-            spectra = spectra + bias
+            spectra = spectra + bias[:,None]
         if self.intensify:
             spectra = self.intensifier(spectra)
 

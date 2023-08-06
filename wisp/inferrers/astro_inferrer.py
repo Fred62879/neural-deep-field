@@ -83,7 +83,7 @@ class AstroInferrer(BaseInferrer):
         self.model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames = sort_alphanumeric(self.model_fnames)
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames[-1:]
+            self.selected_model_fnames = self.selected_model_fnames #[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -102,7 +102,6 @@ class AstroInferrer(BaseInferrer):
         self.main_infer = self.mode == "infer"
         self.pretrain_infer = self.mode == "pretrain_infer"
         assert (self.main_infer ^ self.pretrain_infer)
-        self.infer_selected = self.extra_args["infer_selected"]
 
         # quantization setups
         self.qtz_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
@@ -250,6 +249,7 @@ class AstroInferrer(BaseInferrer):
             self.recon_img_sup_spectra or self.recon_img_valid_spectra
 
         self.requested_fields = ["coords"]
+        self.infer_selected = False
 
         if self.pretrain_infer:
             self.wave_source = "spectra"
@@ -326,14 +326,18 @@ class AstroInferrer(BaseInferrer):
             self.wave_source = "spectra"
             self.coords_source = "spectra_train"
             # pretrain coords set using checkpoint
+
+            self.infer_selected = self.extra_args["infer_selected"]
             if self.infer_selected:
                 self.dataset_length = self.extra_args["pretrain_num_infer"]
             else: self.dataset_length = self.num_sup_spectra
+
         else: # self.main_infer
             self.wave_source = "trans"
             self.coords_source = "spectra_valid"
             self._set_dataset_coords_cur_val_coords()
             self.dataset_length = self.num_cur_val_coords
+            self.infer_selected = False
 
         if not self.extra_args["infer_spectra_individually"]:
             self.batch_size = min(
@@ -361,8 +365,9 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             self.coords_source = "codebook_latents"
             self.dataset_length = self.qtz_n_embd
+            self.infer_selected = False
 
-        elif self.recon_codebook_spectra_individ:
+        else: # elif self.recon_codebook_spectra_individ:
             if self.pretrain_infer:
                 self.coords_source = "spectra_latents"
                 self.requested_fields.extend([
@@ -370,6 +375,7 @@ class AstroInferrer(BaseInferrer):
                     "spectra_sup_redshift",
                     "spectra_sup_plot_mask"
                 ])
+                self.infer_selected = self.extra_args["infer_selected"]
 
                 if self.infer_selected:
                     self.dataset_length = self.extra_args["pretrain_num_infer"]
@@ -380,6 +386,7 @@ class AstroInferrer(BaseInferrer):
                 self.coords_source = "spectra_valid"
                 self._set_dataset_coords_cur_val_coords()
                 self.dataset_length = self.num_cur_val_coords
+                self.infer_selected = False
 
         self.batch_size = min(self.extra_args["infer_batch_size"], self.dataset_length)
         self.reset_dataloader()
@@ -901,6 +908,7 @@ class AstroInferrer(BaseInferrer):
                 self.recon_fluxes.extend(fluxes)
                 if self.save_redshift_pre:
                     self.redshift.extend(ret["redshift"])
+                    self.gt_redshift.extend(data["spectra_sup_redshift"])
                 if self.save_qtz_weights:
                     self.qtz_weights.extend(ret["qtz_weights"])
 
@@ -973,6 +981,7 @@ class AstroInferrer(BaseInferrer):
         self.dataset.set_coords_source(self.coords_source)
         self.dataset.toggle_wave_sampling(not self.use_full_wave)
         self.dataset.toggle_integration(self.perform_integration)
+        self.dataset.toggle_selected_inferrence(self.infer_selected)
 
         # select the same random set of spectra to recon
         if self.pretrain_infer and self.infer_selected:
@@ -998,8 +1007,6 @@ class AstroInferrer(BaseInferrer):
         self.dataset.set_hardcode_data(self.coords_source, codebook_latents)
 
     def _set_dataset_coords_cur_val_coords(self):
-        # cur_patch_spectra_ids = self.dataset.get_validation_spectra_ids(self.cur_patch_uid)
-        # cur_val_coords = self.dataset.get_validation_spectra_norm_world_coords(cur_patch_spectra_ids)
         cur_val_coords = self.dataset.get_coords()[self.val_spectra_map]
         self.dataset.set_hardcode_data(self.coords_source, cur_val_coords)
         self.num_cur_val_coords = len(cur_val_coords)

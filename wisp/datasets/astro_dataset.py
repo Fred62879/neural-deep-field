@@ -16,9 +16,7 @@ from wisp.datasets.data_utils import clip_data_to_ref_wave_range, \
 
 
 class AstroDataset(Dataset):
-    """ This is a static astronomy image dataset class.
-        This class should be used for training tasks where the task is to fit
-          a astro image with 2d architectures.
+    """ Wrapper dataset class for astronomy data.
     """
     def __init__(self,
                  device                   : str,
@@ -68,6 +66,7 @@ class AstroDataset(Dataset):
         self.coords_source = "fits"
         self.sample_wave = False
         self.use_full_wave = True
+        self.infer_selected = False
         self.perform_integration = True
         self.use_predefined_wave_range = False
 
@@ -110,6 +109,9 @@ class AstroDataset(Dataset):
     def toggle_wave_sampling(self, sample_wave: bool):
         self.sample_wave = sample_wave
         self.use_full_wave = not sample_wave
+
+    def toggle_selected_inferrence(self, infer_selected: bool):
+        self.infer_selected = infer_selected
 
     ############
     # Getters
@@ -156,17 +158,14 @@ class AstroDataset(Dataset):
     def get_validation_spectra_img_coords(self, idx=None):
         return self.spectra_dataset.get_validation_img_coords(idx)
 
-    def get_validation_spectra_norm_world_coords(self, idx=None):
-        return self.spectra_dataset.get_validation_norm_world_coords(idx)
+    def get_validation_spectra_world_coords(self, idx=None):
+        return self.spectra_dataset.get_validation_world_coords(idx)
 
     def get_validation_spectra_fluxes(self, idx=None):
         return self.spectra_dataset.get_validation_fluxes(idx)
 
     def get_validation_spectra_pixels(self, idx=None):
         return self.spectra_dataset.get_validation_pixels(idx)
-
-    def get_supervision_spectra_coords(self):
-        return self.spectra_dataset.get_supervision_norm_world_coords()
 
     def get_supervision_spectra_pixels(self):
         return self.spectra_dataset.get_supervision_pixels()
@@ -214,7 +213,7 @@ class AstroDataset(Dataset):
                selected_ids: select from source data (filter index)
                idx: dataset index (batch index)
         """
-        if self.mode == "pretrain_infer" and self.kwargs["infer_selected"]:
+        if self.mode == "pretrain_infer" and self.infer_selected:
             assert "selected_ids" in self.data
             data = data[self.data["selected_ids"]]
         return data[idx]

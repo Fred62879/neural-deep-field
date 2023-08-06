@@ -49,28 +49,19 @@ class SpatialDecoder(nn.Module):
         if self.quantize_z:
             self.qtz = Quantization(self.qtz_calculate_loss, **self.kwargs)
 
-        if self.output_bias:
-            self.init_bias_decoder()
-
-        if self.output_scaler:
+        if self.output_scaler or self.output_bias:
             self.init_scaler_decoder()
 
         if not self.apply_gt_redshift:
             self.init_redshift_decoder()
 
-    def init_bias_decoder(self):
-        self.bias_decoder = BasicDecoder(
-            self.input_dim, 1,
-            get_activation_class(self.kwargs["bias_decod_activation_type"]),
-            bias=True, layer=get_layer_class(self.kwargs["bias_decod_layer_type"]),
-            num_layers=self.kwargs["bias_decod_num_hidden_layers"] + 1,
-            hidden_dim=self.kwargs["bias_decod_hidden_dim"],
-            skip=self.kwargs["bias_decod_skip_layers"]
-        )
-
     def init_scaler_decoder(self):
+        output_dim = 0
+        if self.output_bias: output_dim += 1
+        if self.output_scaler: output_dim += 1
+
         self.scaler_decoder = BasicDecoder(
-            self.input_dim, 1,
+            self.input_dim, output_dim,
             get_activation_class(self.kwargs["scaler_decod_activation_type"]),
             bias=True, layer=get_layer_class(self.kwargs["scaler_decod_layer_type"]),
             num_layers=self.kwargs["scaler_decod_num_hidden_layers"] + 1,
@@ -124,15 +115,14 @@ class SpatialDecoder(nn.Module):
         timer.reset()
 
         # forward scaler
-        if self.output_scaler:
-            scaler = self.scaler_decoder(z[:,0])[...,0]
-        else: scaler = None
+        scaler, bias = None, None
+        if self.output_scaler or self.output_bias:
+            out = self.scaler_decoder(z[:,0])
+            if self.output_scaler:
+                scaler = out[...,0]
+                if self.output_bias:
+                    bias = out[...,1]
         timer.check("spatial_decod::scaler done")
-
-        if self.output_bias:
-            bias = self.bias_decoder(z[:,0][...,0])
-        else: bias = None
-        timer.check("spatial_decod::bias done")
 
         # forward redshift
         if self.apply_gt_redshift:   # dont generate redshift

@@ -14,8 +14,7 @@ from wisp.utils.common import create_patch_uid
 from wisp.utils.numerical import normalize_coords
 from wisp.datasets.data_utils import add_dummy_dim, \
     set_input_path, patch_exists, get_bound_id, \
-    clip_data_to_ref_wave_range, get_wave_range_fname, \
-    get_coords_range_fname
+    clip_data_to_ref_wave_range, get_wave_range_fname
 
 from pathlib import Path
 from astropy.io import fits
@@ -137,7 +136,6 @@ class SpectraData:
 
         else: raise ValueError("Unsupported spectra data source choice.")
 
-        self.coords_range_fname = get_coords_range_fname(**self.kwargs)
         self.emit_wave_coverage_fname = join(
             processed_data_path,
             "emit_wave_coverage_" +
@@ -222,11 +220,6 @@ class SpectraData:
             return self.data["supervision_redshift"]
         return self.data["supervision_redshift"][idx]
 
-    def get_supervision_norm_world_coords(self, idx=None):
-        if idx is not None:
-            return self.data["supervision_norm_world_coords"][idx]
-        return self.data["supervision_norm_world_coords"]
-
 
     def get_validation_spectra_ids(self, patch_uid=None):
         """ Get id of validation spectra in given patch.
@@ -251,10 +244,10 @@ class SpectraData:
             return self.data["validation_img_coords"][idx]
         return self.data["validation_img_coords"]
 
-    def get_validation_norm_world_coords(self, idx=None):
+    def get_validation_world_coords(self, idx=None):
         if idx is not None:
-            return self.data["validation_norm_world_coords"][idx]
-        return self.data["validation_norm_world_coords"]
+            return self.data["validation_world_coords"][idx]
+        return self.data["validation_world_coords"]
 
     def get_semi_supervision_redshift(self):
         return self.data["semi_supervision_redshift"]
@@ -285,7 +278,6 @@ class SpectraData:
               iii) finally we do necessary transformations.
         """
         # self.find_full_wave_bound_ids()
-        self.coords_range = np.load(self.coords_range_fname)
 
         if not self.load_spectra_data_from_cache or \
            not exists(self.emit_wave_coverage_fname) or \
@@ -319,7 +311,7 @@ class SpectraData:
             "gt_spectra",
             "gt_spectra_pixels",
             "gt_spectra_redshift",
-            "gt_spectra_world_coords"
+            # "gt_spectra_world_coords"
         ], torch.float32)
         self.to_tensor([
             "full_emit_wave_mask",
@@ -336,12 +328,6 @@ class SpectraData:
 
     def split_spectra(self):
         ids = np.arange(self.num_gt_spectra)
-        # n = min(self.kwargs["num_supervision_spectra"], self.num_gt_spectra)
-        # np.random.shuffle(ids)
-        # self.num_supervision_spectra = n
-        # self.num_validation_spectra = self.num_gt_spectra - n
-        # supervision_ids = ids[:n]
-        # validation_ids = ids[n:]
 
         acc, validation_ids, validation_patch_ids = 0, [], {}
         for tract, patch in zip(self.kwargs["tracts"], self.kwargs["patches"]):
@@ -351,7 +337,7 @@ class SpectraData:
             validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
             acc += len(cur_spectra_ids)
         validation_ids = np.array(validation_ids)
-        validation_ids = np.array([0])
+        # validation_ids = np.array([0])
         log.info(f"validation spectra ids: {validation_ids}")
 
         # get supervision ids
@@ -359,7 +345,7 @@ class SpectraData:
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra"]]
         # supervision_ids = np.array([14,22,31]) # 14,22 fail /31 succeed
-        log.info(f"supervision spectra ids: {supervision_ids}")
+        # log.info(f"supervision spectra ids: {supervision_ids}")
 
         self.num_validation_spectra = len(validation_ids)
         self.num_supervision_spectra = len(supervision_ids)
@@ -375,14 +361,12 @@ class SpectraData:
         self.data["supervision_plot_mask"] = self.data["gt_spectra_plot_mask"][sup_ids]
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][sup_ids]
-        self.data["supervision_norm_world_coords"] = self.data["gt_spectra_norm_world_coords"][sup_ids]
 
         # valiation(and semi sup) spectra data (used during main train)
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
         self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids]
         self.data["validation_img_coords"] = self.data["gt_spectra_img_coords"][val_ids]
         self.data["validation_world_coords"] = self.data["gt_spectra_world_coords"][val_ids]
-        self.data["validation_norm_world_coords"] = self.data["gt_spectra_norm_world_coords"][val_ids]
         if self.kwargs["redshift_semi_supervision"]:
             self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
 
@@ -413,10 +397,6 @@ class SpectraData:
         self.data["gt_spectra_plot_mask"] = np.load(self.gt_spectra_plot_mask_fname)
         self.data["gt_spectra_img_coords"] = np.load(self.gt_spectra_img_coords_fname)
         self.data["gt_spectra_world_coords"] = np.load(self.gt_spectra_world_coords_fname)
-
-        norm_coords, _ = normalize_coords(
-            self.data["gt_spectra_world_coords"], coords_range=self.coords_range)
-        self.data["gt_spectra_norm_world_coords"] = norm_coords
 
     def gather_processed_spectra(self):
         """ Load processed data for each spectra and save together.
@@ -456,10 +436,6 @@ class SpectraData:
             img_coords, axis=0).astype(np.int16) # [n,2]
         self.data["gt_spectra_world_coords"] = np.concatenate(
             world_coords, axis=0).astype(np.float32) # [n,n_neighbr,2]
-
-        norm_coords, _ = normalize_coords(
-            self.data["gt_spectra_world_coords"], coords_range=self.coords_range)
-        self.data["gt_spectra_norm_world_coords"] = norm_coords
 
         # save data for all spectra together
         np.save(self.gt_spectra_fname, self.data["gt_spectra"])
@@ -527,7 +503,7 @@ class SpectraData:
         _= [accumulate(cur_redshift) for cur_redshift in redshift]
         distrib = np.array(distrib) # / sum(distrib))
 
-        plt.plot(x, distrib)
+        plt.plot(x, distrib); plt.title("Emitted wave coverage")
         plt.savefig(self.emit_wave_coverage_fname[:-4] + ".png")
         plt.close()
 
@@ -663,7 +639,7 @@ class SpectraData:
                                       cur_patch_spectra_plot_mask,
                                       df, patch, emit_wave_distrib)
 
-        for i, (idx, img_coord) in enumerate(zip(spectra_ids[6:], img_coords[6:])):
+        for i, (idx, img_coord) in enumerate(zip(spectra_ids, img_coords)):
             process_one_spectra(idx, img_coord)
 
         cur_patch_spectra_fname = join(
@@ -1194,36 +1170,40 @@ def process_gt_spectra(infname, spectra_fname, plot_mask_fname,
                     (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
           mask:     mask out bad flux values
     """
-    spectra = unpack_gt_spectra(infname, format=format) # [3,nsmpl]
-    assert spectra.shape[1] <= max_spectra_len
-    mask = create_spectra_mask(spectra, max_spectra_len)
-    spectra = wave_based_sort(spectra)
-    spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
-    spectra, mask = clean_flux(spectra, mask)
-    spectra = normalize_spectra(spectra, bound)
-    spectra = convolve_spectra(spectra, bound, std=sigma)
-    spectra, mask, bound = mask_spectra_range(spectra, mask, bound, trans_range, trusted_range)
-    spectra = spectra.astype(np.float32)
+    if False: #exists(spectra_fname + ".npy") and exists(plot_mask_fname):
+        mask = np.load(plot_mask_fname)
+        spectra = np.load(spectra_fname + ".npy")
+    else:
+        spectra = unpack_gt_spectra(infname, format=format) # [3,nsmpl]
+        assert spectra.shape[1] <= max_spectra_len
+        mask = create_spectra_mask(spectra, max_spectra_len)
+        spectra = wave_based_sort(spectra)
+        spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
+        spectra, mask = clean_flux(spectra, mask)
+        spectra = normalize_spectra(spectra, bound)
+        spectra = convolve_spectra(spectra, bound, std=sigma)
+        spectra, mask, bound = mask_spectra_range(spectra, mask, bound, trans_range, trusted_range)
+        spectra = spectra.astype(np.float32)
 
-    weight = get_wave_weight(spectra, redshift, emit_wave_distrib, bound)
-    spectra = np.concatenate((spectra, weight[None,:]), axis=0)
+        weight = get_wave_weight(spectra, redshift, emit_wave_distrib, bound)
+        spectra = np.concatenate((spectra, weight[None,:]), axis=0)
 
-    interp_trans_data = interpolate_trans(
-        trans_data, spectra, bound, fname=spectra_fname, colors=colors)
-    spectra = np.concatenate((spectra, interp_trans_data), axis=0)
+        interp_trans_data = interpolate_trans(
+            trans_data, spectra, bound, fname=spectra_fname, colors=colors)
+        spectra = np.concatenate((spectra, interp_trans_data), axis=0)
 
-    if save:
-        np.save(spectra_fname + ".npy", spectra)
-        np.save(plot_mask_fname, mask)
+        if save:
+            np.save(spectra_fname + ".npy", spectra)
+            np.save(plot_mask_fname, mask)
 
-    if plot:
-        plt.plot(spectra[0], spectra[1])
-        plt.savefig(spectra_fname + ".png")
-        plt.close()
+        if plot:
+            plt.plot(spectra[0], spectra[1])
+            plt.savefig(spectra_fname + ".png")
+            plt.close()
 
-        plt.plot(spectra[0], mask)
-        plt.savefig(spectra_fname + "_plot_mask.png")
-        plt.close()
+            plt.plot(spectra[0], mask)
+            plt.savefig(spectra_fname + "_plot_mask.png")
+            plt.close()
 
     if validator is not None and not validator(spectra_data):
         return None, None

@@ -26,10 +26,7 @@ def get_pretrain_pipelines(pipelines, tasks, args):
     if "codebook_pretrain" in tasks:
         assert(args.quantize_latent or args.quantize_spectra)
         pretrain_nef = CodebookPretrainNerf(
-            args.codebook_pretrain_pixel_supervision,
-            _model_redshift=args.model_redshift,
-            **vars(args)
-        )
+            args.codebook_pretrain_pixel_supervision, **vars(args))
         pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
 
     if "pretrain_infer" in tasks:
@@ -38,14 +35,15 @@ def get_pretrain_pipelines(pipelines, tasks, args):
         pipelines["full"] = AstroPipeline(pretrain_nef)
 
         if "recon_gt_spectra" in tasks:
-            spectra_nef = CodebookPretrainNerf(False, **vars(args))
+            spectra_nef = CodebookPretrainNerf(**vars(args))
             pipelines["spectra_infer"] = AstroPipeline(spectra_nef)
 
         if "recon_codebook_spectra" in tasks:
             codebook_nef = CodebookNef(**vars(args))
             pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_nef)
+
         elif "recon_codebook_spectra_individ" in tasks:
-            codebook_spectra_nef = CodebookPretrainNerf(False, **vars(args))
+            codebook_spectra_nef = CodebookPretrainNerf(**vars(args))
             pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_spectra_nef)
 
     return pipelines
@@ -53,27 +51,27 @@ def get_pretrain_pipelines(pipelines, tasks, args):
 def get_main_train_pipelines(pipelines, tasks, args):
     if "train" in tasks:
         # full pipline for training
-        nef_train = globals()[args.nef_type](**vars(args))
+        # nef_train = globals()[args.nef_type](**vars(args))
+        nef_train = AstroHyperSpectralNerf(**vars(args))
         pipelines["full"] = AstroPipeline(nef_train)
 
     if "infer" in tasks:
         # full pipline for img recon
-        nef_train = globals()[args.nef_type](**vars(args))
+        nef_train = AstroHyperSpectralNerf(**vars(args))
         pipelines["full"] = AstroPipeline(nef_train)
 
         # pipeline for spectra inferrence
         if "recon_gt_spectra" in tasks or "recon_dummy_spectra" in tasks:
-            spectra_nef = globals()[args.nef_type](
-                integrate=False, qtz_calculate_loss=False, **vars(args))
+            spectra_nef = AstroHyperSpectralNerf(integrate=False, **vars(args))
             pipelines["spectra_infer"] = AstroPipeline(spectra_nef)
 
         # pipeline for codebook spectra inferrence
         if "recon_codebook_spectra" in tasks:
             codebook_nef = CodebookNef(**vars(args))
             pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_nef)
+
         elif "recon_codebook_spectra_individ" in tasks:
-            codebook_nef = globals()[args.nef_type](
-                integrate=False, qtz_calculate_loss=False, **vars(args))
+            codebook_nef = AstroHyperSpectralNerf(integrate=False, **vars(args))
             pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_nef)
 
     return pipelines
