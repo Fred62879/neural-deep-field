@@ -12,7 +12,7 @@ from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
 class CodebookPretrainNerf(BaseNeuralField):
-    def __init__(self, pretrain_pixel_supervision, **kwargs):
+    def __init__(self, pretrain_pixel_supervision=False, **kwargs):
         super(CodebookPretrainNerf, self).__init__()
 
         self.kwargs = kwargs

@@ -155,7 +155,7 @@ class TransData:
     def get_band_coverage_range(self):
         return np.load(self.band_coverage_range_fname)
 
-    def sample_wave(self, batch_size, num_samples, use_full_wave=False):
+    def sample_wave(self, batch_size, num_samples, use_all_wave=False):
         """ Sample lambda and transmission data for given sampling methods.
             @Return
               wave:  [bsz,nsmpl,1]/[bsz,nbands,nsmpl,1]
@@ -165,7 +165,7 @@ class TransData:
         smpl_ids = None
         nsmpl_within_each_band = None
 
-        if use_full_wave:
+        if use_all_wave:
             smpl_trans = self.data["full_trans"]
             smpl_wave = self.data["full_wave"][None,:,None]
             nsmpl_within_each_band = self.data["nsmpl_within_bands"]

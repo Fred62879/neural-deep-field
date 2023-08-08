@@ -118,25 +118,25 @@ def generate_hdu(header, data, fname):
     hdu = fits.PrimaryHDU(data=data, header=header)
     hdu.writeto(fname, overwrite=True)
 
-def get_num_wave_smpl(infer, args):
-    ''' Get # of wave samples to use. '''
+# def get_num_wave_smpl(infer, args):
+#     ''' Get # of wave samples to use. '''
 
-    # all 3 mc can infer with all wave
-    if infer and args.infer_use_all_wave:
-        nsmpl = len(np.load(args.full_wave_fn))
-    elif args.mc_cho == 'mc_hardcode':
-        nsmpl = args.num_trans_smpl
-    elif args.mc_cho == 'mc_bandwise':
-        nsmpl = args.num_trans_smpl//args.num_bands
+#     # all 3 mc can infer with all wave
+#     if infer and args.infer_use_all_wave:
+#         nsmpl = len(np.load(args.full_wave_fn))
+#     elif args.mc_cho == 'mc_hardcode':
+#         nsmpl = args.num_trans_smpl
+#     elif args.mc_cho == 'mc_bandwise':
+#         nsmpl = args.num_trans_smpl//args.num_bands
 
-    # only mixture mc can train with all wave
-    elif not infer and args.train_use_all_wave:
-        nsmpl = len(np.load(args.full_wave_fn))
-    elif args.mc_cho == 'mc_mixture':
-        nsmpl = args.num_trans_smpl
-    else:
-        raise Exception('Unsupported monte carlo choice')
-    return nsmpl
+#     # only mixture mc can train with all wave
+#     elif not infer and args.train_use_all_wave:
+#         nsmpl = len(np.load(args.full_wave_fn))
+#     elif args.mc_cho == 'mc_mixture':
+#         nsmpl = args.num_trans_smpl
+#     else:
+#         raise Exception('Unsupported monte carlo choice')
+#     return nsmpl
 
 def restore_unmasked(recon, gt, mask):
     ''' Fill recon with unmasked pixels from gt

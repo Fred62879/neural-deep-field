@@ -65,7 +65,7 @@ class AstroDataset(Dataset):
         self.wave_source = "trans"
         self.coords_source = "fits"
         self.sample_wave = False
-        self.use_full_wave = True
+        self.use_all_wave = True
         self.infer_selected = False
         self.perform_integration = True
         self.use_predefined_wave_range = False
@@ -108,7 +108,7 @@ class AstroDataset(Dataset):
 
     def toggle_wave_sampling(self, sample_wave: bool):
         self.sample_wave = sample_wave
-        self.use_full_wave = not sample_wave
+        self.use_all_wave = not sample_wave
 
     def toggle_selected_inferrence(self, infer_selected: bool):
         self.infer_selected = infer_selected
@@ -303,12 +303,12 @@ class AstroDataset(Dataset):
                     out["wave"], out["trans"], out["wave_smpl_ids"], out["nsmpl"] = \
                         self.trans_dataset.sample_wave(
                             batch_size,
-                            self.kwargs["main_train_num_wave_samples"],
-                            use_full_wave=self.use_full_wave
+                            self.kwargs["train_num_wave_samples"],
+                            use_all_wave=self.use_all_wave
                         )
 
                 if self.mode == "infer" and "recon_synthetic_band" in self.kwargs["tasks"]:
-                    assert(self.use_full_wave) # only in inferrence
+                    assert(self.use_all_wave) # only in inferrence
                     nsmpl = out["trans"].shape[1]
                     out["trans"] = torch.cat((out["trans"], torch.ones(1,nsmpl)), dim=0)
                     out["nsmpl"] = torch.cat((out["nsmpl"], torch.tensor([nsmpl])), dim=0)

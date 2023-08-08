@@ -329,6 +329,7 @@ class SpectraData:
     def split_spectra(self):
         ids = np.arange(self.num_gt_spectra)
 
+        # reserve all spectra in main train image patch as validation spectra
         acc, validation_ids, validation_patch_ids = 0, [], {}
         for tract, patch in zip(self.kwargs["tracts"], self.kwargs["patches"]):
             patch_uid = create_patch_uid(tract, patch)
@@ -366,6 +367,7 @@ class SpectraData:
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
         self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids]
         self.data["validation_img_coords"] = self.data["gt_spectra_img_coords"][val_ids]
+        # print(self.data["validation_img_coords"])
         self.data["validation_world_coords"] = self.data["gt_spectra_world_coords"][val_ids]
         if self.kwargs["redshift_semi_supervision"]:
             self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
@@ -891,6 +893,8 @@ class SpectraData:
               spectra_clipped: whether or not spectra is already clipped to
         """
         assert not clip or (recon_masks is not None or spectra_clipped)
+
+        # recon_fluxes *= -1
 
         n = len(recon_wave)
         if gt_wave is None: gt_wave = [None]*n

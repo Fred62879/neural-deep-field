@@ -144,7 +144,7 @@ class CodebookTrainer(BaseTrainer):
         #  and we should never do redshift supervision during pretrain
         self.apply_gt_redshift = self.extra_args["model_redshift"]
 
-        self.sample_wave = not self.extra_args["train_use_all_wave"] # True
+        self.sample_wave = not self.extra_args["pretrain_use_all_wave"] # True
         self.train_within_wave_range = not self.pixel_supervision and \
             self.extra_args["learn_spectra_within_wave_range"]
 
@@ -369,7 +369,7 @@ class CodebookTrainer(BaseTrainer):
             # re-init dataloader to make sure pixels are in order
             self.use_all_pixels = True
             self.shuffle_dataloader = False
-            self.sample_wave = False # not self.extra_args["train_use_all_wave"]
+            self.sample_wave = False # not self.extra_args["pretrain_use_all_wave"]
             self.dataset.toggle_wave_sampling(self.sample_wave)
             self.set_num_batches()
             self.init_dataloader()
@@ -408,7 +408,7 @@ class CodebookTrainer(BaseTrainer):
             self.use_all_pixels = False
             self.shuffle_dataloader = True
             self.save_data = False
-            self.sample_wave = not self.extra_args["train_use_all_wave"]
+            self.sample_wave = not self.extra_args["pretrain_use_all_wave"]
             self.dataset.toggle_wave_sampling(self.sample_wave)
             self.configure_dataset()
             self.set_num_batches()

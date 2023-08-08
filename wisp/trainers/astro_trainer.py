@@ -58,7 +58,7 @@ class AstroTrainer(BaseTrainer):
         self.pretrain_codebook = extra_args["pretrain_codebook"]
         self.use_all_pixels = extra_args["train_with_all_pixels"]
         self.spectra_n_neighb = extra_args["spectra_neighbour_size"]**2
-        assert self.use_all_pixels and extra_args["train_pixel_ratio"] == 1
+        # assert self.use_all_pixels and extra_args["train_pixel_ratio"] == 1
 
         self.summarize_training_tasks()
         self.set_path()
@@ -114,7 +114,9 @@ class AstroTrainer(BaseTrainer):
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
         self.dataset.set_mode("main_train")
-        self.dataset.toggle_wave_sampling(True)
+        self.dataset.toggle_wave_sampling(
+            sample_wave=not self.extra_args["train_use_all_wave"]
+        )
         self.set_coords()
 
     def summarize_training_tasks(self):
@@ -272,26 +274,32 @@ class AstroTrainer(BaseTrainer):
         if self.extra_args["resume_train"]:
             self.resume_train()
 
-        self.scene_state.optimization.running = True
+        # self.scene_state.optimization.running = True
         # log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
 
     def train(self):
+        self.timer.reset()
+
         for i, (tract, patch) in enumerate(zip(
                 self.extra_args["tracts"], self.extra_args["patches"]
         )):
             self.get_cur_patch_data(i, tract, patch)
+            self.timer.check("got current patch data")
 
             self.begin_train()
+            self.timer.check("train begun for current patch")
+
             for epoch in range(self.num_epochs + 1):
                 self.epoch = epoch
                 self.begin_epoch()
 
-                # for batch in tqdm(range(self.num_iterations_cur_epoch)):
-                for batch in range(self.num_iterations_cur_epoch):
-                    iter_start_time = time.time()
-                    self.scene_state.optimization.iteration = self.iteration
+                for batch in tqdm(range(self.num_iterations_cur_epoch)):
+                # for batch in range(self.num_iterations_cur_epoch):
+                    # iter_start_time = time.time()
+                    # self.scene_state.optimization.iteration = self.iteration
 
                     data = self.next_batch()
+                    self.timer.check("got data")
                     self.pre_step()
                     self.step(data)
                     self.post_step()
@@ -299,9 +307,9 @@ class AstroTrainer(BaseTrainer):
                     self.iteration += 1
                     self.total_steps += 1
 
-                    iter_end_time = time.time()
-                    self.scene_state.optimization.elapsed_time += \
-                        iter_end_time - iter_start_time
+                    # iter_end_time = time.time()
+                    # self.scene_state.optimization.elapsed_time += \
+                    #     iter_end_time - iter_start_time
 
                 self.end_epoch()
             self.end_train()
@@ -349,7 +357,9 @@ class AstroTrainer(BaseTrainer):
     def begin_epoch(self):
         self.iteration = 0
         self.reset_data_iterator()
+        self.timer.check("reset data iterator")
         self.pre_epoch()
+        self.timer.check("pre_epoch done")
         self.init_log_dict()
 
     def end_epoch(self):
@@ -380,33 +390,32 @@ class AstroTrainer(BaseTrainer):
         if self.extra_args["only_last"]:
             self.loss_lods = self.loss_lods[-1:]
 
-        if self.save_data_every > -1 and self.epoch % self.save_data_every == 0:
-            self.save_data = True
-            if self.save_scaler: self.scalers = []
-            if self.save_latents: self.latents = []
-            if self.save_redshift: self.redshift = []
-            if self.save_codebook: self.codebook = None
-            if self.plot_embed_map: self.embed_ids = []
-            if self.save_qtz_weights: self.qtz_weights = []
-            if self.recon_img or self.recon_crop: self.recon_pixels = []
-            if self.recon_gt_spectra:
-                self.recon_wave = []
-                self.recon_masks = []
-                self.recon_fluxes = []
-            if self.recon_codebook_spectra_individ:
-                self.codebook_spectra = []
+        # if self.save_data_every > -1 and self.epoch % self.save_data_every == 0:
+        #     self.save_data = True
+        #     if self.save_scaler: self.scalers = []
+        #     if self.save_latents: self.latents = []
+        #     if self.save_redshift: self.redshift = []
+        #     if self.save_codebook: self.codebook = None
+        #     if self.plot_embed_map: self.embed_ids = []
+        #     if self.save_qtz_weights: self.qtz_weights = []
+        #     if self.recon_img or self.recon_crop: self.recon_pixels = []
+        #     if self.recon_gt_spectra:
+        #         self.recon_wave = []
+        #         self.recon_masks = []
+        #         self.recon_fluxes = []
+        #     if self.recon_codebook_spectra_individ:
+        #         self.codebook_spectra = []
 
-            # re-init dataloader to make sure pixels are in order
-            self.use_all_pixels = True
-            self.shuffle_dataloader = False
-            # self.set_num_batches(max_bsz=512)
-            # self.dataset.toggle_wave_sampling(False)
+        #     # re-init dataloader to make sure pixels are in order
+        #     self.use_all_pixels = True
+        #     self.shuffle_dataloader = False
+        #     # self.set_num_batches(max_bsz=512)
+        #     # self.dataset.toggle_wave_sampling(False)
 
-            self.init_dataloader()
-            self.reset_data_iterator()
+        #     self.init_dataloader()
+        #     self.reset_data_iterator()
 
         self.pipeline.train()
-        self.timer.check("pre_epoch done")
 
     def post_epoch(self):
         """ By default, this function logs to Tensorboard, renders images to Tensorboard,
@@ -488,26 +497,26 @@ class AstroTrainer(BaseTrainer):
         self.optimizer.step()
         self.timer.check("backward and step")
 
-        if self.save_data:
-            if self.save_scaler: self.scalers.extend(ret["scaler"])
-            if self.save_latents: self.latents.extend(ret["latents"])
-            if self.save_redshift:
-                self.redshift.extend(ret["redshift"])
-                # self.gt_redshift = data["spectra_sup_redshift"]
-            if self.plot_embed_map: self.embed_ids.extend(ret["embed_ids"])
-            if self.save_qtz_weights: self.qtz_weights.extend(ret["qtz_weights"])
-            if self.recon_img or self.recon_crop:
-                self.recon_pixels.extend(ret["intensity"])
-            if self.save_codebook and self.codebook is None:
-                self.codebook = ret["codebook"]
+        # if self.save_data:
+        #     if self.save_scaler: self.scalers.extend(ret["scaler"])
+        #     if self.save_latents: self.latents.extend(ret["latents"])
+        #     if self.save_redshift:
+        #         self.redshift.extend(ret["redshift"])
+        #         # self.gt_redshift = data["spectra_sup_redshift"]
+        #     if self.plot_embed_map: self.embed_ids.extend(ret["embed_ids"])
+        #     if self.save_qtz_weights: self.qtz_weights.extend(ret["qtz_weights"])
+        #     if self.recon_img or self.recon_crop:
+        #         self.recon_pixels.extend(ret["intensity"])
+        #     if self.save_codebook and self.codebook is None:
+        #         self.codebook = ret["codebook"]
 
-            if self.recon_gt_spectra:
-                #self.gt_wave.extend()
-                #self.gt_fluxes.extend(data["spectra_sup_data"][:,1])
-                self.recon_fluxes.extend(ret["spectra"])
+        #     if self.recon_gt_spectra:
+        #         #self.gt_wave.extend()
+        #         #self.gt_fluxes.extend(data["spectra_sup_data"][:,1])
+        #         self.recon_fluxes.extend(ret["spectra"])
 
-            if self.recon_codebook_spectra_individ:
-                self.codebook_spectra.extend(ret["codebook_spectra"])
+        #     if self.recon_codebook_spectra_individ:
+        #         self.codebook_spectra.extend(ret["codebook_spectra"])
 
     def post_step(self):
         pass
@@ -592,11 +601,9 @@ class AstroTrainer(BaseTrainer):
         length = self.get_dataset_length()
         if not self.use_all_pixels:
             length = int(length * self.extra_args["train_pixel_ratio"])
-
         self.batch_size = min(self.extra_args["batch_size"], length)
         if max_bsz is not None: # when we use all wave, we need to control bsz
             self.batch_size = min(self.batch_size, max_bsz)
-
         if self.dataloader_drop_last:
             self.num_iterations_cur_epoch = int(length // self.batch_size)
         else:

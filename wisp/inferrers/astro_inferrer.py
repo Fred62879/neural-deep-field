@@ -5,6 +5,7 @@ import numpy as np
 import logging as log
 import matplotlib.pyplot as plt
 
+from tqdm import tqdm
 from pathlib import Path
 from functools import partial
 from os.path import exists, join
@@ -83,7 +84,7 @@ class AstroInferrer(BaseInferrer):
         self.model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames = sort_alphanumeric(self.model_fnames)
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -821,52 +822,53 @@ class AstroInferrer(BaseInferrer):
         load_model_weights(self.full_pipeline, model_state)
         self.full_pipeline.eval()
 
-        while True:
-            try:
-                data = self.next_batch()
-                add_to_device(data, self.extra_args["gpu_data"], self.device)
+        num_batches = int(np.ceil(self.dataset_length / self.extra_args["infer_batch_size"]))
+        log.info(f"infer all coords, totally {num_batches} batches")
 
-                with torch.no_grad():
-                    ret = forward(
-                        data,
-                        self.full_pipeline,
-                        iterations,
-                        self.space_dim,
-                        qtz=self.qtz,
-                        qtz_strategy=self.qtz_strategy,
-                        apply_gt_redshift=self.apply_gt_redshift,
-                        perform_integration=self.perform_integration,
-                        trans_sample_method=self.trans_sample_method,
-                        save_qtz_weights=self.save_qtz_weights,
-                        save_scaler=self.save_scaler,
-                        save_embed_ids=self.plot_embed_map,
-                        save_latents=self.plot_latent_embed,
-                        save_redshift=self.save_redshift_main,
-                    )
+        for i in tqdm(range(num_batches)):
+        # for i in range(num_batches):
+            data = self.next_batch()
+            add_to_device(data, self.extra_args["gpu_data"], self.device)
 
-                if self.recon_img or self.recon_img_sup_spectra:
-                    # artifically generated transmission function (last channel)
-                    if self.recon_synthetic_band:
-                        self.recon_synthetic_pixels.extend(ret["intensity"][...,-1:])
-                        ret["intensity"] = ret["intensity"][...,:-1]
-                    self.recon_pixels.extend(ret["intensity"])
+            with torch.no_grad():
+                ret = forward(
+                    data,
+                    self.full_pipeline,
+                    iterations,
+                    self.space_dim,
+                    qtz=self.qtz,
+                    qtz_strategy=self.qtz_strategy,
+                    apply_gt_redshift=self.apply_gt_redshift,
+                    perform_integration=self.perform_integration,
+                    trans_sample_method=self.trans_sample_method,
+                    save_qtz_weights=self.save_qtz_weights,
+                    save_scaler=self.save_scaler,
+                    save_embed_ids=self.plot_embed_map,
+                    save_latents=self.plot_latent_embed,
+                    save_redshift=self.save_redshift_main,
+                )
 
-                if self.save_scaler:
-                    self.scalers.extend(ret["scaler"])
-                if self.plot_latent_embed:
-                    self.latents.extend(ret["latents"])
-                if self.plot_embed_map:
-                    self.embed_ids.extend(ret["min_embed_ids"])
-                if self.save_qtz_weights:
-                    self.qtz_weights.extend(ret["qtz_weights"])
-                if self.save_redshift_main:
-                    self.redshift.extend(ret["redshift"])
-                    if self.extra_args["pretrain_codebook"]:
-                        self.gt_redshift.extend(data["spectra_sup_redshift"])
+            if self.recon_img or self.recon_img_sup_spectra:
+                # artifically generated transmission function (last channel)
+                if self.recon_synthetic_band:
+                    self.recon_synthetic_pixels.extend(ret["intensity"][...,-1:])
+                    ret["intensity"] = ret["intensity"][...,:-1]
+                self.recon_pixels.extend(ret["intensity"])
 
-            except StopIteration:
-                log.info("all coords inferrence done")
-                break
+            if self.save_scaler:
+                self.scalers.extend(ret["scaler"])
+            if self.plot_latent_embed:
+                self.latents.extend(ret["latents"])
+            if self.plot_embed_map:
+                self.embed_ids.extend(ret["min_embed_ids"])
+            if self.save_qtz_weights:
+                self.qtz_weights.extend(ret["qtz_weights"])
+            if self.save_redshift_main:
+                self.redshift.extend(ret["redshift"])
+                if self.extra_args["pretrain_codebook"]:
+                    self.gt_redshift.extend(data["spectra_sup_redshift"])
+
+        log.info("all coords inferrence done")
 
     def infer_spectra(self, model_id, checkpoint):
         iterations = checkpoint["epoch_trained"]

@@ -31,7 +31,9 @@ def get_pretrain_pipelines(pipelines, tasks, args):
 
     if "pretrain_infer" in tasks:
         pretrain_nef = CodebookPretrainNerf(
-            args.codebook_pretrain_pixel_supervision, **vars(args))
+            pretrain_pixel_supervision=args.codebook_pretrain_pixel_supervision,
+            **vars(args)
+        )
         pipelines["full"] = AstroPipeline(pretrain_nef)
 
         if "recon_gt_spectra" in tasks:
