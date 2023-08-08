@@ -32,7 +32,6 @@ from multiprocessing.pool import ThreadPool
 class SpectraData:
     def __init__(self, trans_obj, device, **kwargs):
         self.kwargs = kwargs
-        self.summarize_tasks(kwargs["tasks"])
 
         self.device = device
         self.trans_obj = trans_obj
@@ -64,28 +63,6 @@ class SpectraData:
         self.set_path(self.dataset_path)
         self.load_accessory_data()
         self.load_spectra()
-
-    def summarize_tasks(self, tasks):
-        tasks = set(tasks)
-
-        self.recon_gt_spectra = "recon_gt_spectra" in tasks or \
-            "recon_gt_spectra_during_train" in tasks
-        self.recon_dummy_spectra = "recon_dummy_spectra" in tasks or \
-            "recon_dummy_spectra_during_train" in tasks
-        self.recon_codebook_spectra = "recon_codebook_spectra" in tasks or \
-            "recon_codebook_spectra_during_train" in tasks
-
-        self.codebook_pretrain = self.kwargs["pretrain_codebook"] and \
-            "codebook_pretrain" in tasks
-        self.pretrain_infer = self.kwargs["pretrain_codebook"] and \
-            "pretrain_infer" in tasks
-        self.require_spectra_coords = self.kwargs["mark_spectra"] and \
-            ("plot_redshift" in tasks or "plot_embed_map" in tasks)
-        self.recon_spectra = self.recon_gt_spectra or self.recon_dummy_spectra or \
-            self.recon_codebook_spectra
-        self.spectra_supervision_train = "train" in tasks and self.kwargs["spectra_supervision"]
-        self.spectra_valid_train = self.kwargs["train_spectra_pixels_only"] and "train" in tasks
-        self.spectra_valid_infer = self.kwargs["train_spectra_pixels_only"] and "infer" in tasks
 
     def set_path(self, dataset_path):
         """ Create path and filename of required files.
@@ -162,7 +139,6 @@ class SpectraData:
         self.data = defaultdict(lambda: [])
         self.load_gt_spectra_data()
         self.set_wave_range()
-        # self.mark_spectra_on_img()
 
     #############
     # Getters
@@ -931,22 +907,6 @@ class SpectraData:
         if self.kwargs["plot_spectrum_together"]:
             fname = join(spectra_dir, sub_dir, f"all_spectra_{name}")
             fig.tight_layout(); plt.savefig(fname); plt.close()
-
-    # def mark_spectra_on_img(self):
-    #     markers = self.kwargs["spectra_markers"]
-    #     spectra_img_coords = self.get_spectra_img_coords()
-    #     spectra_fits_ids = set(spectra_img_coords[:,-1])
-    #     for fits_id in spectra_fits_ids:
-    #         # collect spectra in the same tile
-    #         cur_coords, cur_markers = [], []
-    #         for i, (r, c, cur_fits_id) in zip(
-    #                 self.kwargs["gt_spectra_ids"], spectra_img_coords):
-    #             if cur_fits_id == fits_id:
-    #                 cur_coords.append([r,c])
-    #                 cur_markers.append(markers[i])
-    #         # mark on the corresponding tile
-    #         self.fits_obj.mark_on_img(
-    #             np.array(cur_coords), cur_markers, fits_id)
 
 # SpectraData class ends
 #############

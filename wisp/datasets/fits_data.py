@@ -12,7 +12,7 @@ from astropy.nddata import Cutout2D
 from wisp.utils.common import worldToPix
 from astropy.coordinates import SkyCoord
 
-from wisp.utils.plot import plot_horizontally, mark_on_img
+from wisp.utils.plot import plot_horizontally
 from wisp.utils.common import generate_hdu, create_patch_uid
 from wisp.utils.numerical import normalize_coords, normalize, \
     calculate_metrics, calculate_zscale_ranges_multiple_patches
@@ -220,17 +220,6 @@ class FitsData:
     ############
     # Utilities
     ############
-
-    def mark_on_img(self, coords, markers, patch_id):
-        """ Mark spectra pixels on GT image.
-            @Param
-              coords: r, c
-        """
-        patch_uid = self.patch_uids[patch_id]
-        gt_img_fname = self.gt_img_fnames[patch_uid]
-        gt_img = np.load(gt_img_fname + ".npy")
-        png_fname = gt_img_fname + "_marked.png"
-        mark_on_img(png_fname, gt_img, coords, markers)
 
     def world2pix(self, ra, dec, neighbour_size, tract, patch):
         """ Convert from world coordinate to pixel coordinate.

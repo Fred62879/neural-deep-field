@@ -27,7 +27,7 @@ global:
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
     tasks: ['train'] #,'save_redshift_during_train','recon_gt_spectra_during_train','recon_img_during_train','save_qtz_weights_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
-    # tasks: ['infer','recon_gt_spectra','recon_img'] #,'recon_codebook_spectra_individ','save_qtz_weights','save_redshift','save_scaler']
+    #tasks: ['infer','recon_gt_spectra','recon_img'] #,'recon_codebook_spectra_individ','save_qtz_weights','save_redshift','save_scaler']
 
 optimizer:
     optimizer_type: 'adam'
@@ -146,17 +146,17 @@ trainer:
     pixel_loss_cho: l1_mean
     spectra_loss_cho: l2_mean #emd
     redshift_loss_cho: l2_mean
-    num_epochs: 100
+    num_epochs: 10
     batch_size: 15000 #40960 #65536 #262144
     pretrain_batch_size: 1000
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 10
+    log_cli_every: 1
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 10
+    save_model_every: 1
     save_as_new: True
 
     train_with_all_pixels: True
@@ -213,7 +213,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20230805-172920_10k_spectra_30k_epochs'
+    infer_log_dir: '20230807-204151_main_train_2k_img_100_epochs'
     metric_options: ['mse','ssim','psnr']
     log_pixel_ratio: True
 
@@ -256,13 +256,13 @@ dataset:
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
 
 patch_data:
-    use_full_patch: False
+    use_full_patch: True
 
     # if don't use full patch, we can select cutout from tiles
     # the order of the following 5 fields corresponds to each other
     tracts: ['9812']
     patches: ['1,5']
-    patch_selection_cho: "2k_cutout" #"small_cutout"  # change all these
+    patch_selection_cho: "full" #"2k_cutout" #"small_cutout"  # change all these
     patch_cutout_num_rows: [2048] #[64]      #  fields
     patch_cutout_num_cols: [2048] #[64]      #  together
     patch_cutout_start_pos: [[0,0]] #[[1917,754]] #[[1750,550]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]

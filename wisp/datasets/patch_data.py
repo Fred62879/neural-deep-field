@@ -10,7 +10,7 @@ from os.path import join, exists
 from astropy.nddata import Cutout2D
 from astropy.coordinates import SkyCoord
 
-from wisp.utils.plot import plot_horizontally
+from wisp.utils.plot import plot_horizontally, mark_on_img
 from wisp.utils.common import generate_hdu, create_patch_uid
 from wisp.utils.numerical import normalize, calculate_zscale_ranges
 from wisp.datasets.data_utils import set_input_path, \
@@ -367,6 +367,21 @@ class PatchData:
         self.data["spectra_pixel_wave"] = spectra[:,0]
         self.data["spectra_pixel_fluxes"] = spectra[:,1]
         self.data["spectra_pixel_plot_masks"] = plot_masks
+
+        self.mark_spectra_on_img()
+        assert 0
+
+    def mark_spectra_on_img(self):
+        """ Mark spectra location in current patch image.
+        """
+        gt_img = np.load(self.gt_img_fname + ".npy")
+        png_fname = self.gt_img_fname + "_marked.png"
+        mark_on_img(
+            png_fname,
+            gt_img,
+            self.data["spectra_img_coords"],
+            self.kwargs["spectra_markers"])
+        print(png_fname)
 
     def get_world_coords(self):
         """ Get ra/dec coords from current patch and normalize.

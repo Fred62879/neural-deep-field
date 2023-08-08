@@ -324,7 +324,7 @@ class AstroTrainer(BaseTrainer):
             plt.close()
 
             plt.plot(x, np.log10(self.losses)); plt.title("Log10 loss")
-            plt.savefig(self.loss_fname + "_1og10.png")
+            plt.savefig(self.loss_fname + "_log10.png")
             plt.close()
 
             np.save(self.loss_fname + ".npy", self.losses)
