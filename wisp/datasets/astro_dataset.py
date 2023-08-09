@@ -276,6 +276,7 @@ class AstroDataset(Dataset):
                 out["spectra_sup_data"], sample_ids = batch_sample_torch(
                     out["spectra_sup_data"], self.kwargs["pretrain_num_wave_samples"],
                     keep_sample_ids=True)
+                # print(sample_ids)
                 out["spectra_sup_plot_mask"] = batch_sample_torch(
                     out["spectra_sup_plot_mask"], self.kwargs["pretrain_num_wave_samples"],
                     sample_ids=sample_ids)

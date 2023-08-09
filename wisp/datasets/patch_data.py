@@ -21,7 +21,11 @@ class PatchData:
     """ Data class for each patch. """
 
     def __init__(self, tract, patch,
-                 load_pixels=False, load_coords=False, load_weights=False, load_spectra=False,
+                 load_pixels=False,
+                 load_coords=False,
+                 load_weights=False,
+                 load_spectra=False,
+                 mark_spectra_on_patch=False,
                  cutout_num_rows=None, cutout_num_cols=None, cutout_start_pos=None,
                  pixel_norm_cho=None, full_patch=True, spectra_obj=None, **kwargs
     ):
@@ -38,6 +42,8 @@ class PatchData:
         self.load_coords = load_coords
         self.load_weights = load_weights
         self.load_spectra = load_spectra
+        self.mark_spectra_on_patch = mark_spectra_on_patch
+
         self.use_full_patch = full_patch
         self.cutout_num_rows = cutout_num_rows
         self.cutout_num_cols = cutout_num_cols
@@ -368,8 +374,8 @@ class PatchData:
         self.data["spectra_pixel_fluxes"] = spectra[:,1]
         self.data["spectra_pixel_plot_masks"] = plot_masks
 
-        self.mark_spectra_on_img()
-        assert 0
+        if self.mark_spectra_on_patch:
+            self.mark_spectra_on_img()
 
     def mark_spectra_on_img(self):
         """ Mark spectra location in current patch image.
@@ -381,7 +387,6 @@ class PatchData:
             gt_img,
             self.data["spectra_img_coords"],
             self.kwargs["spectra_markers"])
-        print(png_fname)
 
     def get_world_coords(self):
         """ Get ra/dec coords from current patch and normalize.

@@ -609,6 +609,7 @@ class FitsData:
             load_coords=self.load_coords,
             load_weights=self.load_weights,
             load_spectra=self.load_spectra,
+            mark_spectra_on_patch=self.kwargs["mark_spectra"],
             cutout_num_rows=cutout_num_rows,
             cutout_num_cols=cutout_num_cols,
             cutout_start_pos=cutout_start_pos,

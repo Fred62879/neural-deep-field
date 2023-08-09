@@ -59,6 +59,7 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux, weight_by_wave_
     ''' Loss function for spectra supervision
         @Param
           loss: l1/l2 as specified in config
+                NOTE: `reduction` for loss MUST be set as `none` for spectra loss!
           mask:       [bsz,num_smpls]
           gt_spectra: [bsz,4+2*nbanbds,num_smpls]
                       (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
@@ -67,7 +68,9 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux, weight_by_wave_
     if weight_by_wave_coverage:
         weight = gt_spectra[:,3]
         ret = loss(gt_spectra[:,1]*mask*weight, recon_flux*mask*weight)
-    else: ret = loss(gt_spectra[:,1]*mask, recon_flux*mask)
+    else:
+        ret = loss(gt_spectra[:,1]*mask, recon_flux*mask)
+    ret = torch.mean(torch.sum(ret, dim=-1), dim=-1)
     return ret
 
 def redshift_supervision_loss(loss, gt_redshift, recon_redshift, mask=None):

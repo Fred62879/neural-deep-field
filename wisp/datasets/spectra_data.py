@@ -314,7 +314,7 @@ class SpectraData:
             validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
             acc += len(cur_spectra_ids)
         validation_ids = np.array(validation_ids)
-        # validation_ids = np.array([0])
+        validation_ids = np.array([0])
         log.info(f"validation spectra ids: {validation_ids}")
 
         # get supervision ids

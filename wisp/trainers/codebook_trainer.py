@@ -195,6 +195,7 @@ class CodebookTrainer(BaseTrainer):
         if self.extra_args["spectra_loss_cho"] == "emd":
             self.spectra_loss = spectra_supervision_emd_loss
         else:
+            assert self.extra_args["spectra_loss_cho"][-4:] == "none"
             loss = self.get_loss(self.extra_args["spectra_loss_cho"])
             self.spectra_loss = partial(spectra_supervision_loss, loss)
 

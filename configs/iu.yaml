@@ -8,8 +8,8 @@ global:
     exp_name: 'test-ngp-nerf'
     use_gpu: True
 
-    tasks: ['codebook_pretrain'] #,'save_pixel_values_during_train','recon_gt_spectra_during_train'] #,'save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_codebook_spectra'] #'recon_gt_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #,'save_qtz_weights','save_redshift','recon_img']
+    tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
+    tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights'] #'recon_codebook_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #'save_redshift','recon_img']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -26,7 +26,7 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    tasks: ['train'] #,'save_redshift_during_train','recon_gt_spectra_during_train','recon_img_during_train','save_qtz_weights_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
+    #tasks: ['train'] #,'save_redshift_during_train','recon_gt_spectra_during_train','recon_img_during_train','save_qtz_weights_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
     #tasks: ['infer','recon_gt_spectra','recon_img'] #,'recon_codebook_spectra_individ','save_qtz_weights','save_redshift','save_scaler']
 
 optimizer:
@@ -48,7 +48,7 @@ net:
     encode_coords: True
     coords_encode_method: 'grid' #'positional_encoding'
     wave_encode_method: 'positional_encoding'
-    wave_multiplier: 10
+    wave_multiplier: 20
 
 embedder:
     coords_embed_bias: True
@@ -58,7 +58,7 @@ embedder:
     coords_embed_seed: 2
 
     wave_embed_bias: True
-    wave_embed_dim: 16
+    wave_embed_dim: 32
     wave_embed_omega: 1
     wave_embed_sigma: 1
     wave_embed_seed: 1
@@ -104,13 +104,13 @@ qtz:
     quantization_strategy: 'soft'
     quantization_calculate_loss: False # only if hard qtz
     qtz_latent_dim: 16
-    qtz_num_embed: 20
+    qtz_num_embed: 10
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
 
 spatial_decod:
-    decode_bias: False
+    decode_bias: True
     decode_scaler: True
 
     spatial_decod_hidden_dim: 64
@@ -144,19 +144,19 @@ trainer:
 
     plot_loss: True
     pixel_loss_cho: l1_mean
-    spectra_loss_cho: l2_mean #emd
+    spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
-    num_epochs: 10
+    num_epochs: 10000
     batch_size: 15000 #40960 #65536 #262144
     pretrain_batch_size: 1000
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 1
+    log_cli_every: 1000
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 1
+    save_model_every: 1000
     save_as_new: True
 
     train_with_all_pixels: True
@@ -170,15 +170,15 @@ trainer:
     learn_spectra_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
 
-    num_supervision_spectra: 1000
+    num_supervision_spectra: 20
     spectra_neighbour_size: 1
 
     pixel_supervision: True          # these two conflict
     train_spectra_pixels_only: False #  each other
 
-    apply_gt_redshift: False         # -
+    apply_gt_redshift: True         # -
     redshift_unsupervision: False    #  |- these three conflict each other
-    redshift_semi_supervision: True  # -
+    redshift_semi_supervision: False  # -
 
     spectra_beta: 1
     redshift_beta: 1
@@ -187,15 +187,15 @@ trainer:
     spectra_supervision_start_epoch: 0
 
     resume_train: False
-    decode_spatial_embedding: True
+    decode_spatial_embedding: False
     quantize_latent: False
-    quantize_spectra: True
+    quantize_spectra: False
     weight_train: False
 
     weight_by_wave_coverage: False
     # resume_log_dir: '20230726-175816_main_train_1000_epochs'
-    pretrain_log_dir: '20230805-172920_10k_spectra_30k_epochs'
-    pretrained_model_name: 'model-ep30000-it1.pth'
+    # pretrain_log_dir: '20230805-172920_10k_spectra_30k_epochs'
+    # pretrained_model_name: 'model-ep30000-it1.pth'
 
     uniform_sample_wave: True
     mixture_avg_per_band: True
@@ -213,7 +213,7 @@ infer:
 
     # recon img
     to_HDU: False
-    infer_log_dir: '20230807-204151_main_train_2k_img_100_epochs'
+    # infer_log_dir: '20230808-175732_pretrain_pe_16_mul_50'
     metric_options: ['mse','ssim','psnr']
     log_pixel_ratio: True
 
@@ -224,7 +224,7 @@ infer:
     recon_cutout_start_pos: [ [[256,256]], [[86,188]] ]
 
     # recon spectra
-    infer_selected: True
+    infer_selected: False
     pretrain_num_infer: 100
 
     flux_norm_cho: "linr"
@@ -256,16 +256,16 @@ dataset:
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
 
 patch_data:
-    use_full_patch: True
+    use_full_patch: False
 
     # if don't use full patch, we can select cutout from tiles
     # the order of the following 5 fields corresponds to each other
     tracts: ['9812']
-    patches: ['1,5']
-    patch_selection_cho: "full" #"2k_cutout" #"small_cutout"  # change all these
-    patch_cutout_num_rows: [2048] #[64]      #  fields
-    patch_cutout_num_cols: [2048] #[64]      #  together
-    patch_cutout_start_pos: [[0,0]] #[[1917,754]] #[[1750,550]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    patches: ['0,1'] #['1,5']
+    patch_selection_cho: "512_cutout" #"2k_cutout" #"small_cutout"  # change all these
+    patch_cutout_num_rows: [512] #[64]      #  fields
+    patch_cutout_num_cols: [512] #[64]      #  together
+    patch_cutout_start_pos: [[1750,550]] #[[1917,754]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
 trans_data:
     # num_bands: 1
@@ -320,13 +320,13 @@ spectra_data:
 
     spectra_smooth_sigma: 50
 
-    spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
-    spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
+    spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
+    spectra_patches_r: ['0'] #,'1','2','3','4','5','6','7','8']
+    spectra_patches_c: ['0','1','2'] #,'3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
     source_spectra_cho: "" #"6000_to_8000"
-    processed_spectra_cho: "v7_table"
+    processed_spectra_cho: "debug5" #"v7_table"
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
     codebook_spectra_plot_wave_lo: 2000

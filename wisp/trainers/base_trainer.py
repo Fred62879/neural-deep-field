@@ -458,10 +458,14 @@ class BaseTrainer(ABC):
             loss = nn.L1Loss()
         elif cho == "l1_sum":
             loss = nn.L1Loss(reduction="sum")
+        elif cho == "l1_none":
+            loss = nn.L1Loss(reduction="none")
         elif cho == "l2_mean":
             loss = nn.MSELoss()
         elif cho == "l2_sum":
             loss = nn.MSELoss(reduction="sum")
+        elif cho == "l2_none":
+            loss = nn.MSELoss(reduction="none")
         else:
             raise Exception("Unsupported loss choice")
         if self.cuda: loss = loss.cuda()
