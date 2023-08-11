@@ -521,25 +521,29 @@ class AstroInferrer(BaseInferrer):
             plot_latent_embed(self.latents, self.embed, model_id, self.latent_embed_dir)
 
         if self.plot_embed_map:
-            if self.extra_args["mark_spectra"]:
-                coords = self.dataset.get_spectra_img_coords()
-            else: coords = []
-            plot_embed_map_log = partial(plot_embed_map, coords)
+            if self.pretrain_infer:
+                self.embed_ids = torch.stack(self.embed_ids).detach().cpu().numpy()
+                log.info(f"embed ids: {self.embed_ids}")
+            else:
+                if self.extra_args["mark_spectra"]:
+                    coords = self.dataset.get_spectra_img_coords()
+                else: coords = []
+                plot_embed_map_log = partial(plot_embed_map, coords)
 
-            re_args = {
-                "fname": model_id,
-                "dir": self.embed_map_dir,
-                "verbose": self.verbose,
-                "num_bands": 1,
-                "log_max": False,
-                "save_locally": False,
-                "plot_func": plot_embed_map_log,
-                "zscale": False,
-                "to_HDU": False,
-                "match_patch": True,
-                "calculate_metrics": False,
-            }
-            _, _ = self.dataset.restore_evaluate_tiles(self.embed_ids, **re_args)
+                re_args = {
+                    "fname": model_id,
+                    "dir": self.embed_map_dir,
+                    "verbose": self.verbose,
+                    "num_bands": 1,
+                    "log_max": False,
+                    "save_locally": False,
+                    "plot_func": plot_embed_map_log,
+                    "zscale": False,
+                    "to_HDU": False,
+                    "match_patch": True,
+                    "calculate_metrics": False,
+                }
+                _, _ = self.dataset.restore_evaluate_tiles(self.embed_ids, **re_args)
 
         if self.save_redshift_main:
             # plot redshift img

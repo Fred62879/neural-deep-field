@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights'] #'recon_codebook_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #'save_redshift','recon_img']
+    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights'] #'recon_codebook_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #'save_redshift','recon_img']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -146,17 +146,17 @@ trainer:
     pixel_loss_cho: l1_mean
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
-    num_epochs: 10000
+    num_epochs: 30000
     batch_size: 15000 #40960 #65536 #262144
     pretrain_batch_size: 1000
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 1000
+    log_cli_every: 3000
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 1000
+    save_model_every: 3000
     save_as_new: True
 
     train_with_all_pixels: True
@@ -170,7 +170,7 @@ trainer:
     learn_spectra_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
 
-    num_supervision_spectra: 20
+    num_supervision_spectra: 1000
     spectra_neighbour_size: 1
 
     pixel_supervision: True          # these two conflict
@@ -187,15 +187,15 @@ trainer:
     spectra_supervision_start_epoch: 0
 
     resume_train: False
-    decode_spatial_embedding: False
+    decode_spatial_embedding: True
     quantize_latent: False
-    quantize_spectra: False
+    quantize_spectra: True
     weight_train: False
 
     weight_by_wave_coverage: False
-    # resume_log_dir: '20230726-175816_main_train_1000_epochs'
-    # pretrain_log_dir: '20230805-172920_10k_spectra_30k_epochs'
-    # pretrained_model_name: 'model-ep30000-it1.pth'
+    # resume_log_dir: '20230810-192935'
+    # pretrain_log_dir: '20230810-200115
+    pretrained_model_name: 'model-ep30000-it1.pth'
 
     uniform_sample_wave: True
     mixture_avg_per_band: True
@@ -261,11 +261,11 @@ patch_data:
     # if don't use full patch, we can select cutout from tiles
     # the order of the following 5 fields corresponds to each other
     tracts: ['9812']
-    patches: ['0,1'] #['1,5']
-    patch_selection_cho: "512_cutout" #"2k_cutout" #"small_cutout"  # change all these
-    patch_cutout_num_rows: [512] #[64]      #  fields
-    patch_cutout_num_cols: [512] #[64]      #  together
-    patch_cutout_start_pos: [[1750,550]] #[[1917,754]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    patches: ['1,5']
+    patch_selection_cho: "small_cutout" #"512_cutout" #"2k_cutout" # change all these
+    patch_cutout_num_rows: [64] #[512] #[64]      #  fields
+    patch_cutout_num_cols: [64] #[512] #[64]      #  together
+    patch_cutout_start_pos: [[1917,754]] #[[1750,550]] #[[1917,754]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
 trans_data:
     # num_bands: 1
@@ -320,13 +320,13 @@ spectra_data:
 
     spectra_smooth_sigma: 50
 
-    spectra_tracts: ['9812'] #['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
-    spectra_patches_r: ['0'] #,'1','2','3','4','5','6','7','8']
-    spectra_patches_c: ['0','1','2'] #,'3','4','5','6','7','8']
+    spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
+    spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
+    spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
     source_spectra_cho: "" #"6000_to_8000"
-    processed_spectra_cho: "debug5" #"v7_table"
+    processed_spectra_cho: "v7_table"
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
     codebook_spectra_plot_wave_lo: 2000

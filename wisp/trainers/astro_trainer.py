@@ -293,8 +293,8 @@ class AstroTrainer(BaseTrainer):
                 self.epoch = epoch
                 self.begin_epoch()
 
-                for batch in tqdm(range(self.num_iterations_cur_epoch)):
-                # for batch in range(self.num_iterations_cur_epoch):
+                # for batch in tqdm(range(self.num_iterations_cur_epoch)):
+                for batch in range(self.num_iterations_cur_epoch):
                     # iter_start_time = time.time()
                     # self.scene_state.optimization.iteration = self.iteration
 
