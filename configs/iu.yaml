@@ -148,7 +148,7 @@ trainer:
     redshift_loss_cho: l2_mean
     num_epochs: 30000
     batch_size: 15000 #40960 #65536 #262144
-    pretrain_batch_size: 1000
+    pretrain_batch_size: 3000
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
@@ -170,7 +170,7 @@ trainer:
     learn_spectra_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
 
-    num_supervision_spectra: 1000
+    num_supervision_spectra: 100
     spectra_neighbour_size: 1
 
     pixel_supervision: True          # these two conflict
@@ -193,9 +193,9 @@ trainer:
     weight_train: False
 
     weight_by_wave_coverage: False
-    # resume_log_dir: '20230810-192935'
-    # pretrain_log_dir: '20230810-200115
-    pretrained_model_name: 'model-ep30000-it1.pth'
+    resume_log_dir: '20230811-131623'
+    # pretrain_log_dir: '20230811-115904_pretrain_300_spectra_30k_epochs'
+    pretrained_model_name: 'model-ep1000-it1.pth'
 
     uniform_sample_wave: True
     mixture_avg_per_band: True
@@ -207,13 +207,13 @@ trainer:
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_batch_size: 2200 #20 #4096 #20000 #36864
+    infer_batch_size: 200 #2200 #20 #4096 #20000 #36864
     infer_use_all_wave: True # enforced
     infer_last_model_only: True
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20230808-175732_pretrain_pe_16_mul_50'
+    # infer_log_dir: '20230810-200927'
     metric_options: ['mse','ssim','psnr']
     log_pixel_ratio: True
 

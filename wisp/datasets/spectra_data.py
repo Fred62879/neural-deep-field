@@ -314,14 +314,13 @@ class SpectraData:
             validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
             acc += len(cur_spectra_ids)
         validation_ids = np.array(validation_ids)
-        validation_ids = np.array([0])
-        log.info(f"validation spectra ids: {validation_ids}")
+        # validation_ids = np.array([0])
+        # log.info(f"validation spectra ids: {validation_ids}")
 
         # get supervision ids
         supervision_ids = np.array(list(set(ids) - set(validation_ids))).astype(int)
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra"]]
-        # supervision_ids = np.array([14,22,31]) # 14,22 fail /31 succeed
         # log.info(f"supervision spectra ids: {supervision_ids}")
 
         self.num_validation_spectra = len(validation_ids)

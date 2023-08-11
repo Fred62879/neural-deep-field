@@ -56,7 +56,9 @@ def print_shape(data):
         if p is None:
             print(f"{n} is None")
         elif type(p) == tuple or type(p) == list:
-            print(n, len(p), p[0].dtype)
+            print(n, len(p), p[0].dtype, p[0].device)
+        elif type(p) == torch.Tensor:
+            print(n, p.shape, p.dtype, p.device)
         else: print(n, p.shape, p.dtype)
 
 def get_input_latents_dim(**kwargs):

@@ -451,6 +451,7 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_grad_every != -1 and (self.epoch == 0 or \
            (self.plot_grad_every % self.epoch == 0)):
             plot_grad_flow(self.params_dict.items(), self.grad_fname)
+
         self.optimizer.step()
         self.timer.check("stepped")
 
@@ -497,29 +498,20 @@ class CodebookTrainer(BaseTrainer):
     def resume_train(self):
         try:
             assert(exists(self.pretrained_model_fname))
-            if self.verbose:
-                log.info(f"saved model found, loading {self.pretrained_model_fname}")
+            log.info(f"saved model found, loading {self.pretrained_model_fname}")
             checkpoint = torch.load(self.pretrained_model_fname)
 
             self.train_pipeline.load_state_dict(checkpoint["model_state_dict"])
             self.train_pipeline.eval()
-            self.latents.load_state_dict(checkpoint["latents"])
-
-            if "cuda" in str(self.device):
-                self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-                for state in self.optimizer.state.values():
-                    for k, v in state.items():
-                        if torch.is_tensor(v):
-                            state[k] = v.cuda()
-            else:
-                self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-
-            if self.verbose: log.info("resume training")
+            self.latents = nn.Embedding.from_pretrained(checkpoint["latents"])
+            # a = checkpoint["optimizer_state_dict"]
+            # b = a["state"];c = a["param_groups"];print(b[0])
+            self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            log.info("resume training")
 
         except Exception as e:
-            if self.verbose:
-                log.info(e)
-                log.info("start training from begining")
+            log.info(e)
+            log.info("start training from begining")
 
     def calculate_loss(self, data):
         total_loss = 0
@@ -600,7 +592,7 @@ class CodebookTrainer(BaseTrainer):
             "model_state_dict": self.train_pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
         }
-        checkpoint["latents"] = self.latents
+        checkpoint["latents"] = self.latents.weight
 
         torch.save(checkpoint, model_fname)
         return checkpoint

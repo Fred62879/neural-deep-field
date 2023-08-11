@@ -642,14 +642,14 @@ class AstroTrainer(BaseTrainer):
             self.pipeline.load_state_dict(checkpoint["model_state_dict"])
             self.pipeline.eval()
 
-            if "cuda" in str(self.device):
-                self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-                for state in self.optimizer.state.values():
-                    for k, v in state.items():
-                        if torch.is_tensor(v):
-                            state[k] = v.cuda()
-            else:
-                self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            # if "cuda" in str(self.device):
+            #     self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            #     for state in self.optimizer.state.values():
+            #         for k, v in state.items():
+            #             if torch.is_tensor(v):
+            #                 state[k] = v.cuda()
+            # else:
+            self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
             if self.verbose: log.info("resume training")
 
