@@ -42,9 +42,8 @@ def default_log_setup(level=logging.INFO):
 def select_inferrence_ids(n, m):
     set_seed()
     ids = np.arange(n)
-    np.random.shuffle(ids)
+    # np.random.shuffle(ids)
     ids = ids[:m]
-    print(ids)
     return ids
 
 def create_patch_uid(tract, patch):

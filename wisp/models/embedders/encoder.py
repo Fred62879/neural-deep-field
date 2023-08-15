@@ -38,6 +38,8 @@ class Encoder(nn.Module):
             grid_class = TriplanarGrid
         elif grid_type == "HashGrid":
             grid_class = HashGrid
+        elif grid_type == "DenseGrid":
+            grid_class = DenseGrid
         else:
             raise NotImplementedError
 
@@ -67,14 +69,11 @@ class Encoder(nn.Module):
 
         if self.encode_method == "positional_encoding":
             latents = self.embedder(coords) # [bsz,num_samples,coords_embed_dim]
-            #timer.check("rf_hyperspectral_pe")
-
         elif self.encode_method == "grid":
             if lod_idx is None:
                 lod_idx = len(self.grid.active_lods) - 1
             latents = self.grid.interpolate(coords, lod_idx)
             latents = latents.reshape(batch, num_samples, self.effective_feature_dim)
-            #timer.check("rf_hyperspectra_interpolate")
         else:
             latents = coords
         return latents

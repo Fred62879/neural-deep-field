@@ -347,6 +347,9 @@ class CodebookTrainer(BaseTrainer):
         if self.extra_args["only_last"]:
             self.loss_lods = self.loss_lods[-1:]
 
+        if self.save_model_every > -1 and self.epoch % self.save_model_every == 0:
+            self.save_model()
+
         if self.save_data_every > -1 and self.epoch % self.save_data_every == 0:
             self.save_data = True
 
@@ -399,9 +402,6 @@ class CodebookTrainer(BaseTrainer):
 
         if self.render_tb_every > -1 and self.epoch % self.render_tb_every == 0:
             self.render_tb()
-
-        if self.save_model_every > -1 and self.epoch % self.save_model_every == 0:
-            self.save_model()
 
         # save data locally and restore trainer state
         if self.save_data:
@@ -502,7 +502,7 @@ class CodebookTrainer(BaseTrainer):
             checkpoint = torch.load(self.pretrained_model_fname)
 
             self.train_pipeline.load_state_dict(checkpoint["model_state_dict"])
-            self.train_pipeline.eval()
+            self.train_pipeline.train()
             self.latents = nn.Embedding.from_pretrained(checkpoint["latents"])
             # a = checkpoint["optimizer_state_dict"]
             # b = a["state"];c = a["param_groups"];print(b[0])

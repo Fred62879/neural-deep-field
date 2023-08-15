@@ -84,7 +84,7 @@ class AstroInferrer(BaseInferrer):
         self.model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames = sort_alphanumeric(self.model_fnames)
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames #[-1:]
+            self.selected_model_fnames = self.selected_model_fnames[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -689,6 +689,7 @@ class AstroInferrer(BaseInferrer):
                 gt_wave[lo:hi], gt_fluxes[lo:hi],
                 recon_wave[lo:hi], recon_fluxes[lo:hi],
                 mode=self.mode,
+                # save_spectra_together=True,
                 clip=self.extra_args["plot_clipped_spectrum"],
                 gt_masks=gt_masks[lo:hi],
                 recon_masks=recon_masks[lo:hi])
@@ -1000,7 +1001,7 @@ class AstroInferrer(BaseInferrer):
     def _set_dataset_coords_pretrain(self, checkpoint):
         """ Set spectra trainable latents as input coords (for pretrain infer only).
         """
-        latents = checkpoint["latents"].weight
+        latents = checkpoint["latents"]
         self.dataset.set_hardcode_data(self.coords_source, latents)
 
     def _set_dataset_coords_codebook(self, checkpoint):

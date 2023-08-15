@@ -1,0 +1,79 @@
+def get_bound_id(wave_bound, source_wave, within_bound=True):
+    """ Get id of lambda values in source wave that bounds or is bounded by given wave_bound
+        if `within_bound`
+            source_wave[id_lo] >= wave_lo
+            source_wave[id_hi] <= wave_hi
+        else
+            source_wave[id_lo] <= wave_lo
+            source_wave[id_hi] >= wave_hi
+    """
+    if type(source_wave).__module__ == "torch":
+        source_wave = source_wave.numpy()
+    wave_lo, wave_hi = wave_bound
+    # wave_hi = int(min(wave_hi, int(max(source_wave))))
+    if within_bound:
+        if wave_lo <= min(source_wave): id_lo = 0
+        else: id_lo = np.argmax((source_wave >= wave_lo))
+        if wave_hi >= max(source_wave): id_hi = len(source_wave) - 1
+        else: id_hi = np.argmax((source_wave > wave_hi)) - 1
+        assert(source_wave[id_lo] >= wave_lo and source_wave[id_hi] <= wave_hi)
+    else:
+        if wave_lo <= min(source_wave): id_lo = 0
+        else: id_lo = np.argmax((source_wave > wave_lo)) - 1
+        if wave_hi >= max(source_wave): id_hi = len(source_wave) - 1
+        else: id_hi = np.argmax((source_wave >= wave_hi))
+        assert(source_wave[id_lo] <= wave_lo and source_wave[id_hi] >= wave_hi)
+    return [id_lo, id_hi]
+
+def convolve_spectra(spectra, bound, std=5, border=True):
+    """ Smooth gt spectra with given std.
+        @Param
+          bound: defines range to convolve within
+          border: if True, we add 1 padding at two ends when convolving
+    """
+    if std <= 0: return
+    lo, hi = bound
+    n = hi - lo + 1
+    kernel = Gaussian1DKernel(stddev=std)
+    if border:
+        nume = convolve(spectra[1][lo:hi+1], kernel)
+        denom = convolve(np.ones(n), kernel)
+        spectra[1][lo:hi+1] = nume / denom
+    else:
+        spectra[1][lo:hi+1] = convolve(spectra[1][lo:hi+1], kernel)
+    return spectra
+
+def mask_spectra_range(spectra, mask, bound, trans_range, trusted_range):
+    """ Mask out spectra data beyond given wave range.
+        @Param
+          spectra: spectra data [3,nsmpl] (wave,flux,ivar)
+          bound: defines range of valid spectra
+          mask: mask to be updated [nsmpl]
+          trans_range: transmission data wave range
+          trusted_range: spectra supervision wave range
+    """
+    (id_lo_old, id_hi_old) = bound
+    m, n = spectra.shape
+    lo1, hi1 = trans_range
+    lo2, hi2 = trusted_range
+    wave_range = (max(lo1,lo2), min(hi1,hi2))
+    (id_lo_new, id_hi_new) = get_bound_id(wave_range, spectra[0])
+    id_lo = max(id_lo_old, id_lo_new)
+    id_hi = min(id_hi_old, id_hi_new)
+    new_mask = np.zeros(n).astype(bool)
+    new_mask[id_lo:id_hi+1] = 1
+    mask &= new_mask
+    bound = (id_lo, id_hi)
+    return spectra, mask, bound
+
+
+def solve(infname, max_spectra_len, sigma):
+    spectra = unpack_gt_spectra(infname, format='tbl') # [3,nsmpl]
+    assert spectra.shape[1] <= max_spectra_len
+    mask = create_spectra_mask(spectra, max_spectra_len)
+    spectra = wave_based_sort(spectra)
+    spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
+    spectra, mask = clean_flux(spectra, mask)
+    spectra = convolve_spectra(spectra, bound, std=sigma)
+    spectra = normalize_spectra(spectra, bound)
+    return spectra

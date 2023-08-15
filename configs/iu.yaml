@@ -104,7 +104,7 @@ qtz:
     quantization_strategy: 'soft'
     quantization_calculate_loss: False # only if hard qtz
     qtz_latent_dim: 16
-    qtz_num_embed: 10
+    qtz_num_embed: 50
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
@@ -135,7 +135,7 @@ spatial_decod:
 hyperspectral:
     hps_combine_method: 'concat'
     integration_method: 'dot_prod'
-    intensify_intensity: True
+    intensify_intensity: False
     intensification_method: 'sinh'
 
 trainer:
@@ -170,7 +170,7 @@ trainer:
     learn_spectra_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
 
-    num_supervision_spectra: 100
+    num_supervision_spectra: 35
     spectra_neighbour_size: 1
 
     pixel_supervision: True          # these two conflict
@@ -193,9 +193,9 @@ trainer:
     weight_train: False
 
     weight_by_wave_coverage: False
-    resume_log_dir: '20230811-131623'
-    # pretrain_log_dir: '20230811-115904_pretrain_300_spectra_30k_epochs'
-    pretrained_model_name: 'model-ep1000-it1.pth'
+    # resume_log_dir: '20230811-155045_pretrain_40k_epochs'
+    # pretrain_log_dir: '20230812-215241_pretrain_1k_spectra_60k_epochs_50_codes'
+    # pretrained_model_name: 'model-ep60000-it0.pth'
 
     uniform_sample_wave: True
     mixture_avg_per_band: True
@@ -207,13 +207,13 @@ trainer:
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_batch_size: 200 #2200 #20 #4096 #20000 #36864
+    infer_batch_size: 20 #4096 #20000 #36864
     infer_use_all_wave: True # enforced
     infer_last_model_only: True
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20230810-200927'
+    # infer_log_dir: '20230813-210801_main_train_512_img_60k_epochs_50_codes'
     metric_options: ['mse','ssim','psnr']
     log_pixel_ratio: True
 
@@ -224,10 +224,10 @@ infer:
     recon_cutout_start_pos: [ [[256,256]], [[86,188]] ]
 
     # recon spectra
-    infer_selected: False
-    pretrain_num_infer: 100
+    infer_selected: True
+    pretrain_num_infer: 35
 
-    flux_norm_cho: "linr"
+    flux_norm_cho: "none"
     spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]
     mark_spectra: True
     plot_clipped_spectrum: True
@@ -262,10 +262,10 @@ patch_data:
     # the order of the following 5 fields corresponds to each other
     tracts: ['9812']
     patches: ['1,5']
-    patch_selection_cho: "small_cutout" #"512_cutout" #"2k_cutout" # change all these
-    patch_cutout_num_rows: [64] #[512] #[64]      #  fields
-    patch_cutout_num_cols: [64] #[512] #[64]      #  together
-    patch_cutout_start_pos: [[1917,754]] #[[1750,550]] #[[1917,754]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+    patch_selection_cho: "512_cutout" #"small_cutout" #"512_cutout" #"2k_cutout" # change all these
+    patch_cutout_num_rows: [512] #[64]      #  fields
+    patch_cutout_num_cols: [512] #[64]      #  together
+    patch_cutout_start_pos: [[1750,550]] #[[1917,754]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
 
 trans_data:
     # num_bands: 1
