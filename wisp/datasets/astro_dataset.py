@@ -230,35 +230,36 @@ class AstroDataset(Dataset):
                 data = self.fits_dataset.get_coords(idx)
             else:
                 data = self.data[self.coords_source]
-                data = self.index_selected_data(data, idx)
 
         elif field == "pixels":
-            data = self.fits_dataset.get_pixels(idx)
+            data = self.fits_dataset.get_pixels()
         elif field == "weights":
-            data = self.fits_dataset.get_weights(idx)
+            data = self.fits_dataset.get_weights()
         elif field == "spectra_id_map":
-            data = self.fits_dataset.get_spectra_id_map(idx)
+            data = self.fits_dataset.get_spectra_id_map()
         elif field == "spectra_bin_map":
-            data = self.fits_dataset.get_spectra_bin_map(idx)
+            data = self.fits_dataset.get_spectra_bin_map()
 
-        elif field == "spectra_semi_sup_redshift":
-            data = self.spectra_dataset.get_semi_supervision_redshift(idx)
+        elif field == "spectra_val_pixels":
+            data = self.get_validation_spectra_pixels()
+
         elif field == "spectra_sup_data":
-            data = self.spectra_dataset.get_supervision_data()
-            data = self.index_selected_data(data, idx)
+            data = self.get_supervision_spectra_data()
         elif field == "spectra_sup_plot_mask":
-            data = self.spectra_dataset.get_supervision_masks()
-            data = self.index_selected_data(data, idx)
+            data = self.get_supervision_spectra_masks()
         elif field == "spectra_sup_pixels":
-            data = self.spectra_dataset.get_supervision_pixels()
-            data = self.index_selected_data(data, idx)
+            data = self.get_supervision_spectra_pixels()
         elif field == "spectra_sup_redshift":
-            data = self.spectra_dataset.get_supervision_redshift()
-            data = self.index_selected_data(data, idx)
+            data = self.get_supervision_spectra_redshift()
+        elif field == "spectra_semi_sup_redshift":
+            data = self.get_semi_supervision_spectra_redshift()
+
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
         else:
             raise ValueError(f"Unrecognized data field: {field}.")
+
+        data = self.index_selected_data(data, idx)
         return data
 
     def get_wave_data(self, batch_size, out):

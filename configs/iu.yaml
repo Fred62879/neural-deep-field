@@ -27,7 +27,7 @@ global:
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
     tasks: ['train','recon_img_during_train','save_redshift_during_train','recon_gt_spectra_during_train'] #,'save_qtz_weights_during_train','save_scaler_during_train','recon_codebook_spectra_individ_during_train'
-    # tasks: ['infer','recon_img','recon_gt_spectra','save_redshift'] #,'recon_codebook_spectra_individ','save_qtz_weights','save_scaler']
+    tasks: ['infer','recon_codebook_spectra'] #'recon_img','recon_gt_spectra','save_redshift'] #,'recon_codebook_spectra_individ','save_qtz_weights','save_scaler']
 
 optimizer:
     optimizer_type: 'adam'
@@ -161,7 +161,7 @@ trainer:
 
     train_with_all_pixels: True
     train_pixel_ratio: 0.01
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_data','spectra_sup_plot_mask','spectra_sup_pixels','spectra_semi_sup_redshift','spectra_val_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_data','spectra_sup_plot_mask','spectra_sup_pixels','spectra_semi_sup_redshift','spectra_val_redshift','masks','spectra_val_pixels','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
     pretrain_codebook: False         # these two conflict
     spectra_supervision: False       #  each other

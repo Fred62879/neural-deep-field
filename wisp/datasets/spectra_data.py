@@ -349,7 +349,7 @@ class SpectraData:
 
         # valiation(and semi sup) spectra data (used during main train)
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
-        self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids]
+        self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids][:,0]
         self.data["validation_masks"] = self.data["gt_spectra_plot_mask"][val_ids]
         self.data["validation_img_coords"] = self.data["gt_spectra_img_coords"][val_ids]
         self.data["validation_world_coords"] = self.data["gt_spectra_world_coords"][val_ids]

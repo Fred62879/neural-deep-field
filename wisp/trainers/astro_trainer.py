@@ -94,13 +94,6 @@ class AstroTrainer(BaseTrainer):
             fields.append("wave_data")
             self.dataset.set_wave_source("trans")
 
-        if self.pixel_supervision or self.train_spectra_pixels_only:
-            fields.extend(["coords","pixels"])
-            if self.weight_train:
-                fields.append("weights")
-            if self.spectral_inpaint:
-                pass
-
         if self.spectra_supervision:
             fields.append("spectra_data")
 
@@ -110,6 +103,17 @@ class AstroTrainer(BaseTrainer):
             else:
                 fields.extend([
                     "spectra_id_map","spectra_bin_map","redshift_data"])
+
+        if self.pixel_supervision or self.train_spectra_pixels_only:
+            fields.append("coords")
+            if self.pixel_supervision:
+                fields.append("pixels")
+                if self.weight_train:
+                    fields.append("weights")
+                if self.spectral_inpaint:
+                    pass
+            elif self.train_spectra_pixels_only:
+                fields.append("spectra_val_pixels")
 
         length = self.get_dataset_length()
 
@@ -706,7 +710,11 @@ class AstroTrainer(BaseTrainer):
         # i) reconstruction loss (taking inpaint into account)
         recon_loss, recon_pixels = 0, None
         if self.pixel_supervision or self.train_spectra_pixels_only:
-            gt_pixels = data["pixels"]
+            if self.pixel_supervision:
+                gt_pixels = data["pixels"]
+            elif self.train_spectra_pixels_only:
+                gt_pixels = data["spectra_val_pixels"]
+
             recon_pixels = ret["intensity"]
 
             if self.extra_args["weight_train"]:
@@ -719,19 +727,12 @@ class AstroTrainer(BaseTrainer):
                 recon_loss = self.pixel_loss(gt_pixels, recon_pixels, mask)
             else:
                 recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
-                print(gt_pixels, recon_pixels)
-                loss = nn.L1Loss()
-                err = loss(gt_pixels, recon_pixels)
-                print('***', recon_loss, err)
-                assert 0
-
             self.log_dict["recon_loss"] += recon_loss.item()
             self.timer.check("recon loss")
 
         # ii) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
         if self.spectra_supervision:
-            # and \self.epoch >= self.extra_args["spectra_supervision_start_epoch"]:
             gt_spectra = data["gt_spectra"]
 
             # todo: efficiently slice spectra with different bound
@@ -980,7 +981,7 @@ class AstroTrainer(BaseTrainer):
         recon_pixels = torch.stack(self.recon_pixels).detach().cpu().numpy()
 
         if self.train_spectra_pixels_only:
-            gt_pixels = self.dataset.get_validation_spectra_pixels().numpy()[:,0]
+            gt_pixels = self.dataset.get_validation_spectra_pixels().numpy()
             np.save(join(self.recon_dir, f"{self.epoch}_gt.npy"), gt_pixels)
             np.save(join(self.recon_dir, f"{self.epoch}_recon.npy"), recon_pixels)
             np.set_printoptions(suppress=True)

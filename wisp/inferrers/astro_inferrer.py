@@ -264,7 +264,7 @@ class AstroInferrer(BaseInferrer):
 
             self.requested_fields.append("spectra_sup_data")
             if self.recon_img_sup_spectra:
-                self.requested_fields.append("pixels")
+                self.requested_fields.append("spectra_sup_pixels")
             if self.apply_gt_redshift:
                 self.requested_fields.append("spectra_sup_redshift")
 
@@ -289,6 +289,9 @@ class AstroInferrer(BaseInferrer):
 
             if self.recon_img:
                 self.requested_fields.append("pixels")
+            elif self.recon_img_val_spectra:
+                self.requested_fields.append("spectra_val_pixels")
+
             if self.save_redshift_main:
                 if self.recon_spectra_pixels_only:
                     self.requested_fields.append("spectra_semi_sup_redshift")
@@ -507,14 +510,14 @@ class AstroInferrer(BaseInferrer):
                 log.info(f"Recon. pixels (full) {recon_pixels}")
 
         elif self.recon_img_val_spectra:
-            vals = torch.stack(self.recon_pixels).detach().cpu().numpy()
+            gt_pixels = torch.stack(self.gt_pixels).detach().cpu().numpy()
+            recon_pixels = torch.stack(self.recon_pixels).detach().cpu().numpy()
             fname = join(self.recon_dir, f"{model_id}.pth")
-            np.save(fname, vals)
+            np.save(fname, recon_pixels)
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
-            log.info(f"Recon vals {vals}")
-            gt_vals = self.dataset.get_validation_spectra_pixels().numpy()[:,0]
-            log.info(f"GT vals {gt_vals}")
+            log.info(f"GT pixels {gt_pixels}")
+            log.info(f"Recon pixels {recon_pixels}")
 
         if self.recon_synthetic_band:
             re_args = {
@@ -896,7 +899,12 @@ class AstroInferrer(BaseInferrer):
                 if self.recon_synthetic_band:
                     self.recon_synthetic_pixels.extend(ret["intensity"][...,-1:])
                     ret["intensity"] = ret["intensity"][...,:-1]
-                self.gt_pixels.extend([data["pixels"])
+                if self.recon_img:
+                    self.gt_pixels.extend(data["pixels"])
+                elif self.recon_img_sup_spectra:
+                    self.gt_pixels.extend(data["spectra_sup_pixels"])
+                elif self.recon_img_val_spectra:
+                    self.gt_pixels.extend(data["spectra_val_pixels"])
                 self.recon_pixels.extend(ret["intensity"])
 
             if self.save_scaler:
