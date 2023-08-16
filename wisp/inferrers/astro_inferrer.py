@@ -455,6 +455,7 @@ class AstroInferrer(BaseInferrer):
             self.embed = load_embed(checkpoint["model_state_dict"])
 
     def post_checkpoint_all_coords_full_model(self, model_id):
+        print(self.recon_img_val_spectra)
         if self.recon_img:
             re_args = {
                 "fname": model_id,

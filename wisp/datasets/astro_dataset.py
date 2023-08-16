@@ -231,6 +231,7 @@ class AstroDataset(Dataset):
             else:
                 data = self.data[self.coords_source]
                 data = self.index_selected_data(data, idx)
+
         elif field == "pixels":
             data = self.fits_dataset.get_pixels(idx)
         elif field == "weights":
@@ -239,9 +240,9 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_spectra_id_map(idx)
         elif field == "spectra_bin_map":
             data = self.fits_dataset.get_spectra_bin_map(idx)
+
         elif field == "spectra_semi_sup_redshift":
             data = self.spectra_dataset.get_semi_supervision_redshift(idx)
-
         elif field == "spectra_sup_data":
             data = self.spectra_dataset.get_supervision_data()
             data = self.index_selected_data(data, idx)

@@ -409,6 +409,13 @@ class AstroTrainer(BaseTrainer):
             self.init_dataloader()
             self.reset_data_iterator()
 
+        # note, if we want to save data during training and compare with inferrence data
+        # we need to save model in `pre_epoch` (before step) so data save during training
+        # is generated using exactly the same model as data generated during inferrence
+        # otherwise, we can move save model to `post_epoch`
+        if self.save_model_every > -1 and self.epoch % self.save_model_every == 0:
+            self.save_model()
+
         self.pipeline.train()
 
     def post_epoch(self):
@@ -431,9 +438,6 @@ class AstroTrainer(BaseTrainer):
 
         if self.render_tb_every > -1 and self.epoch % self.render_tb_every == 0:
             self.render_tb()
-
-        if self.save_model_every > -1 and self.epoch % self.save_model_every == 0:
-            self.save_model()
 
         if self.save_data:
             self.save_local()
@@ -715,6 +719,11 @@ class AstroTrainer(BaseTrainer):
                 recon_loss = self.pixel_loss(gt_pixels, recon_pixels, mask)
             else:
                 recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
+                print(gt_pixels, recon_pixels)
+                loss = nn.L1Loss()
+                err = loss(gt_pixels, recon_pixels)
+                print('***', recon_loss, err)
+                assert 0
 
             self.log_dict["recon_loss"] += recon_loss.item()
             self.timer.check("recon loss")
@@ -774,6 +783,7 @@ class AstroTrainer(BaseTrainer):
         # Average over iterations
         n = len(self.train_data_loader)
 
+        print(self.log_dict["recon_loss"])
         log_text = "EPOCH {}/{}".format(self.epoch, self.num_epochs)
         log_text += " | total loss: {:>.3E}".format(self.log_dict["total_loss"] / n)
         log_text += " | recon loss: {:>.3E}".format(self.log_dict["recon_loss"] / n)
@@ -858,10 +868,10 @@ class AstroTrainer(BaseTrainer):
     def _save_redshift(self):
         redshift = torch.stack(self.redshift).detach().cpu().numpy()
         if self.train_spectra_pixels_only:
-            gt_redshift = self.dataset.get_semi_supervision_spectra_redshift()
+            gt_redshift = self.dataset.get_semi_supervision_spectra_redshift().numpy()
         else:
             redshift = redshift[self.val_spectra_map]
-            gt_redshift = self.cur_patch.get_spectra_pixel_redshift()
+            gt_redshift = self.cur_patch.get_spectra_pixel_redshift().numpy()
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
         log.info(f"est redshift: {redshift}")
@@ -967,14 +977,16 @@ class AstroTrainer(BaseTrainer):
             )
 
     def restore_evaluate_tiles(self):
-        self.recon_pixels = torch.stack(self.recon_pixels).detach().cpu().numpy()
+        recon_pixels = torch.stack(self.recon_pixels).detach().cpu().numpy()
 
         if self.train_spectra_pixels_only:
             gt_pixels = self.dataset.get_validation_spectra_pixels().numpy()[:,0]
+            np.save(join(self.recon_dir, f"{self.epoch}_gt.npy"), gt_pixels)
+            np.save(join(self.recon_dir, f"{self.epoch}_recon.npy"), recon_pixels)
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
             log.info(f"GT pixels: {gt_pixels}")
-            log.info(f"Recon pixels: {self.recon_pixels}")
+            log.info(f"Recon pixels: {recon_pixels}")
         else:
             re_args = {
                 "fname": self.epoch,
@@ -989,7 +1001,7 @@ class AstroTrainer(BaseTrainer):
                 "recon_flat_trans": False,
                 "calculate_metrics": False
             }
-            _, _ = self.dataset.restore_evaluate_tiles(self.recon_pixels, **re_args)
+            _, _ = self.dataset.restore_evaluate_tiles(recon_pixels, **re_args)
 
             if self.recon_crop:
                 self.save_cropped_recon_locally(**re_args)

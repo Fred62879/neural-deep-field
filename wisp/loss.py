@@ -10,20 +10,23 @@ def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     emd = torch.mean(torch.abs(emd))
     return emd
 
-def plotspectra(spectra, fname):
-    spectra = spectra.detach().cpu().numpy()
-    import matplotlib.pyplot as plt
-    n,m = spectra.shape
-    x = np.arange(m)
-    # fig, axs = plt.subplots(2,10,figsize=(50,10))
-    fig, axs = plt.subplots(1,1,figsize=(50,10))
-    for i in range(n):
-        # axis = axs[i//10,i%10]
-        axis = axs
-        axis.plot(x,spectra[i])
-    fig.tight_layout()
-    plt.savefig(fname)
-    plt.close()
+def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):
+    ''' Loss function for spectra supervision
+        @Param
+          loss: l1/l2 as specified in config
+                NOTE: `reduction` for loss MUST be set as `none` for spectra loss!
+          mask:       [bsz,num_smpls]
+          gt_spectra: [bsz,4+2*nbanbds,num_smpls]
+                      (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
+          recon_flux: [bsz,num_smpls]
+    '''
+    if weight_by_wave_coverage:
+        weight = gt_spectra[:,3]
+        ret = loss(gt_spectra[:,1]*mask*weight, recon_flux*mask*weight)
+    else:
+        ret = loss(gt_spectra[:,1]*mask, recon_flux*mask)
+    ret = torch.mean(torch.sum(ret, dim=-1), dim=-1)
+    return ret
 
 def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):
     ''' Loss function for spectra supervision
@@ -54,24 +57,6 @@ def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux, weight_by_wave_co
                         weight=weight, precision=gt_spectra[:,2])
     emd = torch.mean(torch.abs(emd))
     return emd
-
-def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):
-    ''' Loss function for spectra supervision
-        @Param
-          loss: l1/l2 as specified in config
-                NOTE: `reduction` for loss MUST be set as `none` for spectra loss!
-          mask:       [bsz,num_smpls]
-          gt_spectra: [bsz,4+2*nbanbds,num_smpls]
-                      (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
-          recon_flux: [bsz,num_smpls]
-    '''
-    if weight_by_wave_coverage:
-        weight = gt_spectra[:,3]
-        ret = loss(gt_spectra[:,1]*mask*weight, recon_flux*mask*weight)
-    else:
-        ret = loss(gt_spectra[:,1]*mask, recon_flux*mask)
-    ret = torch.mean(torch.sum(ret, dim=-1), dim=-1)
-    return ret
 
 def redshift_supervision_loss(loss, gt_redshift, recon_redshift, mask=None):
     ''' Loss function for few-shot redshift supervision

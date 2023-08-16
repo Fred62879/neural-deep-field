@@ -26,8 +26,8 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    tasks: ['train','recon_img_during_train'] #'save_redshift_during_train'] #,'recon_gt_spectra_during_train','save_qtz_weights_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
-    tasks: ['infer','recon_img'] #'recon_gt_spectra'] #,'save_redshift'] #,'recon_codebook_spectra_individ','save_qtz_weights','save_scaler']
+    tasks: ['train','recon_img_during_train','save_redshift_during_train','recon_gt_spectra_during_train'] #,'save_qtz_weights_during_train','save_scaler_during_train','recon_codebook_spectra_individ_during_train'
+    # tasks: ['infer','recon_img','recon_gt_spectra','save_redshift'] #,'recon_codebook_spectra_individ','save_qtz_weights','save_scaler']
 
 optimizer:
     optimizer_type: 'adam'
@@ -135,7 +135,7 @@ spatial_decod:
 hyperspectral:
     hps_combine_method: 'concat'
     integration_method: 'dot_prod'
-    intensify_intensity: False
+    intensify_intensity: True
     intensification_method: 'sinh'
 
 trainer:
