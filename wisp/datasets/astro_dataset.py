@@ -139,9 +139,8 @@ class AstroDataset(Dataset):
     def get_coords(self):
         return self.fits_dataset.get_coords()
 
-
-    # def get_spectra_coord_ids(self):
-    #     return self.spectra_dataset.get_spectra_coord_ids()
+    def get_coords_range(self):
+        return self.fits_dataset.get_coords_range()
 
     def get_full_spectra_wave_mask(self):
         return self.spectra_dataset.get_full_wave_mask()
@@ -152,8 +151,18 @@ class AstroDataset(Dataset):
     def get_spectra_img_coords(self):
         return self.spectra_dataset.get_gt_spectra_img_coords()
 
+
     def get_validation_spectra_ids(self, patch_uid=None):
         return self.spectra_dataset.get_validation_spectra_ids(patch_uid)
+
+    def get_validation_spectra(self, idx=None):
+        return self.spectra_dataset.get_validation_spectra(idx)
+
+    def get_validation_spectra_masks(self):
+        return self.spectra_dataset.get_validation_masks()
+
+    def get_validation_spectra_pixels(self, idx=None):
+        return self.spectra_dataset.get_validation_pixels(idx)
 
     def get_validation_spectra_img_coords(self, idx=None):
         return self.spectra_dataset.get_validation_img_coords(idx)
@@ -161,17 +170,14 @@ class AstroDataset(Dataset):
     def get_validation_spectra_world_coords(self, idx=None):
         return self.spectra_dataset.get_validation_world_coords(idx)
 
-    def get_validation_spectra_fluxes(self, idx=None):
-        return self.spectra_dataset.get_validation_fluxes(idx)
-
-    def get_validation_spectra_pixels(self, idx=None):
-        return self.spectra_dataset.get_validation_pixels(idx)
-
     def get_supervision_spectra_pixels(self):
         return self.spectra_dataset.get_supervision_pixels()
 
     def get_supervision_spectra_redshift(self):
         return self.spectra_dataset.get_supervision_redshift()
+
+    def get_semi_supervision_spectra_redshift(self):
+        return self.spectra_dataset.get_semi_supervision_redshift()
 
 
     def get_num_gt_spectra(self):
@@ -233,11 +239,14 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_spectra_id_map(idx)
         elif field == "spectra_bin_map":
             data = self.fits_dataset.get_spectra_bin_map(idx)
+        elif field == "spectra_semi_sup_redshift":
+            data = self.spectra_dataset.get_semi_supervision_redshift(idx)
+
         elif field == "spectra_sup_data":
             data = self.spectra_dataset.get_supervision_data()
             data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_plot_mask":
-            data = self.spectra_dataset.get_supervision_plot_mask()
+            data = self.spectra_dataset.get_supervision_masks()
             data = self.index_selected_data(data, idx)
         elif field == "spectra_sup_pixels":
             data = self.spectra_dataset.get_supervision_pixels()
@@ -273,10 +282,11 @@ class AstroDataset(Dataset):
                 # sample from spectra data (wave, flux, ivar, and interpolated trans)
                 # sample_ids [bsz,nsmpl,2]
                 assert self.kwargs["uniform_sample_wave"]
+
                 out["spectra_sup_data"], sample_ids = batch_sample_torch(
                     out["spectra_sup_data"], self.kwargs["pretrain_num_wave_samples"],
                     keep_sample_ids=True)
-                # print(sample_ids)
+
                 out["spectra_sup_plot_mask"] = batch_sample_torch(
                     out["spectra_sup_plot_mask"], self.kwargs["pretrain_num_wave_samples"],
                     sample_ids=sample_ids)
@@ -362,13 +372,13 @@ class AstroDataset(Dataset):
                 out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
 
     def get_redshift_data(self, out):
-        """ Get supervision redshift values.
+        """ Get redshift values for main train redshift semi-supervision.
         """
         ids = out["spectra_id_map"]
         if not self.kwargs["train_spectra_pixels_only"]:
             bin_map = out["spectra_bin_map"]
             ids = ids[bin_map]
-        out["spectra_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
+        out["sup_spectra_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
         del out["spectra_id_map"]
 
     def __len__(self):

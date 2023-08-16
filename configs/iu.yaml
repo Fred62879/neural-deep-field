@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights'] #'recon_codebook_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #'save_redshift','recon_img']
+    tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights'] #'recon_codebook_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #'save_redshift','recon_img']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -26,8 +26,8 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    #tasks: ['train'] #,'save_redshift_during_train','recon_gt_spectra_during_train','recon_img_during_train','save_qtz_weights_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
-    #tasks: ['infer','recon_gt_spectra','recon_img'] #,'recon_codebook_spectra_individ','save_qtz_weights','save_redshift','save_scaler']
+    tasks: ['train','recon_img_during_train'] #'save_redshift_during_train'] #,'recon_gt_spectra_during_train','save_qtz_weights_during_train','save_scaler_during_train'] #,'recon_codebook_spectra_individ_during_train']
+    tasks: ['infer','recon_img'] #'recon_gt_spectra'] #,'save_redshift'] #,'recon_codebook_spectra_individ','save_qtz_weights','save_scaler']
 
 optimizer:
     optimizer_type: 'adam'
@@ -104,7 +104,7 @@ qtz:
     quantization_strategy: 'soft'
     quantization_calculate_loss: False # only if hard qtz
     qtz_latent_dim: 16
-    qtz_num_embed: 50
+    qtz_num_embed: 10
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
@@ -146,39 +146,39 @@ trainer:
     pixel_loss_cho: l1_mean
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
-    num_epochs: 30000
+    num_epochs: 2000
     batch_size: 15000 #40960 #65536 #262144
     pretrain_batch_size: 3000
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 3000
+    log_cli_every: 200
     log_gpu_every: -1
     plot_grad_every: -1
-    save_data_every: -1
-    save_model_every: 3000
+    save_data_every: 200
+    save_model_every: 200
     save_as_new: True
 
     train_with_all_pixels: True
     train_pixel_ratio: 0.01
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_data','spectra_sup_plot_mask','spectra_sup_pixels','spectra_sup_redshift','spectra_val_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_data','spectra_sup_plot_mask','spectra_sup_pixels','spectra_semi_sup_redshift','spectra_val_redshift','masks','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
-    pretrain_codebook: True          # these two conflict
+    pretrain_codebook: False         # these two conflict
     spectra_supervision: False       #  each other
 
     batched_pretrain: True
     learn_spectra_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
 
-    num_supervision_spectra: 35
+    num_supervision_spectra: 1000
     spectra_neighbour_size: 1
 
-    pixel_supervision: True          # these two conflict
-    train_spectra_pixels_only: False #  each other
+    pixel_supervision: False          # these two conflict
+    train_spectra_pixels_only: True #  each other
 
-    apply_gt_redshift: True         # -
+    apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
-    redshift_semi_supervision: False  # -
+    redshift_semi_supervision: True  # -
 
     spectra_beta: 1
     redshift_beta: 1
@@ -194,13 +194,13 @@ trainer:
 
     weight_by_wave_coverage: False
     # resume_log_dir: '20230811-155045_pretrain_40k_epochs'
-    # pretrain_log_dir: '20230812-215241_pretrain_1k_spectra_60k_epochs_50_codes'
-    # pretrained_model_name: 'model-ep60000-it0.pth'
+    pretrain_log_dir: '20230815-120522_pretrain_10k_spectra_30k_epochs_50_codes_debugged_spectra'
+    pretrained_model_name: 'model-ep30000-it0.pth'
 
     uniform_sample_wave: True
     mixture_avg_per_band: True
 
-    train_use_all_wave: False
+    train_use_all_wave: True
     pretrain_use_all_wave: False
     train_num_wave_samples: 50
     pretrain_num_wave_samples: 100
@@ -225,9 +225,9 @@ infer:
 
     # recon spectra
     infer_selected: True
-    pretrain_num_infer: 35
+    pretrain_num_infer: 200
 
-    flux_norm_cho: "none"
+    flux_norm_cho: "linr"
     spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]
     mark_spectra: True
     plot_clipped_spectrum: True
@@ -250,22 +250,24 @@ dataset:
     load_patch_data_cache: True
     dataset_path: '/scratch/projects/vision/data/pdr3'
     wave_range_fname: 'wave_range0.npy'
-    coords_range_fname: 'coords_range0.npy' # make sure pretrain and main train
-                                            # use the same norm range for coords
     gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
 
 patch_data:
-    use_full_patch: False
-
-    # if don't use full patch, we can select cutout from tiles
-    # the order of the following 5 fields corresponds to each other
     tracts: ['9812']
     patches: ['1,5']
-    patch_selection_cho: "512_cutout" #"small_cutout" #"512_cutout" #"2k_cutout" # change all these
-    patch_cutout_num_rows: [512] #[64]      #  fields
-    patch_cutout_num_cols: [512] #[64]      #  together
-    patch_cutout_start_pos: [[1750,550]] #[[1917,754]] #[[86,188]] #[[1867,535]] #[[2009,917]] #[[1970,758]]
+
+    use_full_patch: True
+
+    #### **** below fields should be changed together ****
+    coords_range_fname: 'coords_range_981215_full.npy'
+    patch_selection_cho: "full_cutout" #"small_cutout" #"512_cutout" #"2k_cutout"
+
+    # if don't use full patch, we can select cutout from tiles
+    patch_cutout_num_rows: [4200] #[512]
+    patch_cutout_num_cols: [4200] #[512]
+    patch_cutout_start_pos: [[0,0]] #[[1750,550]] #[[1917,754]] #[[86,188]]
+    #### *************************************************
 
 trans_data:
     # num_bands: 1

@@ -172,11 +172,11 @@ class SpectraData:
         """ Get #validation spectra (doesn't count neighbours). """
         return self.num_validation_spectra
 
-    def get_supervision_plot_mask(self, idx=None):
-        """ Get mask for plotting. """
+    def get_supervision_masks(self, idx=None):
+        """ Get supervision spectra mask for plotting. """
         if idx is None:
-            return self.data["supervision_plot_mask"]
-        return self.data["supervision_plot_mask"][idx]
+            return self.data["supervision_masks"]
+        return self.data["supervision_masks"][idx]
 
     def get_supervision_data(self, idx=None):
         """ Get gt spectra (with same wave range as recon) used for supervision. """
@@ -225,7 +225,15 @@ class SpectraData:
             return self.data["validation_world_coords"][idx]
         return self.data["validation_world_coords"]
 
-    def get_semi_supervision_redshift(self):
+    def get_validation_masks(self, idx=None):
+        """ Get validation spectra mask for plotting. """
+        if idx is None:
+            return self.data["validation_masks"]
+        return self.data["validation_masks"][idx]
+
+    def get_semi_supervision_redshift(self, idx=None):
+        if idx is not None:
+            return self.data["semi_supervision_redshift"][idx]
         return self.data["semi_supervision_redshift"]
 
     #############
@@ -334,16 +342,16 @@ class SpectraData:
 
         # supervision spectra data (used during pretrain)
         self.data["supervision_spectra"] = self.data["gt_spectra"][sup_ids]
+        self.data["supervision_masks"] = self.data["gt_spectra_plot_mask"][sup_ids]
         self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][sup_ids]
-        self.data["supervision_plot_mask"] = self.data["gt_spectra_plot_mask"][sup_ids]
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][sup_ids]
 
         # valiation(and semi sup) spectra data (used during main train)
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
         self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids]
+        self.data["validation_masks"] = self.data["gt_spectra_plot_mask"][val_ids]
         self.data["validation_img_coords"] = self.data["gt_spectra_img_coords"][val_ids]
-        # print(self.data["validation_img_coords"])
         self.data["validation_world_coords"] = self.data["gt_spectra_world_coords"][val_ids]
         if self.kwargs["redshift_semi_supervision"]:
             self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]

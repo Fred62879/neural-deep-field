@@ -125,16 +125,20 @@ class SpatialDecoder(nn.Module):
         timer.check("spatial_decod::scaler done")
 
         # forward redshift
+        # print(z, z.shape)
         if self.apply_gt_redshift:   # dont generate redshift
             assert specz is not None
             redshift = specz
             ret["redshift"] = redshift
         elif self.model_redshift:
             redshift = self.redshift_decoder(z[:,0])[...,0]
+            # print(redshift)
             redshift = self.redshift_adjust(redshift + 0.5)
+            # print(redshift)
         else:
             redshift = None
         timer.check("spatial_decod::redshift done")
+        # print('*********')
 
         # decode/quantize
         if self.quantize_spectra:

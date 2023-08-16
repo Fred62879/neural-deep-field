@@ -97,6 +97,7 @@ class FitsData:
         self.coords_fname = join(img_data_path, f"coords{suffix}.npy")
         self.coords_range_fname = get_coords_range_fname(**self.kwargs)
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
+        self.headers_fname = join(img_data_path, f"headers{suffix}.txt")
         self.meta_data_fname = join(img_data_path, f"meta_data{suffix}.txt")
         self.pixels_fname = join(img_data_path, f"pixels_{norm_str}{suffix}.npy")
         self.zscale_ranges_fname = join(img_data_path, f"zscale_ranges_{norm_str}{suffix}.npy")
@@ -116,7 +117,7 @@ class FitsData:
         self.data = {}
 
         cached = self.load_patch_data_cache and \
-            exists(self.meta_data_fname) and \
+            exists(self.headers_fname) and exists(self.meta_data_fname) and \
             (not self.load_weights or exists(self.weights_fname)) and \
             (not self.load_pixels or (exists(self.pixels_fname) and \
                                       exists(self.zscale_ranges_fname))) and \
@@ -127,8 +128,8 @@ class FitsData:
                                        exists(self.spectra_pixel_fluxes_fname) and \
                                        exists(self.spectra_pixel_redshift_fname)))
 
-        if cached: pixels, coords, weights, spectra_data  = self.load_cache()
-        else:      pixels, coords, weights, spectra_data = self.process_data()
+        if cached: pixels, coords, coords_range, weights, spectra_data  = self.load_cache()
+        else:      pixels, coords, coords_range, weights, spectra_data = self.process_data()
 
         if self.load_pixels:
             pixel_max = np.round(np.max(pixels, axis=0), 3)
@@ -140,6 +141,7 @@ class FitsData:
         if self.load_coords:
             coords = add_dummy_dim(coords, **self.kwargs)[:,None]
             self.data["coords"] = torch.FloatTensor(coords)
+            self.data["coords_range"] = coords_range
 
         if self.load_weights:
             self.data["weights"] = torch.FloatTensor(weights)
@@ -185,6 +187,9 @@ class FitsData:
             return self.data["coords"][idx]
         return self.data["coords"]
 
+    def get_coords_range(self):
+        return self.data["coords_range"]
+
     def get_weights(self, idx=None):
         if idx is not None:
             return self.data["weights"][idx]
@@ -221,60 +226,52 @@ class FitsData:
     # Utilities
     ############
 
-    def world2pix(self, ra, dec, neighbour_size, tract, patch):
-        """ Convert from world coordinate to pixel coordinate.
-            @Param:
-               ra/dec:         world coordinate
-               neighbour_size: size of neighbouring area to average for spectra
+    # def world2pix(self, ra, dec, neighbour_size, tract, patch):
+    #     """ Convert from world coordinate to pixel coordinate.
+    #         @Param:
+    #            ra/dec:         world coordinate
+    #            neighbour_size: size of neighbouring area to average for spectra
 
-            We can either
-             i) directly normalize the given ra/dec with coordinates range or
-            ii) get pixel id based on ra/dec and index from loaded coordinates.
+    #         We can either
+    #          i) directly normalize the given ra/dec with coordinates range or
+    #         ii) get pixel id based on ra/dec and index from loaded coordinates.
 
-            Since ra/dec values from spectra data may not be as precise as
-              real coordinates calculated from wcs package, method i) tends to
-              be inaccurate and method ii) is more reliable.
-            However, if given ra/dec is not within loaded coordinates, we
-              can only use method i)
-        """
-        patch_uid = create_patch_uid(tract, patch)
-        patch_id = self.patch_uids.index(patch_uid)
+    #         Since ra/dec values from spectra data may not be as precise as
+    #           real coordinates calculated from wcs package, method i) tends to
+    #           be inaccurate and method ii) is more reliable.
+    #         However, if given ra/dec is not within loaded coordinates, we
+    #           can only use method i)
+    #     """
+    #     patch_uid = create_patch_uid(tract, patch)
+    #     patch_id = self.patch_uids.index(patch_uid)
 
-        # ra/dec values from spectra data may not be exactly the same as real coords
-        # this normalized ra/dec may thus be slightly different from real coords
-        # (ra_lo, ra_hi, dec_lo, dec_hi) = np.load(self.patch_obj.coords_range_fname)
-        # coord_loose = ((ra - ra_lo) / (ra_hi - ra_lo),
-        #                (dec - dec_lo) / (dec_hi - dec_lo))
+    #     # ra/dec values from spectra data may not be exactly the same as real coords
+    #     # this normalized ra/dec may thus be slightly different from real coords
+    #     # (ra_lo, ra_hi, dec_lo, dec_hi) = np.load(self.patch_obj.coords_range_fname)
+    #     # coord_loose = ((ra - ra_lo) / (ra_hi - ra_lo),
+    #     #                (dec - dec_lo) / (dec_hi - dec_lo))
 
-        header = self.headers[patch_uid]
+    #     header = self.headers[patch_uid]
 
-        # index coord from original coords array to get accurate coord
-        # this only works if spectra coords is included in the loaded coords
-        (r, c) = worldToPix(header, ra, dec) # image coord, r and c coord within full tile
+    #     # index coord from original coords array to get accurate coord
+    #     # this only works if spectra coords is included in the loaded coords
+    #     (r, c) = worldToPix(header, ra, dec) # image coord, r and c coord within full tile
 
-        img_coords = np.array([r, c, patch_id])
-        # if self.use_full_patch:
-        #     img_coords = np.array([r, c, patch_id])
-        # else:
-        #     start_pos = self.patch_cutout_start_pos[patch_id]
-        #     img_coords = np.array([r - start_pos[0], c - start_pos[1], patch_id])
+    #     img_coords = np.array([r, c, patch_id])
+    #     # if self.use_full_patch:
+    #     #     img_coords = np.array([r, c, patch_id])
+    #     # else:
+    #     #     start_pos = self.patch_cutout_start_pos[patch_id]
+    #     #     img_coords = np.array([r - start_pos[0], c - start_pos[1], patch_id])
 
-        pixel_ids = self.get_pixel_ids(patch_uid, r, c, neighbour_size)
-        grid_coords = self.get_coords(pixel_ids)
-        # print(r, c, pixel_ids, coords_accurate, self.kwargs["patch_cutout_start_pos"])
-        return img_coords, grid_coords, pixel_ids
+    #     pixel_ids = self.get_pixel_ids(patch_uid, r, c, neighbour_size)
+    #     grid_coords = self.get_coords(pixel_ids)
+    #     # print(r, c, pixel_ids, coords_accurate, self.kwargs["patch_cutout_start_pos"])
+    #     return img_coords, grid_coords, pixel_ids
 
     def calculate_local_id(self, r, c, index, patch_uid):
         """ Count number of pixels before given position in given patch.
         """
-        # if self.use_full_patch:
-        #     r_lo, c_lo = 0, 0
-        #     total_cols = self.num_cols[patch_uid]
-        # else:
-        #     (r_lo, c_lo) = self.patch_cutout_start_pos[index]
-        #     total_cols = self.num_cols[patch_uid]
-        # local_id = total_cols * (r - r_lo) + c - c_lo
-
         total_cols = self.num_cols[patch_uid]
         local_id = total_cols * r + c
         return local_id
@@ -409,8 +406,10 @@ class FitsData:
             np.save(np_fname, recon_patch)
 
         if re_args["to_HDU"]:
-            patch_fname = join(dir, f"{patch_uid}_{fname}.patch")
-            generate_hdu(class_obj.headers[patch_uid], recon_patch, patch_fname)
+            # patch_fname = join(dir, f"{patch_uid}_{fname}.patch")
+            # generate_hdu(self.headers[patch_uid], recon_patch, patch_fname)
+            # requires proper saving of header
+            raise NotImplementedError("hdu image generation currently not supported")
 
         if "plot_func" in re_args:
             png_fname = join(dir, f"{patch_uid}_{fname}.png")
@@ -515,10 +514,11 @@ class FitsData:
         if self.verbose: log.info("PATCH data cached.")
         pixels, coords, weights, spectra_data = [None]*4
 
+        # with open(self.headers_fname, "rb") as fp:
+        #     headers = pickle.load(fp)
         with open(self.meta_data_fname, "rb") as fp:
             meta_data = pickle.load(fp)
-        (self.headers, self.num_rows, self.num_cols,
-         self.gt_paths, self.gt_img_fnames) = meta_data
+        (self.num_rows, self.num_cols, self.gt_paths, self.gt_img_fnames) = meta_data
 
         if self.load_pixels:
             pixels = np.load(self.pixels_fname)
@@ -526,7 +526,6 @@ class FitsData:
         if self.load_coords:
             coords = np.load(self.coords_fname)
             coords_range = np.load(self.coords_range_fname)
-            # print(self.coords_fname, self.coords_range_fname, coords_range)
             coords, _ = normalize_coords(coords, coords_range=coords_range)
         if self.load_weights:
             weights = np.load(self.weights_fname)
@@ -537,7 +536,7 @@ class FitsData:
             spectra_pixel_redshift = np.load(self.spectra_pixel_redshift_fname)
             spectra_data = (spectra_id_map, spectra_bin_map,
                             spectra_pixel_fluxes, spectra_pixel_redshift)
-        return pixels, coords, weights, spectra_data
+        return pixels, coords, coords_range, weights, spectra_data
 
     def process_data(self):
         pixels, coords, weights, spectra_data = [], [], [], []
@@ -555,9 +554,10 @@ class FitsData:
                 spectra_bin_map, spectra_pixel_fluxes, spectra_pixel_redshift,
                 tract, patch, cutout_num_rows, cutout_num_cols, cutout_start_pos)
 
-        meta_data = (self.headers, self.num_rows, self.num_cols,
-                     self.gt_paths, self.gt_img_fnames)
+        meta_data = (self.num_rows, self.num_cols, self.gt_paths, self.gt_img_fnames)
 
+        with open(self.headers_fname, "wb") as fp:
+            pickle.dump(self.headers, fp)
         with open(self.meta_data_fname, "wb") as fp:
             pickle.dump(meta_data, fp)
 
@@ -597,7 +597,7 @@ class FitsData:
             spectra_data = (spectra_id_map, spectra_bin_map,
                             spectra_pixel_fluxes, spectra_pixel_redshift)
 
-        return pixels, coords, weights, spectra_data
+        return pixels, coords, coords_range, weights, spectra_data
 
     def load_one_patch(self, pixels, coords, weights, spectra_id_map,
                        spectra_bin_map, spectra_pixel_fluxes, spectra_pixel_redshift,

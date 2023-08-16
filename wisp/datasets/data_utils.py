@@ -195,6 +195,7 @@ def add_dummy_dim(coords, **kwargs):
         else:
             raise ValueError("Unknown collection class")
         coords[...,:2] = coords_2d
+    coords = torch.FloatTensor(coords)
     return coords
 
 def default_collate(batch):
