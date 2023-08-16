@@ -431,19 +431,20 @@ class AstroInferrer(BaseInferrer):
         self.reset_data_iterator()
 
         if self.recon_img:
-            self.recon_pixels = []
-            self.recon_HSI_now = self.recon_HSI and model_id == self.num_models
-            self.to_HDU_now = self.extra_args["to_HDU"] and model_id == self.num_models
+            self.gt_pixels = []; self.recon_pixels = []
+            # self.recon_HSI_now = self.recon_HSI and model_id == self.num_models
+            # self.to_HDU_now = self.extra_args["to_HDU"] and model_id == self.num_models
             # self.recon_flat_trans_now = self.recon_flat_trans and model_id == self.num_models
         if self.save_scaler: self.scalers = []
         if self.plot_embed_map: self.embed_ids = []
         if self.plot_latent_embed: self.latents = []
         if self.save_redshift_main:
-            self.redshift = []
-            self.gt_redshift = []
+            self.redshift = []; self.gt_redshift = []
         if self.save_qtz_weights: self.qtz_weights = []
-        if self.recon_img_sup_spectra: self.recon_pixels = []
-        if self.recon_img_val_spectra: self.recon_pixels = []
+        if self.recon_img_sup_spectra:
+            self.gt_pixels = []; self.recon_pixels = []
+        if self.recon_img_val_spectra:
+            self.gt_pixels = []; self.recon_pixels = []
         if self.recon_synthetic_band: self.recon_synthetic_pixels = []
 
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
@@ -488,21 +489,22 @@ class AstroInferrer(BaseInferrer):
 
         elif self.recon_img_sup_spectra:
             assert(self.pretrain_infer)
-            recon_vals = torch.stack(self.recon_pixels).detach().cpu().numpy()
-            gt_vals = self.dataset.get_supervision_spectra_pixels().numpy()[:,0]
-            if self.infer_selected:
-                gt_vals = gt_vals[self.dataset.get_selected_ids()]
+            gt_pixels = torch.stack(self.gt_pixels).detach().cpu().numpy()
+            recon_pixels = torch.stack(self.recon_pixels).detach().cpu().numpy()
+            # gt_pixels = self.dataset.get_supervision_spectra_pixels().numpy()[:,0]
+            # if self.infer_selected:
+            #     gt_pixels = gt_pixels[self.dataset.get_selected_ids()]
             fname = join(self.recon_dir, f"{model_id}.pth")
-            np.save(fname, recon_vals)
+            np.save(fname, recon_pixels)
 
             np.set_printoptions(suppress=True)
             np.set_printoptions(precision=3)
             if self.extra_args["log_pixel_ratio"]:
-                ratio = recon_vals / gt_vals
+                ratio = recon_pixels / gt_pixels
                 log.info(f"Recon./GT. ratio (full): {ratio}")
             else:
-                log.info(f"GT. vals (full) {gt_vals}")
-                log.info(f"Recon. vals (full) {recon_vals}")
+                log.info(f"GT. pixels (full) {gt_pixels}")
+                log.info(f"Recon. pixels (full) {recon_pixels}")
 
         elif self.recon_img_val_spectra:
             vals = torch.stack(self.recon_pixels).detach().cpu().numpy()
@@ -894,6 +896,7 @@ class AstroInferrer(BaseInferrer):
                 if self.recon_synthetic_band:
                     self.recon_synthetic_pixels.extend(ret["intensity"][...,-1:])
                     ret["intensity"] = ret["intensity"][...,:-1]
+                self.gt_pixels.extend([data["pixels"])
                 self.recon_pixels.extend(ret["intensity"])
 
             if self.save_scaler:
