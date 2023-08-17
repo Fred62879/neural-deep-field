@@ -227,7 +227,7 @@ class AstroDataset(Dataset):
     def get_batched_data(self, field, idx):
         if field == "coords":
             if self.coords_source == "fits":
-                data = self.fits_dataset.get_coords(idx)
+                data = self.fits_dataset.get_coords()
             else:
                 data = self.data[self.coords_source]
 
@@ -380,7 +380,7 @@ class AstroDataset(Dataset):
         if not self.kwargs["train_spectra_pixels_only"]:
             bin_map = out["spectra_bin_map"]
             ids = ids[bin_map]
-        out["sup_spectra_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
+        out["spectra_semi_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
         del out["spectra_id_map"]
 
     def __len__(self):

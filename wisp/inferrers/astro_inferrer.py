@@ -51,8 +51,11 @@ class AstroInferrer(BaseInferrer):
         super().__init__(pipelines, dataset, device, mode, **extra_args)
 
         if mode == "pretrain_infer":
+            self.batch_size = extra_args["pretrain_infer_batch_size"]
             self.num_sup_spectra = dataset.get_num_supervision_spectra()
-        else: self.num_val_spectra = dataset.get_num_validation_spectra()
+        else:
+            self.batch_size = extra_args["infer_batch_size"]
+            self.num_val_spectra = dataset.get_num_validation_spectra()
 
         self.set_path()
         self.select_models()
@@ -320,7 +323,7 @@ class AstroInferrer(BaseInferrer):
             else:
                 self.dataset_length = self.dataset.get_num_coords()
 
-        self.batch_size = min(self.extra_args["infer_batch_size"], self.dataset_length)
+        self.batch_size = min(self.batch_size, self.dataset_length)
         self.reset_dataloader()
 
     def post_inferrence_all_coords_full_model(self):
@@ -364,7 +367,7 @@ class AstroInferrer(BaseInferrer):
         if not self.extra_args["infer_spectra_individually"]:
             self.batch_size = min(
                 self.dataset_length * self.extra_args["spectra_neighbour_size"]**2,
-                self.extra_args["infer_batch_size"])
+                self.batch_size)
         else: self.batch_size = self.extra_args["spectra_neighbour_size"]**2
         self.reset_dataloader()
 
@@ -410,7 +413,7 @@ class AstroInferrer(BaseInferrer):
                 self.dataset_length = self.num_cur_val_coords
                 self.infer_selected = False
 
-        self.batch_size = min(self.extra_args["infer_batch_size"], self.dataset_length)
+        self.batch_size = min(self.batch_size, self.dataset_length)
         self.reset_dataloader()
 
     def post_inferrence_hardcode_coords_modified_model(self):
@@ -459,7 +462,6 @@ class AstroInferrer(BaseInferrer):
             self.embed = load_embed(checkpoint["model_state_dict"])
 
     def post_checkpoint_all_coords_full_model(self, model_id):
-        print(self.recon_img_val_spectra)
         if self.recon_img:
             re_args = {
                 "fname": model_id,
@@ -471,7 +473,7 @@ class AstroInferrer(BaseInferrer):
                 "zscale": True,
                 "log_max": True,
                 "save_locally": True,
-                "to_HDU": self.to_HDU_now,
+                "to_HDU": False, #self.to_HDU_now,
                 "calculate_metrics": self.calculate_metrics,
                 "recon_synthetic_band": False,
                 "zoom": self.extra_args["recon_zoomed"],
@@ -794,9 +796,9 @@ class AstroInferrer(BaseInferrer):
         self.codebook_spectra = torch.stack(
             self.codebook_spectra).detach().cpu().numpy()
 
-        if self.recon_codebook_spectra_individ: # debug purpose
-            self.redshift = torch.stack(self.redshift).detach().cpu().numpy()
-            print(self.redshift)
+        # if self.recon_codebook_spectra_individ: # debug purpose
+        #     self.redshift = torch.stack(self.redshift).detach().cpu().numpy()
+        #     print(self.redshift)
 
         if self.recon_codebook_spectra:
             spectra_wave = torch.stack(self.spectra_wave_c).view(
@@ -868,7 +870,7 @@ class AstroInferrer(BaseInferrer):
         load_model_weights(self.full_pipeline, model_state)
         self.full_pipeline.eval()
 
-        num_batches = int(np.ceil(self.dataset_length / self.extra_args["infer_batch_size"]))
+        num_batches = int(np.ceil(self.dataset_length / self.batch_size))
         log.info(f"infer all coords, totally {num_batches} batches")
 
         for i in tqdm(range(num_batches)):
@@ -1064,6 +1066,7 @@ class AstroInferrer(BaseInferrer):
             cur_val_coords = self.dataset.get_validation_spectra_world_coords()
             coords_range = self.dataset.get_coords_range()
             cur_val_coords, _ = normalize_coords(cur_val_coords, coords_range=coords_range)
+            cur_val_coords = add_dummy_dim(cur_val_coords[:,0], **self.extra_args)[:,None]
         else:
             cur_val_coords = self.dataset.get_coords()[self.val_spectra_map]
         self.dataset.set_hardcode_data(self.coords_source, cur_val_coords)

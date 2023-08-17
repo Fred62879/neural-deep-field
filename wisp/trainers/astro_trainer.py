@@ -205,7 +205,7 @@ class AstroTrainer(BaseTrainer):
                  "embed_map_dir","latent_dir","scaler_dir","redshift_dir",
                  "codebook_dir","qtz_weights_dir"],
                 ["models","train_recons","train_spectra","train_codebook_spectra",
-                 "train_embed_maps","latents","scaler","train_redshift"
+                 "train_embed_maps","latents","scaler","train_redshift",
                  "codebook","train_qtz_weights"]
         ):
             path = join(self.log_dir, cur_pname)
@@ -248,7 +248,7 @@ class AstroTrainer(BaseTrainer):
         """
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
-        sampler_cls = SequentialSampler
+        # sampler_cls = SequentialSampler
         # sampler_cls = RandomSampler
 
         self.train_data_loader = DataLoader(
@@ -958,22 +958,26 @@ class AstroTrainer(BaseTrainer):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()
         if not self.train_spectra_pixels_only:
             self.codebook_spectra = self.codebook_spectra[self.val_spectra_map]
+        num_spectra = self.extra_args["qtz_num_embed"]
 
-        # if spectra is 2d, add dummy 1st dim to simplify code
-        if self.recon_codebook_spectra:
-            self.codebook_spectra = [self.codebook_spectra]
-            prefix = ""
-        else: prefix = "individ-"
+        recon_wave = np.tile(
+            self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
+        recon_masks = np.tile(
+            self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
 
         for i, codebook_spectra in enumerate(self.codebook_spectra):
             cur_dir = join(self.codebook_spectra_dir, f"spectra-{i}")
             Path(cur_dir).mkdir(parents=True, exist_ok=True)
 
-            fname = f"{prefix}ep{self.epoch}-it{self.iteration}"
+            fname = f"individ-ep{self.epoch}-it{self.iteration}"
             self.dataset.plot_spectrum(
-                cur_dir, fname, codebook_spectra,
+                cur_dir, fname,
                 self.extra_args["flux_norm_cho"],
-                is_codebook=True, save_spectra_together=True,
+                None, None,
+                recon_wave, codebook_spectra,
+                recon_masks=recon_masks,
+                is_codebook=True,
+                save_spectra_together=True,
                 clip=self.extra_args["plot_clipped_spectrum"]
             )
 

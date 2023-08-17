@@ -512,7 +512,7 @@ class FitsData:
 
     def load_cache(self):
         if self.verbose: log.info("PATCH data cached.")
-        pixels, coords, weights, spectra_data = [None]*4
+        pixels, coords, coords_range, weights, spectra_data = [None]*5
 
         # with open(self.headers_fname, "rb") as fp:
         #     headers = pickle.load(fp)
