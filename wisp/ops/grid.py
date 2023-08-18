@@ -7,39 +7,47 @@
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
 import torch
-from kaolin import _C
+import torch.nn as nn
+import torch.nn.functional as F
+
 import wisp._C as wisp_C
 import kaolin.ops.spc as spc_ops
 
-# Alternative set of primes
-#PRIMES = [2654436881, 5915587277, 1500450271, 3267000013, 5754853343,
-#          4093082899, 9576890767, 3628273133, 2860486313, 5463458053,
-#          3367900313, 5654500741, 5654500763, 5654500771, 5654500783,
-#          5654500801, 5654500811, 5654500861, 5654500879, 5654500889,
-#          5654500897, 5654500927, 5654500961, 5654500981, 5654500993,
-#          9999999967, 7654487179, 7654489553, 7654495087, 7654486423,
-#          7654488209, 8654487029, 8654489771, 8654494517, 8654495341]
+from kaolin import _C
+
 
 PRIMES = [1, 265443567, 805459861]
 
+def dense_grid(coords, resolutions, lod_idx, codebook):
+    """
+        @Param
+          coords: 2d coords [bsz,num_samples,2] (un-normalized mesh grid)
+    """
+    coords = coords[None,...]
+    feats = []
+    for i, res in enumerate(resolutions[:lod_idx+1]):
+        feat = F.grid_sample(codebook[i], coords, mode="bilinear") # [1,feature_dim,bsz,1]
+        # print(codebook[i].shape, coords.shape, feat.shape)
+        feat = feat[0,...,0].T # [bsz,feature_dim]
+        feats.append(feat)
+    return torch.cat(feats, -1)
+
 def hashgrid_naive(coords, resolutions, codebook_bitwidth, lod_idx, codebook):
-    """A naive PyTorch implementation of the hashgrid.
+    """ A naive PyTorch implementation of the hashgrid.
+        This code exists here mostly as a reference. Do NOT expect a 1-to-1
+         numerical correspondence to the CUDA accelerated version (this might
+         be a future TODO(ttakikawa) but right now there are no strong motivations
+         to ensure 1-to-1 correspondence).
+       This code is also very slow. :)
+       @Para
+         coords (torch.FloatTensor): 3D coordinates of shape [batch, num_samples, 3]
+         resolutions (torch.LongTensor): the resolution of the grid per level of shape [num_lods]
+         codebook_bitwidth (int): The bitwidth of the codebook. The codebook will have 2^bw entries.
+         lod_idx (int): The LOD to aggregate to.
+         codebook (torch.ModuleList[torch.FloatTensor]): A list of codebooks of shapes [codebook_size, feature_dim].
 
-    This code exists here mostly as a reference. Do NOT expect a 1-to-1 numerical correspondence
-    to the CUDA accelerated version (this might be a future TODO(ttakikawa) but right now there are no
-    strong motivations to ensure 1-to-1 correspondence).
-
-    This code is also very slow. :)
-
-    Args:
-        coords (torch.FloatTensor): 3D coordinates of shape [batch, num_samples, 3]
-        resolutions (torch.LongTensor): the resolution of the grid per level of shape [num_lods]
-        codebook_bitwidth (int): The bitwidth of the codebook. The codebook will have 2^bw entries.
-        lod_idx (int): The LOD to aggregate to.
-        codebook (torch.ModuleList[torch.FloatTensor]): A list of codebooks of shapes [codebook_size, feature_dim].
-
-    Returns:
-        (torch.FloatTensor): Features of shape [batch, num_samples, feature_dim]
+        @Returns
+          (torch.FloatTensor): Features of shape [batch, num_samples, feature_dim]
     """
     _, feature_dim = codebook[0].shape
     batch, num_samples, _ = coords.shape

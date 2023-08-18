@@ -26,7 +26,7 @@ class Encoder(nn.Module):
             self.embedder = RandGaus(embedder_args)
         elif encode_method == "grid":
             self.init_grid()
-        else: assert 0
+        else: raise NotImplementedError
 
     def init_grid(self):
         grid_type = self.kwargs["grid_type"]
@@ -40,8 +40,7 @@ class Encoder(nn.Module):
             grid_class = HashGrid
         elif grid_type == "DenseGrid":
             grid_class = DenseGrid
-        else:
-            raise NotImplementedError
+        else: raise NotImplementedError
 
         self.grid = grid_class(
             self.kwargs["grid_feature_dim"],
@@ -53,7 +52,10 @@ class Encoder(nn.Module):
             **self.kwargs)
 
         self.grid.init_from_geometric(
-            self.kwargs["min_grid_res"], self.kwargs["max_grid_res"], self.kwargs["grid_num_lods"])
+            self.kwargs["min_grid_res"],
+            self.kwargs["max_grid_res"],
+            self.kwargs["grid_num_lods"]
+        )
         self.effective_feature_dim = get_input_latents_dim(**self.kwargs)
 
     def forward(self, coords, lod_idx=None):

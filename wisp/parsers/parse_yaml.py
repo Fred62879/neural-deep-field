@@ -128,15 +128,12 @@ def define_cmd_line_args():
 
     net_group.add_argument("--nef-type", type=str,
                            help="The neural field class to be used.")
-
     net_group.add_argument("--model-redshift", action="store_true",
                            help="whether the arch model redshift or not.")
-
     net_group.add_argument("--encode-coords", action="store_true")
     net_group.add_argument("--coords-encode-method", type=str,
                            choices=["positional","grid"],
                            help="ra/dec coordinate encoding method.")
-
     net_group.add_argument("--encode-wave", action="store_true")
     net_group.add_argument("--wave-encode-method", type=str,
                            choices=["positional"],
@@ -179,9 +176,11 @@ def define_cmd_line_args():
     ###################
     grid_group = parser.add_argument_group("grid")
 
-    grid_group.add_argument("--grid-dim", type=int, help="Dimension of grid (2 for image, 3 for shape).")
+    grid_group.add_argument("--grid-dim", type=int,
+                            help="Dimension of grid (2 for image, 3 for shape).")
     grid_group.add_argument("--grid-type", type=str, default="OctreeGrid",
-                            choices=["None", "OctreeGrid", "CodebookOctreeGrid", "TriplanarGrid", "HashGrid"],
+                            choices=["None", "OctreeGrid", "CodebookOctreeGrid",
+                                     "TriplanarGrid", "HashGrid"],
                             help="Type of grid to use.")
     grid_group.add_argument("--grid-interpolation-type", type=str, default="linear",
                             choices=["linear", "closest"], help="SPC interpolation mode.")
@@ -204,9 +203,11 @@ def define_cmd_line_args():
                             help="The minimum grid resolution. Used only in geometric initialization.")
     grid_group.add_argument("--max-grid-res", type=int, default=2048,
                             help="The maximum grid resolution. Used only in geometric initialization.")
-    grid_group.add_argument("--tree-type", type=str, default="quad", choices=["quad", "geometric"],
-                            help="What type of tree to use. `quad` is a quadtree or octree-like growing \
-                                  scheme, whereas geometric is the Instant-NGP growing scheme.")
+    grid_group.add_argument("--tree-type", type=str, default="quad",
+                            choices=["quad", "geometric"],
+                            help="What type of tree to use. `quad` is a quadtree or \
+                            octree-like growing scheme, whereas geometric is the \
+                            Instant-NGP growing scheme.")
     grid_group.add_argument("--codebook-bitwidth", type=int, default=8,
                             help="Bitwidth to use for the codebook. The number of vectors will be 2^bitwidth.")
 
@@ -347,6 +348,8 @@ def define_cmd_line_args():
     data_group.add_argument("--u-band-scale",type=float, default=10**((30-27)/2.5),
                             help="scale value for u band pixel values")
 
+    data_group.add_argument("--coords-cho", type=str, choices=["grid","world"])
+    data_group.add_argument("--normalize-coords", action="store_true")
     data_group.add_argument("--gt-img-norm-cho", type=str, default="identity")
     data_group.add_argument("--train-pixels-norm", type=str,
                             choices=["identity","arcsinh","linear","clip","zscale"])
@@ -388,6 +391,8 @@ def define_cmd_line_args():
                             help="id of chosen gt spectra for supervision/recon etc.")
     data_group.add_argument("--spectra-markers", type=int, nargs='+',
                             help="marker to plot each spectra.")
+
+    data_group.add_argument("--convolve-spectra", action="store_true")
     data_group.add_argument("--spectra-smooth-sigma",type=int, default=5)
     data_group.add_argument("--flux-norm-cho",type=str,
                             choices=["max","sum","linr","scale_gt","scale_recon"],

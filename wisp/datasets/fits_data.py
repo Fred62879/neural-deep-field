@@ -85,6 +85,8 @@ class FitsData:
         _, img_data_path = set_input_path(dataset_path, self.kwargs["sensor_collection_name"])
         paths = [img_data_path]
 
+        coords_cho = self.kwargs["coords_cho"]
+        norm_cho = "normed_" if self.kwargs["normalize_coords"] else ""
         # suffix that defines that currently selected group of image patches
         if self.kwargs["patch_selection_cho"] is None:
             # concatenate all selected patches together
@@ -94,7 +96,7 @@ class FitsData:
             suffix = "_" + self.kwargs["patch_selection_cho"]
 
         norm_str = self.kwargs["train_pixels_norm"]
-        self.coords_fname = join(img_data_path, f"coords{suffix}.npy")
+        self.coords_fname = join(img_data_path, f"coords_{norm_cho}{coords_cho}{suffix}.npy")
         self.coords_range_fname = get_coords_range_fname(**self.kwargs)
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.headers_fname = join(img_data_path, f"headers{suffix}.txt")
@@ -139,8 +141,9 @@ class FitsData:
             self.data["pixels"] = torch.FloatTensor(pixels)
 
         if self.load_coords:
-            coords = add_dummy_dim(coords, **self.kwargs)[:,None]
-            self.data["coords"] = torch.FloatTensor(coords)
+            if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
+                coords = add_dummy_dim(coords, **self.kwargs)
+            self.data["coords"] = torch.FloatTensor(coords[:,None])
             self.data["coords_range"] = coords_range
 
         if self.load_weights:
@@ -526,7 +529,8 @@ class FitsData:
         if self.load_coords:
             coords = np.load(self.coords_fname)
             coords_range = np.load(self.coords_range_fname)
-            coords, _ = normalize_coords(coords, coords_range=coords_range)
+            if self.kwargs["normalize_coords"]:
+                coords, _ = normalize_coords(coords, coords_range=coords_range)
         if self.load_weights:
             weights = np.load(self.weights_fname)
         if self.load_spectra:
@@ -539,6 +543,7 @@ class FitsData:
         return pixels, coords, coords_range, weights, spectra_data
 
     def process_data(self):
+        coords_range = None
         pixels, coords, weights, spectra_data = [], [], [], []
         spectra_id_map, spectra_bin_map = [], []
         spectra_pixel_fluxes, spectra_pixel_redshift = [], []
@@ -577,8 +582,9 @@ class FitsData:
         if self.load_coords:
             coords = np.concatenate(coords)
             np.save(self.coords_fname, coords) # save un-normed coords
-            coords, coords_range = normalize_coords(coords)
-            np.save(self.coords_range_fname, coords_range)
+            if self.kwargs["normalize_coords"]:
+                coords, coords_range = normalize_coords(coords)
+                np.save(self.coords_range_fname, coords_range)
 
         if self.load_weights:
             weights = np.concatenate(weights)

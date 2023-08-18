@@ -299,8 +299,8 @@ class AstroTrainer(BaseTrainer):
                 self.epoch = epoch
                 self.begin_epoch()
 
-                # for batch in tqdm(range(self.num_iterations_cur_epoch)):
-                for batch in range(self.num_iterations_cur_epoch):
+                for batch in tqdm(range(self.num_iterations_cur_epoch)):
+                # for batch in range(self.num_iterations_cur_epoch):
                     data = self.next_batch()
                     self.timer.check("got data")
                     self.pre_step()
@@ -580,12 +580,13 @@ class AstroTrainer(BaseTrainer):
 
     def set_coords(self):
         if self.train_spectra_pixels_only:
-            coords_range = np.load(self.coords_range_fname)
-            world_coords = self.dataset.get_validation_spectra_world_coords()
-            norm_world_coords, _ = normalize_coords(
-                world_coords, coords_range=coords_range)
-            norm_world_coords = add_dummy_dim(
-                norm_world_coords[:,0], **self.extra_args)[:,None]
+            coords = self.dataset.get_validation_spectra_world_coords()
+            if self.kwargs["normalize_coords"]:
+                coords_range = np.load(self.coords_range_fname)
+                coords, _ = normalize_coords(coords, coords_range=coords_range)
+            if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
+                coords = add_dummy_dim(coords[:,0], **self.extra_args)
+            coords = coords[:,None]
 
             self.dataset.set_coords_source("spectra_coords")
             self.dataset.set_hardcode_data("spectra_coords", norm_world_coords)

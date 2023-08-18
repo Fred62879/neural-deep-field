@@ -118,6 +118,7 @@ class HashGrid(BLASGrid):
             fts = torch.zeros(min(self.codebook_size, num_pts), self.feature_dim)
             fts += torch.randn_like(fts) * self.feature_std
             self.codebook.append(nn.Parameter(fts))
+        print('*', self.codebook)
 
     def freeze(self):
         """Freezes the feature grid.

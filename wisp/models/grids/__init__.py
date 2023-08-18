@@ -7,6 +7,7 @@
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
 from .blas_grid import *
+from .hash_grid import *
+from .dense_grid import *
 from .octree_grid import *
-from .hash_grid import * 
 from .triplanar_grid import *

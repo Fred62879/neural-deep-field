@@ -162,15 +162,25 @@ def get_bound_id(wave_bound, source_wave, within_bound=True):
 
     return [id_lo, id_hi]
 
-def get_mgrid_np(num_rows, num_cols, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
-    """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version).
+def get_mgrid_np(num_rows, num_cols, rlo=-1, rhi=1, clo=-1, chi=1,
+                 dim=2, indexing='ij', flat=True
+):
+    """ Generates a mesh grid of coords (numpy version).
     """
-    x = np.linspace(lo, hi, num=num_cols)
-    y = np.linspace(lo, hi, num=num_rows)
-    mgrid = np.stack(np.meshgrid(x, y, indexing=indexing), axis=-1)
-
+    x = np.linspace(clo, chi, num=num_cols)
+    y = np.linspace(rlo, rhi, num=num_rows)
+    mgrid = np.stack(np.meshgrid(y, x, indexing=indexing), axis=-1)
     if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
     return mgrid
+
+# def get_mgrid_np(num_rows, num_cols, lo=-1, hi=1, dim=2, indexing='ij', flat=True):
+#     """ Generates a flattened grid of (x,y,...) coords in [-1,1] (numpy version).
+#     """
+#     x = np.linspace(lo, hi, num=num_cols)
+#     y = np.linspace(lo, hi, num=num_rows)
+#     mgrid = np.stack(np.meshgrid(x, y, indexing=indexing), axis=-1)
+#     if flat: mgrid = mgrid.reshape(-1,dim) # [sidelen**2,dim]
+#     return mgrid
 
 def get_mgrid_tensor(self, sidelen, lo=-1, hi=1, dim=2, flat=True):
     """ Generates a flattened grid of (x,y,...) coords in [-1,1] (Tensor version).

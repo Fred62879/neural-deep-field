@@ -27,7 +27,7 @@ global:
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
     tasks: ['train'] #,'recon_gt_spectra_during_train'] #'recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train','save_scaler_during_train'
-    tasks: ['infer','recon_gt_spectra','save_redshift','recon_img','recon_codebook_spectra_individ'] #,'save_qtz_weights','save_scaler'
+    #tasks: ['infer','recon_gt_spectra'] #,'save_redshift','recon_img'] #,'recon_codebook_spectra_individ'] #,'save_qtz_weights','save_scaler'
 
 optimizer:
     optimizer_type: 'adam'
@@ -41,14 +41,15 @@ optimizer:
     grid_lr_weight: 100
 
 net:
-    nef_type: 'AstroHyperSpectralNerf'
-    #nef_type: 'AstroNerf'
+    nef_type: 'AstroHyperSpectralNerf' #'AstroNerf'
     model_redshift: True
+
     encode_wave: True
-    encode_coords: True
-    coords_encode_method: 'grid' #'positional_encoding'
     wave_encode_method: 'positional_encoding'
     wave_multiplier: 20
+
+    encode_coords: True
+    coords_encode_method: 'grid' #'positional_encoding'
 
 embedder:
     coords_embed_bias: True
@@ -72,8 +73,8 @@ embedder:
     wave_encoder_siren_last_linear: False
 
 grid:
-    grid_dim: 3
-    grid_type: 'HashGrid'
+    grid_dim: 2
+    grid_type: 'DenseGrid'
     grid_interpolation_type: 'linear'
     grid_multiscale_type: 'cat'
     grid_feature_dim: 2
@@ -146,17 +147,17 @@ trainer:
     pixel_loss_cho: l1_mean
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
-    num_epochs: 10
+    num_epochs: 1000
     batch_size: 5000 #40960 #65536 #262144
     pretrain_batch_size: 3000
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 1
+    log_cli_every: 200
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 2
+    save_model_every: 200
     save_as_new: True
 
     train_with_all_pixels: True
@@ -216,7 +217,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20230813-210801_main_train_512_img_60k_epochs_50_codes'
+    infer_log_dir: '20230816-200330_main-train_512_img_w_pretrain_1k_epochs'
     metric_options: ['mse','ssim','psnr']
     log_pixel_ratio: True
 
@@ -230,7 +231,7 @@ infer:
     infer_selected: True
     pretrain_num_infer: 200
 
-    flux_norm_cho: "linr"
+    flux_norm_cho: "none"
     spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]
     mark_spectra: True
     plot_clipped_spectrum: True
@@ -253,6 +254,8 @@ dataset:
     load_patch_data_cache: True
     dataset_path: '/scratch/projects/vision/data/pdr3'
     wave_range_fname: 'wave_range0.npy'
+    coords_cho: "grid"
+    normalize_coords: True
     gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
 
@@ -322,15 +325,19 @@ spectra_data:
     spectra_data_source: "deimos"
     max_spectra_len: 8191 # hardcoded
 
-    spectra_smooth_sigma: 50
-
     spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
     spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
     num_gt_spectra: 7000  # upper bound of # spectra to load
     source_spectra_cho: "" #"6000_to_8000"
+
+    # **** Below fields should be modified together ****
+    convolve_spectra: True
+    spectra_smooth_sigma: 50
     processed_spectra_cho: "v7_table"
+    # **************************************************
+
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
     codebook_spectra_plot_wave_lo: 6000 #2000

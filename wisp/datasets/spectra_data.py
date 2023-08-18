@@ -11,10 +11,8 @@ import matplotlib.pyplot as plt
 
 from wisp.datasets.patch_data import PatchData
 from wisp.utils.common import create_patch_uid
-from wisp.utils.numerical import normalize_coords
-from wisp.datasets.data_utils import add_dummy_dim, \
-    set_input_path, patch_exists, get_bound_id, \
-    clip_data_to_ref_wave_range, get_wave_range_fname
+from wisp.datasets.data_utils import set_input_path, patch_exists, \
+    get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname
 
 from pathlib import Path
 from astropy.io import fits
@@ -52,9 +50,9 @@ class SpectraData:
         self.download_source_spectra = kwargs["download_source_spectra"]
         self.load_spectra_data_from_cache = kwargs["load_spectra_data_from_cache"]
 
-        self.smooth_sigma = kwargs["spectra_smooth_sigma"]
         self.neighbour_size = kwargs["spectra_neighbour_size"]
         self.wave_discretz_interval = kwargs["trans_sample_interval"]
+        self.smooth_sigma = kwargs["spectra_smooth_sigma"] if kwargs["spectra_smooth_sigma"] else -1
         self.trusted_wave_range = None if not kwargs["learn_spectra_within_wave_range"] \
             else [kwargs["spectra_supervision_wave_lo"],
                   kwargs["spectra_supervision_wave_hi"]]
@@ -78,6 +76,9 @@ class SpectraData:
         if suffix != "": suffix = "_" + suffix
 
         self.wave_range_fname = get_wave_range_fname(**self.kwargs)
+        spectra_cho = self.kwargs["processed_spectra_cho"]
+        if self.kwargs["convolve_spectra"]:
+            spectra_cho += "_convolved"
 
         if self.spectra_data_source == "manual":
             assert 0
@@ -91,7 +92,7 @@ class SpectraData:
                 path, self.kwargs["source_spectra_fname"])
 
             processed_data_path = join(
-                path, "processed_" + self.kwargs["processed_spectra_cho"] + suffix)
+                path, "processed_" + spectra_cho + suffix)
             self.processed_spectra_path = join(
                 processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(
@@ -105,7 +106,7 @@ class SpectraData:
                 path, "source_zcosmos_table.fits")
 
             processed_data_path = join(
-                path, "processed_" + self.kwargs["processed_spectra_cho"] + suffix)
+                path, "processed_" + spectra_cho + suffix)
             self.processed_spectra_path = join(
                 processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(

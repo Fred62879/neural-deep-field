@@ -14,7 +14,7 @@ from wisp.utils.plot import plot_horizontally, mark_on_img
 from wisp.utils.common import generate_hdu, create_patch_uid
 from wisp.utils.numerical import normalize, calculate_zscale_ranges
 from wisp.datasets.data_utils import set_input_path, \
-    create_patch_fname, create_selected_patches_uid, get_mgrid_np, add_dummy_dim
+    create_patch_fname, create_selected_patches_uid, get_mgrid_np
 
 
 class PatchData:
@@ -121,8 +121,11 @@ class PatchData:
         self.load_header()
 
         if self.load_coords:
-            self.get_world_coords()
-            # self.get_grid_coords()
+            if self.kwargs["coords_cho"] == "grid":
+                self.get_grid_coords()
+            elif self.kwargs["coords_cho"] == "world":
+                self.get_world_coords()
+            else: raise NotImplementedError
 
         if self.load_pixels or self.load_weights:
             self.load_patch()
@@ -388,8 +391,16 @@ class PatchData:
             self.data["spectra_img_coords"],
             self.kwargs["spectra_markers"])
 
+    def get_grid_coords(self):
+        """ Generate mesh grid based on current image size as img coords.
+        """
+        # coords = get_mgrid_np(self.cur_num_rows, self.cur_num_cols)
+        coords = get_mgrid_np(self.cur_num_rows, self.cur_num_cols,
+                              0, self.cur_num_rows-1, 0, self.cur_num_cols-1)
+        self.data["coords"] = coords
+
     def get_world_coords(self):
-        """ Get ra/dec coords from current patch and normalize.
+        """ Get ra/dec coords from current patch.
             pix2world calculate coords in x-y order
               coords can be indexed using r-c
             @Return
@@ -410,10 +421,6 @@ class PatchData:
             coords = coords[r : r+self.cutout_num_rows,
                             c : c+self.cutout_num_cols].reshape(-1,2)
         self.data["coords"] = coords
-
-    # def get_grid_coords(self):
-    #     coords = get_mgrid_np(self.cur_num_rows, self.cur_num_cols)
-    #     self.data["coords"] = coords
 
     def read_fits_file(self):
         """ Load pixel values or variance from one PATCH file (patch_id/subpatch_id).

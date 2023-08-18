@@ -125,20 +125,14 @@ class HyperSpectralConverter(nn.Module):
         if redshift is None:
             assert not self._model_redshift
         else: wave = self.shift_wave(wave, redshift)
-        #print(wave_bound)
         wave = self.linear_norm_wave(wave, wave_bound)
-        #print(wave[:,:,0])
 
         if self.encode_wave:
-            assert(coords_encode_dim != self.kwargs["space_dim"])
             wave = self.wave_encoder(wave) # [bsz,num_samples,wave_embed_dim]
-
-        else: # assert coords are not encoded as well, should only use siren in this case
-            if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
-                assert(coords_encode_dim == self.kwargs["space_dim"])
-            else:
-                assert(coords_encode_dim == 2)
-                latents = latents[...,:2] # remove dummy 3rd dim
+        else:
+            # assert coords are not encoded as well, should only use siren in this case
+            assert not self.kwargs["encode_coords"] and coords_encode_dim == 2
+            # latents = latents[...,:2] # remove dummy 3rd dim
 
         latents = latents.tile(1,num_samples,1) # [bsz,nsamples,encode_dim or 2]
         latents = self.combine_spatial_spectral(latents, wave)
