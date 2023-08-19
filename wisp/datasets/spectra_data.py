@@ -52,7 +52,7 @@ class SpectraData:
 
         self.neighbour_size = kwargs["spectra_neighbour_size"]
         self.wave_discretz_interval = kwargs["trans_sample_interval"]
-        self.smooth_sigma = kwargs["spectra_smooth_sigma"] if kwargs["spectra_smooth_sigma"] else -1
+        self.smooth_sigma = kwargs["spectra_smooth_sigma"] if kwargs["convolve_spectra"] else -1
         self.trusted_wave_range = None if not kwargs["learn_spectra_within_wave_range"] \
             else [kwargs["spectra_supervision_wave_lo"],
                   kwargs["spectra_supervision_wave_hi"]]
@@ -216,11 +216,6 @@ class SpectraData:
             return self.data["validation_pixels"][idx]
         return self.data["validation_pixels"]
 
-    def get_validation_img_coords(self, idx=None):
-        if idx is not None:
-            return self.data["validation_img_coords"][idx]
-        return self.data["validation_img_coords"]
-
     def get_validation_world_coords(self, idx=None):
         if idx is not None:
             return self.data["validation_world_coords"][idx]
@@ -352,7 +347,6 @@ class SpectraData:
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
         self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids][:,0]
         self.data["validation_masks"] = self.data["gt_spectra_plot_mask"][val_ids]
-        self.data["validation_img_coords"] = self.data["gt_spectra_img_coords"][val_ids]
         self.data["validation_world_coords"] = self.data["gt_spectra_world_coords"][val_ids]
         if self.kwargs["redshift_semi_supervision"]:
             self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
@@ -610,6 +604,7 @@ class SpectraData:
         redshift = np.array(list(df.iloc[spectra_ids]["zspec"])).astype(np.float32)
 
         # get img coords for all spectra within current patch
+        # NOTE, these coords exclude neighbours
         wcs = WCS(patch.get_header())
         world_coords = np.concatenate((ras[:,None], decs[:,None]), axis=-1)
         img_coords = wcs.all_world2pix(world_coords, 0).astype(int) # [n,2]
@@ -617,7 +612,7 @@ class SpectraData:
         #  wcs of each patch, here after we get img coords, we convert
         #  img coords back to world coords to get accurate values
         world_coords = wcs.all_pix2world(img_coords, 0) # [n,2]
-        img_coords = img_coords[:,::-1] # xy coords to rc coords
+        img_coords = img_coords[:,::-1] # xy coords to rc coords [n,2]
 
         cur_patch_spectra = []
         cur_patch_spectra_plot_mask = []
@@ -677,14 +672,14 @@ class SpectraData:
         df.at[idx,"world_coord_fname"] = world_coord_fname
 
         pixel_ids = patch.get_pixel_ids(
-            img_coord[0], img_coord[1], neighbour_size=self.neighbour_size
-        )
-        pixels = patch.get_pixels(pixel_ids)[None,:]
-        np.save(join(self.processed_spectra_path, pix_fname), pixels)
+            img_coord[0], img_coord[1], neighbour_size=self.neighbour_size)
 
-        # `img_coord` excludes neighbours, `world_coords` include
-        world_coords = patch.get_coords(pixel_ids)[None,:] # un-normed ra/dec [n,]
-        np.save(join(self.processed_spectra_path, img_coord_fname), img_coord[None,:])
+        pixels = patch.get_pixels(pixel_ids)             # [n_neighbr,2]
+        img_coords = patch.get_img_coords(pixel_ids)     # mesh grid coords [n_neighbr,2]
+        world_coords = patch.get_world_coords(pixel_ids) # un-normed ra/dec [n_neighbr,2]
+        # print(img_coord, img_coords, world_coords)
+        np.save(join(self.processed_spectra_path, pix_fname), pixels)
+        np.save(join(self.processed_spectra_path, img_coord_fname), img_coords)
         np.save(join(self.processed_spectra_path, world_coord_fname), world_coords)
 
         # process source spectra and save locally
@@ -1069,7 +1064,7 @@ def convolve_spectra(spectra, bound, std=5, border=True):
           bound: defines range to convolve within
           border: if True, we add 1 padding at two ends when convolving
     """
-    if std <= 0: return
+    if std <= 0: return spectra
 
     lo, hi = bound
     n = hi - lo + 1

@@ -85,7 +85,7 @@ class FitsData:
         _, img_data_path = set_input_path(dataset_path, self.kwargs["sensor_collection_name"])
         paths = [img_data_path]
 
-        coords_cho = self.kwargs["coords_cho"]
+        coords_cho = self.kwargs["train_coords_cho"]
         norm_cho = "normed_" if self.kwargs["normalize_coords"] else ""
         # suffix that defines that currently selected group of image patches
         if self.kwargs["patch_selection_cho"] is None:
@@ -634,7 +634,11 @@ class FitsData:
         if self.load_pixels:
             pixels.append(cur_patch.get_pixels())
         if self.load_coords:
-            coords.append(cur_patch.get_coords())
+            if self.kwargs["train_coords_cho"] == "grid":
+                coords.append(cur_patch.get_img_coords())
+            elif self.kwargs["train_coords_cho"] == "world":
+                coords.append(cur_patch.get_world_coords())
+            else: raise NotImplementedError
         if self.load_weights:
             weights.append(cur_patch.get_weights())
         if self.load_spectra:

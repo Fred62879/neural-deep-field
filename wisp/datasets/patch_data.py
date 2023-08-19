@@ -121,11 +121,8 @@ class PatchData:
         self.load_header()
 
         if self.load_coords:
-            if self.kwargs["coords_cho"] == "grid":
-                self.get_grid_coords()
-            elif self.kwargs["coords_cho"] == "world":
-                self.get_world_coords()
-            else: raise NotImplementedError
+            self.load_grid_coords()
+            self.load_world_coords()
 
         if self.load_pixels or self.load_weights:
             self.load_patch()
@@ -178,13 +175,19 @@ class PatchData:
         return self.data["weights"]
 
     def get_num_coords(self):
-        return self.data["coords"].shape[0]
+        return self.data["img_coords"].shape[0]
 
-    def get_coords(self, idx=None):
-        """ Get indexed (world) coords [n,1,2] """
+    def get_img_coords(self, idx=None):
+        """ Get indexed (img) coords [n,n_neighbours,2] """
         if idx is not None:
-            return self.data["coords"][idx]
-        return self.data["coords"]
+            return self.data["img_coords"][idx]
+        return self.data["img_coords"]
+
+    def get_world_coords(self, idx=None):
+        """ Get indexed (world) coords [n,n_neighbours,2] """
+        if idx is not None:
+            return self.data["world_coords"][idx]
+        return self.data["world_coords"]
 
     def get_spectra_img_coords(self, idx=None):
         if idx is not None:
@@ -285,6 +288,7 @@ class PatchData:
         if self.use_full_patch:
             self.cur_num_rows = self.full_num_rows
             self.cur_num_cols = self.full_num_cols
+            self.cutout_start_pos = (0,0)
         else:
             (r, c) = self.cutout_start_pos
             num_rows = self.cutout_num_rows
@@ -391,15 +395,17 @@ class PatchData:
             self.data["spectra_img_coords"],
             self.kwargs["spectra_markers"])
 
-    def get_grid_coords(self):
+    def load_grid_coords(self):
         """ Generate mesh grid based on current image size as img coords.
         """
-        # coords = get_mgrid_np(self.cur_num_rows, self.cur_num_cols)
-        coords = get_mgrid_np(self.cur_num_rows, self.cur_num_cols,
-                              0, self.cur_num_rows-1, 0, self.cur_num_cols-1)
-        self.data["coords"] = coords
+        coords = get_mgrid_np(self.full_num_rows, self.full_num_cols,
+                              0, self.full_num_rows-1, 0, self.full_num_cols-1, flat=False)
+        # crop mesh grid for current cutout only
+        (r, c) = self.cutout_start_pos
+        coords = coords[r:r+self.cur_num_rows,c:c+self.cur_num_cols]
+        self.data["img_coords"] = coords.reshape((-1,2))
 
-    def get_world_coords(self):
+    def load_world_coords(self):
         """ Get ra/dec coords from current patch.
             pix2world calculate coords in x-y order
               coords can be indexed using r-c
@@ -420,7 +426,7 @@ class PatchData:
             (r, c) = self.cutout_start_pos # start position (r/c)
             coords = coords[r : r+self.cutout_num_rows,
                             c : c+self.cutout_num_cols].reshape(-1,2)
-        self.data["coords"] = coords
+        self.data["world_coords"] = coords
 
     def read_fits_file(self):
         """ Load pixel values or variance from one PATCH file (patch_id/subpatch_id).

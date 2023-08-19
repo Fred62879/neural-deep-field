@@ -581,15 +581,16 @@ class AstroTrainer(BaseTrainer):
     def set_coords(self):
         if self.train_spectra_pixels_only:
             coords = self.dataset.get_validation_spectra_world_coords()
-            if self.kwargs["normalize_coords"]:
+            print(coords.shape)
+            if self.extra_args["normalize_coords"]:
                 coords_range = np.load(self.coords_range_fname)
                 coords, _ = normalize_coords(coords, coords_range=coords_range)
-            if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
+            if self.extra_args["coords_encode_method"] == "grid" and self.extra_args["grid_dim"] == 3:
                 coords = add_dummy_dim(coords[:,0], **self.extra_args)
             coords = coords[:,None]
 
             self.dataset.set_coords_source("spectra_coords")
-            self.dataset.set_hardcode_data("spectra_coords", norm_world_coords)
+            self.dataset.set_hardcode_data("spectra_coords", coords)
         else:
             self.dataset.set_coords_source("fits")
 

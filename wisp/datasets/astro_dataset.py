@@ -148,9 +148,6 @@ class AstroDataset(Dataset):
     def get_full_spectra_wave_coverage(self):
         return self.spectra_dataset.get_full_wave_coverage()
 
-    def get_spectra_img_coords(self):
-        return self.spectra_dataset.get_gt_spectra_img_coords()
-
 
     def get_validation_spectra_ids(self, patch_uid=None):
         return self.spectra_dataset.get_validation_spectra_ids(patch_uid)
@@ -164,11 +161,14 @@ class AstroDataset(Dataset):
     def get_validation_spectra_pixels(self, idx=None):
         return self.spectra_dataset.get_validation_pixels(idx)
 
-    def get_validation_spectra_img_coords(self, idx=None):
-        return self.spectra_dataset.get_validation_img_coords(idx)
-
     def get_validation_spectra_world_coords(self, idx=None):
         return self.spectra_dataset.get_validation_world_coords(idx)
+
+    def get_supervision_spectra_data(self):
+        return self.spectra_dataset.get_supervision_data()
+
+    def get_supervision_spectra_masks(self):
+        return self.spectra_dataset.get_supervision_masks()
 
     def get_supervision_spectra_pixels(self):
         return self.spectra_dataset.get_supervision_pixels()

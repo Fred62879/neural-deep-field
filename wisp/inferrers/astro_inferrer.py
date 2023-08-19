@@ -555,9 +555,7 @@ class AstroInferrer(BaseInferrer):
                 self.embed_ids = torch.stack(self.embed_ids).detach().cpu().numpy()
                 log.info(f"embed ids: {self.embed_ids}")
             else:
-                if self.extra_args["mark_spectra"]:
-                    coords = self.dataset.get_spectra_img_coords()
-                else: coords = []
+                coords = []
                 plot_embed_map_log = partial(plot_embed_map, coords)
 
                 re_args = {
@@ -585,7 +583,6 @@ class AstroInferrer(BaseInferrer):
                 log.info(f"GT. redshift (full): {gt_redshift}")
             else:
                 if self.extra_args["mark_spectra"]:
-                    # positions = self.dataset.get_spectra_img_coords() # [n,3] r/c/patch_id
                     positions = self.cur_patch.get_spectra_img_coords()
                     markers = np.array(self.extra_args["spectra_markers"])
                 else:
