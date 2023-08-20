@@ -58,6 +58,7 @@ class FitsData:
     def require_any_data(self, tasks):
         """ Find all required data based on given self.tasks. """
         tasks = set(tasks)
+        # if self.kwargs["train_spectra_pixels_only"]: return False
 
         self.load_weights = "train" in tasks and self.kwargs["weight_train"]
         self.load_pixels = len(tasks.intersection({"train","recon_img","log_pixel_value"}))
@@ -86,7 +87,7 @@ class FitsData:
         paths = [img_data_path]
 
         coords_cho = self.kwargs["train_coords_cho"]
-        norm_cho = "normed_" if self.kwargs["normalize_coords"] else ""
+        norm_cho = "_normed" if self.kwargs["normalize_coords"] else ""
         # suffix that defines that currently selected group of image patches
         if self.kwargs["patch_selection_cho"] is None:
             # concatenate all selected patches together
@@ -96,7 +97,7 @@ class FitsData:
             suffix = "_" + self.kwargs["patch_selection_cho"]
 
         norm_str = self.kwargs["train_pixels_norm"]
-        self.coords_fname = join(img_data_path, f"coords_{norm_cho}{coords_cho}{suffix}.npy")
+        self.coords_fname = join(img_data_path, f"coords{suffix}{norm_cho}_{coords_cho}.npy")
         self.coords_range_fname = get_coords_range_fname(**self.kwargs)
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.headers_fname = join(img_data_path, f"headers{suffix}.txt")
@@ -124,14 +125,15 @@ class FitsData:
             (not self.load_pixels or (exists(self.pixels_fname) and \
                                       exists(self.zscale_ranges_fname))) and \
             (not self.load_coords or (exists(self.coords_fname) and \
-                                      exists(self.coords_range_fname))) and \
+                                      (not self.kwargs["normalize_coords"] or \
+                                       exists(self.coords_range_fname)))) and \
             (not self.load_spectra or (exists(self.spectra_id_map_fname) and \
                                        exists(self.spectra_bin_map_fname) and \
                                        exists(self.spectra_pixel_fluxes_fname) and \
                                        exists(self.spectra_pixel_redshift_fname)))
 
-        if cached: pixels, coords, coords_range, weights, spectra_data  = self.load_cache()
-        else:      pixels, coords, coords_range, weights, spectra_data = self.process_data()
+        if cached: pixels, coords, weights, spectra_data  = self.load_cache()
+        else:      pixels, coords, weights, spectra_data = self.process_data()
 
         if self.load_pixels:
             pixel_max = np.round(np.max(pixels, axis=0), 3)
@@ -144,7 +146,6 @@ class FitsData:
             if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
                 coords = add_dummy_dim(coords, **self.kwargs)
             self.data["coords"] = torch.FloatTensor(coords[:,None])
-            self.data["coords_range"] = coords_range
 
         if self.load_weights:
             self.data["weights"] = torch.FloatTensor(weights)
@@ -189,9 +190,6 @@ class FitsData:
         if idx is not None:
             return self.data["coords"][idx]
         return self.data["coords"]
-
-    def get_coords_range(self):
-        return self.data["coords_range"]
 
     def get_weights(self, idx=None):
         if idx is not None:
@@ -515,7 +513,7 @@ class FitsData:
 
     def load_cache(self):
         if self.verbose: log.info("PATCH data cached.")
-        pixels, coords, coords_range, weights, spectra_data = [None]*5
+        pixels, coords, weights, spectra_data = [None]*4
 
         # with open(self.headers_fname, "rb") as fp:
         #     headers = pickle.load(fp)
@@ -528,9 +526,7 @@ class FitsData:
             zscale_ranges = np.load(self.zscale_ranges_fname)
         if self.load_coords:
             coords = np.load(self.coords_fname)
-            coords_range = np.load(self.coords_range_fname)
-            if self.kwargs["normalize_coords"]:
-                coords, _ = normalize_coords(coords, coords_range=coords_range)
+            coords = self.process_coords(coords)
         if self.load_weights:
             weights = np.load(self.weights_fname)
         if self.load_spectra:
@@ -540,10 +536,9 @@ class FitsData:
             spectra_pixel_redshift = np.load(self.spectra_pixel_redshift_fname)
             spectra_data = (spectra_id_map, spectra_bin_map,
                             spectra_pixel_fluxes, spectra_pixel_redshift)
-        return pixels, coords, coords_range, weights, spectra_data
+        return pixels, coords, weights, spectra_data
 
     def process_data(self):
-        coords_range = None
         pixels, coords, weights, spectra_data = [], [], [], []
         spectra_id_map, spectra_bin_map = [], []
         spectra_pixel_fluxes, spectra_pixel_redshift = [], []
@@ -582,9 +577,7 @@ class FitsData:
         if self.load_coords:
             coords = np.concatenate(coords)
             np.save(self.coords_fname, coords) # save un-normed coords
-            if self.kwargs["normalize_coords"]:
-                coords, coords_range = normalize_coords(coords)
-                np.save(self.coords_range_fname, coords_range)
+            coords = self.process_coords(coords)
 
         if self.load_weights:
             weights = np.concatenate(weights)
@@ -603,7 +596,7 @@ class FitsData:
             spectra_data = (spectra_id_map, spectra_bin_map,
                             spectra_pixel_fluxes, spectra_pixel_redshift)
 
-        return pixels, coords, coords_range, weights, spectra_data
+        return pixels, coords, weights, spectra_data
 
     def load_one_patch(self, pixels, coords, weights, spectra_id_map,
                        spectra_bin_map, spectra_pixel_fluxes, spectra_pixel_redshift,
@@ -646,6 +639,25 @@ class FitsData:
             spectra_bin_map.append(cur_patch.get_spectra_bin_map())
             spectra_pixel_fluxes.append(cur_patch.get_spectra_pixel_fluxes())
             spectra_pixel_redshift.append(cur_patch.get_spectra_pixel_redshift())
+
+    def process_coords(self, coords):
+        """ Process loaded coordinates
+            @Param
+              coords: [num_rows*num_cols,2]
+        """
+        if self.kwargs["normalize_coords"]:
+            if not exists(self.coords_range_fname):
+                coords, coords_range = normalize_coords(coords)
+                np.save(self.coords_range_fname, coords_range)
+            else:
+                coords_range = np.load(self.coords_range_fname)
+                coords, _ = normalize_coords(coords, coords_range=coords_range)
+
+        if self.kwargs["coords_encode_method"] == "grid" and \
+           self.kwargs["grid_type"] == "HashGrid" and self.kwargs["grid_dim"] == 3:
+            coords = add_dummy_dim(coords, **self.kwargs)
+        coords = coords[:,None]
+        return coords
 
 # PATCH class ends
 #################

@@ -119,7 +119,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.reset()
 
-        # print(coords.shape)
+        # print(coords)
 
         if self.kwargs["encode_coords"]:
             latents = self.spatial_encoder(coords, lod_idx=lod_idx)

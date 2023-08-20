@@ -11,8 +11,10 @@ import matplotlib.pyplot as plt
 
 from wisp.datasets.patch_data import PatchData
 from wisp.utils.common import create_patch_uid
+from wisp.utils.numerical import normalize_coords
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
-    get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname
+    get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
+    get_coords_range_fname, add_dummy_dim
 
 from pathlib import Path
 from astropy.io import fits
@@ -57,6 +59,7 @@ class SpectraData:
             else [kwargs["spectra_supervision_wave_lo"],
                   kwargs["spectra_supervision_wave_hi"]]
         self.trans_range = self.trans_obj.get_wave_range()
+        self.gt_convolved = kwargs["convolve_spectra"]
 
         self.set_path(self.dataset_path)
         self.load_accessory_data()
@@ -76,6 +79,7 @@ class SpectraData:
         if suffix != "": suffix = "_" + suffix
 
         self.wave_range_fname = get_wave_range_fname(**self.kwargs)
+        self.coords_range_fname = get_coords_range_fname(**self.kwargs)
         spectra_cho = self.kwargs["processed_spectra_cho"]
         if self.kwargs["convolve_spectra"]:
             spectra_cho += "_convolved"
@@ -140,6 +144,14 @@ class SpectraData:
         self.data = defaultdict(lambda: [])
         self.load_gt_spectra_data()
         self.set_wave_range()
+        self.transform_data()
+
+    def finalize_spectra(self):
+        """ Finalize spectra data processing.
+            Call this function after deriving coords norm range.
+        """
+        self.process_coords()
+        self.train_valid_split()
 
     #############
     # Getters
@@ -216,10 +228,10 @@ class SpectraData:
             return self.data["validation_pixels"][idx]
         return self.data["validation_pixels"]
 
-    def get_validation_world_coords(self, idx=None):
+    def get_validation_coords(self, idx=None):
         if idx is not None:
-            return self.data["validation_world_coords"][idx]
-        return self.data["validation_world_coords"]
+            return self.data["validation_coords"][idx]
+        return self.data["validation_coords"]
 
     def get_validation_masks(self, idx=None):
         """ Get validation spectra mask for plotting. """
@@ -235,6 +247,64 @@ class SpectraData:
     #############
     # Helpers
     #############
+
+    def process_coords(self):
+        if self.kwargs["train_coords_cho"] == "grid":
+            coords = self.data["gt_spectra_img_coords"]
+        elif self.kwargs["train_coords_cho"] == "world":
+            coords = self.data["gt_spectra_world_coords"]
+        else: raise NotImplementedError
+
+        if self.kwargs["normalize_coords"]:
+            assert exists(self.coords_range_fname)
+            coords_range = np.load(self.coords_range_fname)
+            coords, coords_range = normalize_coords(coords, coords_range=coords_range)
+
+        if self.kwargs["coords_encode_method"] == "grid" and \
+           self.kwargs["grid_type"] == "HashGrid" and self.kwargs["grid_dim"] == 3:
+            coords = add_dummy_dim(coords, **self.kwargs)
+
+        # flatten neighbouring pixel dim
+        # coords now is [n,n_neighbr,2/3]
+        coords = coords.reshape(-1,coords.shape[-1])
+        coords = coords[:,None]
+
+        self.data["gt_spectra_coords"] = coords
+
+    def transform_data(self):
+        self.to_tensor([
+            "full_emit_wave",
+            "gt_spectra",
+            "gt_spectra_pixels",
+            "gt_spectra_redshift",
+            "gt_spectra_img_coords",
+            "gt_spectra_world_coords",
+        ], torch.float32)
+        self.to_tensor([
+            "full_emit_wave_mask",
+            "gt_spectra_plot_mask",
+        ], torch.bool)
+
+    def train_valid_split(self):
+        sup_ids, val_ids = self.split_spectra()
+        log.info(f"spectra train/valid {len(sup_ids)}/{len(val_ids)}")
+
+        # supervision spectra data (used during pretrain)
+        self.data["supervision_spectra"] = self.data["gt_spectra"][sup_ids]
+        self.data["supervision_masks"] = self.data["gt_spectra_plot_mask"][sup_ids]
+        self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][sup_ids]
+        if self.kwargs["codebook_pretrain_pixel_supervision"]:
+            self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][sup_ids]
+
+        # valiation(and semi sup) spectra data (used during main train)
+        self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
+        self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids]
+        self.data["validation_coords"] = self.data["gt_spectra_coords"][val_ids]
+        self.data["validation_masks"] = self.data["gt_spectra_plot_mask"][val_ids]
+        # self.data["validation_img_coords"] = self.data["gt_spectra_img_coords"][val_ids]
+        # self.data["validation_world_coords"] = self.data["gt_spectra_world_coords"][val_ids]
+        if self.kwargs["redshift_semi_supervision"]:
+            self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
 
     def set_wave_range(self):
         """ Set wave range used for linear normalization.
@@ -282,21 +352,8 @@ class SpectraData:
 
         self.get_full_emit_wave_mask()
         self.num_gt_spectra = len(self.data["gt_spectra"])
-        self.transform_data()
-        self.train_valid_split()
-
-    def transform_data(self):
-        self.to_tensor([
-            "full_emit_wave",
-            "gt_spectra",
-            "gt_spectra_pixels",
-            "gt_spectra_redshift",
-            # "gt_spectra_world_coords"
-        ], torch.float32)
-        self.to_tensor([
-            "full_emit_wave_mask",
-            "gt_spectra_plot_mask",
-        ], torch.bool)
+        # self.transform_data()
+        # self.train_valid_split()
 
     #############
     # Loading helpers
@@ -331,25 +388,6 @@ class SpectraData:
         self.num_validation_spectra = len(validation_ids)
         self.num_supervision_spectra = len(supervision_ids)
         return supervision_ids, validation_ids
-
-    def train_valid_split(self):
-        sup_ids, val_ids = self.split_spectra()
-        log.info(f"spectra train/valid {len(sup_ids)}/{len(val_ids)}")
-
-        # supervision spectra data (used during pretrain)
-        self.data["supervision_spectra"] = self.data["gt_spectra"][sup_ids]
-        self.data["supervision_masks"] = self.data["gt_spectra_plot_mask"][sup_ids]
-        self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][sup_ids]
-        if self.kwargs["codebook_pretrain_pixel_supervision"]:
-            self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][sup_ids]
-
-        # valiation(and semi sup) spectra data (used during main train)
-        self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
-        self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids][:,0]
-        self.data["validation_masks"] = self.data["gt_spectra_plot_mask"][val_ids]
-        self.data["validation_world_coords"] = self.data["gt_spectra_world_coords"][val_ids]
-        if self.kwargs["redshift_semi_supervision"]:
-            self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
 
     def get_full_emit_wave_mask(self):
         """ Generate mask for codebook spectra plot.
@@ -400,9 +438,9 @@ class SpectraData:
             plot_masks.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["plot_mask_fname"])))
             img_coords.append(
-                np.load(join(self.processed_spectra_path, df.iloc[i]["img_coord_fname"])))
+                np.load(join(self.processed_spectra_path, df.iloc[i]["img_coord_fname"]))[None,...])
             world_coords.append(
-                np.load(join(self.processed_spectra_path, df.iloc[i]["world_coord_fname"])))
+                np.load(join(self.processed_spectra_path, df.iloc[i]["world_coord_fname"]))[None,...])
 
         self.data["full_emit_wave"] = np.load(self.emit_wave_coverage_fname)[0]
 
@@ -414,7 +452,7 @@ class SpectraData:
         self.data["gt_spectra_pixels"] = np.concatenate(pixels, axis=0).astype(np.float32)
         self.data["gt_spectra_redshift"] = np.array(redshift).astype(np.float32) # [n,]
         self.data["gt_spectra_img_coords"] = np.concatenate(
-            img_coords, axis=0).astype(np.int16) # [n,2]
+            img_coords, axis=0).astype(np.int16) # [n,n_neighbr,2]
         self.data["gt_spectra_world_coords"] = np.concatenate(
             world_coords, axis=0).astype(np.float32) # [n,n_neighbr,2]
 
@@ -677,7 +715,8 @@ class SpectraData:
         pixels = patch.get_pixels(pixel_ids)             # [n_neighbr,2]
         img_coords = patch.get_img_coords(pixel_ids)     # mesh grid coords [n_neighbr,2]
         world_coords = patch.get_world_coords(pixel_ids) # un-normed ra/dec [n_neighbr,2]
-        # print(img_coord, img_coords, world_coords)
+        # print(img_coord, img_coords.shape, world_coords.shape)
+
         np.save(join(self.processed_spectra_path, pix_fname), pixels)
         np.save(join(self.processed_spectra_path, img_coord_fname), img_coords)
         np.save(join(self.processed_spectra_path, world_coord_fname), world_coords)
@@ -817,6 +856,9 @@ class SpectraData:
         (gt_wave, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux) = data
 
         sub_dir = ""
+        if self.gt_convolved:
+            sub_dir += "convolved_"
+
         plot_gt_spectrum = self.kwargs["plot_spectrum_with_gt"] \
             and gt_flux is not None and not is_codebook
         plot_recon_spectrum = self.kwargs["plot_spectrum_with_recon"]

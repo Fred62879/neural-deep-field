@@ -11,9 +11,6 @@ from functools import partial
 from os.path import exists, join
 
 from wisp.inferrers import BaseInferrer
-from wisp.datasets.data_utils import get_coords_range_fname, add_dummy_dim
-
-from wisp.utils.numerical import normalize_coords
 from wisp.utils.plot import plot_horizontally, plot_embed_map, \
     plot_latent_embed, annotated_heat, plot_simple
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
@@ -85,8 +82,6 @@ class AstroInferrer(BaseInferrer):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
-
-        self.coords_range_fname = get_coords_range_fname(**self.extra_args)
 
     def select_models(self):
         self.model_fnames = os.listdir(self.model_dir)
@@ -280,14 +275,7 @@ class AstroInferrer(BaseInferrer):
             self.wave_source = "trans"
 
             if self.recon_spectra_pixels_only:
-                coords = self.dataset.get_validation_spectra_world_coords()
-                if self.kwargs["normalize_coords"]:
-                    coords_range = np.load(self.coords_range_fname)
-                    coords, _ = normalize_coords(coords, coords_range=coords_range)
-                if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
-                    coords = add_dummy_dim(coords[:,0], **self.extra_args)
-                coords = coords[:,None]
-
+                coords = self.dataset.get_validation_spectra_coords()
                 self.coords_source = "spectra_coords"
                 self.dataset.set_hardcode_data("spectra_coords", coords)
             else:
@@ -1063,13 +1051,7 @@ class AstroInferrer(BaseInferrer):
     def _set_dataset_coords_cur_val_coords(self):
         assert self.main_infer
         if self.recon_spectra_pixels_only:
-            cur_val_coords = self.dataset.get_validation_spectra_world_coords()
-            if self.kwargs["normalize_coords"]:
-                coords_range = self.dataset.get_coords_range()
-                cur_val_coords, _ = normalize_coords(cur_val_coords, coords_range=coords_range)
-            if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
-                cur_val_coords = add_dummy_dim(cur_val_coords[:,0], **self.extra_args)
-            cur_val_coords = cur_val_coords[:,None]
+            cur_val_coords = self.dataset.get_validation_spectra_coords()
         else:
             cur_val_coords = self.dataset.get_coords()[self.val_spectra_map]
         self.dataset.set_hardcode_data(self.coords_source, cur_val_coords)

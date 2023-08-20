@@ -40,8 +40,11 @@ def get_coords_range_fname(**kwargs):
     _, img_data_path = set_input_path(
         kwargs["dataset_path"], kwargs["sensor_collection_name"]
     )
+    patch = kwargs["patch_selection_cho"]
+    coords_cho = kwargs["train_coords_cho"]
+    norm_cho = "_normed" if kwargs["normalize_coords"] else ""
     fname = join(
-        img_data_path, kwargs["coords_range_fname"])
+        img_data_path, f"coords_range_{patch}{norm_cho}_{coords_cho}.npy")
     return fname
 
 def create_patch_fname(tract, patch, band, megau=False, weights=False):
@@ -192,16 +195,17 @@ def get_mgrid_tensor(self, sidelen, lo=-1, hi=1, dim=2, flat=True):
 
 def add_dummy_dim(coords, **kwargs):
     if kwargs["coords_encode_method"] == "grid" and kwargs["grid_dim"] == 3:
-        num_coords = coords.shape[0]
+        sp = list(coords.shape[:-1])
+        sp.append(3)
         class_name = coords.__class__.__name__
         # print(coords.shape, class_name)
         # if type(coords).__module__ == "torch":
         coords_2d = coords
 
         if class_name == "Tensor":
-            coords = torch.zeros((num_coords, 3))
+            coords = torch.zeros(sp)
         elif class_name == "ndarray":
-            coords = np.zeros((num_coords, 3))
+            coords = np.zeros(sp)
         else:
             raise ValueError("Unknown collection class")
         coords[...,:2] = coords_2d

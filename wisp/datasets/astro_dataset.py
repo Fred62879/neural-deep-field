@@ -55,6 +55,7 @@ class AstroDataset(Dataset):
                                            self.device, **self.kwargs)
         self.fits_dataset = FitsData(self.device, self.spectra_dataset, **self.kwargs)
         self.mask_dataset = MaskData(self.fits_dataset, self.device, **self.kwargs)
+        self.spectra_dataset.finalize_spectra()
 
         wave_range_fname = get_wave_range_fname(**self.kwargs)
         self.data["wave_range"] = np.load(wave_range_fname)
@@ -139,9 +140,6 @@ class AstroDataset(Dataset):
     def get_coords(self):
         return self.fits_dataset.get_coords()
 
-    def get_coords_range(self):
-        return self.fits_dataset.get_coords_range()
-
     def get_full_spectra_wave_mask(self):
         return self.spectra_dataset.get_full_wave_mask()
 
@@ -158,11 +156,11 @@ class AstroDataset(Dataset):
     def get_validation_spectra_masks(self):
         return self.spectra_dataset.get_validation_masks()
 
+    def get_validation_spectra_coords(self, idx=None):
+        return self.spectra_dataset.get_validation_coords(idx)
+
     def get_validation_spectra_pixels(self, idx=None):
         return self.spectra_dataset.get_validation_pixels(idx)
-
-    def get_validation_spectra_world_coords(self, idx=None):
-        return self.spectra_dataset.get_validation_world_coords(idx)
 
     def get_supervision_spectra_data(self):
         return self.spectra_dataset.get_supervision_data()

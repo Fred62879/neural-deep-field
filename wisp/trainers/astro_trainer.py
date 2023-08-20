@@ -18,13 +18,9 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
 
 from wisp.datasets import default_collate
 from wisp.datasets.patch_data import PatchData
-from wisp.datasets.data_utils import get_coords_range_fname, add_dummy_dim
-
-from wisp.utils.numerical import normalize_coords
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     load_pretrained_model_weights, forward, print_shape, create_patch_uid
-
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
@@ -213,7 +209,6 @@ class AstroTrainer(BaseTrainer):
             Path(path).mkdir(parents=True, exist_ok=True)
 
         self.grad_fname = join(self.log_dir, "grad.png")
-        self.coords_range_fname = get_coords_range_fname(**self.extra_args)
 
         if self.plot_loss:
             self.loss_fname = join(self.log_dir, "loss")
@@ -299,8 +294,8 @@ class AstroTrainer(BaseTrainer):
                 self.epoch = epoch
                 self.begin_epoch()
 
-                for batch in tqdm(range(self.num_iterations_cur_epoch)):
-                # for batch in range(self.num_iterations_cur_epoch):
+                # for batch in tqdm(range(self.num_iterations_cur_epoch)):
+                for batch in range(self.num_iterations_cur_epoch):
                     data = self.next_batch()
                     self.timer.check("got data")
                     self.pre_step()
@@ -580,15 +575,7 @@ class AstroTrainer(BaseTrainer):
 
     def set_coords(self):
         if self.train_spectra_pixels_only:
-            coords = self.dataset.get_validation_spectra_world_coords()
-            print(coords.shape)
-            if self.extra_args["normalize_coords"]:
-                coords_range = np.load(self.coords_range_fname)
-                coords, _ = normalize_coords(coords, coords_range=coords_range)
-            if self.extra_args["coords_encode_method"] == "grid" and self.extra_args["grid_dim"] == 3:
-                coords = add_dummy_dim(coords[:,0], **self.extra_args)
-            coords = coords[:,None]
-
+            coords = self.dataset.get_validation_spectra_coords()
             self.dataset.set_coords_source("spectra_coords")
             self.dataset.set_hardcode_data("spectra_coords", coords)
         else:
@@ -786,7 +773,6 @@ class AstroTrainer(BaseTrainer):
         # Average over iterations
         n = len(self.train_data_loader)
 
-        print(self.log_dict["recon_loss"])
         log_text = "EPOCH {}/{}".format(self.epoch, self.num_epochs)
         log_text += " | total loss: {:>.3E}".format(self.log_dict["total_loss"] / n)
         log_text += " | recon loss: {:>.3E}".format(self.log_dict["recon_loss"] / n)

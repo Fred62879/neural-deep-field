@@ -47,8 +47,15 @@ def find_closest_tensor(tensor1, tensor2):
 
 def get_coords_range(coords):
     ''' Find min and max of given 2D coords. '''
-    min_ra, max_ra = np.min(coords[...,0]), np.max(coords[...,0])
-    min_dec, max_dec = np.min(coords[...,1]), np.max(coords[...,1])
+    class_name = coords.__class__.__name__
+    if class_name == "Tensor":
+        min_ra, max_ra = np.min(coords[...,0]), np.max(coords[...,0])
+        min_dec, max_dec = np.min(coords[...,1]), np.max(coords[...,1])
+    elif class_name == "ndarray":
+        min_ra, max_ra = torch.min(coords[...,0]), torch.max(coords[...,0])
+        min_dec, max_dec = torch.min(coords[...,1]), torch.max(coords[...,1])
+    else:
+        raise NotImplementedError()
     return np.array([min_ra, max_ra, min_dec, max_dec])
 
 def normalize_coords(coords, coords_range=None):
@@ -57,13 +64,14 @@ def normalize_coords(coords, coords_range=None):
         @Param
           coords: [...,2] (float32)
     '''
-    coords = coords.copy()
+    # coords = coords.copy()
     if coords_range is None:
         coords_range = get_coords_range(coords)
     (min_x, max_x, min_y, max_y) = coords_range
     coords[...,0] = (coords[...,0] - min_x) / (max_x - min_x)
     coords[...,1] = (coords[...,1] - min_y) / (max_y - min_y)
-    return np.float32(coords), np.float32(coords_range)
+    # return np.float32(coords), np.float32(coords_range)
+    return coords, coords_range
 
 def calculate_zscale_ranges(pixels):
     """ Calculate zscale ranges based on given pixels for each bands separately.

@@ -321,8 +321,6 @@ def define_cmd_line_args():
     data_group.add_argument("--space-dim", type=int)
     data_group.add_argument("--wave-range-fname", type=str,
                             help="fname of lambda range used for linear normalization.")
-    data_group.add_argument("--coords-range-fname", type=str,
-                            help="fname of ra/dec used for normalization.")
     # fits data
     data_group.add_argument("--patch-selection-cho", type=str)
     data_group.add_argument("--tracts", nargs="+", help="tracts of chose FITS files")
