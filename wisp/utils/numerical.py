@@ -48,10 +48,10 @@ def find_closest_tensor(tensor1, tensor2):
 def get_coords_range(coords):
     ''' Find min and max of given 2D coords. '''
     class_name = coords.__class__.__name__
-    if class_name == "Tensor":
+    if class_name == "ndarray":
         min_ra, max_ra = np.min(coords[...,0]), np.max(coords[...,0])
         min_dec, max_dec = np.min(coords[...,1]), np.max(coords[...,1])
-    elif class_name == "ndarray":
+    elif class_name == "Tensor":
         min_ra, max_ra = torch.min(coords[...,0]), torch.max(coords[...,0])
         min_dec, max_dec = torch.min(coords[...,1]), torch.max(coords[...,1])
     else:
@@ -68,8 +68,8 @@ def normalize_coords(coords, coords_range=None):
     if coords_range is None:
         coords_range = get_coords_range(coords)
     (min_x, max_x, min_y, max_y) = coords_range
-    coords[...,0] = (coords[...,0] - min_x) / (max_x - min_x)
-    coords[...,1] = (coords[...,1] - min_y) / (max_y - min_y)
+    coords[...,0] = 2 * (coords[...,0] - min_x) / (max_x - min_x) - 1
+    coords[...,1] = 2 * (coords[...,1] - min_y) / (max_y - min_y) - 1
     # return np.float32(coords), np.float32(coords_range)
     return coords, coords_range
 

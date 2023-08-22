@@ -12,7 +12,6 @@ from wisp.inferrers import *
 from wisp.models.nefs import *
 from wisp.datasets.transforms import *
 from wisp.models import AstroPipeline
-from wisp.models.layers import init_codebook
 
 
 str2optim = {m.lower(): getattr(torch.optim, m) for m in dir(torch.optim) if m[0].isupper()}

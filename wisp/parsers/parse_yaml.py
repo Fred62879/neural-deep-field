@@ -210,6 +210,9 @@ def define_cmd_line_args():
                             Instant-NGP growing scheme.")
     grid_group.add_argument("--codebook-bitwidth", type=int, default=8,
                             help="Bitwidth to use for the codebook. The number of vectors will be 2^bitwidth.")
+    grid_group.add_argument("--interpolation-align-corners", action="store_true",
+                            help="arg for dense grid interpolation, torch.align_sample")
+
 
     ###################
     # Decoder arguments

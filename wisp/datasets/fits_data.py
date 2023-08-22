@@ -87,7 +87,6 @@ class FitsData:
         paths = [img_data_path]
 
         coords_cho = self.kwargs["train_coords_cho"]
-        norm_cho = "_normed" if self.kwargs["normalize_coords"] else ""
         # suffix that defines that currently selected group of image patches
         if self.kwargs["patch_selection_cho"] is None:
             # concatenate all selected patches together
@@ -97,7 +96,7 @@ class FitsData:
             suffix = "_" + self.kwargs["patch_selection_cho"]
 
         norm_str = self.kwargs["train_pixels_norm"]
-        self.coords_fname = join(img_data_path, f"coords{suffix}{norm_cho}_{coords_cho}.npy")
+        self.coords_fname = join(img_data_path, f"coords{suffix}_{coords_cho}.npy")
         self.coords_range_fname = get_coords_range_fname(**self.kwargs)
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.headers_fname = join(img_data_path, f"headers{suffix}.txt")
@@ -143,9 +142,7 @@ class FitsData:
             self.data["pixels"] = torch.FloatTensor(pixels)
 
         if self.load_coords:
-            if self.kwargs["coords_encode_method"] == "grid" and self.kwargs["grid_dim"] == 3:
-                coords = add_dummy_dim(coords, **self.kwargs)
-            self.data["coords"] = torch.FloatTensor(coords[:,None])
+            self.data["coords"] = torch.FloatTensor(coords)
 
         if self.load_weights:
             self.data["weights"] = torch.FloatTensor(weights)

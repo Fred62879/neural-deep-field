@@ -18,16 +18,35 @@ from kaolin import _C
 
 PRIMES = [1, 265443567, 805459861]
 
-def dense_grid(coords, resolutions, lod_idx, codebook):
+def dense_grid(coords, resolutions, lod_idx, codebook, align_corners):
     """
         @Param
-          coords: 2d coords [bsz,num_samples,2] (un-normalized mesh grid)
+          coords: 2d coords [1,bsz,num_samples,2] (un-normalized mesh grid)
+          codebook: num_lods * [1,feature_dim,reso,reso]
     """
     coords = coords[None,...]
     feats = []
     for i, res in enumerate(resolutions[:lod_idx+1]):
-        feat = F.grid_sample(codebook[i], coords, mode="bilinear") # [1,feature_dim,bsz,1]
-        # print(codebook[i].shape, coords.shape, feat.shape)
+
+        # debug
+        # coords[...,0] -= 1750
+        # coords[...,1] -= 550
+        # print(torch.min(coords[...,0]), torch.max(coords[...,0]),
+        #       torch.min(coords[...,1]), torch.max(coords[...,1]))
+        # a=coords[0,:10,0].type(torch.int64)
+        # b=codebook[i][0]
+        # print(b[:,a[:,1],a[:,0]])
+        # coords = 2 * coords / 511 - 1
+        # feat = F.grid_sample(
+        #     codebook[i], coords, mode="bilinear", align_corners=True) #align_corners
+        # # ) # [1,feature_dim,bsz,1]
+        # feat = feat[0,...,0].T # [bsz,feature_dim]
+        # print(feat[:10])
+        # assert 0
+
+        feat = F.grid_sample(
+            codebook[i], coords, mode="bilinear", align_corners=align_corners
+        ) # [1,feature_dim,bsz,1]
         feat = feat[0,...,0].T # [bsz,feature_dim]
         feats.append(feat)
     return torch.cat(feats, -1)

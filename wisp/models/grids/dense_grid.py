@@ -46,6 +46,7 @@ class DenseGrid(nn.Module):
         self.feature_bias = feature_bias
         self.multiscale_type = multiscale_type
         self.interpolation_type = interpolation_type
+        self.align_corners = kwargs["interpolation_align_corners"]
         assert self.grid_dim == 2
 
     def init_from_geometric(self, min_width, max_width, num_lods):
@@ -70,14 +71,10 @@ class DenseGrid(nn.Module):
         self.max_lod = self.num_lods - 1
 
         self.codebook = nn.ParameterList([])
-        # params = []
         for res in resolutions:
-            fts = torch.zeros((1, res, res, self.feature_dim))
+            fts = torch.zeros((1, self.feature_dim, res, res))
             fts += torch.randn_like(fts) * self.feature_std
-            fts = fts.permute(0,3,1,2)
             self.codebook.append(nn.Parameter(fts))
-            # params.append(nn.Parameter(fts))
-        # self.codebook = nn.Parameter(torch.stack(params))
 
     def interpolate(self, coords, lod_idx, pidx=None):
         """  Query multiscale features.
@@ -90,7 +87,9 @@ class DenseGrid(nn.Module):
         """
         timer = PerfTimer(activate=False, show_memory=False)
         batch, num_samples, _ = coords.shape
-        feats = grid_ops.dense_grid(coords, self.resolutions, lod_idx, self.codebook)
+        feats = grid_ops.dense_grid(
+            coords, self.resolutions, lod_idx, self.codebook, self.align_corners
+        )
 
         if self.multiscale_type == 'cat':
             ret = feats
