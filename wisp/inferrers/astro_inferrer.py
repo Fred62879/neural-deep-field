@@ -11,6 +11,7 @@ from functools import partial
 from os.path import exists, join
 
 from wisp.inferrers import BaseInferrer
+from wisp.datasets.data_utils import get_bound_id
 from wisp.utils.plot import plot_horizontally, plot_embed_map, \
     plot_latent_embed, annotated_heat, plot_simple
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
@@ -145,7 +146,6 @@ class AstroInferrer(BaseInferrer):
                     self.recon_img_val_spectra = True
                 else: self.recon_img = True
 
-        self.plot_pixel_distrib = "plot_pixel_distrib" in tasks
         self.plot_embed_map = "plot_embed_map" in tasks and self.qtz
         self.plot_latent_embed = "plot_latent_embed" in tasks and self.qtz
 
@@ -175,6 +175,10 @@ class AstroInferrer(BaseInferrer):
         self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ" in tasks and self.qtz and self.model_redshift
         assert not (self.recon_codebook_spectra and self.recon_codebook_spectra_individ)
 
+        # (iv) infer w/o no modeling running
+        self.integrate_gt_spectra = "integrate_gt_spectra" in tasks
+        self.plot_gt_pixel_distrib = "plot_gt_pixel_distrib" in tasks
+
         # keep only tasks required to perform
         self.group_tasks = []
 
@@ -191,7 +195,7 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
             self.group_tasks.append("infer_hardcode_coords_modified_model")
 
-        if self.plot_pixel_distrib:
+        if self.integrate_gt_spectra or self.plot_gt_pixel_distrib:
             self.group_tasks.append("infer_no_model_run")
 
         # set all grouped tasks to False, only required tasks will be toggled afterwards
@@ -411,7 +415,7 @@ class AstroInferrer(BaseInferrer):
         pass
 
     def inferrence_no_model_run(self):
-        if self.plot_pixel_distrib:
+        if self.plot_gt_pixel_distrib:
             assert(exists(self.recon_dir))
             for fname in os.listdir(self.recon_dir):
                 if not "npy" in fname: continue
@@ -419,6 +423,29 @@ class AstroInferrer(BaseInferrer):
                 out_fname = join(self.pixel_distrib_dir, fname[:-4] + ".png")
                 pixels = np.load(in_fname)
                 plot_horizontally(pixels, out_fname, plot_option="plot_distrib")
+
+        if self.integrate_gt_spectra:
+            valid_pixels = self.dataset.get_validation_spectra_pixels().numpy()
+            valid_spectra = self.dataset.get_validation_spectra()[:,:2] # [bsz,2,nsmpl]
+            valid_spectra_masks = self.dataset.get_validation_spectra_masks() # [bsz,nsmpl]
+            func = self.dataset.get_transmission_interpolation_function()
+
+            recon_pixels = []
+            for (spectra, mask) in zip(valid_spectra, valid_spectra_masks):
+                wave = spectra[0]
+                (id_lo, id_hi) = get_bound_id(self.dataset.get_trans_wave_range(), wave)
+                wave = wave[id_lo:id_hi+1]
+                interp_trans = func(wave)
+                nsmpl = np.sum(interp_trans != 0, axis=-1)
+                recon_pixels.append( np.einsum("j,kj->k", wave, interp_trans) / nsmpl )
+
+            recon_pixels = np.array(recon_pixels)
+            ratio = recon_pixels / valid_pixels
+            np.set_printoptions(suppress=True)
+            np.set_printoptions(precision=3)
+            # log.info(f"GT pixels: {valid_pixels}")
+            # log.info(f"Recon pixels: {recon_pixels}")
+            log.info(f"Recon/GT ratio: {ratio}")
 
     #############
     # Infer with checkpoint

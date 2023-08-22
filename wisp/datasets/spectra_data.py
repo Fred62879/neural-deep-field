@@ -771,6 +771,32 @@ class SpectraData:
     # Utilities
     #############
 
+    # def interpolate_spectra(self, f, spectra, masks):
+    #     """ Interpolate spectra to same discretization interval as trans data
+    #         @Param
+    #           spectra: spectra data [bsz,2,nsmpl] (wave/flux)
+    #           masks: mask out range of spectra to ignore [bsz,nsmpl] (1-keep, 0-drop)
+    #     """
+    #     # masks = masks[:,None] #.tile(1,2,1)
+    #     interp_spectra = []
+    #     print(spectra.shape, masks.shape)
+    #     for (cur_spectra, cur_mask) in zip(spectra, masks):
+    #         interp_spectra.append(
+    #             self.interpolate_one_spectra(f, cur_spectra, cur_mask)
+    #         )
+    #     return interp_spectra
+
+    # def interpolate_one_spectra(self, f, spectra, mask):
+    #     # print(spectra.shape, mask.shape, spectra.dtype, mask.dtype)
+    #     spectra_wave = spectra[0][mask]
+    #     # print(spectra_wave.shape, spectra_wave[0], spectra_wave[-1])
+    #     interp_trans = f(spectra_wave)
+    #     print(interp_flux.shape)
+    #     assert 0
+
+    # def integrate_spectra_over_trans(self, spectra, trans):
+    #     pass
+
     def normalize_one_flux(self, sub_dir, is_codebook, plot_gt_spectrum,
                            plot_recon_spectrum, flux_norm_cho, gt_flux, recon_flux
     ):

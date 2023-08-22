@@ -7,10 +7,12 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 from os.path import join, exists
-from wisp.utils.plot import plot_save
-from wisp.datasets.data_utils import get_wave_range_fname, get_bound_id
+from scipy.interpolate import interp1d
 #from astroquery.svo_fps import SvoFps
 #from unagi import filters as unagi_filters
+
+from wisp.utils.plot import plot_save
+from wisp.datasets.data_utils import get_wave_range_fname, get_bound_id
 
 
 class TransData:
@@ -138,7 +140,14 @@ class TransData:
         return self.data["full_wave"]
 
     def get_wave_range(self):
+        """ Get wave range used for lambda value normalziation.
+        """
         return self.data["wave_range"]
+
+    def get_trans_wave_range(self):
+        """ Get min and max value of transmission lambda.
+        """
+        return (min(self.data["full_wave"]), max(self.data["full_wave"]))
 
     def get_full_trans_data(self):
         return self.data["trans_data"]
@@ -154,6 +163,17 @@ class TransData:
 
     def get_band_coverage_range(self):
         return np.load(self.band_coverage_range_fname)
+
+    def get_transmission_interpolation_function(self):
+        # print(self.data["full_wave"].shape, self.data["full_trans"].shape)
+        # print(self.data["full_wave"][0], self.data["full_wave"][-1])
+        # wave [nsmpl], trans [nbands, nsmpl]
+        f = interp1d(self.data["full_wave"], self.data["full_trans"], axis=1)
+        return f
+
+    def get_interpolated_transmission(self, f):
+        interp_trans = f(self.data["full_wave"])
+        return interp_trans
 
     def sample_wave(self, batch_size, num_samples, use_all_wave=False):
         """ Sample lambda and transmission data for given sampling methods.
@@ -466,11 +486,16 @@ class TransData:
                          label=self.kwargs["plot_labels"][j],
                          linestyle=self.kwargs["plot_styles"][j])
 
-    def integrate(self, spectra, all_wave=True):
+    def integrate(self, spectra, spectra_masks=None, all_wave=True, interpolate=False):
         """ Integrate spectra over transmission.
-            TODO: deal with cases where spectra pixel has multiple neighbour
+            TODO: deal with cases where spectra pixel has multiple neighbours
+            @Param
+              spectra: spectra data [bsz,2,nsmpl] (wave/flux)
+              spectra_masks: mask out range of spectra to ignore [bsz,nsmpl] (1-keep, 0-drop)
         """
-        if all_wave:
+        if interpolate:
+            spectra = self.interpolate_spectra(spectra, spectra_masks)
+        elif all_wave:
             trans = self.data["full_trans"].numpy()
             nsmpl = self.data["nsmpl_within_bands"].numpy()
             spectra = spectra[:,0]

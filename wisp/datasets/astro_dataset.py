@@ -121,6 +121,12 @@ class AstroDataset(Dataset):
     def get_trans_data_obj(self):
         return self.trans_dataset
 
+    def get_trans_wave_range(self):
+        return self.trans_dataset.get_trans_wave_range()
+
+    def get_transmission_interpolation_function(self):
+        return self.trans_dataset.get_transmission_interpolation_function()
+
     def get_spectra_data_obj(self):
         return self.spectra_dataset
 
@@ -418,6 +424,16 @@ class AstroDataset(Dataset):
 
     def get_pixel_ids_one_patch(self, r, c, neighbour_size=1):
         return self.fits_dataset.get_pixel_ids_one_patch(r, c, neighbour_size)
+
+    def interpolate_spectra(self, f, spectra, spectra_masks):
+        return self.spectra_dataset.interpolate_spectra(f, spectra, spectra_masks)
+
+    def integrate_spectra_over_transmission(
+            self, spectra, spectra_masks=None, all_wave=True, interpolate=True
+    ):
+        return self.trans_dataset.integrate(
+            spectra, spectra_masks=spectra_masks, all_wave=all_wave, interpolate=interpolate
+        )
 
     def restore_evaluate_tiles(self, recon_pixels, **re_args):
         """ Restore flattened image, save locally and/or calculate metrics.
