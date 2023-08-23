@@ -709,6 +709,9 @@ class AstroInferrer(BaseInferrer):
                 self.dataset_length, -1).detach().cpu().numpy()
             recon_wave = gt_wave
             recon_masks = gt_masks
+
+            recon_fluxes = torch.stack(self.recon_fluxes).view(
+                self.dataset_length, 1, -1).detach().cpu().numpy()
         else:
             if self.recon_spectra_pixels_only:
                 num_spectra = self.dataset.get_num_validation_spectra()
@@ -727,19 +730,18 @@ class AstroInferrer(BaseInferrer):
             recon_masks = np.tile(
                 self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
 
-        recon_fluxes = torch.stack(self.recon_fluxes).view(
-            self.dataset_length, self.extra_args["spectra_neighbour_size"]**2, -1
-        ).detach().cpu().numpy()
+            recon_fluxes = torch.stack(self.recon_fluxes).view(
+                num_spectra, self.extra_args["spectra_neighbour_size"]**2, -1
+            ).detach().cpu().numpy()
 
         # plot spectrum in multiple figures, each figure contains several spectrum
-        n_spectrum = self.dataset_length
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
-        n_figs = int(np.ceil(n_spectrum / n_spectrum_per_fig))
+        n_figs = int(np.ceil(num_spectra / n_spectrum_per_fig))
 
         for i in range(n_figs):
             fname = f"model{model_id}-plot{i}"
             lo = i * n_spectrum_per_fig
-            hi = min(lo + n_spectrum_per_fig, n_spectrum)
+            hi = min(lo + n_spectrum_per_fig, num_spectra)
 
             self.dataset.plot_spectrum(
                 self.spectra_dir, fname,
@@ -1077,10 +1079,11 @@ class AstroInferrer(BaseInferrer):
 
     def _set_dataset_coords_cur_val_coords(self):
         assert self.main_infer
-        if self.recon_spectra_pixels_only:
-            cur_val_coords = self.dataset.get_validation_spectra_coords()
-        else:
-            cur_val_coords = self.dataset.get_coords()[self.val_spectra_map]
+        cur_val_coords = self.dataset.get_validation_spectra_coords()
+        # if self.recon_spectra_pixels_only:
+        #     cur_val_coords = self.dataset.get_validation_spectra_coords()
+        # else:
+        #     cur_val_coords = self.dataset.get_coords()[self.val_spectra_map]
         self.dataset.set_hardcode_data(self.coords_source, cur_val_coords)
         self.num_cur_val_coords = len(cur_val_coords)
 

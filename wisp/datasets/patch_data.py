@@ -190,6 +190,9 @@ class PatchData:
         return self.data["world_coords"]
 
     def get_spectra_img_coords(self, idx=None):
+        """ Get img coords for spectra pixels.
+            Currently only used for marking spectra on images.
+        """
         if idx is not None:
             return self.data["spectra_img_coords"][idx]
         return self.data["spectra_img_coords"]
@@ -215,8 +218,8 @@ class PatchData:
 
     def get_spectra_pixel_masks(self, idx=None):
         if idx is not None:
-            return self.data["spectra_pixel_plot_masks"][idx]
-        return self.data["spectra_pixel_plot_masks"]
+            return self.data["spectra_pixel_masks"][idx]
+        return self.data["spectra_pixel_masks"]
 
     def get_spectra_pixel_fluxes(self, idx=None):
         if idx is not None:
@@ -341,18 +344,18 @@ class PatchData:
         cur_patch_spectra_fname = join(path, f"{self.patch_uid}.npy")
         cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
         cur_patch_img_coords_fname = join(path, f"{self.patch_uid}_img_coords.npy")
-        cur_patch_spectra_plot_masks_fname = join(path, f"{self.patch_uid}_plot_mask.npy")
+        cur_patch_spectra_masks_fname = join(path, f"{self.patch_uid}_plot_mask.npy")
 
         spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]
         redshift = np.load(cur_patch_redshift_fname)
         img_coords = np.load(cur_patch_img_coords_fname)
-        plot_masks = np.load(cur_patch_spectra_plot_masks_fname)
+        spectra_masks = np.load(cur_patch_spectra_masks_fname)
 
         valid_spectra_ids = self.filter_spectra(img_coords)
         spectra = spectra[valid_spectra_ids]
         redshift = redshift[valid_spectra_ids]
-        plot_masks = plot_masks[valid_spectra_ids]
         img_coords = img_coords[valid_spectra_ids]
+        spectra_masks = spectra_masks[valid_spectra_ids]
         pixel_ids = self.get_pixel_ids(img_coords[:,0], img_coords[:,1])
 
         # convert global img coords to local img coords
@@ -379,7 +382,7 @@ class PatchData:
         self.data["spectra_pixel_redshift"] = redshift
         self.data["spectra_pixel_wave"] = spectra[:,0]
         self.data["spectra_pixel_fluxes"] = spectra[:,1]
-        self.data["spectra_pixel_plot_masks"] = plot_masks
+        self.data["spectra_pixel_masks"] = spectra_masks
 
         if self.mark_spectra_on_patch:
             self.mark_spectra_on_img()

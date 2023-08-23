@@ -653,6 +653,7 @@ class FitsData:
         if self.kwargs["coords_encode_method"] == "grid" and \
            self.kwargs["grid_type"] == "HashGrid" and self.kwargs["grid_dim"] == 3:
             coords = add_dummy_dim(coords, **self.kwargs)
+
         coords = coords[:,None]
         return coords
 

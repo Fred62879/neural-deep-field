@@ -190,7 +190,7 @@ class AstroTrainer(BaseTrainer):
         # self.selected_spectra_ids = self.dataset.get_spectra_coord_ids()
 
         if self.spectra_supervision:
-            self.num_supervision_spectra = self.extra_args["num_supervision_spectra"]
+            self.num_supervision_spectra_upper_bound = self.extra_args["num_supervision_spectra_upper_bound"]
 
     def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
@@ -376,9 +376,6 @@ class AstroTrainer(BaseTrainer):
 
     def pre_epoch(self):
         self.loss_lods = list(range(0, self.extra_args["grid_num_lods"]))
-
-        if self.extra_args["grow_every"] > 0:
-            self.grow()
 
         if self.extra_args["only_last"]:
             self.loss_lods = self.loss_lods[-1:]
@@ -726,7 +723,7 @@ class AstroTrainer(BaseTrainer):
 
             # todo: efficiently slice spectra with different bound
             (lo, hi) = data["spectra_supervision_wave_bound_ids"][0]
-            recon_spectra = ret["spectra"][:self.num_supervision_spectra,lo:hi]
+            recon_spectra = ret["spectra"][:self.num_supervision_spectra_upper_bound,lo:hi]
 
             if len(recon_spectra) == 0:
                 spectra_loss = 0

@@ -153,8 +153,8 @@ class AstroDataset(Dataset):
         return self.spectra_dataset.get_full_wave_coverage()
 
 
-    def get_validation_spectra_ids(self, patch_uid=None):
-        return self.spectra_dataset.get_validation_spectra_ids(patch_uid)
+    # def get_validation_spectra_ids(self, patch_uid=None):
+    #     return self.spectra_dataset.get_validation_spectra_ids(patch_uid)
 
     def get_validation_spectra(self, idx=None):
         return self.spectra_dataset.get_validation_spectra(idx)

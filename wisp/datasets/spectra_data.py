@@ -75,6 +75,8 @@ class SpectraData:
             dataset_path, self.kwargs["sensor_collection_name"])
         spectra_path = join(dataset_path, "input/spectra")
 
+        n_neighbours = self.kwargs["spectra_neighbour_size"]
+
         suffix = self.kwargs["source_spectra_cho"]
         if suffix != "": suffix = "_" + suffix
 
@@ -96,7 +98,7 @@ class SpectraData:
                 path, self.kwargs["source_spectra_fname"])
 
             processed_data_path = join(
-                path, "processed_" + spectra_cho + suffix)
+                path, f"processed_{spectra_cho}_{n_neighbours}_neighbours{suffix}")
             self.processed_spectra_path = join(
                 processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(
@@ -110,7 +112,7 @@ class SpectraData:
                 path, "source_zcosmos_table.fits")
 
             processed_data_path = join(
-                path, "processed_" + spectra_cho + suffix)
+                path, f"processed_{spectra_cho}_{n_neighbours}_neighbours{suffix}")
             self.processed_spectra_path = join(
                 processed_data_path, "processed_spectra")
             self.processed_metadata_table_fname = join(
@@ -129,8 +131,8 @@ class SpectraData:
         self.gt_spectra_pixels_fname = join(processed_data_path, "gt_spectra_pixels.npy")
         self.gt_spectra_redshift_fname = join(processed_data_path, "gt_spectra_redshift.npy")
         self.gt_spectra_plot_mask_fname = join(processed_data_path, "gt_spectra_plot_mask.npy")
-        self.gt_spectra_img_coords_fname = join(processed_data_path, "gt_spectra_img_coords.npy")
-        self.gt_spectra_world_coords_fname = join(processed_data_path, "gt_spectra_world_coords.npy")
+        self.gt_spectra_img_coords_fname = join(processed_data_path, f"gt_spectra_img_coords.npy")
+        self.gt_spectra_world_coords_fname = join(processed_data_path, f"gt_spectra_world_coords.npy")
 
         for path in [processed_data_path, self.processed_spectra_path]:
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -210,13 +212,13 @@ class SpectraData:
         return self.data["supervision_redshift"][idx]
 
 
-    def get_validation_spectra_ids(self, patch_uid=None):
-        """ Get id of validation spectra in given patch.
-            Id here is in context of all validation spectra
-        """
-        if patch_uid is not None:
-            return self.data["validation_patch_ids"][patch_uid]
-        return self.data["validation_patch_ids"]
+    # def get_validation_spectra_ids(self, patch_uid=None):
+    #     """ Get id of validation spectra in given patch.
+    #         Id here is in context of all validation spectra
+    #     """
+    #     if patch_uid is not None:
+    #         return self.data["validation_patch_ids"][patch_uid]
+    #     return self.data["validation_patch_ids"]
 
     def get_validation_spectra(self, idx=None):
         if idx is not None:
@@ -264,12 +266,7 @@ class SpectraData:
            self.kwargs["grid_type"] == "HashGrid" and self.kwargs["grid_dim"] == 3:
             coords = add_dummy_dim(coords, **self.kwargs)
 
-        # flatten neighbouring pixel dim
-        # coords now is [n,n_neighbr,2/3]
-        coords = coords.reshape(-1,coords.shape[-1])
-        coords = coords[:,None]
-
-        self.data["gt_spectra_coords"] = coords
+        self.data["gt_spectra_coords"] = coords # [n,n_neighbr,2/3]
 
     def transform_data(self):
         self.to_tensor([
@@ -286,8 +283,8 @@ class SpectraData:
         ], torch.bool)
 
     def train_valid_split(self):
-        sup_ids, val_ids = self.split_spectra()
-        log.info(f"spectra train/valid {len(sup_ids)}/{len(val_ids)}")
+        test_ids, val_ids, sup_ids = self.split_spectra()
+        log.info(f"spectra train/valid {len(sup_ids)}/{len(val_ids)}/{len(test_ids)}")
 
         # supervision spectra data (used during pretrain)
         self.data["supervision_spectra"] = self.data["gt_spectra"][sup_ids]
@@ -299,12 +296,20 @@ class SpectraData:
         # valiation(and semi sup) spectra data (used during main train)
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
         self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids]
-        self.data["validation_coords"] = self.data["gt_spectra_coords"][val_ids]
         self.data["validation_masks"] = self.data["gt_spectra_plot_mask"][val_ids]
-        # self.data["validation_img_coords"] = self.data["gt_spectra_img_coords"][val_ids]
-        # self.data["validation_world_coords"] = self.data["gt_spectra_world_coords"][val_ids]
         if self.kwargs["redshift_semi_supervision"]:
             self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
+
+        valid_coords = self.data["gt_spectra_coords"][val_ids] # [n_valid,n_neighbr**2,2/3]
+        self.data["validation_coords"] = valid_coords.view(-1, valid_coords.shape[-1])[:,None]
+        # [n_valid*n_neighbr**2,1,2/3]
+
+        # test spectra data (used during main inferrence only)
+        self.data["test_spectra"] = self.data["gt_spectra"][test_ids]
+        self.data["test_coords"] = self.data["gt_spectra_coords"][test_ids]
+        self.data["test_pixels"] = self.data["gt_spectra_pixels"][test_ids]
+        self.data["test_masks"] = self.data["gt_spectra_plot_mask"][test_ids]
+        self.data["test_redshift"] = self.data["gt_spectra_redshift"][test_ids]
 
     def set_wave_range(self):
         """ Set wave range used for linear normalization.
@@ -352,8 +357,6 @@ class SpectraData:
 
         self.get_full_emit_wave_mask()
         self.num_gt_spectra = len(self.data["gt_spectra"])
-        # self.transform_data()
-        # self.train_valid_split()
 
     #############
     # Loading helpers
@@ -364,30 +367,87 @@ class SpectraData:
             self.data[field] = torch.tensor(self.data[field], dtype=dtype)
 
     def split_spectra(self):
+        """ Split spectra into pretrain, main train, and test set
+        """
         ids = np.arange(self.num_gt_spectra)
 
-        # reserve all spectra in main train image patch as validation spectra
-        acc, validation_ids, validation_patch_ids = 0, [], {}
-        for tract, patch in zip(self.kwargs["tracts"], self.kwargs["patches"]):
+        # reserve all spectra in main train image patch as validation or test spectra
+        acc, test_ids, validation_ids = 0, [], []
+        for i, (tract, patch) in enumerate(
+            zip(self.kwargs["tracts"], self.kwargs["patches"])
+        ):
             patch_uid = create_patch_uid(tract, patch)
-            cur_spectra_ids = self.data["gt_spectra_ids"][patch_uid]
-            validation_ids.extend(cur_spectra_ids)
-            validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
-            acc += len(cur_spectra_ids)
-        validation_ids = np.array(validation_ids)
-        # validation_ids = np.array([0])
-        # log.info(f"validation spectra ids: {validation_ids}")
+            cur_spectra_id_coords = np.array(self.data["gt_spectra_ids"][patch_uid])
+            cur_spectra_ids = cur_spectra_id_coords[:,0]
 
-        # get supervision ids
-        supervision_ids = np.array(list(set(ids) - set(validation_ids))).astype(int)
+            if self.kwargs["train_spectra_pixels_only"] or self.kwargs["use_full_patch"]:
+                # randomly split spectra in each patch into validation and test set
+                np.random.shuffle(cur_spectra_ids)
+                num_val = int(len(cur_spectra_ids) * self.kwargs["val_spectra_ratio"])
+                cur_val_ids = cur_spectra_ids[:num_val]
+                cur_test_ids = cur_spectra_ids[num_val:]
+            else:
+                # use spectra within cutout as validation set and the rest as test set
+                num_rows = self.kwargs["patch_cutout_num_rows"][i]
+                num_cols = self.kwargs["patch_cutout_num_cols"][i]
+                (r, c) = self.kwargs["patch_cutout_start_pos"][i] # top-left corner
+
+                coords = cur_spectra_id_coords[:,1:]
+                # print(coords, r, c, num_rows, num_cols)
+                within_cutout = (coords[:,0] >= r) & (coords[:,0] < r + num_rows) & \
+                    (coords[:,1] >= c) & (coords[:,1] < c + num_cols)
+                cur_val_ids = cur_spectra_ids[within_cutout]
+                cur_test_ids = list(set(cur_spectra_ids) - set(cur_val_ids))
+
+            test_ids.extend(cur_test_ids)
+            validation_ids.extend(cur_val_ids)
+            # validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
+            # acc += len(cur_spectra_ids)
+
+        test_ids = np.array(test_ids)
+        validation_ids = np.array(validation_ids)
+        if len(test_ids) == 0 or len(validation_ids) == 0:
+            raise ValueError("Please select patches properly to make sure the number of validation and test spectra is not zero.")
+
+        # validation_ids = np.array([0])
+        log.info(f"test spectra ids: {test_ids}")
+        log.info(f"validation spectra ids: {validation_ids}")
+
+        # use the rest spectra for pretrain (spectra supervision)
+        supervision_ids = np.array(list(set(ids)-set(validation_ids)-set(test_ids))).astype(int)
         np.random.shuffle(supervision_ids)
-        supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra"]]
-        # supervision_ids = supervision_ids[13:13+self.kwargs["num_supervision_spectra"]]
+        supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
         # log.info(f"supervision spectra ids: {supervision_ids}")
 
+        self.num_test_spectra = len(test_ids)
         self.num_validation_spectra = len(validation_ids)
         self.num_supervision_spectra = len(supervision_ids)
-        return supervision_ids, validation_ids
+        return test_ids, validation_ids, supervision_ids
+
+    # def split_spectra(self):
+    #     ids = np.arange(self.num_gt_spectra)
+
+    #     # reserve all spectra in main train image patch as validation spectra
+    #     acc, validation_ids, validation_patch_ids = 0, [], {}
+    #     for tract, patch in zip(self.kwargs["tracts"], self.kwargs["patches"]):
+    #         patch_uid = create_patch_uid(tract, patch)
+    #         cur_spectra_ids = self.data["gt_spectra_ids"][patch_uid]
+    #         validation_ids.extend(cur_spectra_ids)
+    #         validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
+    #         acc += len(cur_spectra_ids)
+    #     validation_ids = np.array(validation_ids)
+    #     # validation_ids = np.array([0])
+    #     # log.info(f"validation spectra ids: {validation_ids}")
+
+    #     # get supervision ids
+    #     supervision_ids = np.array(list(set(ids) - set(validation_ids))).astype(int)
+    #     np.random.shuffle(supervision_ids)
+    #     supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
+    #     # log.info(f"supervision spectra ids: {supervision_ids}")
+
+    #     self.num_validation_spectra = len(validation_ids)
+    #     self.num_supervision_spectra = len(supervision_ids)
+    #     return validation_ids, supervision_ids
 
     def get_full_emit_wave_mask(self):
         """ Generate mask for codebook spectra plot.
@@ -452,7 +512,7 @@ class SpectraData:
         self.data["gt_spectra_pixels"] = np.concatenate(pixels, axis=0).astype(np.float32)
         self.data["gt_spectra_redshift"] = np.array(redshift).astype(np.float32) # [n,]
         self.data["gt_spectra_img_coords"] = np.concatenate(
-            img_coords, axis=0).astype(np.int16) # [n,n_neighbr,2]
+            img_coords, axis=0).astype(np.float32) # [n,n_neighbr,2]
         self.data["gt_spectra_world_coords"] = np.concatenate(
             world_coords, axis=0).astype(np.float32) # [n,n_neighbr,2]
 
@@ -465,7 +525,7 @@ class SpectraData:
         np.save(self.gt_spectra_world_coords_fname, self.data["gt_spectra_world_coords"])
 
     def process_spectra(self):
-        upper_bound = self.kwargs["num_gt_spectra"]
+        upper_bound = self.kwargs["num_gt_spectra_upper_bound"]
         df = self.load_source_metadata().iloc[:upper_bound]
         log.info(f"found {len(df)} source spectra")
 
@@ -568,7 +628,8 @@ class SpectraData:
 
             valid_spectra_ids = []
             for k, v in spectra_ids.items():
-                valid_spectra_ids.extend(v)
+                # v: n*[3] (global_spectra_id/r/c)
+                valid_spectra_ids.extend(np.array(v)[:,0])
 
             ids = np.arange(n)
             spectra_to_drop = list(set(ids) - set(valid_spectra_ids))
@@ -584,7 +645,7 @@ class SpectraData:
         for idx in range(n):
             ra = df.iloc[idx]["ra"]
             dec = df.iloc[idx]["dec"]
-            tract, patch, i, j = localize(ra, dec)
+            tract, patch, r, c = localize(ra, dec)
 
             # TODO: we may adapt to spectra that doesn't belong
             #       to any patches we have in the future
@@ -593,7 +654,7 @@ class SpectraData:
                 continue
 
             patch_uid = create_patch_uid(tract, patch)
-            spectra_ids[patch_uid].append(idx)
+            spectra_ids[patch_uid].append([idx,r,c])
             df.at[idx,"tract"] = tract
             df.at[idx,"patch"] = patch
 
@@ -636,6 +697,8 @@ class SpectraData:
         if len(spectra_ids) == 0: return
 
         log.info(f"spectra-data::processing {patch_uid}, contains {len(spectra_ids)} spectra")
+
+        spectra_ids = np.array(spectra_ids)[:,0]
 
         ras = np.array(list(df.iloc[spectra_ids]["ra"]))
         decs = np.array(list(df.iloc[spectra_ids]["dec"]))
@@ -709,10 +772,11 @@ class SpectraData:
         df.at[idx,"img_coord_fname"] = img_coord_fname
         df.at[idx,"world_coord_fname"] = world_coord_fname
 
+        pixel_ids = patch.get_pixel_ids(img_coord[0], img_coord[1])
+        pixels = patch.get_pixels(pixel_ids)             # [1,2]
+
         pixel_ids = patch.get_pixel_ids(
             img_coord[0], img_coord[1], neighbour_size=self.neighbour_size)
-
-        pixels = patch.get_pixels(pixel_ids)             # [n_neighbr,2]
         img_coords = patch.get_img_coords(pixel_ids)     # mesh grid coords [n_neighbr,2]
         world_coords = patch.get_world_coords(pixel_ids) # un-normed ra/dec [n_neighbr,2]
         # print(img_coord, img_coords.shape, world_coords.shape)
@@ -853,9 +917,9 @@ class SpectraData:
 
         axis.set_title(idx)
         if plot_gt_spectrum:
-            axis.plot(gt_wave, gt_flux, color="blue", label="GT")
+            axis.plot(gt_wave, gt_flux, color="gray", label="GT")
         if plot_recon_spectrum:
-            axis.plot(recon_wave, recon_flux, color="black", label="Recon.")
+            axis.plot(recon_wave, recon_flux, color="blue", label="Recon.")
 
         if sub_dir != "":
             if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]
@@ -990,6 +1054,8 @@ class SpectraData:
 #############
 
 def locate_tract_patch(wcs, headers, tracts, patches_r, patches_c, ra, dec):
+    """ Localize the image patch and r/c coordinates of given world coord.
+    """
     for i, tract in enumerate(tracts):
         for j, patch_r in enumerate(patches_r):
             for k, patch_c in enumerate(patches_c):
@@ -997,13 +1063,14 @@ def locate_tract_patch(wcs, headers, tracts, patches_r, patches_c, ra, dec):
                 if headers[i][l] is None: continue
 
                 num_rows, num_cols = headers[i][l]["NAXIS2"], headers[i][l]["NAXIS1"]
-                if is_in_patch(ra, dec, wcs[i][l], num_rows, num_cols):
-                    return tract, f"{patch_r},{patch_c}", i, l
+                x, y = wcs[i][l].wcs_world2pix(ra, dec, 0)
+                if x >= 0 and y >= 0 and x < num_cols and y < num_rows:
+                    return tract, f"{patch_r},{patch_c}", int(y), int(x) #i, l
     return -1,-1,-1,-1
 
-def is_in_patch(ra, dec, wcs, num_rows, num_cols):
-    x, y = wcs.wcs_world2pix(ra, dec, 0)
-    return x >= 0 and y >= 0 and x < num_cols and y < num_rows
+# def is_in_patch(ra, dec, wcs, num_rows, num_cols):
+#     x, y = wcs.wcs_world2pix(ra, dec, 0)
+#     return x >= 0 and y >= 0 and x < num_cols and y < num_rows
 
 def scale_trans(trans, source_trans):
     nbands = trans.shape[0]

@@ -399,7 +399,14 @@ def define_cmd_line_args():
                             choices=["max","sum","linr","scale_gt","scale_recon"],
                             help="0- divide with max, 1-divide with sum")
 
-    data_group.add_argument("--num-gt-spectra", type=int)
+    data_group.add_argument("--num-gt-spectra-upper-bound", type=int)
+    data_group.add_argument("--num-supervision-spectra-upper-bound", type=int,
+                             help="upper bound# of gt spectra used for supervision \
+                             (always select the first n spectra).")
+    data_group.add_argument("--val-spectra-ratio", type=float,
+                            help="ratio of validation over validation plus test spectra \
+                            (the first ration% are validation spectra)\
+                            only used when using full patch or train spectra pixels only.")
     data_group.add_argument("--source-spectra-cho", type=str)
     data_group.add_argument("--processed-spectra-cho", type=str)
     data_group.add_argument("--spectra-supervision-wave-lo", type=int)
@@ -529,30 +536,13 @@ def define_cmd_line_args():
                             help="for mixture sampling method, whether average pixel values \
                             with number of samples falling within each band")
 
-    train_group.add_argument("--num-supervision-spectra", type=int,
-                             help="# of gt spectra used for supervision \
-                             (always select the first n spectra).")
     train_group.add_argument("--spectra-neighbour-size", type=int,
                              help="size of neighbourhood to average when calculating spectra.")
+    train_group.add_argument("--infer-with-multi-neighbours", action="store_true",
+                             help="infer with multi pixels in the neighbourhood and average.")
 
     train_group.add_argument("--log-dir", type=str, default="_results/logs/runs/",
                              help="Log file directory for checkpoints.")
-    # TODO (ttakikawa): This is only really used in the SDF training but it should be useful for multiview too
-    train_group.add_argument("--grow-every", type=int, default=-1,
-                             help="Grow network every X epochs")
-    train_group.add_argument("--prune-every", type=int, default=-1,
-                             help="Prune every N iterations")
-    # TODO (ttakikawa): Only used in multiview training, combine with the SDF growing schemes.
-    train_group.add_argument("--random-lod", action="store_true",
-                             help="Use random lods to train.")
-    # One by one trains one level at a time.
-    # Increase starts from [0] and ends up at [0,...,N]
-    # Shrink strats from [0,...,N] and ends up at [N]
-    # Fine to coarse starts from [N] and ends up at [0,...,N]
-    # Only last starts and ends at [N]
-    train_group.add_argument("--growth-strategy", type=str, default="increase",
-                             choices=["onebyone","increase","shrink", "finetocoarse", "onlylast"],
-                             help="Strategy for coarse-to-fine training")
 
     ###################
     # Arguments for validation
