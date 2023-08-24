@@ -284,7 +284,7 @@ class SpectraData:
 
     def train_valid_split(self):
         test_ids, val_ids, sup_ids = self.split_spectra()
-        log.info(f"spectra train/valid {len(sup_ids)}/{len(val_ids)}/{len(test_ids)}")
+        log.info(f"spectra train/valid/test: {len(sup_ids)}/{len(val_ids)}/{len(test_ids)}")
 
         # supervision spectra data (used during pretrain)
         self.data["supervision_spectra"] = self.data["gt_spectra"][sup_ids]
@@ -300,8 +300,8 @@ class SpectraData:
         if self.kwargs["redshift_semi_supervision"]:
             self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
 
-        valid_coords = self.data["gt_spectra_coords"][val_ids] # [n_valid,n_neighbr**2,2/3]
-        self.data["validation_coords"] = valid_coords.view(-1, valid_coords.shape[-1])[:,None]
+        self.data["validation_coords"] = self.data["gt_spectra_coords"][val_ids] # [n_valid,n_neighbr**2,2/3]
+        # self.data["validation_coords"] = valid_coords.view(-1, valid_coords.shape[-1])[:,None]
         # [n_valid*n_neighbr**2,1,2/3]
 
         # test spectra data (used during main inferrence only)
@@ -980,7 +980,6 @@ class SpectraData:
     def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
                       gt_wave, gt_fluxes,
                       recon_wave, recon_fluxes,
-                      mode="pretrain_infer",
                       is_codebook=False,
                       save_spectra=False,
                       save_spectra_together=False,

@@ -25,17 +25,21 @@ if __name__ == "__main__":
         )
         trainer.train()
 
-    if "pretrain_infer" in tasks and args.pretrain_codebook:
-        # infer for pretrained model (recon gt spectra & codebook spectra ect.)
-        inferrer = get_inferrer_from_config(pipelines, dataset, device, "pretrain_infer", args)
-        inferrer.infer()
-
     if "train" in tasks:
         optim_cls, optim_params = get_optimizer_from_config(args)
         trainer = get_trainer_from_config(
             AstroTrainer, pipelines["full"], dataset, optim_cls, optim_params, device, args)
         trainer.train()
 
+    if "pretrain_infer" in tasks and args.pretrain_codebook:
+        # infer for pretrained model (recon gt spectra & codebook spectra ect.)
+        inferrer = get_inferrer_from_config(pipelines, dataset, device, "pretrain_infer", args)
+        inferrer.infer()
+
     if "infer" in tasks:
         inferrer = get_inferrer_from_config(pipelines, dataset, device, "infer", args)
+        inferrer.infer()
+
+    if "test" in tasks:
+        inferrer = get_inferrer_from_config(pipelines, dataset, device, "test", args)
         inferrer.infer()

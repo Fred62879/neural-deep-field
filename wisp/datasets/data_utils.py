@@ -20,6 +20,12 @@ from torch.utils.data._utils.collate import default_convert
 np_str_obj_array_pattern = re.compile(r'[SaUO]')
 
 
+def get_neighbourhood_center_pixel_id(neighbour_size):
+    """ Get id of center pixel within a neighbourhood (defined in PatchData).
+    """
+    offset = neighbour_size // 2
+    return offset * (neighbour_size + 1)
+
 @lru_cache
 def patch_exists(path, tract, patch):
     """ Check whether the given patch file exists.
@@ -40,7 +46,8 @@ def get_coords_range_fname(**kwargs):
     _, img_data_path = set_input_path(
         kwargs["dataset_path"], kwargs["sensor_collection_name"]
     )
-    patch = kwargs["patch_selection_cho"]
+    if kwargs["use_full_patch"]: patch = "full_patch"
+    else: patch = kwargs["patch_selection_cho"]
     coords_cho = kwargs["train_coords_cho"]
     norm_cho = "_normed" if kwargs["normalize_coords"] else ""
     fname = join(

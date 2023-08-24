@@ -18,6 +18,7 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
 
 from wisp.datasets import default_collate
 from wisp.datasets.patch_data import PatchData
+from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     load_pretrained_model_weights, forward, print_shape, create_patch_uid
@@ -115,7 +116,7 @@ class AstroTrainer(BaseTrainer):
 
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
-        self.dataset.set_mode("main_train")
+        self.dataset.set_mode("train")
         self.dataset.toggle_wave_sampling(
             sample_wave=not self.extra_args["train_use_all_wave"]
         )
@@ -136,6 +137,9 @@ class AstroTrainer(BaseTrainer):
         self.pixel_supervision = self.extra_args["pixel_supervision"]
         self.train_spectra_pixels_only = self.extra_args["train_spectra_pixels_only"]
         assert(self.pixel_supervision ^ self.train_spectra_pixels_only)
+        if self.train_spectra_pixels_only:
+            assert self.extra_args["use_full_patch"]
+
         self.perform_integration = self.pixel_supervision or self.train_spectra_pixels_only
         self.trans_sample_method = self.extra_args["trans_sample_method"]
 
@@ -148,10 +152,10 @@ class AstroTrainer(BaseTrainer):
             self.apply_gt_redshift = self.extra_args["apply_gt_redshift"]
             self.redshift_unsupervision = self.extra_args["redshift_unsupervision"]
             self.redshift_semi_supervision = self.extra_args["redshift_semi_supervision"]
-            # assert self.redshift_semi_supervision
-            assert sum([
-                self.apply_gt_redshift, self.redshift_unsupervision,
-                self.redshift_semi_supervision]) <= 1 # at most one of these three can be True
+            assert self.redshift_semi_supervision
+            # assert sum([
+            #     self.apply_gt_redshift, self.redshift_unsupervision,
+            #     self.redshift_semi_supervision]) <= 1 # at most one of these three can be True
         else:
             self.apply_gt_redshift, self.redshift_unsupervision, \
                 self.redshift_semi_supervision = False, False, False
@@ -375,11 +379,6 @@ class AstroTrainer(BaseTrainer):
     #############
 
     def pre_epoch(self):
-        self.loss_lods = list(range(0, self.extra_args["grid_num_lods"]))
-
-        if self.extra_args["only_last"]:
-            self.loss_lods = self.loss_lods[-1:]
-
         if self.save_data_every > -1 and self.epoch % self.save_data_every == 0:
             self.save_data = True
             if self.save_scaler: self.scalers = []
@@ -572,7 +571,9 @@ class AstroTrainer(BaseTrainer):
 
     def set_coords(self):
         if self.train_spectra_pixels_only:
-            coords = self.dataset.get_validation_spectra_coords()
+            pixel_id = get_neighbourhood_center_pixel_id(
+                self.extra_args["spectra_neighbour_size"])
+            coords = self.dataset.get_validation_spectra_coords()[:,pixel_id:pixel_id+1]
             self.dataset.set_coords_source("spectra_coords")
             self.dataset.set_hardcode_data("spectra_coords", coords)
         else:
@@ -906,8 +907,10 @@ class AstroTrainer(BaseTrainer):
             self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
             self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
 
-        sp = (num_spectra, self.spectra_n_neighb, -1)
+        # sp = (num_spectra, self.spectra_n_neighb, -1)
+        sp = (num_spectra, 1, -1)
         self.recon_fluxes = torch.stack(self.recon_fluxes)
+        print(self.recon_fluxes.shape)
 
         if self.spectra_supervision:
             # recon_fluxes [bsz,num_spectra_coords,num_sampeles]
@@ -932,7 +935,6 @@ class AstroTrainer(BaseTrainer):
             self.extra_args["flux_norm_cho"],
             self.gt_wave, self.gt_fluxes,
             self.recon_wave, self.recon_fluxes,
-            mode="main_train",
             save_spectra=True,
             gt_masks=self.gt_masks,
             recon_masks=self.recon_masks,

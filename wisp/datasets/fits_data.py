@@ -92,6 +92,8 @@ class FitsData:
             # concatenate all selected patches together
             # use only with small number of selections
             suffix = create_selected_patches_uid(self, **self.kwargs)
+        elif self.kwargs["use_full_patch"]:
+            suffix = "_full_patch"
         else:
             suffix = "_" + self.kwargs["patch_selection_cho"]
 

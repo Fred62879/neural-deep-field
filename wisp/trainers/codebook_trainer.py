@@ -85,7 +85,7 @@ class CodebookTrainer(BaseTrainer):
     def configure_dataset(self):
         """ Configure dataset with selected fields and set length accordingly.
         """
-        self.dataset.set_mode("pre_train")
+        self.dataset.set_mode("codebook_pretrain")
 
         # set required fields from dataset
         fields = ["coords","wave_data"]
@@ -338,14 +338,6 @@ class CodebookTrainer(BaseTrainer):
 
     def pre_epoch(self):
         self.set_num_batches()
-
-        self.loss_lods = list(range(0, self.extra_args["grid_num_lods"]))
-
-        if self.extra_args["grow_every"] > 0:
-            self.grow()
-
-        if self.extra_args["only_last"]:
-            self.loss_lods = self.loss_lods[-1:]
 
         if self.save_model_every > -1 and self.epoch % self.save_model_every == 0:
             self.save_model()

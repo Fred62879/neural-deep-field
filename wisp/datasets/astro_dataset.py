@@ -62,7 +62,7 @@ class AstroDataset(Dataset):
 
         # randomly initialize
         self.set_length(0)
-        self.mode = "main_train"
+        self.mode = "train"
         self.wave_source = "trans"
         self.coords_source = "fits"
         self.sample_wave = False
@@ -76,7 +76,7 @@ class AstroDataset(Dataset):
     ############
 
     def set_mode(self, mode):
-        """ Possible modes: ["pre_train","pretrain_infer","infer","main_train"]
+        """ Possible modes: ["codebook_pretrain","train","pretrain_infer","infer","test"]
         """
         self.mode = mode
 
@@ -346,7 +346,7 @@ class AstroDataset(Dataset):
         assert(self.kwargs["pretrain_codebook"] ^ self.kwargs["spectra_supervision"])
 
         if self.kwargs["pretrain_codebook"]:
-            assert self.mode == "pre_train"
+            assert self.mode == "codebook_pretrain"
             n = self.spectra_dataset.get_num_gt_spectra()
             out["coords"] = self.data["spectra_latents"][:n]
             if self.kwargs["codebook_pretrain_pixel_supervision"]:
@@ -361,7 +361,7 @@ class AstroDataset(Dataset):
                 self.spectra_dataset.get_supervision_wave_bound_ids()
 
         elif self.kwargs["spectra_supervision"]:
-            assert self.mode == "main_train"
+            assert self.mode == "train"
             out["full_wave"] = self.get_full_wave()
 
             # get all coords to plot all spectra (gt, dummy, incl. neighbours)
@@ -444,16 +444,15 @@ class AstroDataset(Dataset):
 
     def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
                       gt_wave, gt_fluxes, recon_wave, recon_fluxes,
-                      mode="pretrain_infer", is_codebook=False,
+                      is_codebook=False, spectra_ids=None,
                       save_spectra=False, save_spectra_together=False,
-                      spectra_ids=None,
                       gt_masks=None, recon_masks=None,
                       clip=False, spectra_clipped=False
     ):
         self.spectra_dataset.plot_spectrum(
             spectra_dir, name, flux_norm_cho,
             gt_wave, gt_fluxes, recon_wave, recon_fluxes,
-            mode=mode, is_codebook=is_codebook,
+            is_codebook=is_codebook,
             save_spectra=save_spectra,
             save_spectra_together=save_spectra_together,
             spectra_ids=spectra_ids,
