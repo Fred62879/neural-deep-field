@@ -36,8 +36,8 @@ if __name__ == "__main__":
         inferrer = get_inferrer_from_config(pipelines, dataset, device, "pretrain_infer", args)
         inferrer.infer()
 
-    if "infer" in tasks:
-        inferrer = get_inferrer_from_config(pipelines, dataset, device, "infer", args)
+    if "main_infer" in tasks:
+        inferrer = get_inferrer_from_config(pipelines, dataset, device, "main_infer", args)
         inferrer.infer()
 
     if "test" in tasks:

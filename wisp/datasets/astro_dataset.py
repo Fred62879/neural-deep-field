@@ -62,7 +62,7 @@ class AstroDataset(Dataset):
 
         # randomly initialize
         self.set_length(0)
-        self.mode = "train"
+        self.mode = "main_train"
         self.wave_source = "trans"
         self.coords_source = "fits"
         self.sample_wave = False
@@ -76,7 +76,7 @@ class AstroDataset(Dataset):
     ############
 
     def set_mode(self, mode):
-        """ Possible modes: ["codebook_pretrain","train","pretrain_infer","infer","test"]
+        """ Possible modes: ["codebook_pretrain","main_train","pretrain_infer","main_infer","test"]
         """
         self.mode = mode
 
@@ -153,6 +153,15 @@ class AstroDataset(Dataset):
         return self.spectra_dataset.get_full_wave_coverage()
 
 
+    def get_test_spectra(self, idx=None):
+        return self.spectra_dataset.get_test_spectra(idx)
+
+    def get_test_spectra_masks(self):
+        return self.spectra_dataset.get_test_masks()
+
+    def get_test_spectra_coords(self, idx=None):
+        return self.spectra_dataset.get_test_coords(idx)
+
     # def get_validation_spectra_ids(self, patch_uid=None):
     #     return self.spectra_dataset.get_validation_spectra_ids(patch_uid)
 
@@ -168,8 +177,8 @@ class AstroDataset(Dataset):
     def get_validation_spectra_pixels(self, idx=None):
         return self.spectra_dataset.get_validation_pixels(idx)
 
-    def get_supervision_spectra_data(self):
-        return self.spectra_dataset.get_supervision_data()
+    def get_supervision_spectra(self):
+        return self.spectra_dataset.get_supervision_spectra()
 
     def get_supervision_spectra_masks(self):
         return self.spectra_dataset.get_supervision_masks()
@@ -198,6 +207,9 @@ class AstroDataset(Dataset):
 
     def get_num_validation_spectra(self):
         return self.spectra_dataset.get_num_validation_spectra()
+
+    def get_num_test_spectra(self):
+        return self.spectra_dataset.get_num_test_spectra()
 
     def get_selected_ids(self):
         assert "selected_ids" in self.data
@@ -248,7 +260,7 @@ class AstroDataset(Dataset):
             data = self.get_validation_spectra_pixels()
 
         elif field == "spectra_sup_data":
-            data = self.get_supervision_spectra_data()
+            data = self.get_supervision_spectra()
         elif field == "spectra_sup_plot_mask":
             data = self.get_supervision_spectra_masks()
         elif field == "spectra_sup_pixels":
@@ -324,7 +336,7 @@ class AstroDataset(Dataset):
                             use_all_wave=self.use_all_wave
                         )
 
-                if self.mode == "infer" and "recon_synthetic_band" in self.kwargs["tasks"]:
+                if self.mode == "main_infer" and "recon_synthetic_band" in self.kwargs["tasks"]:
                     assert(self.use_all_wave) # only in inferrence
                     nsmpl = out["trans"].shape[1]
                     out["trans"] = torch.cat((out["trans"], torch.ones(1,nsmpl)), dim=0)
@@ -361,7 +373,7 @@ class AstroDataset(Dataset):
                 self.spectra_dataset.get_supervision_wave_bound_ids()
 
         elif self.kwargs["spectra_supervision"]:
-            assert self.mode == "train"
+            assert self.mode == "main_train"
             out["full_wave"] = self.get_full_wave()
 
             # get all coords to plot all spectra (gt, dummy, incl. neighbours)

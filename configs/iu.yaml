@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights'] #'recon_codebook_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #'save_redshift','recon_img','integrate_gt_spectra']
+    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights'] #'recon_codebook_spectra'] #'save_pixel_values'] #'recon_codebook_spectra_individ'] #'save_redshift','recon_img','integrate_gt_spectra']
 
     #tasks: ['infer','recon_img']
     #tasks: ['infer','plot_redshift']
@@ -26,8 +26,9 @@ global:
     #tasks: ['infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    tasks: ['train','recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train','save_scaler_during_train'
-    tasks: ['infer','recon_gt_spectra','save_redshift','recon_img','recon_codebook_spectra_individ'] #,'save_qtz_weights','save_scaler'
+    #tasks: ['train','recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train','save_scaler_during_train'
+    #tasks: ['infer','recon_gt_spectra','save_redshift','recon_img','recon_codebook_spectra_individ'] #,'save_qtz_weights','save_scaler'
+    tasks: ['test','recon_gt_spectra','save_redshift','recon_img','recon_codebook_spectra_individ'] #,'save_qtz_weights','save_scaler']
 
 optimizer:
     optimizer_type: 'adam'
@@ -192,7 +193,7 @@ trainer:
     redshift_unsupervision: False    #  |- these three conflict each other
     redshift_semi_supervision: True  # -
 
-    train_use_all_wave: True
+    train_use_all_wave: False
     pretrain_use_all_wave: False
     train_num_wave_samples: 50
     pretrain_num_wave_samples: 100

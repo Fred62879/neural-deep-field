@@ -116,7 +116,7 @@ class AstroTrainer(BaseTrainer):
 
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
-        self.dataset.set_mode("train")
+        self.dataset.set_mode("main_train")
         self.dataset.toggle_wave_sampling(
             sample_wave=not self.extra_args["train_use_all_wave"]
         )

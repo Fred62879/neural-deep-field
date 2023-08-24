@@ -187,6 +187,28 @@ class SpectraData:
         """ Get #validation spectra (doesn't count neighbours). """
         return self.num_validation_spectra
 
+    def get_num_test_spectra(self):
+        """ Get #test spectra (doesn't count neighbours). """
+        return self.num_test_spectra
+
+
+    def get_test_masks(self, idx=None):
+        """ Get test spectra mask for plotting. """
+        if idx is None:
+            return self.data["test_masks"]
+        return self.data["test_masks"][idx]
+
+    def get_test_spectra(self, idx=None):
+        """ Get gt spectra (with same wave range as recon) used for test. """
+        if idx is None:
+            return self.data["test_spectra"]
+        return self.data["test_spectra"][idx]
+
+    def get_test_coords(self, idx=None):
+        if idx is not None:
+            return self.data["test_coords"][idx]
+        return self.data["test_coords"]
+
     def get_supervision_masks(self, idx=None):
         """ Get supervision spectra mask for plotting. """
         if idx is None:

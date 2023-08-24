@@ -56,7 +56,7 @@ def get_main_train_pipelines(pipelines, tasks, args):
         nef_train = AstroHyperSpectralNerf(**vars(args))
         pipelines["full"] = AstroPipeline(nef_train)
 
-    if "infer" in tasks:
+    if "infer" or "test" in tasks:
         # full pipline for img recon
         nef_train = AstroHyperSpectralNerf(**vars(args))
         pipelines["full"] = AstroPipeline(nef_train)

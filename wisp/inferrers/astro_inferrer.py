@@ -52,12 +52,12 @@ class AstroInferrer(BaseInferrer):
         if mode == "pretrain_infer":
             self.batch_size = extra_args["pretrain_infer_batch_size"]
             self.num_sup_spectra = dataset.get_num_supervision_spectra()
-        elif self.mode == "infer":
+        elif self.mode == "main_infer":
             self.batch_size = extra_args["infer_batch_size"]
             self.num_val_spectra = dataset.get_num_validation_spectra()
         elif self.mode == "test":
             self.batch_size = extra_args["infer_batch_size"]
-            self.num_val_spectra = dataset.get_num_test_spectra()
+            self.num_test_spectra = dataset.get_num_test_spectra()
         else: raise ValueError()
 
         self.set_path()
@@ -74,13 +74,20 @@ class AstroInferrer(BaseInferrer):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         if self.verbose: log.info(f"logging to {self.log_dir}")
 
+        if self.pretrain_infer:
+            spectra_dir_name = "pretrain_spectra"
+        if self.main_infer :
+            spectra_dir_name = "val_spectra"
+        elif self.test:
+            spectra_dir_name = "test_spectra"
+        else: raise ValueError()
+
         for cur_path, cur_pname, in zip(
-                ["model_dir","recon_dir","recon_synthetic_dir","metric_dir", "spectra_dir",
-                 "codebook_spectra_dir", "codebook_spectra_individ_dir",
-                 "embed_map_dir","latent_dir",
-                 "redshift_dir","latent_embed_dir","zoomed_recon_dir",
-                 "scaler_dir","pixel_distrib_dir","qtz_weights_dir"],
-                ["models","recons","recon_synthetic","metrics","spectra",
+                ["model_dir","recon_dir","recon_synthetic_dir","metric_dir",
+                 "spectra_dir","codebook_spectra_dir", "codebook_spectra_individ_dir",
+                 "embed_map_dir","latent_dir","redshift_dir","latent_embed_dir",
+                 "zoomed_recon_dir","scaler_dir","pixel_distrib_dir","qtz_weights_dir"],
+                ["models","recons","recon_synthetic","metrics",spectra_dir_name,
                  "codebook_spectra","codebook_spectra_individ",
                  "embed_map","latents","redshift","latent_embed","zoomed_recon",
                  "scaler","pixel_distrib","qtz_weights"]
@@ -169,11 +176,10 @@ class AstroInferrer(BaseInferrer):
         self.save_redshift = "save_redshift" in tasks and self.model_redshift and self.qtz
         self.save_redshift_pre = self.save_redshift and self.pretrain_infer
         self.save_redshift_main = self.save_redshift and self.main_infer
-        self.save_redshift_tests = self.save_redshift and self.test
+        self.save_redshift_test = self.save_redshift and self.test
 
         # ii) infer selected coords using partial model
         self.recon_gt_spectra = "recon_gt_spectra" in tasks and self.space_dim == 3
-        self.recon_dummy_spectra = "recon_dummy_spectra" in tasks and self.space_dim == 3
         # save spectra pixel values, doing same job as
         #   `recon_img_sup_spectra` during pretran infer &
         #   `recon_img_val_spectra` during main train infer
@@ -195,12 +201,13 @@ class AstroInferrer(BaseInferrer):
 
         if self.recon_HSI or self.recon_synthetic_band or \
            self.plot_embed_map or self.plot_latent_embed or \
-           self.save_qtz_weights or self.save_redshift_main or self.save_scaler or \
-           self.recon_img or self.recon_img_sup_spectra or self.recon_img_val_spectra:
+           self.save_qtz_weights or self.save_scaler or \
+           self.save_redshift_main or self.save_redshift_test or \
+           self.recon_img or self.recon_img_sup_spectra or \
+           self.recon_img_val_spectra or self.recon_img_test_spectra:
             self.group_tasks.append("infer_all_coords_full_model")
 
-        if self.recon_dummy_spectra or self.recon_gt_spectra or \
-           self.save_qtz_weights or self.save_redshift_pre:
+        if self.recon_gt_spectra or self.save_qtz_weights or self.save_redshift_pre:
             self.group_tasks.append("infer_selected_coords_partial_model")
 
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
@@ -333,8 +340,9 @@ class AstroInferrer(BaseInferrer):
 
         elif self.test:
             self.wave_source = "trans"
-            self.dataset_length = self.num_test_spectra
-            coords = self.dataset.get_test_spectra_coords()
+            self.dataset_length = self.num_test_spectra*self.extra_args["spectra_neighbour_size"]**2
+            coords = self.dataset.get_test_spectra_coords() # [bsz,n_neighbr,2.3]
+            coords = coords.view(-1,1,coords.shape[-1])
             self.coords_source = "spectra_coords"
             self.dataset.set_hardcode_data("spectra_coords", coords)
 
@@ -754,27 +762,34 @@ class AstroInferrer(BaseInferrer):
                 num_spectra, -1).detach().cpu().numpy()
             recon_wave = gt_wave
             recon_masks = gt_masks
-
             recon_fluxes = torch.stack(self.recon_fluxes).view(
                 self.dataset_length, 1, -1).detach().cpu().numpy()
         else:
-            if self.recon_spectra_pixels_only:
-                num_spectra = self.dataset.get_num_validation_spectra()
-                val_spectra = self.dataset.get_validation_spectra()
-                gt_wave = val_spectra[:,0]
-                gt_fluxes = val_spectra[:,1]
-                gt_masks = self.dataset.get_validation_spectra_masks()
+            if self.main_infer:
+                if self.recon_spectra_pixels_only:
+                    num_spectra = self.dataset.get_num_validation_spectra()
+                    val_spectra = self.dataset.get_validation_spectra()
+                    gt_wave = val_spectra[:,0]
+                    gt_fluxes = val_spectra[:,1]
+                    gt_masks = self.dataset.get_validation_spectra_masks()
+                else:
+                    num_spectra = self.cur_patch.get_num_spectra()
+                    gt_wave = self.cur_patch.get_spectra_pixel_wave()
+                    gt_masks = self.cur_patch.get_spectra_pixel_masks()
+                    gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
+            elif self.test:
+                num_spectra = self.dataset.get_num_test_spectra()
+                test_spectra = self.dataset.get_test_spectra()
+                gt_wave = test_spectra[:,0]
+                gt_fluxes = test_spectra[:,1]
+                gt_masks = self.dataset.get_test_spectra_masks()
             else:
-                num_spectra = self.cur_patch.get_num_spectra()
-                gt_wave = self.cur_patch.get_spectra_pixel_wave()
-                gt_masks = self.cur_patch.get_spectra_pixel_masks()
-                gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
+                raise ValueError()
 
             recon_wave = np.tile(
                 self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
             recon_masks = np.tile(
                 self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
-
             recon_fluxes = torch.stack(self.recon_fluxes).view(
                 num_spectra, self.extra_args["spectra_neighbour_size"]**2, -1
             ).detach().cpu().numpy()
@@ -1012,7 +1027,7 @@ class AstroInferrer(BaseInferrer):
                     self.gt_fluxes.extend(data["spectra_sup_data"][:,1])
                     self.spectra_wave.extend(data["spectra_sup_data"][:,0])
                     self.spectra_masks.extend(data["spectra_sup_plot_mask"])
-                else: # self.infer
+                else: # self.main_infer
                     # during main inferrence, validation spectra can be obtained
                     # from patch data object
                     pass
@@ -1133,6 +1148,16 @@ class AstroInferrer(BaseInferrer):
         #     cur_val_coords = self.dataset.get_coords()[self.val_spectra_map]
         self.dataset.set_hardcode_data(self.coords_source, cur_val_coords)
         self.num_cur_val_coords = len(cur_val_coords)
+
+    def _set_dataset_coords_cur_test_coords(self):
+        """ Set test spectra coords as dataset coords.
+            For (codebook) spectra reconstruction only.
+        """
+        assert self.test
+        cur_test_coords = self.dataset.get_test_spectra_coords()
+        cur_test_coords = cur_test_coords.view(-1,1,cur_test_coords.shape[-1])
+        self.dataset.set_hardcode_data(self.coords_source, cur_test_coords)
+        self.num_cur_test_coords = len(cur_test_coords)
 
     # def calculate_recon_spectra_pixel_values(self):
     #     for patch_uid in self.patch_uids:
