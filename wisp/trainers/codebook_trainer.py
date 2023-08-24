@@ -92,8 +92,8 @@ class CodebookTrainer(BaseTrainer):
         if self.extra_args["batched_pretrain"]:
             fields.extend([
                 "spectra_sup_data",
-                "spectra_sup_redshift",
-                "spectra_sup_plot_mask"
+                "spectra_sup_masks",
+                "spectra_sup_redshift"
             ])
             if self.pixel_supervision:
                 fields.append("spectra_sup_pixels")
@@ -120,7 +120,7 @@ class CodebookTrainer(BaseTrainer):
         if self.extra_args["infer_selected"]:
             self.selected_ids = select_inferrence_ids(
                 self.num_sup_spectra,
-                self.extra_args["pretrain_num_infer"]
+                self.extra_args["pretrain_num_infer_upper_bound"]
             )
         else: self.selected_ids = np.arange(self.num_sup_spectra)
 
@@ -460,12 +460,12 @@ class CodebookTrainer(BaseTrainer):
                 self.recon_fluxes.extend(ret["spectra"])
                 self.gt_fluxes.extend(data["spectra_sup_data"][:,1])
                 self.spectra_wave.extend(data["spectra_sup_data"][:,0])
-                self.spectra_masks.extend(data["spectra_sup_plot_mask"])
+                self.spectra_masks.extend(data["spectra_sup_masks"])
 
             if self.recon_codebook_spectra_individ:
                 self.codebook_spectra.extend(ret["codebook_spectra"])
                 self.spectra_wave_c.extend(data["spectra_sup_data"][:,0])
-                self.spectra_masks_c.extend(data["spectra_sup_plot_mask"])
+                self.spectra_masks_c.extend(data["spectra_sup_masks"])
 
     def post_step(self):
         pass
@@ -532,7 +532,7 @@ class CodebookTrainer(BaseTrainer):
         spectra_loss = 0
         recon_flux = ret["spectra"]
         gt_spectra = data["spectra_sup_data"]
-        spectra_masks = data["spectra_sup_plot_mask"]
+        spectra_masks = data["spectra_sup_masks"]
 
         if len(recon_flux) == 0:
             spectra_loss = 0

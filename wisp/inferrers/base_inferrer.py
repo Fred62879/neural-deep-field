@@ -23,11 +23,17 @@ class BaseInferrer(ABC):
         self.pipelines = pipelines
         self.run_model = True
 
-        self.verbose = extra_args["verbose"]
         self.space_dim = extra_args["space_dim"]
         self.num_bands = extra_args["num_bands"]
         self.batch_size = extra_args["infer_batch_size"]
+        self.log_pixel_ratio = extra_args["log_pixel_ratio"]
+        self.neighbour_size = extra_args["spectra_neighbour_size"]
+        self.trans_sample_method = extra_args["trans_sample_method"]
+
+        self.verbose = extra_args["verbose"]
+        self.infer_selected = extra_args["infer_selected"]
         self.infer_last_model_only = extra_args["infer_last_model_only"]
+        self.recon_spectra_pixels_only = extra_args["train_spectra_pixels_only"]
 
         self.extra_args = extra_args
 

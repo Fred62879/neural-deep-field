@@ -153,15 +153,6 @@ class AstroDataset(Dataset):
         return self.spectra_dataset.get_full_wave_coverage()
 
 
-    def get_test_spectra(self, idx=None):
-        return self.spectra_dataset.get_test_spectra(idx)
-
-    def get_test_spectra_masks(self):
-        return self.spectra_dataset.get_test_masks()
-
-    def get_test_spectra_coords(self, idx=None):
-        return self.spectra_dataset.get_test_coords(idx)
-
     # def get_validation_spectra_ids(self, patch_uid=None):
     #     return self.spectra_dataset.get_validation_spectra_ids(patch_uid)
 
@@ -177,6 +168,7 @@ class AstroDataset(Dataset):
     def get_validation_spectra_pixels(self, idx=None):
         return self.spectra_dataset.get_validation_pixels(idx)
 
+
     def get_supervision_spectra(self):
         return self.spectra_dataset.get_supervision_spectra()
 
@@ -191,6 +183,22 @@ class AstroDataset(Dataset):
 
     def get_semi_supervision_spectra_redshift(self):
         return self.spectra_dataset.get_semi_supervision_redshift()
+
+
+    def get_test_spectra(self, idx=None):
+        return self.spectra_dataset.get_test_spectra(idx)
+
+    def get_test_spectra_masks(self):
+        return self.spectra_dataset.get_test_masks()
+
+    def get_test_spectra_coords(self, idx=None):
+        return self.spectra_dataset.get_test_coords(idx)
+
+    def get_test_spectra_pixels(self, idx=None):
+        return self.spectra_dataset.get_test_pixels(idx)
+
+    def get_test_spectra_redshift(self, idx=None):
+        return self.spectra_dataset.get_test_redshift(idx)
 
 
     def get_num_gt_spectra(self):
@@ -256,19 +264,24 @@ class AstroDataset(Dataset):
         elif field == "spectra_bin_map":
             data = self.fits_dataset.get_spectra_bin_map()
 
-        elif field == "spectra_val_pixels":
-            data = self.get_validation_spectra_pixels()
-
         elif field == "spectra_sup_data":
             data = self.get_supervision_spectra()
-        elif field == "spectra_sup_plot_mask":
+        elif field == "spectra_sup_masks":
             data = self.get_supervision_spectra_masks()
         elif field == "spectra_sup_pixels":
             data = self.get_supervision_spectra_pixels()
         elif field == "spectra_sup_redshift":
             data = self.get_supervision_spectra_redshift()
+
+        elif field == "spectra_val_pixels":
+            data = self.get_validation_spectra_pixels()
         elif field == "spectra_semi_sup_redshift":
             data = self.get_semi_supervision_spectra_redshift()
+
+        elif field == "spectra_test_pixels":
+            data = self.get_test_spectra_pixels()
+        elif field == "spectra_test_redshift":
+            data = self.get_test_spectra_redshift()
 
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
@@ -290,7 +303,7 @@ class AstroDataset(Dataset):
 
             bsz = out["coords"].shape[0]
             out["wave"] = full_wave[None,:,None].tile(bsz,1,1)
-            out["spectra_sup_plot_mask"] = mask[None,:].tile(bsz,1)
+            out["spectra_sup_masks"] = mask[None,:].tile(bsz,1)
 
         elif self.wave_source == "spectra":
             # spectra_sup_data: [bsz,4+2*nbands,nsmpl]
@@ -305,8 +318,8 @@ class AstroDataset(Dataset):
                     out["spectra_sup_data"], self.kwargs["pretrain_num_wave_samples"],
                     keep_sample_ids=True)
 
-                out["spectra_sup_plot_mask"] = batch_sample_torch(
-                    out["spectra_sup_plot_mask"], self.kwargs["pretrain_num_wave_samples"],
+                out["spectra_sup_masks"] = batch_sample_torch(
+                    out["spectra_sup_masks"], self.kwargs["pretrain_num_wave_samples"],
                     sample_ids=sample_ids)
 
             if self.perform_integration:

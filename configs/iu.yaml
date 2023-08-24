@@ -28,7 +28,7 @@ global:
     #tasks: ['infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
     #tasks: ['train','recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train','save_scaler_during_train'
     #tasks: ['infer','recon_gt_spectra','save_redshift','recon_img','recon_codebook_spectra_individ'] #,'save_qtz_weights','save_scaler'
-    tasks: ['test','recon_gt_spectra','save_redshift','recon_img','recon_codebook_spectra_individ'] #,'save_qtz_weights','save_scaler']
+    tasks: ['test','recon_gt_spectra','save_redshift','recon_img','recon_codebook_spectra_individ']
 
 optimizer:
     optimizer_type: 'adam'
@@ -228,7 +228,8 @@ infer:
 
     # recon spectra
     infer_selected: True
-    pretrain_num_infer: 70
+    pretrain_num_infer_upper_bound: 70
+    test_num_infer_upper_bound: 10
 
     spectra_neighbour_size: 3
 

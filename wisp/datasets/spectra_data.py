@@ -198,16 +198,6 @@ class SpectraData:
             return self.data["test_masks"]
         return self.data["test_masks"][idx]
 
-    def get_test_spectra(self, idx=None):
-        """ Get gt spectra (with same wave range as recon) used for test. """
-        if idx is None:
-            return self.data["test_spectra"]
-        return self.data["test_spectra"][idx]
-
-    def get_test_coords(self, idx=None):
-        if idx is not None:
-            return self.data["test_coords"][idx]
-        return self.data["test_coords"]
 
     def get_supervision_masks(self, idx=None):
         """ Get supervision spectra mask for plotting. """
@@ -267,6 +257,28 @@ class SpectraData:
         if idx is not None:
             return self.data["semi_supervision_redshift"][idx]
         return self.data["semi_supervision_redshift"]
+
+
+    def get_test_spectra(self, idx=None):
+        """ Get gt spectra (with same wave range as recon) used for test. """
+        if idx is None:
+            return self.data["test_spectra"]
+        return self.data["test_spectra"][idx]
+
+    def get_test_coords(self, idx=None):
+        if idx is not None:
+            return self.data["test_coords"][idx]
+        return self.data["test_coords"]
+
+    def get_test_pixels(self, idx=None):
+        if idx is not None:
+            return self.data["test_pixels"][idx]
+        return self.data["test_pixels"]
+
+    def get_test_redshift(self, idx=None):
+        if idx is not None:
+            return self.data["test_redshift"][idx]
+        return self.data["test_redshift"]
 
     #############
     # Helpers
