@@ -26,7 +26,7 @@ def set_seed(seed: int = 42) -> None:
     torch.backends.cudnn.benchmark = False
     # Set a fixed value for the hash seed
     os.environ["PYTHONHASHSEED"] = str(seed)
-    logging.info(f"Random seed set as {seed}")
+    # logging.info(f"Random seed set as {seed}")
 
 def default_log_setup(level=logging.INFO):
     """ Sets up default logging, always logging to stdout.

@@ -972,9 +972,8 @@ class SpectraData:
 
         return sub_dir
 
-    def process_spectrum_plot_data(
-            self, flux_norm_cho, is_codebook,
-            clip, spectra_clipped, data):
+    def process_spectrum_plot_data(self, flux_norm_cho, is_codebook,
+                                   clip, spectra_clipped, data):
         """ Collect data for spectrum plotting for the given spectra.
         """
         (gt_wave, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux) = data
@@ -1072,8 +1071,6 @@ class SpectraData:
         if save_spectra_together:
             fname = join(spectra_dir, name)
             np.save(fname, recon_fluxes)
-            # a = np.concatenate((gt_wave, gt_fluxes, recon_fluxes[0]),axis=0)
-            # np.save(fname, a)
 
         if self.kwargs["plot_spectrum_together"]:
             fname = join(spectra_dir, sub_dir, f"all_spectra_{name}")

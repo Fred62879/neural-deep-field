@@ -910,7 +910,6 @@ class AstroTrainer(BaseTrainer):
         # sp = (num_spectra, self.spectra_n_neighb, -1)
         sp = (num_spectra, 1, -1)
         self.recon_fluxes = torch.stack(self.recon_fluxes)
-        print(self.recon_fluxes.shape)
 
         if self.spectra_supervision:
             # recon_fluxes [bsz,num_spectra_coords,num_sampeles]
