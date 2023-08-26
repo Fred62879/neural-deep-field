@@ -291,35 +291,23 @@ class AstroInferrer(BaseInferrer):
                 self._set_coords_from_spectra_source(
                     self.dataset.get_validation_spectra_coords(), w_neighbour=False)
                 self.requested_fields.append("spectra_val_pixels")
-            elif self.recon_all_pixels:
+            elif self.recon_img_all_pixels:
                 self.coords_source = "fits"
                 self.dataset_length = self.dataset.get_num_coords()
                 self.requested_fields.append("pixels")
+                self.configure_metrics()
             else: raise ValueError()
 
             if self.save_redshift:
                 if self.recon_spectra_pixels_only:
                     self.requested_fields.append("spectra_semi_sup_redshift")
                 else:
-                    self.requested_fields.append("redshift_data")
-            if self.redshift_semi_supervision:
-                self.requested_fields.extend(["spectra_id_map","spectra_bin_map"])
+                    # self.requested_fields.append("redshift_data")
+                    self.requested_fields.extend([
+                        "spectra_id_map","spectra_bin_map","redshift_data"])
+            # if self.redshift_semi_supervision:
+            #     self.requested_fields.extend(["spectra_id_map","spectra_bin_map"])
 
-            if self.recon_img_all_pixels:
-                self.metric_options = self.extra_args["metric_options"]
-                self.num_metrics = len(self.metric_options)
-                self.calculate_metrics = self.recon_img_all_pixels \
-                    and self.metric_options is not None
-
-                if self.calculate_metrics:
-                    num_patches = self.dataset.get_num_patches()
-                    self.metrics = np.zeros((self.num_metrics, 0, num_patches, self.num_bands))
-                    self.metrics_zscale = np.zeros((
-                        self.num_metrics, 0, num_patches, self.num_bands))
-                    self.metric_fnames = [ join(self.metric_dir, f"{option}.npy")
-                                           for option in self.metric_options ]
-                    self.metric_fnames_z = [ join(self.metric_dir, f"{option}_zscale.npy")
-                                             for option in self.metric_options ]
         elif self.test:
             self.wave_source = "trans"
             self.coords_source = "spectra_coords"
@@ -586,10 +574,10 @@ class AstroInferrer(BaseInferrer):
             if self.recon_spectra_pixels_only:
                 self._log_data("redshift", gt_field="gt_redshift")
             else:
-                self._plot_redshift_map()
-                if self.extra_args["pretrain_codebook"]:
-                    self._log_data(
-                        "redshift", gt_field="gt_redshift", mask=self.val_spectra_map)
+                self._plot_redshift_map(model_id)
+                if self.extra_args["pretrain_codebook"] and len(self.gt_redshift) > 0:
+                    self._log_data("redshift", gt_field="gt_redshift",
+                                   mask=self.val_spectra_map)
 
         elif self.save_redshift_test:
             self._log_data("redshift", gt_field="gt_redshift")
@@ -1068,7 +1056,7 @@ class AstroInferrer(BaseInferrer):
             log.info(f"{gt_field}: {gt}")
             log.info(f"recon {field}: {recon}")
 
-    def _plot_redshift_map(self):
+    def _plot_redshift_map(self, model_id):
         if self.extra_args["mark_spectra"]:
             positions = self.cur_patch.get_spectra_img_coords()
             markers = np.array(self.extra_args["spectra_markers"])
@@ -1091,3 +1079,19 @@ class AstroInferrer(BaseInferrer):
         }
         # plot redshift img
         _, _ = self.dataset.restore_evaluate_tiles(self.redshift, **re_args)
+
+    def configure_metrics(self):
+        self.metric_options = self.extra_args["metric_options"]
+        self.num_metrics = len(self.metric_options)
+        self.calculate_metrics = self.recon_img_all_pixels \
+            and self.metric_options is not None
+
+        if self.calculate_metrics:
+            num_patches = self.dataset.get_num_patches()
+            self.metrics = np.zeros((self.num_metrics, 0, num_patches, self.num_bands))
+            self.metrics_zscale = np.zeros((
+                self.num_metrics, 0, num_patches, self.num_bands))
+            self.metric_fnames = [ join(self.metric_dir, f"{option}.npy")
+                                   for option in self.metric_options ]
+            self.metric_fnames_z = [ join(self.metric_dir, f"{option}_zscale.npy")
+                                     for option in self.metric_options ]

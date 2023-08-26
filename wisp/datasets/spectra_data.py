@@ -438,6 +438,16 @@ class SpectraData:
             # validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
             # acc += len(cur_spectra_ids)
 
+        # reserve all spectra from test patches as test spectra
+        print(self.kwargs["test_tracts"])
+        for i, (tract, patch) in enumerate(
+            zip(self.kwargs["test_tracts"], self.kwargs["test_patches"])
+        ):
+            patch_uid = create_patch_uid(tract, patch)
+            cur_spectra_id_coords = np.array(self.data["gt_spectra_ids"][patch_uid])
+            cur_spectra_ids = cur_spectra_id_coords[:,0]
+            test_ids.extend(cur_spectra_ids)
+
         test_ids = np.array(test_ids)
         validation_ids = np.array(validation_ids)
         if len(test_ids) == 0 or len(validation_ids) == 0:

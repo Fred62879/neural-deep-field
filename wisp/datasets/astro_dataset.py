@@ -404,12 +404,16 @@ class AstroDataset(Dataset):
                 out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
 
     def get_redshift_data(self, out):
-        """ Get redshift values for main train redshift semi-supervision.
+        """ From currently sampled pixels, pick spectra pixels and get corresponding redshift.
+            Called during main train redshift semi-supervision only.
+            @Param
+              spectra_id_map: label each spectra pixel with corresponding global spectra id.
+              spectra_bin_map: binary map that masks (sets as 0) all non-spectra pixels.
         """
+        assert not self.kwargs["train_spectra_pixels_only"]
         ids = out["spectra_id_map"]
-        if not self.kwargs["train_spectra_pixels_only"]:
-            bin_map = out["spectra_bin_map"]
-            ids = ids[bin_map]
+        bin_map = out["spectra_bin_map"]
+        ids = ids[bin_map]
         out["spectra_semi_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
         del out["spectra_id_map"]
 

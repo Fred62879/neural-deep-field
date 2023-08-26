@@ -326,10 +326,14 @@ def define_cmd_line_args():
                             help="fname of lambda range used for linear normalization.")
     # fits data
     data_group.add_argument("--patch-selection-cho", type=str)
+    data_group.add_argument("--use-full-patch", action="store_true")
     data_group.add_argument("--tracts", nargs="+", help="tracts of chose FITS files")
     data_group.add_argument("--patches", nargs="+", help="patch ids of chosen FITS files")
 
-    data_group.add_argument("--use-full-patch", action="store_true")
+    data_group.add_argument("--use-full-test-patch", action="store_true")
+    data_group.add_argument("--test-tracts", nargs="+", help="tracts of chose FITS files")
+    data_group.add_argument("--test-patches", nargs="+", help="patch ids of chosen FITS files")
+
     data_group.add_argument("--plot-img-distrib", action="store_true")
     data_group.add_argument("--load-patch-data-cache", action="store_true")
     data_group.add_argument("--patch-cutout-num-rows",nargs="+", type=int,

@@ -132,7 +132,7 @@ class SpatialDecoder(nn.Module):
             ret["redshift"] = redshift
         elif self.model_redshift:
             redshift = self.redshift_decoder(z[:,0])[...,0]
-            # redshift = self.redshift_adjust(redshift + 0.5)
+            redshift = self.redshift_adjust(redshift + 0.5)
         else:
             redshift = None
         timer.check("spatial_decod::redshift done")
