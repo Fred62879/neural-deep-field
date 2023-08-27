@@ -15,13 +15,11 @@ namespace wisp {
 typedef unsigned int uint;
 
 __device__ int32_t
-dense_index_2d(
+hash_index_2d(
     const int2 pos,
     const int32_t resolution,
     const int32_t codebook_size
 ){
-    assert (resolution < codebook_size &&
-            resolution * resolution < codebook_size)
     int32_t index = pos.x + pos.y * resolution;
     return index;
 }
@@ -57,7 +55,7 @@ clamp(float x, float a, float b)
 }
 
 __global__ void
-densegrid_interpolate_cuda_kernel_2d(
+hashgrid_interpolate_cuda_kernel_2d(
     const int64_t num_coords,
     const int32_t codebook_size,
     const int64_t feature_dim,
@@ -181,7 +179,7 @@ void hashgrid_interpolate_cuda_impl(
     auto stream = at::cuda::getCurrentCUDAStream();
 
     if (grid_dim == 2)
-      densegrid_interpolate_cuda_kernel_2d<<<(num_coords + num_threads - 1) / num_threads, num_threads, 0, stream>>>
+      hashgrid_interpolate_cuda_kernel_2d<<<(num_coords + num_threads - 1) / num_threads, num_threads, 0, stream>>>
         (num_coords, codebook_size, feature_dim, resolution, lod_idx, num_lods, grid_dim,
          coords.data_ptr<float>(), codebook.data_ptr<float>(), feats.data_ptr<float>());
     else if (grid_dim == 3)
@@ -196,7 +194,7 @@ void hashgrid_interpolate_cuda_impl(
    */
 
 __global__ void
-densegrid_interpolate_backward_cuda_kernel_2d(
+hashgrid_interpolate_backward_cuda_kernel_2d(
     const int64_t num_coords,
     const int32_t codebook_size,
     const int64_t feature_dim,
@@ -318,7 +316,7 @@ void hashgrid_interpolate_backward_cuda_impl(
     auto stream = at::cuda::getCurrentCUDAStream();
 
     if (grid_dim == 2)
-      densegrid_interpolate_backward_cuda_kernel_2d<<<(num_coords + num_threads - 1) / num_threads, num_threads, 0, stream>>>
+      hashgrid_interpolate_backward_cuda_kernel_2d<<<(num_coords + num_threads - 1) / num_threads, num_threads, 0, stream>>>
         (num_coords, codebook_size, feature_dim, resolution, lod_idx, num_lods, grid_dim,
          coords.data_ptr<float>(), grad_output.data_ptr<float>(), grad_codebook.data_ptr<float>());
 
