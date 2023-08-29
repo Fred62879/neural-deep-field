@@ -50,6 +50,7 @@ class AstroTrainer(BaseTrainer):
 
         self.save_data = False
         self.shuffle_dataloader = True
+        self.load_spectra = extra_args["space_dim"] == 3
         self.dataloader_drop_last = extra_args["dataloader_drop_last"]
 
         self.pretrain_codebook = extra_args["pretrain_codebook"]
@@ -336,7 +337,7 @@ class AstroTrainer(BaseTrainer):
     def get_cur_patch_data(self, i, tract, patch):
         self.cur_patch = PatchData(
             tract, patch,
-            load_spectra=True,
+            load_spectra=self.load_spectra,
             cutout_num_rows=self.extra_args["patch_cutout_num_rows"][i],
             cutout_num_cols=self.extra_args["patch_cutout_num_cols"][i],
             cutout_start_pos=self.extra_args["patch_cutout_start_pos"][i],
@@ -345,7 +346,8 @@ class AstroTrainer(BaseTrainer):
             **self.extra_args
         )
         self.cur_patch_uid = create_patch_uid(tract, patch)
-        self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
+        if self.load_spectra:
+            self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
 
     #############
     # Epoch begin and end

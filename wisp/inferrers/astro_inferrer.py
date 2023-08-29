@@ -51,13 +51,16 @@ class AstroInferrer(BaseInferrer):
 
         if mode == "pretrain_infer":
             self.batch_size = extra_args["pretrain_infer_batch_size"]
-            self.num_sup_spectra = dataset.get_num_supervision_spectra()
+            if extra_args["space_dim"] == 3:
+                self.num_sup_spectra = dataset.get_num_supervision_spectra()
         elif self.mode == "main_infer":
             self.batch_size = extra_args["infer_batch_size"]
-            self.num_val_spectra = dataset.get_num_validation_spectra()
+            if extra_args["space_dim"] == 3:
+                self.num_val_spectra = dataset.get_num_validation_spectra()
         elif self.mode == "test":
             self.batch_size = extra_args["infer_batch_size"]
-            self.num_test_spectra = dataset.get_num_test_spectra()
+            if extra_args["space_dim"] == 3:
+                self.num_test_spectra = dataset.get_num_test_spectra()
         else: raise ValueError()
 
         self.set_path()
@@ -99,6 +102,7 @@ class AstroInferrer(BaseInferrer):
 
     def init_model(self, pipelines):
         self.full_pipeline = pipelines["full"]
+        log.info(self.full_pipeline)
         if self.recon_gt_spectra:
             self.spectra_infer_pipeline = pipelines["spectra_infer"]
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
@@ -575,7 +579,7 @@ class AstroInferrer(BaseInferrer):
                 self._log_data("redshift", gt_field="gt_redshift")
             else:
                 self._plot_redshift_map(model_id)
-                if self.extra_args["pretrain_codebook"] and len(self.gt_redshift) > 0:
+                if len(self.gt_redshift) > 0:
                     self._log_data("redshift", gt_field="gt_redshift",
                                    mask=self.val_spectra_map)
 
@@ -598,7 +602,7 @@ class AstroInferrer(BaseInferrer):
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.scalers, **re_args)
 
-            if self.main_infer and self.extra_args["pretrain_codebook"]:
+            if self.main_infer:
                 self._log_data("scalers", mask=self.val_spectra_map)
 
         if self.save_qtz_w_pre:

@@ -107,6 +107,7 @@ def define_cmd_line_args():
     global_group.add_argument("--perf", action="store_true",
                               help="Use high-level profiling for the trainer.")
 
+    global_group.add_argument("--seed", type=int, default=42, help="global random seed.")
     global_group.add_argument("--exp-name", type=str, default="unnamed_experiment",
                               help="Experiment name.")
     global_group.add_argument("--tasks", nargs="+", type=str,
@@ -400,8 +401,9 @@ def define_cmd_line_args():
     data_group.add_argument("--convolve-spectra", action="store_true")
     data_group.add_argument("--spectra-smooth-sigma",type=int, default=5)
     data_group.add_argument("--flux-norm-cho",type=str,
-                            choices=["max","sum","linr","scale_gt","scale_recon"],
+                            choices=["identity","max","sum","linr","scale_gt","scale_recon"],
                             help="0- divide with max, 1-divide with sum")
+    data_group.add_argument("--trans-norm-cho",type=str)
 
     data_group.add_argument("--num-gt-spectra-upper-bound", type=int)
     data_group.add_argument("--num-supervision-spectra-upper-bound", type=int,

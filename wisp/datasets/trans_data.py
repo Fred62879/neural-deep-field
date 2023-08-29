@@ -12,6 +12,7 @@ from scipy.interpolate import interp1d
 #from unagi import filters as unagi_filters
 
 from wisp.utils.plot import plot_save
+from wisp.utils.numerical import normalize_data
 from wisp.datasets.data_utils import get_wave_range_fname, get_bound_id
 
 
@@ -473,16 +474,18 @@ class TransData:
     # Utilities
     #############
 
-    def plot_trans(self, axis=None):
+    def plot_trans(self, axis=None, norm_cho="linr", color=None):
         trans = self.get_source_trans()
         wave = self.get_source_wave()
         for j, (cur_wave, cur_trans) in enumerate(zip(wave, trans)):
+            cur_trans = normalize_data(cur_trans, norm_cho)
+            cur_color = self.kwargs["plot_colors"][j] if color is None else color
             if axis is not None:
-                axis.plot(cur_wave, cur_trans, color=self.kwargs["plot_colors"][j],
-                         label=self.kwargs["plot_labels"][j],
-                         linestyle=self.kwargs["plot_styles"][j])
+                axis.plot(cur_wave, cur_trans, color=cur_color,
+                          label=self.kwargs["plot_labels"][j],
+                          linestyle=self.kwargs["plot_styles"][j])
             else:
-                plt.plot(cur_wave, cur_trans, color=self.kwargs["plot_colors"][j],
+                plt.plot(cur_wave, cur_trans, color=cur_color,
                          label=self.kwargs["plot_labels"][j],
                          linestyle=self.kwargs["plot_styles"][j])
 

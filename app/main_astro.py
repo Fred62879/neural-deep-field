@@ -1,6 +1,8 @@
 
 if __name__ == "__main__":
 
+    import logging as log
+
     from wisp.astro_config_parser import *
     from wisp.parsers.parser import parse_args
     from wisp.trainers import AstroTrainer, CodebookTrainer
@@ -10,7 +12,8 @@ if __name__ == "__main__":
     tasks = set(args.tasks)
     default_log_setup(args.log_level)
 
-    set_seed()
+    set_seed(args.seed)
+    log.info(f"set seed as {args.seed}")
 
     dataset = get_dataset_from_config(args)
     device, pipelines = get_pipelines_from_config(args, tasks=tasks)

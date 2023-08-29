@@ -32,6 +32,7 @@ from multiprocessing.pool import ThreadPool
 class SpectraData:
     def __init__(self, trans_obj, device, **kwargs):
         self.kwargs = kwargs
+        if kwargs["space_dim"] != 3: return
 
         self.device = device
         self.trans_obj = trans_obj
@@ -152,6 +153,7 @@ class SpectraData:
         """ Finalize spectra data processing.
             Call this function after deriving coords norm range.
         """
+        if self.kwargs["space_dim"] != 3: return
         self.process_coords()
         self.train_valid_split()
 
@@ -439,7 +441,6 @@ class SpectraData:
             # acc += len(cur_spectra_ids)
 
         # reserve all spectra from test patches as test spectra
-        print(self.kwargs["test_tracts"])
         for i, (tract, patch) in enumerate(
             zip(self.kwargs["test_tracts"], self.kwargs["test_patches"])
         ):
@@ -911,10 +912,11 @@ class SpectraData:
         """ Normalize one pair of gt and recon flux.
         """
         sub_dir += flux_norm_cho + "_"
-        # if not is_codebook:
         if plot_recon_spectrum:
             sub_dir += "with_recon_"
-            if flux_norm_cho == "max":
+            if flux_norm_cho == "identity":
+                pass
+            elif flux_norm_cho == "max":
                 recon_flux = recon_flux / np.max(recon_flux)
             elif flux_norm_cho == "sum":
                 recon_flux = recon_flux / np.sum(recon_flux)
@@ -924,11 +926,14 @@ class SpectraData:
             elif flux_norm_cho == "scale_gt":
                 # scale gt spectra s.t. its max is same as recon
                 recon_max = np.max(recon_flux)
+            else: raise ValueError()
 
         if plot_gt_spectrum and not is_codebook:
             sub_dir += "with_gt_"
             # assert(np.max(gt_flux) > 0)
-            if flux_norm_cho == "max":
+            if flux_norm_cho == "identity":
+                pass
+            elif flux_norm_cho == "max":
                 gt_flux = gt_flux / np.max(gt_flux)
             elif flux_norm_cho == "sum":
                 gt_flux = gt_flux / (np.sum(gt_flux) + 1e-10)
@@ -940,6 +945,7 @@ class SpectraData:
                 gt_flux = gt_flux / np.max(gt_flux) * recon_max
             elif flux_norm_cho == "scale_recon":
                 recon_flux = recon_flux / np.max(recon_flux) * np.max(gt_flux)
+            else: raise ValueError()
 
         return sub_dir, gt_flux, recon_flux
 
@@ -956,12 +962,13 @@ class SpectraData:
         else: fig, axs = plt.subplots(1); axis = axs[0]
 
         if self.kwargs["plot_spectrum_with_trans"]:
-            sub_dir += "with_trans_"
-            self.trans_obj.plot_trans(axis=axis)
+            sub_dir += "with_" + self.kwargs["trans_norm_cho"] + "_trans_"
+            self.trans_obj.plot_trans(
+                axis=axis, norm_cho=self.kwargs["trans_norm_cho"], color="gray")
 
         axis.set_title(idx)
         if plot_gt_spectrum:
-            axis.plot(gt_wave, gt_flux, color="gray", label="GT")
+            axis.plot(gt_wave, gt_flux, color="black", label="GT")
         if plot_recon_spectrum:
             axis.plot(recon_wave, recon_flux, color="blue", label="Recon.")
 

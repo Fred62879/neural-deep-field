@@ -163,7 +163,7 @@ class BaseInferrer(ABC):
     def get_cur_patch_data(self, i, tract, patch):
         self.cur_patch = PatchData(
             tract, patch,
-            load_spectra=True,
+            load_spectra=self.extra_args["space_dim"] == 3,
             cutout_num_rows=self.extra_args["patch_cutout_num_rows"][i],
             cutout_num_cols=self.extra_args["patch_cutout_num_cols"][i],
             cutout_start_pos=self.extra_args["patch_cutout_start_pos"][i],
@@ -172,7 +172,8 @@ class BaseInferrer(ABC):
             **self.extra_args
         )
         self.cur_patch_uid = create_patch_uid(tract, patch)
-        self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
+        if self.extra_args["space_dim"] == 3:
+            self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
 
     #############
     # Infer w/ one checkpoint

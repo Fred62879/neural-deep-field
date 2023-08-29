@@ -74,8 +74,8 @@ embedder:
     wave_encoder_siren_last_linear: False
 
 grid:
-    grid_dim: 2
-    grid_type: 'DenseGrid'
+    grid_dim: 3
+    grid_type: 'HashGrid'
     grid_interpolation_type: 'linear'
     grid_multiscale_type: 'cat'
     grid_feature_dim: 32
@@ -149,17 +149,17 @@ trainer:
     pixel_loss_cho: l1_mean
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
-    num_epochs: 100
+    num_epochs: 500
     batch_size: 5500
     pretrain_batch_size: 3200
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 20
+    log_cli_every: 100
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 20
+    save_model_every: 100
     save_as_new: True
 
     train_with_all_pixels: False

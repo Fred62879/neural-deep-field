@@ -29,7 +29,7 @@ class AstroNerf(BaseNeuralField):
 
         self.init_encoder()
         self.decoder = Decoder(**kwargs)
-        self.norm = Intensifier(kwargs["intensify_method"])
+        self.norm = Intensifier(kwargs["intensification_method"])
 
         torch.cuda.empty_cache()
 
@@ -70,9 +70,10 @@ class AstroNerf(BaseNeuralField):
               {"indensity": torch.FloatTensor }:
                 - Output intensity tensor of shape [batch, num_samples, num_bands]
         """
-        timer = PerfTimer(activate=self.kwargs["activate_timer"], show_memory=False)
+        timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
 
         batch, num_samples, _ = coords.shape
+        # print(coords, coords.shape)
 
         timer.check("astro2d encode coords")
         coords = self.encoder(coords)

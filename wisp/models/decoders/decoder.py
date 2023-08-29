@@ -77,7 +77,7 @@ class Decoder(nn.Module):
             #     hidden_dim=self.kwargs["decoder_hidden_dim"],
             #     skip=[])
             self.decoder = MLP(input_dim, output_dim,
-                               self.kwargs["decoder_num_layers"],
+                               self.kwargs["decoder_num_hidden_layers"],
                                hidden_dim=self.kwargs["decoder_hidden_dim"])
 
         elif self.kwargs["decoder_activation_type"] == "sin":

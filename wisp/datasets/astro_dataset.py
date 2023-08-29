@@ -51,8 +51,7 @@ class AstroDataset(Dataset):
         """
         self.data = {}
         self.trans_dataset = TransData(self.device, **self.kwargs)
-        self.spectra_dataset = SpectraData(self.trans_dataset,
-                                           self.device, **self.kwargs)
+        self.spectra_dataset = SpectraData(self.trans_dataset, self.device, **self.kwargs)
         self.fits_dataset = FitsData(self.device, self.spectra_dataset, **self.kwargs)
         self.mask_dataset = MaskData(self.fits_dataset, self.device, **self.kwargs)
         self.spectra_dataset.finalize_spectra()

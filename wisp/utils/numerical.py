@@ -58,6 +58,19 @@ def get_coords_range(coords):
         raise NotImplementedError()
     return np.array([min_ra, max_ra, min_dec, max_dec])
 
+def normalize_data(data, norm_cho):
+    if norm_cho == "identity":
+        data = data
+    elif norm_cho == "max":
+        data = data / np.max(data)
+    elif norm_cho == "sum":
+        data = data / np.sum(data)
+    elif norm_cho == "linr":
+        lo, hi = min(data), max(data)
+        data = (data - lo) / (hi - lo)
+    else: raise ValueError()
+    return data
+
 def normalize_coords(coords, coords_range=None):
     ''' Normalize given coords.
         Currently only supports linear normalization.
