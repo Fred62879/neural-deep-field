@@ -421,6 +421,14 @@ class FitsData:
             else:
                 re_args["plot_func"](recon_patch, png_fname)
 
+        if "plot_residual" in re_args and re_args["plot_residual"]:
+            gt_fname = self.gt_img_fnames[patch_uid] + ".npy"
+            gt_tile = np.load(gt_fname)
+            err_map = recon_patch - gt_tile
+            png_fname = join(dir, f"{patch_uid}_{fname}_err_map.png")
+            np.save('tmp.npy', err_map)
+            re_args["plot_func"](err_map, png_fname, plot_option="plot_err_map")
+
         if re_args["calculate_metrics"]:
             gt_fname = self.gt_img_fnames[patch_uid] + ".npy"
             gt_tile = np.load(gt_fname)

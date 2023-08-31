@@ -46,8 +46,9 @@ def get_coords_range_fname(**kwargs):
     _, img_data_path = set_input_path(
         kwargs["dataset_path"], kwargs["sensor_collection_name"]
     )
-    if kwargs["use_full_patch"]: patch = "full_patch"
-    else: patch = kwargs["patch_selection_cho"]
+    patch = "full_patch"
+    # if kwargs["use_full_patch"]: patch = "full_patch"
+    # else: patch = kwargs["patch_selection_cho"]
     coords_cho = kwargs["train_coords_cho"]
     norm_cho = "_normed" if kwargs["normalize_coords"] else ""
     fname = join(

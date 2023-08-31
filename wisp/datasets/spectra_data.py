@@ -207,7 +207,7 @@ class SpectraData:
             return self.data["supervision_masks"]
         return self.data["supervision_masks"][idx]
 
-    def get_supervision_data(self, idx=None):
+    def get_supervision_spectra(self, idx=None):
         """ Get gt spectra (with same wave range as recon) used for supervision. """
         if idx is None:
             return self.data["supervision_spectra"]
@@ -968,7 +968,7 @@ class SpectraData:
 
         axis.set_title(idx)
         if plot_gt_spectrum:
-            axis.plot(gt_wave, gt_flux, color="black", label="GT")
+            axis.plot(gt_wave, gt_flux, color="gray", label="GT")
         if plot_recon_spectrum:
             axis.plot(recon_wave, recon_flux, color="blue", label="Recon.")
 

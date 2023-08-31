@@ -102,9 +102,10 @@ class AstroInferrer(BaseInferrer):
 
     def init_model(self, pipelines):
         self.full_pipeline = pipelines["full"]
-        log.info(self.full_pipeline)
+        # log.info(self.full_pipeline)
         if self.recon_gt_spectra:
             self.spectra_infer_pipeline = pipelines["spectra_infer"]
+            log.info(self.spectra_infer_pipeline)
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
             self.codebook_spectra_infer_pipeline = pipelines["codebook_spectra_infer"]
 
@@ -345,7 +346,7 @@ class AstroInferrer(BaseInferrer):
 
         if self.pretrain_infer:
             self.wave_source = "spectra"
-            self.coords_source = "spectra_train"
+            self.coords_source = "spectra_latents"
             # pretrain coords set using checkpoint
 
             self.requested_fields.extend([
@@ -512,6 +513,7 @@ class AstroInferrer(BaseInferrer):
                 "cutout_start_pos": self.extra_args["recon_cutout_start_pos"],
                 "zoomed_recon_dir": self.zoomed_recon_dir,
                 "zoomed_recon_fname": model_id,
+                "plot_residual": self.plot_residual_map
             }
             cur_metrics, cur_metrics_zscale = self.dataset.restore_evaluate_tiles(
                 self.recon_pixels, **re_args)

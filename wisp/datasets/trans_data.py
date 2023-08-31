@@ -72,7 +72,7 @@ class TransData:
             self.full_wave_masks_fname = join(
                 self.trans_dir, f"full_wave_masks_{name}_{self.smpl_interval}"
             )
-        self.encd_ids_fname = join(self.trans_dir, f"encd_ids.npy_{self.smpl_interval}")
+        self.encd_ids_fname = join(self.trans_dir, f"encd_ids_{self.smpl_interval}.npy")
 
         self.bdws_wave_fname = join(self.trans_dir, f"bdws_wave_{self.smpl_interval}")
         self.bdws_trans_fname = join(self.trans_dir, f"bdws_trans_{self.smpl_interval}")
@@ -390,6 +390,8 @@ class TransData:
             np.save(self.encd_ids_fname, encd_ids)
             np.save(self.full_wave_fname, full_wave)
             np.save(self.full_wave_masks_fname, full_wave_masks)
+            np.save(self.full_trans_fname, full_trans)
+            np.save(self.full_distrib_fname, distrib)
             plot_save(self.full_trans_fname, full_wave, full_trans.T)
             plot_save(self.full_distrib_fname, full_wave, distrib)
 

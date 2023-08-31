@@ -32,6 +32,7 @@ class BaseInferrer(ABC):
 
         self.verbose = extra_args["verbose"]
         self.infer_selected = extra_args["infer_selected"]
+        self.plot_residual_map = extra_args["plot_residual_map"]
         self.infer_last_model_only = extra_args["infer_last_model_only"]
         self.recon_spectra_pixels_only = extra_args["train_spectra_pixels_only"]
 

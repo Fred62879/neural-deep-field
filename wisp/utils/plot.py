@@ -143,6 +143,10 @@ def plot_one_row(fig, r, c, lo, img, num_bands, plot_option, vmins, vmaxs, cal_z
             plot_zscale(ax, img[i], vmins[i], vmaxs[i])
         elif plot_option == "plot_distrib":
             plot_img_distrib_one_band(ax, img[i])
+        elif plot_option == "plot_err_map":
+            # ax.imshow(img[i])
+            heat(ax, img[i])
+        else: raise ValueError()
 
     if cal_z_range:
         return vmins,vmaxs
@@ -207,23 +211,25 @@ def heat_range(arr,lo,hi):
     g.tick_params(left=False, bottom=False)
     #g.set_title("Semantic Textual Similarity")
 
-def heat(fig, arr, r, c, i):
-    ax = fig.add_subplot(r, c, i)
+def heat(ax, arr):
     ax.axis('off')
     img=ax.imshow(arr, cmap='viridis', origin='lower')
     plt.colorbar(img,ax=ax)
 
-def heat_all(data, fn, los=None, his=None):
+def heat_all(data, fig=None, fn=None, los=None, his=None):
     nbands = len(data)
-    fig = plt.figure(figsize=(20,5))
+    if fig is None:
+        fig = plt.figure(figsize=(20,5))
     r, c = 1, nbands
     for i, band in enumerate(data):
         if los is not None and his is not None:
             band = np.clip(fig, los[i], his[i])
-        heat(fig, band, r, c, i+1)
+        ax = fig.add_subplot(r, c, i+1)
+        heat(ax, band)
     fig.tight_layout()
-    plt.savefig(fn)
-    plt.close()
+    if fn is not None:
+        plt.savefig(fn)
+        plt.close()
 
 def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
     """ Plot heat map with markers for given coordinate positions.
@@ -242,7 +248,8 @@ def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
     for i, band in enumerate(data):
         if los is not None and his is not None:
             band = np.clip(fig, los[i], his[i])
-        heat(fig, band, r, c, i+1)
+        ax = fig.add_subplot(r, c, i+1)
+        heat(ax, band)
     fig.tight_layout()
 
     # for (y, x, cur_fits_id), marker in zip(coords, markers):

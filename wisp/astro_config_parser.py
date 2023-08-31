@@ -20,8 +20,6 @@ def register_class(cls, name):
     globals()[name] = cls
 
 def get_pretrain_pipelines(pipelines, tasks, args):
-    if not args.pretrain_codebook: return
-
     if "codebook_pretrain" in tasks:
         # assert(args.quantize_latent or args.quantize_spectra)
         pretrain_nef = CodebookPretrainNerf(
@@ -55,7 +53,7 @@ def get_main_train_pipelines(pipelines, tasks, args):
         nef_train = globals()[args.nef_type](**vars(args))
         pipelines["full"] = AstroPipeline(nef_train)
 
-    if "infer" or "test" in tasks:
+    if "main_infer" in tasks or "test" in tasks:
         # full pipline for img recon
         nef_train = globals()[args.nef_type](**vars(args))
         pipelines["full"] = AstroPipeline(nef_train)
@@ -85,8 +83,7 @@ def get_pipelines_from_config(args, tasks={}):
     else: device = "cpu"
 
     if args.dataset_type == 'astro':
-        if args.pretrain_codebook:
-            get_pretrain_pipelines(pipelines, tasks, args)
+        get_pretrain_pipelines(pipelines, tasks, args)
         get_main_train_pipelines(pipelines, tasks, args)
     else:
         raise ValueError(f"{args.dataset_type} unrecognized dataset_type")
