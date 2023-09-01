@@ -15,6 +15,7 @@ _*/
 build
 imgui.ini
 
+**/configs/**
 **/archived/**
 *~
 wandb/

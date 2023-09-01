@@ -125,7 +125,7 @@ def plot_img_distrib_one_band(ax, data, bins=10, prob=True):
     # ax.set_ylim(0, 30)
     ax.plot(bin_edges, hist)
 
-def plot_one_row(fig, r, c, lo, img, num_bands, plot_option, vmins, vmaxs, cal_z_range=False):
+def plot_one_row(fig, r, c, lo, img, num_bands, plot_option, vmins, vmaxs, cal_z_range=False, **kwargs):
     """ Plot current img (multiband) in one row based on plot_option
         @Param
            fig: global figure
@@ -143,15 +143,15 @@ def plot_one_row(fig, r, c, lo, img, num_bands, plot_option, vmins, vmaxs, cal_z
             plot_zscale(ax, img[i], vmins[i], vmaxs[i])
         elif plot_option == "plot_distrib":
             plot_img_distrib_one_band(ax, img[i])
-        elif plot_option == "plot_err_map":
+        elif plot_option == "plot_heat_map":
             # ax.imshow(img[i])
-            heat(ax, img[i])
+            heat(ax, img[i], **kwargs)
         else: raise ValueError()
 
     if cal_z_range:
         return vmins,vmaxs
 
-def plot_horizontally(img, png_fname, plot_option="plot_img", zscale_ranges=None, save_close=True):
+def plot_horizontally(img, png_fname, plot_option="plot_img", zscale_ranges=None, save_close=True, **kwargs):
     """ Plot multiband image horizontally.
         Currently only supports plot one row.
         @Param
@@ -170,7 +170,8 @@ def plot_horizontally(img, png_fname, plot_option="plot_img", zscale_ranges=None
     num_bands = img.shape[0]
     fig = plt.figure(figsize=(3*num_bands + 1,3))
     plot_one_row(fig, 1, num_bands, 0, img, num_bands,
-                 plot_option, vmins, vmaxs, cal_z_range=cal_z_range)
+                 plot_option, vmins, vmaxs, cal_z_range=cal_z_range,
+                 **kwargs)
     fig.tight_layout()
 
     if save_close:
@@ -211,7 +212,9 @@ def heat_range(arr,lo,hi):
     g.tick_params(left=False, bottom=False)
     #g.set_title("Semantic Textual Similarity")
 
-def heat(ax, arr):
+def heat(ax, arr, resid_lo=None, resid_hi=None):
+    if resid_lo is not None and resid_hi is not None:
+        arr = np.clip(arr, resid_lo, resid_hi)
     ax.axis('off')
     img=ax.imshow(arr, cmap='viridis', origin='lower')
     plt.colorbar(img,ax=ax)
@@ -223,7 +226,8 @@ def heat_all(data, fig=None, fn=None, los=None, his=None):
     r, c = 1, nbands
     for i, band in enumerate(data):
         if los is not None and his is not None:
-            band = np.clip(fig, los[i], his[i])
+            lo, hi = los[i], his[i]
+        else: lo, hi = None, None
         ax = fig.add_subplot(r, c, i+1)
         heat(ax, band)
     fig.tight_layout()
@@ -247,9 +251,10 @@ def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
     r, c = 1, nbands
     for i, band in enumerate(data):
         if los is not None and his is not None:
-            band = np.clip(fig, los[i], his[i])
+            lo, hi = los[i], his[i]
+        else: lo, hi = None, None
         ax = fig.add_subplot(r, c, i+1)
-        heat(ax, band)
+        heat(ax, band, lo, hi)
     fig.tight_layout()
 
     # for (y, x, cur_fits_id), marker in zip(coords, markers):

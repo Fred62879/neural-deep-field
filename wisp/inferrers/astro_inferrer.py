@@ -194,6 +194,7 @@ class AstroInferrer(BaseInferrer):
         assert not (self.recon_codebook_spectra and self.recon_codebook_spectra_individ)
 
         # (iv) infer w/o no modeling running
+        self.plot_img_residual = "plot_img_residual" in tasks
         self.integrate_gt_spectra = "integrate_gt_spectra" in tasks
         self.plot_gt_pixel_distrib = "plot_gt_pixel_distrib" in tasks
 
@@ -211,7 +212,7 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
             self.group_tasks.append("infer_hardcode_coords_modified_model")
 
-        if self.integrate_gt_spectra or self.plot_gt_pixel_distrib:
+        if self.plot_img_residual or self.integrate_gt_spectra or self.plot_gt_pixel_distrib:
             self.group_tasks.append("infer_no_model_run")
 
         # set all grouped tasks to False, only required tasks will be toggled afterwards
@@ -435,6 +436,19 @@ class AstroInferrer(BaseInferrer):
         pass
 
     def inferrence_no_model_run(self):
+        if self.plot_img_residual:
+            gt_fname = self.cur_patch.get_gt_img_fname() + ".npy"
+            # `model_id` requires manual setup
+            model_id = 0
+            recon_fname = join(self.recon_dir, f"{self.cur_patch_uid}_{model_id}.npy")
+            out_fname = join(self.recon_dir, f"{self.cur_patch_uid}_{model_id}_residual.png")
+            gt = np.load(gt_fname)
+            recon = np.load(recon_fname)
+            residual = gt - recon
+
+            kwargs = {"resid_lo": -10, "resid_hi": 10}
+            plot_horizontally(residual, out_fname, plot_option="plot_heat_map", **kwargs)
+
         if self.plot_gt_pixel_distrib:
             assert(exists(self.recon_dir))
             for fname in os.listdir(self.recon_dir):
