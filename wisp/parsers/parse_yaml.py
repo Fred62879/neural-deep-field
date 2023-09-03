@@ -576,6 +576,8 @@ def define_cmd_line_args():
     infer_group.add_argument("--infer-use-all-wave", action="store_true",
                              help="should set this to true, implementation assumes infer with all lambda")
     infer_group.add_argument("--plot-residual-map", action="store_true")
+    infer_group.add_argument("--img-resid-lo", type=int, default=-10)
+    infer_group.add_argument("--img-resid-hi", type=int, default=10)
     infer_group.add_argument("--infer-synthetic-band", action="store_true")
     infer_group.add_argument("--infer-last-model-only", action="store_true")
 

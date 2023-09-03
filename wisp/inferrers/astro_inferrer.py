@@ -221,8 +221,8 @@ class AstroInferrer(BaseInferrer):
         self.infer_selected_coords_partial_model = False
         self.infer_hardcode_coords_modified_model = False
 
-        if self.verbose:
-            log.info(f"inferrence group tasks: {self.group_tasks}.")
+        # if self.verbose:
+        log.info(f"inferrence group tasks: {self.group_tasks}.")
 
     def set_inferrence_funcs(self):
         self.infer_funcs = {}
@@ -270,7 +270,7 @@ class AstroInferrer(BaseInferrer):
 
         self.use_full_wave = True
         self.calculate_metrics = False
-        self.perform_integration = self.recon_img
+        self.perform_integration = True #self.recon_img
 
         self.requested_fields = ["coords"]
 
@@ -446,7 +446,8 @@ class AstroInferrer(BaseInferrer):
             recon = np.load(recon_fname)
             residual = gt - recon
 
-            kwargs = {"resid_lo": -10, "resid_hi": 10}
+            kwargs = {"resid_lo": self.kwargs["img_resid_lo"],
+                      "resid_hi": self.kwargs["img_resid_hi"] }
             plot_horizontally(residual, out_fname, plot_option="plot_heat_map", **kwargs)
 
         if self.plot_gt_pixel_distrib:
@@ -1069,7 +1070,9 @@ class AstroInferrer(BaseInferrer):
         if fname is not None:
             np.save(fname, recon)
 
-        if log_ratio:
+        if gt_field is None:
+            log.info(f"{field}: {recon}")
+        elif log_ratio:
             ratio = recon/gt
             log.info(f"{field}/{gt_field}: {ratio}")
         else:

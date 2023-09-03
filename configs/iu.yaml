@@ -28,7 +28,7 @@ global:
     #tasks: ['main_infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
     tasks: ['train'] #,'recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train','save_scaler_during_train'
     tasks: ['main_infer','recon_gt_spectra'] #,'save_redshift'] #,'recon_codebook_spectra_individ']
-    #tasks: ['test','recon_gt_spectra'] #,'save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
+    tasks: ['test','recon_gt_spectra','save_redshift','recon_codebook_spectra_individ','save_qtz_weights','recon_img']
 
 optimizer:
     optimizer_type: 'adam'
@@ -203,7 +203,7 @@ trainer:
 
     pretrain_codebook: True         # these two conflict
     spectra_supervision: False      #  each other
-    pretrain_log_dir: '20230821-204243_pretrain_6k+_spectra_60k_epochs_conv'
+    pretrain_log_dir: '20230829-200027_pretrain_6k+_spectra_60k_epochs_unconv'
     pretrained_model_name: 'model-ep60000-it0.pth'
     #### ***********************************
 
@@ -216,10 +216,12 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20230828-072804_512_main_train_densegrid_16_levels_pretrain_unconvovled_500_epochs'
+    infer_log_dir: '20230901-004812_512_main_train_unconvolved'
     metric_options: ['mse','ssim','psnr']
     log_pixel_ratio: True
     plot_residual_map: True
+    img_resid_lo: -10
+    img_resid_hi: 10
 
     recon_zoomed: False
     recon_cutout_patch_uids: ['981215']

@@ -451,8 +451,8 @@ class SpectraData:
 
         test_ids = np.array(test_ids)
         validation_ids = np.array(validation_ids)
-        if len(test_ids) == 0 or len(validation_ids) == 0:
-            raise ValueError("Please select patches properly to make sure the number of validation and test spectra is not zero.")
+        # if len(test_ids) == 0 or len(validation_ids) == 0:
+        #     raise ValueError("Please select patches properly to make sure the number of validation and test spectra is not zero.")
 
         # validation_ids = np.array([0])
         log.info(f"test spectra ids: {test_ids}")
@@ -995,7 +995,7 @@ class SpectraData:
         """
         (gt_wave, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux) = data
 
-        sub_dir = ""
+        sub_dir = str(self.kwargs["spectra_neighbour_size"]) + "_neighbours_"
         if self.gt_convolved:
             sub_dir += "convolved_"
 
