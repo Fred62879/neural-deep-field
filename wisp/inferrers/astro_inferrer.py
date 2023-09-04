@@ -102,10 +102,10 @@ class AstroInferrer(BaseInferrer):
 
     def init_model(self, pipelines):
         self.full_pipeline = pipelines["full"]
-        # log.info(self.full_pipeline)
+        log.info(self.full_pipeline)
         if self.recon_gt_spectra:
             self.spectra_infer_pipeline = pipelines["spectra_infer"]
-            log.info(self.spectra_infer_pipeline)
+            # log.info(self.spectra_infer_pipeline)
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
             self.codebook_spectra_infer_pipeline = pipelines["codebook_spectra_infer"]
 
@@ -201,7 +201,7 @@ class AstroInferrer(BaseInferrer):
         # keep only tasks required to perform
         self.group_tasks = []
 
-        if self.recon_img or self.save_redshift or \
+        if self.recon_img or \
            self.save_qtz_weights or self.save_scaler or \
            self.plot_embed_map or self.plot_latent_embed:
             self.group_tasks.append("infer_all_coords_full_model")
@@ -363,6 +363,9 @@ class AstroInferrer(BaseInferrer):
             self.coords_source = "spectra_valid"
             self._set_coords_from_spectra_source(
                 self.dataset.get_validation_spectra_coords())
+
+            if self.save_redshift:
+                self.requested_fields.append("spectra_semi_sup_redshift")
 
         elif self.test:
             self.wave_source = "trans"
@@ -736,7 +739,7 @@ class AstroInferrer(BaseInferrer):
         #     self._log_data(
         #         "recon_pixels", gt_field="gt_pixels", log_ratio=self.log_pixel_ratio)
 
-        if self.save_redshift_pre:
+        if self.save_redshift_pre or self.save_redshift_main:
             self._log_data("redshift", gt_field="gt_redshift")
 
         if self.save_qtz_weights:
@@ -943,6 +946,9 @@ class AstroInferrer(BaseInferrer):
                 if self.save_redshift_pre:
                     self.redshift.extend(ret["redshift"])
                     self.gt_redshift.extend(data["spectra_sup_redshift"])
+                elif self.save_redshift_main:
+                    self.redshift.extend(ret["redshift"])
+                    self.gt_redshift.extend(data["spectra_semi_sup_redshift"])
 
             except StopIteration:
                 log.info("spectra forward done")

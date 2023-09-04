@@ -262,7 +262,7 @@ def annotated_heat(coords, markers, data, fn, fits_id, los=None, his=None):
         # if cur_fits_id != fits_id: continue
         plt.scatter(x, y, marker=marker)
         cur_redshift = data[0,y,x]
-        log.info(f"redshift value of {fits_id}_{y}_{x} is: {cur_redshift}")
+        # log.info(f"redshift value of {fits_id}_{y}_{x} is: {cur_redshift}")
 
     plt.savefig(fn)
     plt.close()
