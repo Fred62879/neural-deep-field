@@ -365,6 +365,7 @@ class AstroInferrer(BaseInferrer):
                 self.dataset.get_validation_spectra_coords())
 
             if self.save_redshift:
+                assert(self.extra_args["spectra_neighbour_size"] == 1)
                 self.requested_fields.append("spectra_semi_sup_redshift")
 
         elif self.test:
