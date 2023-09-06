@@ -1,6 +1,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from wisp.utils import PerfTimer
 from wisp.models.decoders import BasicDecoder, MLP
@@ -36,13 +37,15 @@ class SpatialDecoder(nn.Module):
                     kwargs["redshift_unsupervision"],
                     kwargs["redshift_semi_supervision"]]) <= 1
 
-        self.model_redshift = kwargs["model_redshift"] # and self.qtz
+        self.model_redshift = kwargs["model_redshift"]
+        self.redshift_model_method = kwargs["redshift_model_method"]
         self.apply_gt_redshift = self.model_redshift and kwargs["apply_gt_redshift"]
 
-        self.input_dim = get_input_latents_dim(**kwargs)
         self.init_model()
 
     def init_model(self):
+        self.input_dim = get_input_latents_dim(**self.kwargs)
+
         if self.decode_spatial_embedding or self.qtz:
             self.init_decoder()
 
@@ -70,8 +73,15 @@ class SpatialDecoder(nn.Module):
         )
 
     def init_redshift_decoder(self):
+        if self.redshift_model_method == "regression":
+            output_dim = 1
+        elif self.redshift_model_method == "classification":
+            self.init_redshift_bins()
+            output_dim = self.num_redshift_bins
+        else: raise ValueError()
+
         self.redshift_decoder = BasicDecoder(
-            self.input_dim, 1,
+            self.input_dim, output_dim,
             get_activation_class(self.kwargs["redshift_decod_activation_type"]),
             bias=True, layer=get_layer_class(self.kwargs["redshift_decod_layer_type"]),
             num_layers=self.kwargs["redshift_decod_num_hidden_layers"] + 1,
@@ -79,6 +89,19 @@ class SpatialDecoder(nn.Module):
             skip=self.kwargs["redshift_decod_skip_layers"]
         )
         self.redshift_adjust = nn.ReLU(inplace=True)
+
+    def init_redshift_bins(self):
+        if self.kwargs["use_gpu"]:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else: device = "cpu"
+        self.redshift_bins = torch.arange(
+            self.kwargs["redshift_lo"],
+            self.kwargs["redshift_hi"],
+            self.kwargs["redshift_bin_width"]
+        ).to(device)
+        self.num_redshift_bins = len(self.redshift_bins)
+        offset = self.kwargs["redshift_bin_width"] / 2
+        self.redshift_bins += offset
 
     def init_decoder(self):
         if self.quantize_z:
@@ -125,18 +148,23 @@ class SpatialDecoder(nn.Module):
         timer.check("spatial_decod::scaler done")
 
         # forward redshift
-        # print(z, z.shape)
         if self.apply_gt_redshift:   # dont generate redshift
             assert specz is not None
             redshift = specz
             ret["redshift"] = redshift
         elif self.model_redshift:
-            redshift = self.redshift_decoder(z[:,0])[...,0]
-            redshift = self.redshift_adjust(redshift + 0.5)
+            if self.redshift_model_method == "regression":
+                redshift = self.redshift_decoder(z[:,0])[...,0]
+                redshift = self.redshift_adjust(redshift + 0.5)
+            elif self.redshift_model_method == "classification":
+                weights = self.redshift_decoder(z[:,0])
+                # print(self.redshift_bins)
+                weights = F.softmax(weights, dim=-1)
+                redshift = weights@self.redshift_bins
+            else: raise ValueError()
         else:
             redshift = None
         timer.check("spatial_decod::redshift done")
-        # print('*********')
 
         # decode/quantize
         if self.quantize_spectra:

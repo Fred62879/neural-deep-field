@@ -1079,7 +1079,9 @@ class SpectraData:
                                 name, spectra_dir, fig, axs, nrows, ncols,
                                 save_spectra and not save_spectra_together)
 
+        # ids = np.array([10,6,18,15,11,16,14,7])
         for idx, cur_plot_data in enumerate(
+            #zip(gt_wave[ids], gt_masks[ids], gt_fluxes[ids], recon_wave[ids], recon_masks[ids], recon_fluxes[ids])
             zip(gt_wave, gt_masks, gt_fluxes, recon_wave, recon_masks, recon_fluxes)
         ):
             pargs = process_data(cur_plot_data)

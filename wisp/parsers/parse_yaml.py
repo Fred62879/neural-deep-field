@@ -131,6 +131,9 @@ def define_cmd_line_args():
                            help="The neural field class to be used.")
     net_group.add_argument("--model-redshift", action="store_true",
                            help="whether the arch model redshift or not.")
+    net_group.add_argument("--redshift-model-method", type=str,
+                           help="choice of redshift modeling",
+                           choices=["none","regression","classification"])
     net_group.add_argument("--encode-coords", action="store_true")
     net_group.add_argument("--coords-encode-method", type=str,
                            choices=["positional","grid"],
@@ -293,6 +296,12 @@ def define_cmd_line_args():
                                      default="relu", choices=["relu", "sin"])
     spatial_decod_group.add_argument("--redshift-decod-skip-layers", nargs="+", type=int,
                                      help="Layer to have skip connection.")
+
+    spatial_decod_group.add_argument("--redshift-lo", type=float,
+                                     help="Min value of redshift interval.")
+    spatial_decod_group.add_argument("--redshift-hi", type=float)
+    spatial_decod_group.add_argument("--redshift-bin-width", type=float,
+                                     help="Width of each bin to divide the interval.")
 
     ###################
     # Hyperspectral arguments
@@ -510,6 +519,7 @@ def define_cmd_line_args():
                              help="whether training supervised by pixel values or not.")
     train_group.add_argument("--spectra-supervision", action="store_true",
                              help="whether training supervised by spectra or not.")
+
     train_group.add_argument("--apply-gt-redshift", action="store_true",
                              help="apply gt redshift instead of generating redshift.")
     train_group.add_argument("--redshift-unsupervision", action="store_true",
