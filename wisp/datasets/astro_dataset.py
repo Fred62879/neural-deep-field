@@ -478,7 +478,7 @@ class AstroDataset(Dataset):
                       gt_masks=None, recon_masks=None,
                       clip=False, spectra_clipped=False
     ):
-        self.spectra_dataset.plot_spectrum(
+        return self.spectra_dataset.plot_spectrum(
             spectra_dir, name, flux_norm_cho,
             gt_wave, gt_fluxes, recon_wave, recon_fluxes,
             is_codebook=is_codebook,

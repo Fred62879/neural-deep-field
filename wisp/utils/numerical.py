@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import logging as log
 
+from scipy.interpolate import interp1d
 from astropy.visualization import ZScaleInterval
 from skimage.metrics import structural_similarity
 
@@ -156,6 +157,21 @@ def zscale_img(data, gt):
         data[...,i] = zscale(data[...,i], gt[...,i])
     return data
 
+def calculate_zncc(s1, s2):
+    """ Calculate zero-mean normalized cross correlation between two signals.
+        @Param
+          s1, s2: 1D signals of the same length
+        @Ref
+          https://stackoverflow.com/questions/13439718/how-to-interpret-the-values-returned-by-numpy-correlate-and-numpy-corrcoef
+    """
+    assert s1.shape == s2.shape and s1.ndim == 1
+    # n = len(s2)
+    # m1, m2 = np.mean(s1), np.mean(s2)
+    # std1, std2 = np.std(s1), np.std(s2)
+    # zncc = np.correlate(s1-m1, s2-m2, mode='valid')[0] / (n*(std1*std2))
+    zncc = np.corrcoef(s1, s2)[0,1]
+    return zncc
+
 def calculate_sam_spectrum(gen, gt, convert_to_degree=False):
     numerator = np.sum(np.multiply(gt, gen))
     denominator = np.linalg.norm(gt) * np.linalg.norm(gen)
@@ -178,7 +194,9 @@ def calculate_ssim(gen, gt):
         (gt, gen, data_range=rg) #, win_size=gt.shape[1]-1)
 
 def calculate_metric(recon, gt, band, option):
-    if option == 'mse':
+    if option == "zncc":
+        metric = calculate_zncc(recon, gt)
+    elif option == 'mse':
         metric = calculate_mse(recon[band], gt[band])
     elif option == 'psnr':
         metric = calculate_psnr(recon[band], gt[band])
@@ -199,16 +217,27 @@ def calculate_metric(recon, gt, band, option):
     return metric
 
 def calculate_metrics(recon, gt, options, zscale=False):
-    ''' Calculate metrics and stats of recon w.r.t gt '''
-    num_bands = len(recon)
-    metrics = np.zeros((len(options), num_bands))
+    """ Calculate metrics and stats of recon w.r.t gt
+        @Return
+           metrics: [n_metrics(,n_bands)]
+    """
+    assert recon.shape == gt.shape
 
-    if zscale:
-        recon = zscale_img(recon, gt)
+    if recon.ndim == 2:
+        num_bands = len(recon)
+        metrics = np.zeros((len(options), num_bands))
+        if zscale:
+            recon = zscale_img(recon, gt)
+    else:
+        assert recon.ndim == 1
+        metrics = np.zeros(len(options))
 
     for i, option in enumerate(options):
-        for band in range(num_bands):
-            metrics[i, band] = calculate_metric(recon, gt, band, option)
+        if recon.ndim == 2:
+            for band in range(num_bands):
+                metrics[i, band] = calculate_metric(recon, gt, band, option)
+        else:
+            metrics[i] = calculate_metric(recon, gt, None, option)
     return metrics
 
 '''

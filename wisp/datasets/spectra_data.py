@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 from wisp.datasets.patch_data import PatchData
 from wisp.utils.common import create_patch_uid
-from wisp.utils.numerical import normalize_coords
+from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
     get_coords_range_fname, add_dummy_dim
@@ -949,12 +949,12 @@ class SpectraData:
 
         return sub_dir, gt_flux, recon_flux
 
-    def plot_and_save_one_spectrum(
-            self, name, spectra_dir, fig, axs, nrows, ncols, save_spectra, idx, pargs
-    ):
+    def plot_and_save_one_spectrum(self, name, spectra_dir, fig, axs, nrows, ncols,
+                                   save_spectra, calculate_spectra_metrics, idx, pargs):
         """ Plot one spectrum and save as required.
         """
-        sub_dir, gt_wave, gt_flux, recon_wave, recon_flux, plot_gt_spectrum, plot_recon_spectrum = pargs
+        sub_dir, gt_wave, gt_flux, recon_wave, recon_flux, \
+            plot_gt_spectrum, plot_recon_spectrum = pargs
 
         if self.kwargs["plot_spectrum_together"]:
             if nrows == 1: axis = axs if ncols == 1 else axs[idx%ncols]
@@ -987,10 +987,15 @@ class SpectraData:
             fname = join(cur_spectra_dir, f"spectra_{idx}_{name}")
             np.save(fname, recon_flux)
 
-        return sub_dir
+        if calculate_spectra_metrics:
+            metrics = calculate_metrics(
+                recon_flux, gt_flux, self.kwargs["spectra_metric_options"]) # [n_metrics]
+        else: metrics = None
 
-    def process_spectrum_plot_data(self, flux_norm_cho, is_codebook,
-                                   clip, spectra_clipped, data):
+        return sub_dir, metrics
+
+    def process_spectrum_plot_data(self, flux_norm_cho, is_codebook, clip,
+                                   spectra_clipped, calculate_metrics, data):
         """ Collect data for spectrum plotting for the given spectra.
         """
         (gt_wave, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux) = data
@@ -1018,6 +1023,11 @@ class SpectraData:
                     gt_flux = gt_flux[gt_mask]
                 recon_wave = recon_wave[recon_mask]
                 recon_flux = recon_flux[recon_mask]
+
+        if calculate_metrics and len(recon_wave) != len(gt_wave):
+            f = interp1d(recon_wave, recon_flux)
+            recon_flux = f(gt_wave)
+            recon_wave = gt_wave
 
         sub_dir, gt_flux, recon_flux = self.normalize_one_flux(
             sub_dir, is_codebook, plot_gt_spectrum, plot_recon_spectrum,
@@ -1056,6 +1066,7 @@ class SpectraData:
               spectra_clipped: whether or not spectra is already clipped to
         """
         assert not clip or (recon_masks is not None or spectra_clipped)
+        calculate_metrics = not is_codebook and (clip or spectra_clipped)
 
         n = len(recon_wave)
         if gt_wave is None: gt_wave = [None]*n
@@ -1074,18 +1085,23 @@ class SpectraData:
             fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
 
         process_data = partial(self.process_spectrum_plot_data,
-                               flux_norm_cho, is_codebook, clip, spectra_clipped)
+                               flux_norm_cho, is_codebook, clip, spectra_clipped,
+                               calculate_metrics)
         plot_and_save = partial(self.plot_and_save_one_spectrum,
                                 name, spectra_dir, fig, axs, nrows, ncols,
-                                save_spectra and not save_spectra_together)
+                                save_spectra and not save_spectra_together,
+                                calculate_metrics)
 
         # ids = np.array([10,6,18,15,11,16,14,7])
+        metrics = []
         for idx, cur_plot_data in enumerate(
             #zip(gt_wave[ids], gt_masks[ids], gt_fluxes[ids], recon_wave[ids], recon_masks[ids], recon_fluxes[ids])
             zip(gt_wave, gt_masks, gt_fluxes, recon_wave, recon_masks, recon_fluxes)
         ):
             pargs = process_data(cur_plot_data)
-            sub_dir = plot_and_save(idx, pargs)
+            sub_dir, cur_metrics = plot_and_save(idx, pargs)
+            if cur_metrics is not None:
+                metrics.append(cur_metrics)
 
         if save_spectra_together:
             fname = join(spectra_dir, name)
@@ -1094,6 +1110,11 @@ class SpectraData:
         if self.kwargs["plot_spectrum_together"]:
             fname = join(spectra_dir, sub_dir, f"all_spectra_{name}")
             fig.tight_layout(); plt.savefig(fname); plt.close()
+
+        if calculate_metrics:
+            metrics = np.array(metrics) # [n_spectra,n_metrics]
+            return metrics
+        return None
 
 # SpectraData class ends
 #############

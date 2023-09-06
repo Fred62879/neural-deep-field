@@ -26,8 +26,8 @@ global:
     #tasks: ['main_infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['main_infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['main_infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    tasks: ['train','recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
-    #tasks: ['main_infer','recon_gt_spectra'] #,'save_redshift'] #,'recon_codebook_spectra_individ']
+    tasks: ['train'] #,'recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
+    tasks: ['main_infer','recon_gt_spectra'] #,'save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
     #tasks: ['test','recon_gt_spectra','save_redshift','recon_codebook_spectra_individ','save_qtz_weights','recon_img']
 
 optimizer:
@@ -163,7 +163,7 @@ trainer:
     log_cli_every: 200
     log_gpu_every: -1
     plot_grad_every: -1
-    save_data_every: 200
+    save_data_every: -1
     save_model_every: 200
     save_as_new: True
 
@@ -198,7 +198,7 @@ trainer:
     redshift_unsupervision: False    #  |- these three conflict each other
     redshift_semi_supervision: True  # -
 
-    train_use_all_wave: True
+    train_use_all_wave: False
     pretrain_use_all_wave: False
     train_num_wave_samples: 50
     pretrain_num_wave_samples: 100
@@ -221,8 +221,9 @@ infer:
 
     # recon img
     to_HDU: False
-    infer_log_dir: '20230901-004812_512_main_train_unconvolved'
+    # infer_log_dir: '20230901-004812_512_main_train_unconvolved'
     metric_options: ['mse','ssim','psnr']
+    spectra_metric_options: ['zncc']
     log_pixel_ratio: True
     plot_residual_map: True
     img_resid_lo: -10

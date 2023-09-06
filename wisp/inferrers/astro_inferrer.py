@@ -13,6 +13,7 @@ from os.path import exists, join
 from wisp.inferrers import BaseInferrer
 from wisp.datasets.data_utils import get_bound_id
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
+
 from wisp.utils.plot import plot_horizontally, plot_embed_map, \
     plot_latent_embed, annotated_heat, plot_simple
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
@@ -301,7 +302,7 @@ class AstroInferrer(BaseInferrer):
                 self.coords_source = "fits"
                 self.dataset_length = self.dataset.get_num_coords()
                 self.requested_fields.append("pixels")
-                self.configure_metrics()
+                self.configure_img_metrics()
             else: raise ValueError()
 
             if self.save_redshift:
@@ -376,6 +377,8 @@ class AstroInferrer(BaseInferrer):
         else:
             raise ValueError()
 
+        self.configure_spectra_metrics()
+
         if not self.extra_args["infer_spectra_individually"]:
             self.batch_size = min(
                 self.dataset_length * self.neighbour_size**2, self.batch_size)
@@ -383,7 +386,12 @@ class AstroInferrer(BaseInferrer):
         self.reset_dataloader()
 
     def post_inferrence_selected_coords_partial_model(self):
-        pass
+        self.metrics = np.array(self.metrics) # [n_models,n_spectra,n_metrics]
+        print(self.metrics.shape)
+        if len(self.metrics) != 0:
+            [ np.save(self.metric_fnames[i], self.metrics[...,i])
+              for i in range(self.num_metrics) ]
+            log.info(f"metrics: {np.round(self.metrics[-1,:,:].T, 3)}")
 
     def pre_inferrence_hardcode_coords_modified_model(self):
         """ Codebook spectra reconstruction.
@@ -714,12 +722,13 @@ class AstroInferrer(BaseInferrer):
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
         n_figs = int(np.ceil(num_spectra / n_spectrum_per_fig))
 
+        cur_checkpoint_metrics = []
         for i in range(n_figs):
             fname = f"model{model_id}-plot{i}"
             lo = i * n_spectrum_per_fig
             hi = min(lo + n_spectrum_per_fig, num_spectra)
 
-            self.dataset.plot_spectrum(
+            cur_metrics = self.dataset.plot_spectrum(
                 self.spectra_dir, fname,
                 self.extra_args["flux_norm_cho"],
                 gt_wave[lo:hi], gt_fluxes[lo:hi],
@@ -727,9 +736,14 @@ class AstroInferrer(BaseInferrer):
                 # save_spectra_together=True,
                 clip=self.extra_args["plot_clipped_spectrum"],
                 gt_masks=gt_masks[lo:hi],
-                recon_masks=recon_masks[lo:hi])
+                recon_masks=recon_masks[lo:hi]
+            )
+            cur_checkpoint_metrics.extend(cur_metrics)
 
         log.info("spectrum plotting done")
+
+        if len(cur_checkpoint_metrics) != 0:
+            self.metrics.append(cur_checkpoint_metrics)
 
         # if self.save_pixel_values:
         #     self.recon_pixels = self.trans_obj.integrate(recon_fluxes)
@@ -1110,7 +1124,7 @@ class AstroInferrer(BaseInferrer):
         # plot redshift img
         _, _ = self.dataset.restore_evaluate_tiles(self.redshift, **re_args)
 
-    def configure_metrics(self):
+    def configure_img_metrics(self):
         self.metric_options = self.extra_args["metric_options"]
         self.num_metrics = len(self.metric_options)
         self.calculate_metrics = self.recon_img_all_pixels \
@@ -1121,7 +1135,14 @@ class AstroInferrer(BaseInferrer):
             self.metrics = np.zeros((self.num_metrics, 0, num_patches, self.num_bands))
             self.metrics_zscale = np.zeros((
                 self.num_metrics, 0, num_patches, self.num_bands))
-            self.metric_fnames = [ join(self.metric_dir, f"{option}.npy")
+            self.metric_fnames = [ join(self.metric_dir, f"img_{option}.npy")
                                    for option in self.metric_options ]
-            self.metric_fnames_z = [ join(self.metric_dir, f"{option}_zscale.npy")
+            self.metric_fnames_z = [ join(self.metric_dir, f"img_{option}_zscale.npy")
                                      for option in self.metric_options ]
+
+    def configure_spectra_metrics(self):
+        self.metric_options = self.extra_args["spectra_metric_options"]
+        self.num_metrics = len(self.metric_options)
+        self.metrics = [] #np.zeros((self.num_metrics, 0))
+        self.metric_fnames = [ join(self.metric_dir, f"spectra_{option}.npy")
+                               for option in self.metric_options ]
