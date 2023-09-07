@@ -60,7 +60,7 @@ def get_coords_norm_range(coords, **kwargs):
         coords = coords.numpy()
     assert coords.__class__.__name__ == "ndarray"
 
-    if kwargs["coords_encode_method"] == "grid"
+    if kwargs["coords_encode_method"] == "grid":
         assert kwargs["coords_type"] == "img"
 
     if kwargs["coords_type"] == "img":

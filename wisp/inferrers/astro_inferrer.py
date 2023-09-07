@@ -138,7 +138,7 @@ class AstroInferrer(BaseInferrer):
         self.redshift_semi_supervision = self.model_redshift and \
             self.extra_args["redshift_semi_supervision"]
         if self.pretrain_infer: assert self.apply_gt_redshift
-        else: assert self.redshift_semi_supervision
+        # else: assert self.redshift_semi_supervision
 
         # i) infer all coords using original model
         self.recon_img_all_pixels = False

@@ -655,11 +655,11 @@ class FitsData:
         """
         if self.kwargs["normalize_coords"]:
             if not exists(self.coords_norm_range_fname):
-                coords, norm_range = normalize_coords(coords)
+                coords, norm_range = normalize_coords(coords, **self.kwargs)
                 np.save(self.coords_norm_range_fname, norm_range)
             else:
                 norm_range = np.load(self.coords_norm_range_fname)
-                coords, _ = normalize_coords(coords, norm_range=norm_range)
+                coords, _ = normalize_coords(coords, norm_range=norm_range, **self.kwargs)
 
         if self.kwargs["coords_encode_method"] == "grid" and \
            self.kwargs["grid_type"] == "HashGrid" and self.kwargs["grid_dim"] == 3:

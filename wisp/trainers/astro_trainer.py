@@ -225,6 +225,7 @@ class AstroTrainer(BaseTrainer):
         if self.extra_args["resume_train"]:
             self.resume_model_fname = self.get_checkpoint_fname(
                 self.extra_args["resume_log_dir"])
+            self.resume_loss_fname = join(self.log_dir, "..", exp_dir, "loss.npy")
 
     def init_loss(self):
         if self.spectra_supervision:
@@ -623,9 +624,11 @@ class AstroTrainer(BaseTrainer):
         """
         try:
             assert(exists(self.resume_model_fname))
-            if self.verbose:
-                log.info(f"resume model found, loading {self.resume_model_fname}")
+            log.info(f"resume model found, loading {self.resume_model_fname}")
             checkpoint = torch.load(self.resume_model_fname)
+
+            if self.plot_loss:
+                self.losses = list(np.load(self.resume_loss_fname))
 
             self.pipeline.load_state_dict(checkpoint["model_state_dict"])
             self.pipeline.eval()
@@ -931,7 +934,7 @@ class AstroTrainer(BaseTrainer):
         self.recon_masks = np.tile(
             self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
 
-        self.dataset.plot_spectrum(
+        metrics = self.dataset.plot_spectrum(
             self.spectra_dir, self.epoch,
             self.extra_args["flux_norm_cho"],
             self.gt_wave, self.gt_fluxes,
@@ -941,6 +944,7 @@ class AstroTrainer(BaseTrainer):
             recon_masks=self.recon_masks,
             clip=self.extra_args["plot_clipped_spectrum"]
         )
+        log.info(f"spectra metrics: {metrics.T}")
 
     def _recon_codebook_spectra_individ(self):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()

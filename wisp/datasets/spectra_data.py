@@ -296,7 +296,7 @@ class SpectraData:
         if self.kwargs["normalize_coords"]:
             assert exists(self.coords_norm_range_fname)
             norm_range = np.load(self.coords_norm_range_fname)
-            coords, _ = normalize_coords(coords, norm_range=norm_range)
+            coords, _ = normalize_coords(coords, norm_range=norm_range, **self.kwargs)
 
         if self.kwargs["coords_encode_method"] == "grid" and \
            self.kwargs["grid_type"] == "HashGrid" and self.kwargs["grid_dim"] == 3:
@@ -1064,6 +1064,9 @@ class SpectraData:
               clip: whether or not we plot spectra within certain range
               masks: not None if clip. use mask to clip flux
               spectra_clipped: whether or not spectra is already clipped to
+
+           @Return
+             metrics: [n_spectra,n_metrics]
         """
         assert not clip or (recon_masks is not None or spectra_clipped)
         calculate_metrics = not is_codebook and (clip or spectra_clipped)
