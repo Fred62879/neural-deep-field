@@ -363,7 +363,7 @@ def define_cmd_line_args():
     data_group.add_argument("--u-band-scale",type=float, default=10**((30-27)/2.5),
                             help="scale value for u band pixel values")
 
-    data_group.add_argument("--train-coords-cho", type=str, choices=["grid","world"])
+    data_group.add_argument("--coords-type", type=str, choices=["img","world"])
     data_group.add_argument("--normalize-coords", action="store_true")
     data_group.add_argument("--gt-img-norm-cho", type=str, default="identity")
     data_group.add_argument("--train-pixels-norm", type=str,

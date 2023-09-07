@@ -46,18 +46,51 @@ def find_closest_tensor(tensor1, tensor2):
     ids = torch.argmin(distances, dim=-1)
     return ids
 
-def get_coords_range(coords):
-    ''' Find min and max of given 2D coords. '''
+def get_coords_norm_range(coords, **kwargs):
+    """ Get normalization range for coordinates.
+        Note: when we are using grid for coord encoding, we make sure
+              i) input coords are image coords (r/c)
+              ii) the norm range is the same on both r and c dimensions
+                  (normed coords range from -1 to 1 on the longer edge,
+                   and range within a smaller range on the shorter edge)
+             s.t. each pixel after normalization is still a square
+    """
     class_name = coords.__class__.__name__
-    if class_name == "ndarray":
+    if class_name == "Tensor":
+        coords = coords.numpy()
+    assert coords.__class__.__name__ == "ndarray"
+
+    if kwargs["coords_encode_method"] == "grid"
+        assert kwargs["coords_type"] == "img"
+
+    if kwargs["coords_type"] == "img":
+        start_row, start_col = min(coords[...,0]), min(coords[...,1])
+        num_rows = max(coords[...,0]) - start_row
+        num_cols = max(coords[...,1]) - start_col
+        edge_len = max(num_rows, num_cols) # norm range is the same
+        norm_range = np.array([start_row, start_row + edge_len,
+                               start_col, start_col + edge_len])
+    elif kwargs["coords_type"] == "world":
+        raise NotImplementedError("Temporarily not support world coords")
         min_ra, max_ra = np.min(coords[...,0]), np.max(coords[...,0])
         min_dec, max_dec = np.min(coords[...,1]), np.max(coords[...,1])
-    elif class_name == "Tensor":
-        min_ra, max_ra = torch.min(coords[...,0]), torch.max(coords[...,0])
-        min_dec, max_dec = torch.min(coords[...,1]), torch.max(coords[...,1])
+        norm_range = np.array([min_ra, max_ra, min_dec, max_dec])
     else:
-        raise NotImplementedError()
-    return np.array([min_ra, max_ra, min_dec, max_dec])
+        raise ValueError()
+    return norm_range
+
+def normalize_coords(coords, norm_range=None, **kwargs):
+    """ Normalize given coords.
+        Currently only supports linear normalization.
+        @Param
+          coords: [...,2] (float32)
+    """
+    if norm_range is None:
+        norm_range = get_coords_norm_range(coords, **kwargs)
+    (lo0, hi0, lo1, hi1) = norm_range
+    coords[...,0] = 2 * (coords[...,0] - lo0) / (hi0 - lo0) - 1
+    coords[...,1] = 2 * (coords[...,1] - lo1) / (hi1 - lo1) - 1
+    return coords, norm_range
 
 def normalize_data(data, norm_cho):
     if norm_cho == "identity":
@@ -71,21 +104,6 @@ def normalize_data(data, norm_cho):
         data = (data - lo) / (hi - lo)
     else: raise ValueError()
     return data
-
-def normalize_coords(coords, coords_range=None):
-    ''' Normalize given coords.
-        Currently only supports linear normalization.
-        @Param
-          coords: [...,2] (float32)
-    '''
-    # coords = coords.copy()
-    if coords_range is None:
-        coords_range = get_coords_range(coords)
-    (min_x, max_x, min_y, max_y) = coords_range
-    coords[...,0] = 2 * (coords[...,0] - min_x) / (max_x - min_x) - 1
-    coords[...,1] = 2 * (coords[...,1] - min_y) / (max_y - min_y) - 1
-    # return np.float32(coords), np.float32(coords_range)
-    return coords, coords_range
 
 def calculate_zscale_ranges(pixels):
     """ Calculate zscale ranges based on given pixels for each bands separately.

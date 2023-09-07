@@ -42,17 +42,17 @@ def get_wave_range_fname(**kwargs):
         kwargs["dataset_path"], "input/wave", kwargs["wave_range_fname"])
     return fname
 
-def get_coords_range_fname(**kwargs):
+def get_coords_norm_range_fname(**kwargs):
     _, img_data_path = set_input_path(
         kwargs["dataset_path"], kwargs["sensor_collection_name"]
     )
     # patch = "full_patch"
     if kwargs["use_full_patch"]: patch = "full_patch"
     else: patch = kwargs["patch_selection_cho"]
-    coords_cho = kwargs["train_coords_cho"]
-    norm_cho = "_normed" if kwargs["normalize_coords"] else ""
+    coords_type = kwargs["coords_type"]
+    norm_str = "_normed" if kwargs["normalize_coords"] else ""
     fname = join(
-        img_data_path, f"coords_range_{patch}{norm_cho}_{coords_cho}.npy")
+        img_data_path, f"coords_norm_range_{patch}{norm_str}_{coords_cho}.npy")
     return fname
 
 def create_patch_fname(tract, patch, band, megau=False, weights=False):

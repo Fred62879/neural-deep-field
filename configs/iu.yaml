@@ -26,8 +26,8 @@ global:
     #tasks: ['main_infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['main_infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['main_infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    tasks: ['train'] #,'recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
-    tasks: ['main_infer','recon_gt_spectra'] #,'save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
+    tasks: ['train','recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
+    #tasks: ['main_infer','recon_gt_spectra'] #,'save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
     #tasks: ['test','recon_gt_spectra','save_redshift','recon_codebook_spectra_individ','save_qtz_weights','recon_img']
 
 optimizer:
@@ -44,7 +44,7 @@ optimizer:
 net:
     nef_type: 'AstroHyperSpectralNerf' #'AstroNerf'
     model_redshift: True
-    redshift_model_method: 'classification' # 'regression'
+    redshift_model_method: 'regression' #'classification' # 'regression'
 
     encode_wave: True
     wave_encode_method: 'positional_encoding'
@@ -163,7 +163,7 @@ trainer:
     log_cli_every: 200
     log_gpu_every: -1
     plot_grad_every: -1
-    save_data_every: -1
+    save_data_every: 200
     save_model_every: 200
     save_as_new: True
 
@@ -196,9 +196,9 @@ trainer:
 
     apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
-    redshift_semi_supervision: True  # -
+    redshift_semi_supervision: False  # -
 
-    train_use_all_wave: False
+    train_use_all_wave: True
     pretrain_use_all_wave: False
     train_num_wave_samples: 50
     pretrain_num_wave_samples: 100
@@ -221,7 +221,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20230901-004812_512_main_train_unconvolved'
+    # infer_log_dir: '20230903-174232_512_main_train_unconv_2k_epochs'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: ['zncc']
     log_pixel_ratio: True
@@ -265,7 +265,7 @@ dataset:
     load_patch_data_cache: True
     dataset_path: '/scratch/projects/vision/data/pdr3'
     wave_range_fname: 'wave_range0.npy'
-    train_coords_cho: "grid"
+    coords_type: "grid"
     normalize_coords: True
     gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
     train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)

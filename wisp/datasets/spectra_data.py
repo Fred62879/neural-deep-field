@@ -14,7 +14,7 @@ from wisp.utils.common import create_patch_uid
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
-    get_coords_range_fname, add_dummy_dim
+    get_coords_norm_range_fname, add_dummy_dim
 
 from pathlib import Path
 from astropy.io import fits
@@ -82,7 +82,7 @@ class SpectraData:
         if suffix != "": suffix = "_" + suffix
 
         self.wave_range_fname = get_wave_range_fname(**self.kwargs)
-        self.coords_range_fname = get_coords_range_fname(**self.kwargs)
+        self.coords_norm_range_fname = get_coords_norm_range_fname(**self.kwargs)
         spectra_cho = self.kwargs["processed_spectra_cho"]
         if self.kwargs["convolve_spectra"]:
             spectra_cho += "_convolved"
@@ -287,16 +287,16 @@ class SpectraData:
     #############
 
     def process_coords(self):
-        if self.kwargs["train_coords_cho"] == "grid":
+        if self.kwargs["coords_type"] == "img":
             coords = self.data["gt_spectra_img_coords"]
-        elif self.kwargs["train_coords_cho"] == "world":
+        elif self.kwargs["coords_type"] == "world":
             coords = self.data["gt_spectra_world_coords"]
         else: raise NotImplementedError
 
         if self.kwargs["normalize_coords"]:
-            assert exists(self.coords_range_fname)
-            coords_range = np.load(self.coords_range_fname)
-            coords, coords_range = normalize_coords(coords, coords_range=coords_range)
+            assert exists(self.coords_norm_range_fname)
+            norm_range = np.load(self.coords_norm_range_fname)
+            coords, _ = normalize_coords(coords, norm_range=norm_range)
 
         if self.kwargs["coords_encode_method"] == "grid" and \
            self.kwargs["grid_type"] == "HashGrid" and self.kwargs["grid_dim"] == 3:
@@ -333,8 +333,8 @@ class SpectraData:
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
         self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids]
         self.data["validation_masks"] = self.data["gt_spectra_plot_mask"][val_ids]
-        if self.kwargs["redshift_semi_supervision"]:
-            self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
+        # if self.kwargs["redshift_semi_supervision"]:
+        self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
 
         self.data["validation_coords"] = self.data["gt_spectra_coords"][val_ids] # [n_valid,n_neighbr**2,2/3]
         # self.data["validation_coords"] = valid_coords.view(-1, valid_coords.shape[-1])[:,None]

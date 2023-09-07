@@ -19,7 +19,7 @@ from wisp.utils.numerical import normalize_coords, normalize, \
 
 from wisp.datasets.patch_data import PatchData
 from wisp.datasets.data_utils import set_input_path, add_dummy_dim, \
-    create_selected_patches_uid, get_coords_range_fname
+    create_selected_patches_uid, get_coords_norm_range_fname
 
 
 class FitsData:
@@ -86,7 +86,7 @@ class FitsData:
         _, img_data_path = set_input_path(dataset_path, self.kwargs["sensor_collection_name"])
         paths = [img_data_path]
 
-        coords_cho = self.kwargs["train_coords_cho"]
+        coords_cho = self.kwargs["coords_type"]
         # suffix that defines that currently selected group of image patches
         if self.kwargs["patch_selection_cho"] is None:
             # concatenate all selected patches together
@@ -99,7 +99,7 @@ class FitsData:
 
         norm_str = self.kwargs["train_pixels_norm"]
         self.coords_fname = join(img_data_path, f"coords{suffix}_{coords_cho}.npy")
-        self.coords_range_fname = get_coords_range_fname(**self.kwargs)
+        self.coords_norm_range_fname = get_coords_norm_range_fname(**self.kwargs)
         self.weights_fname = join(img_data_path, f"weights{suffix}.npy")
         self.headers_fname = join(img_data_path, f"headers{suffix}.txt")
         self.meta_data_fname = join(img_data_path, f"meta_data{suffix}.txt")
@@ -127,7 +127,7 @@ class FitsData:
                                       exists(self.zscale_ranges_fname))) and \
             (not self.load_coords or (exists(self.coords_fname) and \
                                       (not self.kwargs["normalize_coords"] or \
-                                       exists(self.coords_range_fname)))) and \
+                                       exists(self.coords_norm_range_fname)))) and \
             (not self.load_spectra or (exists(self.spectra_id_map_fname) and \
                                        exists(self.spectra_bin_map_fname) and \
                                        exists(self.spectra_pixel_fluxes_fname) and \
@@ -247,7 +247,7 @@ class FitsData:
 
     #     # ra/dec values from spectra data may not be exactly the same as real coords
     #     # this normalized ra/dec may thus be slightly different from real coords
-    #     # (ra_lo, ra_hi, dec_lo, dec_hi) = np.load(self.patch_obj.coords_range_fname)
+    #     # (ra_lo, ra_hi, dec_lo, dec_hi) = np.load(self.patch_obj.coords_norm_range_fname)
     #     # coord_loose = ((ra - ra_lo) / (ra_hi - ra_lo),
     #     #                (dec - dec_lo) / (dec_hi - dec_lo))
 
@@ -635,9 +635,9 @@ class FitsData:
         if self.load_pixels:
             pixels.append(cur_patch.get_pixels())
         if self.load_coords:
-            if self.kwargs["train_coords_cho"] == "grid":
+            if self.kwargs["coords_type"] == "img":
                 coords.append(cur_patch.get_img_coords())
-            elif self.kwargs["train_coords_cho"] == "world":
+            elif self.kwargs["coords_type"] == "world":
                 coords.append(cur_patch.get_world_coords())
             else: raise NotImplementedError
         if self.load_weights:
@@ -654,12 +654,12 @@ class FitsData:
               coords: [num_rows*num_cols,2]
         """
         if self.kwargs["normalize_coords"]:
-            if not exists(self.coords_range_fname):
-                coords, coords_range = normalize_coords(coords)
-                np.save(self.coords_range_fname, coords_range)
+            if not exists(self.coords_norm_range_fname):
+                coords, norm_range = normalize_coords(coords)
+                np.save(self.coords_norm_range_fname, norm_range)
             else:
-                coords_range = np.load(self.coords_range_fname)
-                coords, _ = normalize_coords(coords, coords_range=coords_range)
+                norm_range = np.load(self.coords_norm_range_fname)
+                coords, _ = normalize_coords(coords, norm_range=norm_range)
 
         if self.kwargs["coords_encode_method"] == "grid" and \
            self.kwargs["grid_type"] == "HashGrid" and self.kwargs["grid_dim"] == 3:

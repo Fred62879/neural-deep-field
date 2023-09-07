@@ -95,7 +95,7 @@ class AstroTrainer(BaseTrainer):
         if self.spectra_supervision:
             fields.append("spectra_data")
 
-        if self.pretrain_codebook or self.redshift_semi_supervision:
+        if self.redshift_semi_supervision:
             if self.train_spectra_pixels_only:
                 fields.append("spectra_semi_sup_redshift")
             else:
@@ -153,10 +153,10 @@ class AstroTrainer(BaseTrainer):
             self.apply_gt_redshift = self.extra_args["apply_gt_redshift"]
             self.redshift_unsupervision = self.extra_args["redshift_unsupervision"]
             self.redshift_semi_supervision = self.extra_args["redshift_semi_supervision"]
-            assert self.redshift_semi_supervision
-            # assert sum([
-            #     self.apply_gt_redshift, self.redshift_unsupervision,
-            #     self.redshift_semi_supervision]) <= 1 # at most one of these three can be True
+            # assert self.redshift_semi_supervision
+            assert sum([
+                self.apply_gt_redshift, self.redshift_unsupervision,
+                self.redshift_semi_supervision]) <= 1 # at most one of these three can be True
         else:
             self.apply_gt_redshift, self.redshift_unsupervision, \
                 self.redshift_semi_supervision = False, False, False
