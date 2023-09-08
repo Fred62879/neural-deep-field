@@ -175,19 +175,26 @@ def zscale_img(data, gt):
         data[...,i] = zscale(data[...,i], gt[...,i])
     return data
 
-def calculate_zncc(s1, s2):
+def calculate_zncc(s1, s2, window_size=1):
     """ Calculate zero-mean normalized cross correlation between two signals.
         @Param
           s1, s2: 1D signals of the same length
         @Ref
           https://stackoverflow.com/questions/13439718/how-to-interpret-the-values-returned-by-numpy-correlate-and-numpy-corrcoef
     """
-    assert s1.shape == s2.shape and s1.ndim == 1
+    assert s1.shape == s2.shape and s1.ndim == 1 and window_size >= 1
     # n = len(s2)
     # m1, m2 = np.mean(s1), np.mean(s2)
     # std1, std2 = np.std(s1), np.std(s2)
     # zncc = np.correlate(s1-m1, s2-m2, mode='valid')[0] / (n*(std1*std2))
-    zncc = np.corrcoef(s1, s2)[0,1]
+    if window_size == 1:
+        zncc = np.corrcoef(s1, s2)[0,1]
+    else:
+        zncc = []
+        for i in range(0, window_size, n):
+            lo = i * window_size
+            hi = min(lo + window_size, n)
+            zncc.append(np.corrcoef(s1[lo:hi], s2[lo:hi])[0,1])
     return zncc
 
 def calculate_sam_spectrum(gen, gt, convert_to_degree=False):
@@ -211,7 +218,7 @@ def calculate_ssim(gen, gt):
     return structural_similarity\
         (gt, gen, data_range=rg) #, win_size=gt.shape[1]-1)
 
-def calculate_metric(recon, gt, band, option):
+def calculate_metric(recon, gt, band, option, **kwargs):
     if option == "zncc":
         metric = calculate_zncc(recon, gt)
     elif option == 'mse':
@@ -234,7 +241,7 @@ def calculate_metric(recon, gt, band, option):
         metric = np.median(recon[band])
     return metric
 
-def calculate_metrics(recon, gt, options, zscale=False):
+def calculate_metrics(recon, gt, options, zscale=False, **kwargs):
     """ Calculate metrics and stats of recon w.r.t gt
         @Return
            metrics: [n_metrics(,n_bands)]
@@ -253,9 +260,9 @@ def calculate_metrics(recon, gt, options, zscale=False):
     for i, option in enumerate(options):
         if recon.ndim == 2:
             for band in range(num_bands):
-                metrics[i, band] = calculate_metric(recon, gt, band, option)
+                metrics[i, band] = calculate_metric(recon, gt, band, option, **kwargs)
         else:
-            metrics[i] = calculate_metric(recon, gt, None, option)
+            metrics[i] = calculate_metric(recon, gt, None, option, **kwargs)
     return metrics
 
 '''

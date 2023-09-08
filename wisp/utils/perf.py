@@ -47,21 +47,23 @@ class PerfTimer():
     """Super simple performance timer.
     """
     def __init__(self, activate=False, show_memory=False, print_mode=True):
-        self.prev_time = time.process_time()
-        self.start = torch.cuda.Event(enable_timing=True)
-        self.end = torch.cuda.Event(enable_timing=True)
-        self.prev_time_gpu = self.start.record()
-        self.counter = 0
         self.activate = activate
-        self.show_memory = show_memory
-        self.print_mode = print_mode
+        if self.activate:
+            self.prev_time = time.process_time()
+            self.start = torch.cuda.Event(enable_timing=True)
+            self.end = torch.cuda.Event(enable_timing=True)
+            self.prev_time_gpu = self.start.record()
+            self.counter = 0
+            self.show_memory = show_memory
+            self.print_mode = print_mode
 
     def reset(self):
-        self.counter = 0
-        self.prev_time = time.process_time()
-        self.start = torch.cuda.Event(enable_timing=True)
-        self.end = torch.cuda.Event(enable_timing=True)
-        self.prev_time_gpu = self.start.record()
+        if self.activate:
+            self.counter = 0
+            self.prev_time = time.process_time()
+            self.start = torch.cuda.Event(enable_timing=True)
+            self.end = torch.cuda.Event(enable_timing=True)
+            self.prev_time_gpu = self.start.record()
 
     def check(self, name=None):
         if self.activate:

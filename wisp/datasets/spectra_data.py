@@ -989,7 +989,9 @@ class SpectraData:
 
         if calculate_spectra_metrics:
             metrics = calculate_metrics(
-                recon_flux, gt_flux, self.kwargs["spectra_metric_options"]) # [n_metrics]
+                recon_flux, gt_flux, self.kwargs["spectra_metric_options"],
+                window_size=self.kwargs["spectra_zncc_window_size"]
+            ) # [n_metrics]
         else: metrics = None
 
         return sub_dir, metrics
