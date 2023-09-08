@@ -599,6 +599,7 @@ def define_cmd_line_args():
                              help="print ratio of recon over GT pixel val")
     infer_group.add_argument("--metric-options", nargs="+", choices=["mse","psnr","ssim"])
     infer_group.add_argument("--spectra-metric-options", nargs="+", choices=["zncc"])
+    infer_group.add_argument("--spectra-zncc-window-width", type=float, default=1)
 
     infer_group.add_argument("--infer-selected", action="store_true", default=False,
                              help="infer only selected coords/spectra.")

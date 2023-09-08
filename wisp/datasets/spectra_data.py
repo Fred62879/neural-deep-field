@@ -966,9 +966,28 @@ class SpectraData:
             self.trans_obj.plot_trans(
                 axis=axis, norm_cho=self.kwargs["trans_norm_cho"], color="gray")
 
+        if calculate_spectra_metrics:
+            metrics = calculate_metrics(
+                recon_flux, gt_flux, self.kwargs["spectra_metric_options"],
+                window_width=self.kwargs["spectra_zncc_window_width"]
+            ) # [n_metrics]
+            zncc = metrics[0]
+            #zncc = np.repeat(zncc, self.kwargs["spectra_zncc_window_width"])[:len(recon_flux)]
+            #axis.plot(gt_wave, zncc, color="gray")
+            n = len(recon_flux)
+            los = np.arange(0, n, self.kwargs["spectra_zncc_window_width"])
+            wave_lo = min(gt_wave)
+            for val, lo in zip(zncc, los):
+                hi = min(lo + self.kwargs["spectra_zncc_window_width"], n)
+                val = (val + 1) / 2
+                axis.axvspan(lo + wave_lo, hi + wave_lo, color=str(val))
+            metrics = None
+        else: metrics = None
+        # metrics = np.array(metrics)
+
         axis.set_title(idx)
         if plot_gt_spectrum:
-            axis.plot(gt_wave, gt_flux, color="gray", label="GT")
+            axis.plot(gt_wave, gt_flux, color="black", label="GT")
         if plot_recon_spectrum:
             axis.plot(recon_wave, recon_flux, color="blue", label="Recon.")
 
@@ -986,13 +1005,6 @@ class SpectraData:
         if save_spectra:
             fname = join(cur_spectra_dir, f"spectra_{idx}_{name}")
             np.save(fname, recon_flux)
-
-        if calculate_spectra_metrics:
-            metrics = calculate_metrics(
-                recon_flux, gt_flux, self.kwargs["spectra_metric_options"],
-                window_size=self.kwargs["spectra_zncc_window_size"]
-            ) # [n_metrics]
-        else: metrics = None
 
         return sub_dir, metrics
 
