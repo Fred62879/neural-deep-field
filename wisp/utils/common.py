@@ -16,6 +16,13 @@ from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
+def to_numpy(tensor):
+    class_name = tensor.__class__.__name__
+    if class_name == "Tensor":
+        tensor = tensor.numpy()
+    assert tensor.__class__.__name__ == "ndarray"
+    return tensor
+
 def set_seed(seed: int = 42) -> None:
     random.seed(seed)
     np.random.seed(seed)

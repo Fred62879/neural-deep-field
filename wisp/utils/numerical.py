@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import logging as log
 
+from wisp.utils.common import to_numpy
 from scipy.interpolate import interp1d
 from astropy.visualization import ZScaleInterval
 from skimage.metrics import structural_similarity
@@ -55,10 +56,7 @@ def get_coords_norm_range(coords, **kwargs):
                    and range within a smaller range on the shorter edge)
              s.t. each pixel after normalization is still a square
     """
-    class_name = coords.__class__.__name__
-    if class_name == "Tensor":
-        coords = coords.numpy()
-    assert coords.__class__.__name__ == "ndarray"
+    coords = to_numpy(coords)
 
     if kwargs["coords_encode_method"] == "grid":
         assert kwargs["coords_type"] == "img"

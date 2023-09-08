@@ -489,6 +489,7 @@ class CodebookTrainer(BaseTrainer):
 
     def resume_train(self):
         try:
+            print(self.pretrained_model_fname)
             assert(exists(self.pretrained_model_fname))
             log.info(f"saved model found, loading {self.pretrained_model_fname}")
             checkpoint = torch.load(self.pretrained_model_fname)
@@ -504,6 +505,9 @@ class CodebookTrainer(BaseTrainer):
         except Exception as e:
             log.info(e)
             log.info("start training from begining")
+
+        # update coords (since we use latents from checkpoint as coords)
+        self.configure_dataset()
 
     def calculate_loss(self, data):
         total_loss = 0

@@ -10,7 +10,7 @@ import logging as log
 import matplotlib.pyplot as plt
 
 from wisp.datasets.patch_data import PatchData
-from wisp.utils.common import create_patch_uid
+from wisp.utils.common import create_patch_uid, to_numpy
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
@@ -1106,6 +1106,9 @@ class SpectraData:
             (len(gt_wave) == n and len(gt_fluxes) == n and len(gt_masks) == n)
         assert recon_masks[0] is None or \
             (len(recon_fluxes) == n and len(recon_masks) == n)
+
+        gt_fluxes = to_numpy(gt_fluxes)
+        recon_fluxes = to_numpy(recon_fluxes)
 
         if self.kwargs["plot_spectrum_together"]:
             ncols = min(n, self.kwargs["num_spectrum_per_row"])
