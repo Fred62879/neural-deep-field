@@ -387,7 +387,6 @@ class AstroInferrer(BaseInferrer):
 
     def post_inferrence_selected_coords_partial_model(self):
         self.metrics = np.array(self.metrics) # [n_models,n_spectra,n_metrics]
-        print(self.metrics.shape)
         if len(self.metrics) != 0:
             [ np.save(self.metric_fnames[i], self.metrics[...,i])
               for i in range(self.num_metrics) ]

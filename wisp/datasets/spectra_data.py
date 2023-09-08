@@ -947,6 +947,9 @@ class SpectraData:
                 recon_flux = recon_flux / np.max(recon_flux) * np.max(gt_flux)
             else: raise ValueError()
 
+        if self.kwargs["plot_spectrum_with_sliding_zncc"]:
+            sub_dir += "with_zncc_"
+
         return sub_dir, gt_flux, recon_flux
 
     def plot_and_save_one_spectrum(self, name, spectra_dir, fig, axs, nrows, ncols,
@@ -969,21 +972,29 @@ class SpectraData:
         if calculate_spectra_metrics:
             metrics = calculate_metrics(
                 recon_flux, gt_flux, self.kwargs["spectra_metric_options"],
-                window_width=self.kwargs["spectra_zncc_window_width"]
-            ) # [n_metrics]
-            zncc = metrics[0]
-            #zncc = np.repeat(zncc, self.kwargs["spectra_zncc_window_width"])[:len(recon_flux)]
-            #axis.plot(gt_wave, zncc, color="gray")
-            n = len(recon_flux)
-            los = np.arange(0, n, self.kwargs["spectra_zncc_window_width"])
-            wave_lo = min(gt_wave)
-            for val, lo in zip(zncc, los):
-                hi = min(lo + self.kwargs["spectra_zncc_window_width"], n)
-                val = (val + 1) / 2
-                axis.axvspan(lo + wave_lo, hi + wave_lo, color=str(val))
+                window_width=self.kwargs["spectra_zncc_window_width"]) # [n_metrics]
+
+            if "zncc" in metrics:
+                (zncc, zncc_sliding) = metrics["zncc"]
+                metrics["zncc"] = zncc
+
+                if self.kwargs["plot_spectrum_with_sliding_zncc"]:
+                    zncc_sliding = np.repeat(
+                        zncc_sliding, self.kwargs["spectra_zncc_window_width"]
+                    )[:len(recon_flux)]
+                    axis.plot(gt_wave, zncc_sliding, color="gray")
+
+                    # n = len(recon_flux)
+                    # los = np.arange(0, n, self.kwargs["spectra_zncc_window_width"])
+                    # wave_lo = min(gt_wave)
+                    # for val, lo in zip(zncc_sliding, los):
+                    #     hi = min(lo + self.kwargs["spectra_zncc_window_width"], n)
+                    #     val = (val + 1) / 2
+                    #     axis.axvspan(lo + wave_lo, hi + wave_lo, color=str(val))
+
+            metrics = [v for k,v in metrics.items()]
+        else:
             metrics = None
-        else: metrics = None
-        # metrics = np.array(metrics)
 
         axis.set_title(idx)
         if plot_gt_spectrum:
@@ -1110,9 +1121,10 @@ class SpectraData:
                                 calculate_metrics)
 
         # ids = np.array([10,6,18,15,11,16,14,7])
+        # ids = np.array([4])
         metrics = []
         for idx, cur_plot_data in enumerate(
-            #zip(gt_wave[ids], gt_masks[ids], gt_fluxes[ids], recon_wave[ids], recon_masks[ids], recon_fluxes[ids])
+            # zip(gt_wave[ids], gt_masks[ids], gt_fluxes[ids], recon_wave[ids], recon_masks[ids], recon_fluxes[ids])
             zip(gt_wave, gt_masks, gt_fluxes, recon_wave, recon_masks, recon_fluxes)
         ):
             pargs = process_data(cur_plot_data)

@@ -175,7 +175,16 @@ def zscale_img(data, gt):
         data[...,i] = zscale(data[...,i], gt[...,i])
     return data
 
-def calculate_zncc(s1, s2, window_width=None):
+def calculate_zncc(s1, s2):
+    n = len(s1)
+    m1, m2 = np.mean(s1), np.mean(s2)
+    std1, std2 = np.std(s1), np.std(s2)
+    # zncc = np.sum( (s1-m1)*(s2-m2) ) / (n*(std1*std2)) # i)
+    zncc = np.correlate(s1-m1, s2-m2, mode='valid')[0] / (n*(std1*std2) + 1e-10) # ii)
+    # zncc = np.corrcoef(s1, s2)[0,1] # iii)
+    return zncc
+
+def calculate_zncc_composite(s1, s2, window_width=1):
     """ Calculate zero-mean normalized cross correlation between two signals.
         @Param
           s1, s2: 1D signals of the same length
@@ -183,19 +192,16 @@ def calculate_zncc(s1, s2, window_width=None):
           https://stackoverflow.com/questions/13439718/how-to-interpret-the-values-returned-by-numpy-correlate-and-numpy-corrcoef
     """
     assert s1.shape == s2.shape and s1.ndim == 1 and window_width >= 1
-    n = len(s2)
-    # m1, m2 = np.mean(s1), np.mean(s2)
-    # std1, std2 = np.std(s1), np.std(s2)
-    # zncc = np.correlate(s1-m1, s2-m2, mode='valid')[0] / (n*(std1*std2))
-    if window_width is None:
-        zncc = np.corrcoef(s1, s2)[0,1]
-    else:
-        zncc = []
-        los = np.arange(0, n, window_width)
-        for lo in los:
-            hi = min(lo + window_width, n)
-            zncc.append(np.corrcoef(s1[lo:hi], s2[lo:hi])[0,1])
-    return zncc
+    n = len(s1)
+    zncc = calculate_zncc(s1, s2)
+
+    zncc_sliding = []
+    los = np.arange(0, n, window_width)
+    for lo in los:
+        hi = min(lo + window_width, n)
+        cur_zncc = calculate_zncc(s1[lo:hi], s2[lo:hi])
+        zncc_sliding.append(cur_zncc)
+    return (zncc, zncc_sliding)
 
 def calculate_sam_spectrum(gen, gt, convert_to_degree=False):
     numerator = np.sum(np.multiply(gt, gen))
@@ -220,7 +226,7 @@ def calculate_ssim(gen, gt):
 
 def calculate_metric(recon, gt, band, option, **kwargs):
     if option == "zncc":
-        metric = calculate_zncc(recon, gt, **kwargs)
+        metric = calculate_zncc_composite(recon, gt, **kwargs)
     elif option == 'mse':
         metric = calculate_mse(recon[band], gt[band])
     elif option == 'psnr':
@@ -247,25 +253,18 @@ def calculate_metrics(recon, gt, options, zscale=False, **kwargs):
            metrics: [n_metrics(,n_bands)]
     """
     assert recon.shape == gt.shape
-
     if recon.ndim == 2:
         num_bands = len(recon)
-        #metrics = np.zeros((len(options), num_bands))
-        if zscale:
-            recon = zscale_img(recon, gt)
-    else:
-        assert recon.ndim == 1
-        #metrics = np.zeros(len(options))
+        if zscale: recon = zscale_img(recon, gt)
+    else: assert recon.ndim == 1
 
-    metrics = []
+    metrics = {}
     for i, option in enumerate(options):
         if recon.ndim == 2:
             for band in range(num_bands):
-                #metrics[i, band] = calculate_metric(recon, gt, band, option, **kwargs)
-                metrics.append(calculate_metric(recon, gt, band, option, **kwargs))
+                metrics[option].append(calculate_metric(recon, gt, band, option, **kwargs))
         else:
-            # metrics[i] = calculate_metric(recon, gt, None, option, **kwargs)
-            metrics.append(calculate_metric(recon, gt, None, option, **kwargs))
+            metrics[option] = calculate_metric(recon, gt, None, option, **kwargs)
     return metrics
 
 '''

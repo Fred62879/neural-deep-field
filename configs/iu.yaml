@@ -251,6 +251,7 @@ infer:
     plot_spectrum_with_gt: True
     plot_spectrum_with_recon: True
     plot_spectrum_with_trans: False
+    plot_spectrum_with_sliding_zncc: True
     average_neighbour_spectra: True
     infer_spectra_individually: False
 

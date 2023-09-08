@@ -264,8 +264,8 @@ class CodebookTrainer(BaseTrainer):
     def train(self):
         self.begin_train()
 
-        for epoch in tqdm(range(self.num_epochs + 1)):
-        # for epoch in range(self.num_epochs + 1):
+        # for epoch in tqdm(range(self.num_epochs + 1)):
+        for epoch in range(self.num_epochs + 1):
             self.begin_epoch()
             self.timer.check("begun epoch")
 

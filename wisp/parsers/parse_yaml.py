@@ -627,6 +627,7 @@ def define_cmd_line_args():
     infer_group.add_argument("--plot-spectrum-with-gt", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-recon", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-trans", action="store_true")
+    infer_group.add_argument("--plot-spectrum-with-sliding-zncc", action="store_true")
     infer_group.add_argument("--plot-spectrum-together", action="store_true")
     infer_group.add_argument("--infer-spectra-individually", action="store_true")
     infer_group.add_argument("--codebook-spectra-clip-range", nargs="+")
