@@ -180,6 +180,8 @@ class CodebookTrainer(BaseTrainer):
                 dnames.sort()
                 pretrained_model_dir = join(self.log_dir, "..", dnames[-2])
 
+            self.resume_loss_fname = join(pretrained_model_dir, "loss.npy")
+
             pretrained_model_dir = join(pretrained_model_dir, "models")
 
             if self.extra_args["pretrained_model_name"] is not None:
@@ -501,6 +503,9 @@ class CodebookTrainer(BaseTrainer):
             # b = a["state"];c = a["param_groups"];print(b[0])
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             log.info("resume training")
+
+            if self.plot_loss:
+                self.losses = list(np.load(self.resume_loss_fname))
 
         except Exception as e:
             log.info(e)
