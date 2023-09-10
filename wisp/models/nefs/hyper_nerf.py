@@ -92,7 +92,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
     def hyperspectral(self, coords, wave, wave_range,
                       trans=None, nsmpl=None,
                       specz=None, sup_id=None,
-                      full_wave=None, num_spectra_coords=-1,
+                      full_wave=None, num_sup_spectra=-1,
                       qtz_args=None, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
@@ -132,7 +132,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
 
         self.hps_decoder(latents, wave, trans, nsmpl, wave_range,
                          qtz_args=qtz_args, ret=ret, full_wave=full_wave,
-                         codebook=self.codebook, num_spectra_coords=num_spectra_coords)
+                         codebook=self.codebook, num_sup_spectra=num_sup_spectra)
         timer.check("nef::hyperspectral decoding done")
 
         if self.codebook is not None:

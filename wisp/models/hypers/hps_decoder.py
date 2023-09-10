@@ -155,7 +155,7 @@ class HyperSpectralDecoder(nn.Module):
     def forward(self, latents,
                 wave, trans, nsmpl, full_wave_bound,
                 trans_mask=None,
-                full_wave=None, num_spectra_coords=-1,
+                full_wave=None, num_sup_spectra=-1,
                 codebook=None, qtz_args=None, ret=None):
         """ @Param
               latents:   (encoded or original) coords or logits for quantization.
@@ -191,14 +191,14 @@ class HyperSpectralDecoder(nn.Module):
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.reset()
 
-        # spectra supervision (no pretrain in this case)
-        if num_spectra_coords > 0:
+        if num_sup_spectra > 0:
             # forward the last #num_spectra_coords latents with all lambda
+            print(latents.shape, full_wave.shape)
             self.forward_with_full_wave(
-                latents, full_wave, full_wave_bound, num_spectra_coords,
+                latents, full_wave, full_wave_bound, num_sup_spectra,
                 ret, codebook, qtz_args)
 
-            latents = latents[:-num_spectra_coords]
+            latents = latents[:-num_sup_spectra]
             if latents.shape[0] == 0: return
 
         self.reconstruct_spectra(

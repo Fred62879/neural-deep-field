@@ -191,7 +191,7 @@ class PatchData:
 
     def get_spectra_img_coords(self, idx=None):
         """ Get img coords for spectra pixels.
-            Currently only used for marking spectra on images.
+            # Currently only used for marking spectra on images.
         """
         if idx is not None:
             return self.data["spectra_img_coords"][idx]

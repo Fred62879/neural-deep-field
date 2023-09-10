@@ -79,6 +79,11 @@ class AstroDataset(Dataset):
         """
         self.mode = mode
 
+    def set_patch(self, patch_obj):
+        """ Set current patch to process.
+        """
+        self.patch_obj = patch_obj
+
     def set_length(self, length):
         self.dataset_length = length
 
@@ -297,7 +302,8 @@ class AstroDataset(Dataset):
         out["wave_range"] = self.get_wave_range()
 
         if self.wave_source == "full_spectra":
-            # for codebook spectra recon
+            # for codebook spectra recon (according to emitted wave)
+            # doesn't consider effect of redshift on each spectra
             mask = self.get_full_spectra_wave_mask()
             full_wave = self.get_full_spectra_wave_coverage()
 
@@ -361,45 +367,24 @@ class AstroDataset(Dataset):
             raise ValueError("Unsupported wave data source.")
 
     def get_spectra_data(self, out):
-        """ Get unbatched spectra data during
-              i)   codebook pretrain or
-              ii)  main train after pretrain
+        """ Get unbatched spectra data during main train for spectra supervision only.
             If we train on large amount of spectra, use batched data instead.
         """
-        # assert(self.kwargs["pretrain_codebook"] ^ self.kwargs["spectra_supervision"])
+        assert self.mode == "main_train" and self.kwargs["spectra_supervision"]
 
-        if self.mode == "codebook_pretrain":
-            assert self.kwargs["pretrain_codebook"]:
+        out["full_wave"] = self.get_full_wave()
 
-            n = self.spectra_dataset.get_num_gt_spectra()
-            out["coords"] = self.data["spectra_latents"][:n]
-            if self.kwargs["codebook_pretrain_pixel_supervision"]:
-                out["spectra_sup_pixels"] = self.spectra_dataset.get_supervision_pixels()
+        spectra_coords = torch.FloatTensor(self.patch_obj.get_spectra_img_coords())[:,None]
+        if "coords" in out:
+            out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
+        else: out["coords"] = spectra_coords
+        print(out["coords"].shape)
+        out["spectra_masks"] = self.patch_obj.get_spectra_pixel_masks()
+        out["spectra_fluxes"] = self.patch_obj.get_spectra_pixel_fluxes()
 
-            # get only supervision spectra (not all gt spectra) for loss calculation
-            out["spectra_sup_fluxes"] = \
-                self.spectra_dataset.get_supervision_fluxes()
-            out["spectra_sup_redshift"] = \
-                self.spectra_dataset.get_supervision_redshift()
-            # out["spectra_sup_wave_bound_ids"] = \
-            #     self.spectra_dataset.get_supervision_wave_bound_ids()
-
-        elif self.mode == "main_train":
-            assert self.kwargs["spectra_supervision"]:
-            # out["full_wave"] = self.get_full_wave()
-
-            # get all coords to plot all spectra (gt, dummy, incl. neighbours)
-            spectra_coords = self.spectra_dataset.get_spectra_grid_coords()
-            if "coords" in out:
-                out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
-            else: out["coords"] = spectra_coords
-
-            # the first #num_supervision_spectra are gt coords for supervision
-            # the others are forwarded only for spectrum plotting
-            out["num_spectra_coords"] = len(spectra_coords)
-
-            if self.kwargs["redshift_semi_supervision"]:
-                out["spectra_sup_redshift"] = self.spectra_dataset.get_supervision_redshift()
+        # the first #num_supervision_spectra are gt coords for supervision
+        # the others are forwarded only for spectrum plotting
+        out["num_sup_spectra"] = len(spectra_coords)
 
     def get_redshift_data(self, out):
         """ From currently sampled pixels, pick spectra pixels and get corresponding redshift.

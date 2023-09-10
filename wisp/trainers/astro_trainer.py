@@ -65,9 +65,9 @@ class AstroTrainer(BaseTrainer):
         self.init_loss()
         self.init_optimizer()
 
-        self.configure_dataset()
-        self.set_num_batches() #max_bsz=512)
-        self.init_dataloader()
+        # self.configure_dataset()
+        # self.set_num_batches() #max_bsz=512)
+        # self.init_dataloader()
 
         self.total_steps = 0
 
@@ -82,46 +82,6 @@ class AstroTrainer(BaseTrainer):
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.pipeline.parameters()))
         )
-
-    def configure_dataset(self):
-        """ Configure dataset with selected fields and set length accordingly.
-        """
-        fields = []
-
-        if self.space_dim == 3:
-            fields.append("wave_data")
-            self.dataset.set_wave_source("trans")
-
-        if self.spectra_supervision:
-            fields.append("spectra_data")
-
-        if self.redshift_semi_supervision:
-            if self.train_spectra_pixels_only:
-                fields.append("spectra_semi_sup_redshift")
-            else:
-                fields.extend([
-                    "spectra_id_map","spectra_bin_map","redshift_data"])
-
-        if self.pixel_supervision or self.train_spectra_pixels_only:
-            fields.append("coords")
-            if self.pixel_supervision:
-                fields.append("pixels")
-                if self.weight_train:
-                    fields.append("weights")
-                if self.spectral_inpaint:
-                    pass
-            elif self.train_spectra_pixels_only:
-                fields.append("spectra_val_pixels")
-
-        length = self.get_dataset_length()
-
-        self.dataset.set_length(length)
-        self.dataset.set_fields(fields)
-        self.dataset.set_mode("main_train")
-        self.dataset.toggle_wave_sampling(
-            sample_wave=not self.extra_args["train_use_all_wave"]
-        )
-        self.set_coords()
 
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
@@ -244,26 +204,6 @@ class AstroTrainer(BaseTrainer):
                                self.extra_args["relative_inpaint_bands"])
             self.pixel_loss = loss
 
-    def init_dataloader(self):
-        """ (Re-)Initialize dataloader.
-        """
-        if self.shuffle_dataloader: sampler_cls = RandomSampler
-        else: sampler_cls = SequentialSampler
-        # sampler_cls = SequentialSampler
-        # sampler_cls = RandomSampler
-
-        self.train_data_loader = DataLoader(
-            self.dataset,
-            batch_size=None,
-            sampler=BatchSampler(
-                sampler_cls(self.dataset),
-                batch_size=self.batch_size,
-                drop_last=self.dataloader_drop_last
-            ),
-            pin_memory=True,
-            num_workers=self.extra_args["dataset_num_workers"]
-        )
-
     def init_optimizer(self):
         if self.pretrain_codebook:
             self.init_optimizer_off_pretrain()
@@ -274,15 +214,17 @@ class AstroTrainer(BaseTrainer):
     # Training logic
     #############
 
-    def begin_train(self):
+    def begin_train(self, i, tract, patch):
+        self.get_cur_patch_data(i, tract, patch)
+        self.configure_dataset()
+        self.set_num_batches()
+        self.init_dataloader()
+
         if self.plot_loss:
             self.losses = []
 
         if self.extra_args["resume_train"]:
             self.resume_train()
-
-        # self.scene_state.optimization.running = True
-        # log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
 
     def train(self):
         self.timer.reset()
@@ -290,10 +232,7 @@ class AstroTrainer(BaseTrainer):
         for i, (tract, patch) in enumerate(zip(
                 self.extra_args["tracts"], self.extra_args["patches"]
         )):
-            self.get_cur_patch_data(i, tract, patch)
-            self.timer.check("got current patch data")
-
-            self.begin_train()
+            self.begin_train(i, tract, patch)
             self.timer.check("train begun for current patch")
 
             for epoch in range(self.num_epochs + 1):
@@ -330,25 +269,6 @@ class AstroTrainer(BaseTrainer):
 
         if self.extra_args["log_gpu_every"] != -1:
             nvidia_smi.nvmlShutdown()
-
-    #############
-    # Get data for cur Patch
-    #############
-
-    def get_cur_patch_data(self, i, tract, patch):
-        self.cur_patch = PatchData(
-            tract, patch,
-            load_spectra=self.load_spectra,
-            cutout_num_rows=self.extra_args["patch_cutout_num_rows"][i],
-            cutout_num_cols=self.extra_args["patch_cutout_num_cols"][i],
-            cutout_start_pos=self.extra_args["patch_cutout_start_pos"][i],
-            full_patch=self.extra_args["use_full_patch"],
-            spectra_obj=self.dataset.get_spectra_data_obj(),
-            **self.extra_args
-        )
-        self.cur_patch_uid = create_patch_uid(tract, patch)
-        if self.load_spectra:
-            self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
 
     #############
     # Epoch begin and end
@@ -513,7 +433,136 @@ class AstroTrainer(BaseTrainer):
         pass
 
     #############
-    # Helper methods
+    # Data Helpers
+    #############
+
+    def get_cur_patch_data(self, i, tract, patch):
+        self.cur_patch = PatchData(
+            tract, patch,
+            load_spectra=self.load_spectra,
+            cutout_num_rows=self.extra_args["patch_cutout_num_rows"][i],
+            cutout_num_cols=self.extra_args["patch_cutout_num_cols"][i],
+            cutout_start_pos=self.extra_args["patch_cutout_start_pos"][i],
+            full_patch=self.extra_args["use_full_patch"],
+            spectra_obj=self.dataset.get_spectra_data_obj(),
+            **self.extra_args
+        )
+        self.dataset.set_patch(self.cur_patch)
+
+        self.cur_patch_uid = create_patch_uid(tract, patch)
+        if self.load_spectra:
+            self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
+
+    def init_dataloader(self):
+        """ (Re-)Initialize dataloader.
+        """
+        if self.shuffle_dataloader: sampler_cls = RandomSampler
+        else: sampler_cls = SequentialSampler
+        # sampler_cls = SequentialSampler
+        # sampler_cls = RandomSampler
+
+        self.train_data_loader = DataLoader(
+            self.dataset,
+            batch_size=None,
+            sampler=BatchSampler(
+                sampler_cls(self.dataset),
+                batch_size=self.batch_size,
+                drop_last=self.dataloader_drop_last
+            ),
+            pin_memory=True,
+            num_workers=self.extra_args["dataset_num_workers"]
+        )
+
+    def set_num_batches(self, max_bsz=None):
+        """ Set number of batches/iterations and batch size for each epoch.
+            At certain epochs, we may not need all data and/or all wave
+              and can break before iterating thru all data.
+        """
+        length = self.get_dataset_length()
+        if not self.use_all_pixels:
+            length = int(length * self.extra_args["train_pixel_ratio"])
+
+        self.batch_size = min(self.extra_args["batch_size"], length)
+        if max_bsz is not None: # when we use all wave, we need to control bsz
+            self.batch_size = min(self.batch_size, max_bsz)
+
+        if self.dataloader_drop_last:
+            self.num_iterations_cur_epoch = int(length // self.batch_size)
+        else:
+            self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))
+        log.info(f"num batches updated to: {self.num_iterations_cur_epoch}.")
+
+    def configure_dataset(self):
+        """ Configure dataset with selected fields and set length accordingly.
+        """
+        fields = []
+
+        if self.space_dim == 3:
+            fields.append("wave_data")
+            self.dataset.set_wave_source("trans")
+
+        if self.spectra_supervision:
+            fields.append("spectra_data")
+
+        if self.redshift_semi_supervision:
+            if self.train_spectra_pixels_only:
+                fields.append("spectra_semi_sup_redshift")
+            else:
+                fields.extend([
+                    "spectra_id_map","spectra_bin_map","redshift_data"])
+
+        if self.pixel_supervision or self.train_spectra_pixels_only:
+            fields.append("coords")
+            if self.pixel_supervision:
+                fields.append("pixels")
+                if self.weight_train:
+                    fields.append("weights")
+                if self.spectral_inpaint:
+                    pass
+            elif self.train_spectra_pixels_only:
+                fields.append("spectra_val_pixels")
+
+        length = self.get_dataset_length()
+
+        self.dataset.set_length(length)
+        self.dataset.set_fields(fields)
+        self.dataset.set_mode("main_train")
+        self.dataset.toggle_wave_sampling(
+            sample_wave=not self.extra_args["train_use_all_wave"]
+        )
+        self.set_coords()
+
+    def set_coords(self):
+        if self.train_spectra_pixels_only:
+            pixel_id = get_neighbourhood_center_pixel_id(
+                self.extra_args["spectra_neighbour_size"])
+            coords = self.dataset.get_validation_spectra_coords()[:,pixel_id:pixel_id+1]
+            self.dataset.set_coords_source("spectra_coords")
+            self.dataset.set_hardcode_data("spectra_coords", coords)
+        else:
+            self.dataset.set_coords_source("fits")
+
+    def get_dataset_length(self):
+        """ Get length of dataset based on training tasks.
+            If we do pixel supervision, we use #coords as length and don't
+              count #spectra coords as they are included every batch.
+            Otherwise, when we do spectra supervision only, we need to
+              set #spectra coords as dataset length.
+            (TODO: we assume that #spectra coords is far less
+                   than batch size, which may not be the case soon)
+        """
+        if self.pixel_supervision:
+            length = self.dataset.get_num_coords()
+        # elif self.spectra_supervision:
+        #     length = self.dataset.get_num_spectra_coords()
+        elif self.train_spectra_pixels_only:
+            length = self.dataset.get_num_validation_spectra()
+        else:
+            raise ValueError("No training tasks to perform.")
+        return length
+
+    #############
+    # Train Helpers
     #############
 
     def init_optimizer_no_pretrain(self):
@@ -570,53 +619,6 @@ class AstroTrainer(BaseTrainer):
         self.optimizer = self.optim_cls(params, **self.optim_params)
         if self.verbose:
             log.info(self.optimizer)
-
-    def set_coords(self):
-        if self.train_spectra_pixels_only:
-            pixel_id = get_neighbourhood_center_pixel_id(
-                self.extra_args["spectra_neighbour_size"])
-            coords = self.dataset.get_validation_spectra_coords()[:,pixel_id:pixel_id+1]
-            self.dataset.set_coords_source("spectra_coords")
-            self.dataset.set_hardcode_data("spectra_coords", coords)
-        else:
-            self.dataset.set_coords_source("fits")
-
-    def set_num_batches(self, max_bsz=None):
-        """ Set number of batches/iterations and batch size for each epoch.
-            At certain epochs, we may not need all data and/or all wave
-              and can break before iterating thru all data.
-        """
-        length = self.get_dataset_length()
-        if not self.use_all_pixels:
-            length = int(length * self.extra_args["train_pixel_ratio"])
-        self.batch_size = min(self.extra_args["batch_size"], length)
-        if max_bsz is not None: # when we use all wave, we need to control bsz
-            self.batch_size = min(self.batch_size, max_bsz)
-        if self.dataloader_drop_last:
-            self.num_iterations_cur_epoch = int(length // self.batch_size)
-        else:
-            self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))
-
-        log.info(f"num batches updated to: {self.num_iterations_cur_epoch}.")
-
-    def get_dataset_length(self):
-        """ Get length of dataset based on training tasks.
-            If we do pixel supervision, we use #coords as length and don't
-              count #spectra coords as they are included every batch.
-            Otherwise, when we do spectra supervision only, we need to
-              set #spectra coords as dataset length.
-            (TODO: we assume that #spectra coords is far less
-                   than batch size, which may not be the case soon)
-        """
-        if self.pixel_supervision:
-            length = self.dataset.get_num_coords()
-        # elif self.spectra_supervision:
-        #     length = self.dataset.get_num_spectra_coords()
-        elif self.train_spectra_pixels_only:
-            length = self.dataset.get_num_validation_spectra()
-        else:
-            raise ValueError("No training tasks to perform.")
-        return length
 
     def resume_train(self):
         """ Resume training from saved model.
@@ -727,11 +729,13 @@ class AstroTrainer(BaseTrainer):
         # ii) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
         if self.spectra_supervision:
-            gt_spectra = data["gt_spectra"]
+            gt_spectra = data["spectra_fluxes"]
+            n = data["num_sup_spectra"]
 
             # todo: efficiently slice spectra with different bound
-            (lo, hi) = data["spectra_supervision_wave_bound_ids"][0]
-            recon_spectra = ret["spectra"][:self.num_supervision_spectra_upper_bound,lo:hi]
+            recon_spectra = ret["spectra"] #[:self.num_supervision_spectra_upper_bound,lo:hi]
+            print(gt_spectra.shape, recon_spectra.shape)
+            assert 0
 
             if len(recon_spectra) == 0:
                 spectra_loss = 0
@@ -903,6 +907,7 @@ class AstroTrainer(BaseTrainer):
 
     def _recon_gt_spectra(self):
         if self.train_spectra_pixels_only:
+            # todo, use spectra within current patch
             num_spectra = self.dataset.get_num_validation_spectra()
             val_spectra = self.dataset.get_validation_spectra()
             self.gt_wave = val_spectra[:,0]

@@ -236,7 +236,7 @@ def forward(
         if spectra_supervision:
             net_args["full_wave"] = data["full_wave"]
             # num of coords for gt, dummy (incl. neighbours) spectra
-            net_args["num_spectra_coords"] = data["num_spectra_coords"]
+            net_args["num_sup_spectra"] = data["num_sup_spectra"]
         if qtz:
             qtz_args = defaultdict(lambda: False)
             if qtz_strategy == "soft":
