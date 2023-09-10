@@ -456,7 +456,7 @@ def define_cmd_line_args():
 
     train_group.add_argument("--trainer-type", type=str, help="Trainer class to use")
 
-    data_group.add_argument("--plot-loss", action="store_true")
+    train_group.add_argument("--plot-loss", action="store_true")
     train_group.add_argument("--num-epochs", type=int, default=250,
                              help="Number of epochs to run the training.")
     train_group.add_argument("--batch-size", type=int, default=512,
@@ -500,6 +500,7 @@ def define_cmd_line_args():
                              help="ratio of (unmasked) pixels used for training per epoch")
     # train_group.add_argument("--masked_pixl_ratio_per_epoch", type=float, default=1,
     #                          help="ratio of masked pixels used for spectral inpaint training per epoch")
+    train_group.add_argument("--main-train-frozen-layer", nargs="+")
 
     train_group.add_argument("--batched-pretrain", action="store_true")
     train_group.add_argument("--pretrain-codebook", action="store_true")

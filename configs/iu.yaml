@@ -26,8 +26,8 @@ global:
     #tasks: ['main_infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['main_infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['main_infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    tasks: ['train'] #,'recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
-    tasks: ['main_infer','recon_gt_spectra','save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
+    tasks: ['train','recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
+    #tasks: ['main_infer','recon_gt_spectra','save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
     #tasks: ['test','recon_gt_spectra','save_redshift','recon_codebook_spectra_individ','save_qtz_weights','recon_img']
 
 optimizer:
@@ -107,8 +107,8 @@ decoder:
 qtz:
     quantization_strategy: 'soft'
     quantization_calculate_loss: False # only if hard qtz
-    qtz_latent_dim: 16
-    qtz_num_embed: 4
+    qtz_latent_dim: 32
+    qtz_num_embed: 16
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
@@ -163,7 +163,7 @@ trainer:
     log_cli_every: 200
     log_gpu_every: -1
     plot_grad_every: -1
-    save_data_every: -1
+    save_data_every: 200
     save_model_every: 200
     save_as_new: True
 
@@ -190,15 +190,17 @@ trainer:
     uniform_sample_wave: True
     mixture_avg_per_band: True
 
+    main_train_frozen_layer: ["nef.codebook.weight","spectra_decoder"]
+
     #### ******** Constantly modify ********
     pixel_supervision: False          # these two conflict
-    train_spectra_pixels_only: True #  each other
+    train_spectra_pixels_only: True   #  each other
 
     apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
     redshift_semi_supervision: False # -
 
-    train_use_all_wave: False
+    train_use_all_wave: True
     pretrain_use_all_wave: False
     train_num_wave_samples: 50
     pretrain_num_wave_samples: 100
@@ -207,8 +209,8 @@ trainer:
     # resume_log_dir: '20230907-113007'
 
     pretrain_codebook: True         # these two conflict
-    spectra_supervision: False      #  each other
-    pretrain_log_dir: '20230907-194249_pretrain_4_codes_6k+_spectra_30k_epochs_conv'
+    spectra_supervision: True       #  each other
+    pretrain_log_dir: '20230907-201838_pretrain_16_codes_6k+_spectra_30k_epochs_conv'
     pretrained_model_name: 'model-ep30000-it0.pth'
     #### ***********************************
 

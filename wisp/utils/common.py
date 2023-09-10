@@ -258,7 +258,15 @@ def load_layer_weights(checkpoint, layer_identifier):
             return p
     assert(False)
 
-def load_pretrained_model_weights(model, pretrained_state):
+def includes_layer(target_layers, source_layer):
+    """ Determin if source_layer is present in target_layers.
+        Note: target_layers are generally abbreviations of source_layer.
+    """
+    for target_layer in target_layers:
+        if target_layer in source_layer: return True
+    return False
+
+def load_pretrained_model_weights(model, pretrained_state, shared_layer_names):
     """ Load weights from pretrained model.
         Loading is performed for only layers in both the given model and
           the pretrained state.
@@ -266,7 +274,7 @@ def load_pretrained_model_weights(model, pretrained_state):
     pretrained_dict = {}
     cur_state = model.state_dict()
     for n in cur_state.keys():
-        if n in pretrained_state:
+        if n in pretrained_state and includes_layer(shared_layer_names, n):
             pretrained_dict[n] = pretrained_state[n]
         else: pretrained_dict[n] = cur_state[n]
     model.load_state_dict(pretrained_dict)

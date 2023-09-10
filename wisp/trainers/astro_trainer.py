@@ -563,10 +563,9 @@ class AstroTrainer(BaseTrainer):
 
         params.append({"params": grid_params,
                        "lr": self.extra_args["grid_lr"] * self.grid_lr_weight})
-        params.append({"params": scaler_params, "lr": self.extra_args["lr"]})
-        if self.redshift_semi_supervision:
-            params.append({"params": redshift_params, "lr": self.extra_args["lr"]})
         params.append({"params": logit_params, "lr": self.extra_args["lr"]})
+        params.append({"params": scaler_params, "lr": self.extra_args["lr"]})
+        params.append({"params": redshift_params, "lr": self.extra_args["lr"]})
 
         self.optimizer = self.optim_cls(params, **self.optim_params)
         if self.verbose:
@@ -656,10 +655,13 @@ class AstroTrainer(BaseTrainer):
             log.info(f"pretrained model found, loading {self.pretrained_model_fname}")
 
             checkpoint = torch.load(self.pretrained_model_fname)
-            load_pretrained_model_weights(self.pipeline, checkpoint["model_state_dict"])
+            load_pretrained_model_weights(
+                self.pipeline, checkpoint["model_state_dict"],
+                set(self.extra_args["main_train_frozen_layer"])
+            )
 
             self.pipeline.train()
-            if self.verbose: log.info("loaded pretrained model")
+            log.info("loaded pretrained model")
 
         except Exception as e:
             log.info(e)
