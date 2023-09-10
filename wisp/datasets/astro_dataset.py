@@ -363,15 +363,14 @@ class AstroDataset(Dataset):
     def get_spectra_data(self, out):
         """ Get unbatched spectra data during
               i)   codebook pretrain or
-              ii)  main train after pretrain or
-              iii) spectra supervision training (without pretrain)
-            Used only with very small amount of spectra.
+              ii)  main train after pretrain
             If we train on large amount of spectra, use batched data instead.
         """
-        assert(self.kwargs["pretrain_codebook"] ^ self.kwargs["spectra_supervision"])
+        # assert(self.kwargs["pretrain_codebook"] ^ self.kwargs["spectra_supervision"])
 
-        if self.kwargs["pretrain_codebook"]:
-            assert self.mode == "codebook_pretrain"
+        if self.mode == "codebook_pretrain":
+            assert self.kwargs["pretrain_codebook"]:
+
             n = self.spectra_dataset.get_num_gt_spectra()
             out["coords"] = self.data["spectra_latents"][:n]
             if self.kwargs["codebook_pretrain_pixel_supervision"]:
@@ -382,12 +381,12 @@ class AstroDataset(Dataset):
                 self.spectra_dataset.get_supervision_fluxes()
             out["spectra_sup_redshift"] = \
                 self.spectra_dataset.get_supervision_redshift()
-            out["spectra_sup_wave_bound_ids"] = \
-                self.spectra_dataset.get_supervision_wave_bound_ids()
+            # out["spectra_sup_wave_bound_ids"] = \
+            #     self.spectra_dataset.get_supervision_wave_bound_ids()
 
-        elif self.kwargs["spectra_supervision"]:
-            assert self.mode == "main_train"
-            out["full_wave"] = self.get_full_wave()
+        elif self.mode == "main_train":
+            assert self.kwargs["spectra_supervision"]:
+            # out["full_wave"] = self.get_full_wave()
 
             # get all coords to plot all spectra (gt, dummy, incl. neighbours)
             spectra_coords = self.spectra_dataset.get_spectra_grid_coords()

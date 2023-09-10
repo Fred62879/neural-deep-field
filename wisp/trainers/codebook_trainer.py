@@ -88,18 +88,12 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_mode("codebook_pretrain")
 
         # set required fields from dataset
-        fields = ["coords","wave_data"]
-        if self.extra_args["batched_pretrain"]:
-            fields.extend([
-                "spectra_sup_data",
-                "spectra_sup_masks",
-                "spectra_sup_redshift"
-            ])
-            if self.pixel_supervision:
-                fields.append("spectra_sup_pixels")
-        else:
-            fields.append("spectra_data")
-
+        fields = ["coords","wave_data",
+                  "spectra_sup_data",
+                  "spectra_sup_masks",
+                  "spectra_sup_redshift"]
+        if self.pixel_supervision:
+            fields.append("spectra_sup_pixels")
         self.dataset.set_fields(fields)
 
         # use original spectra wave

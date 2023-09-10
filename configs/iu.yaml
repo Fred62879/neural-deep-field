@@ -171,7 +171,6 @@ trainer:
     train_pixel_ratio: 1
     gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_sup_data','spectra_sup_masks','spectra_sup_pixels','spectra_sup_redshift','spectra_semi_sup_redshift','spectra_val_redshift','masks','spectra_val_pixels','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift']
 
-    batched_pretrain: True
     learn_spectra_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
 

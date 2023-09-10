@@ -502,7 +502,6 @@ def define_cmd_line_args():
     #                          help="ratio of masked pixels used for spectral inpaint training per epoch")
     train_group.add_argument("--main-train-frozen-layer", nargs="+")
 
-    train_group.add_argument("--batched-pretrain", action="store_true")
     train_group.add_argument("--pretrain-codebook", action="store_true")
     train_group.add_argument("--learn-spectra-within-wave-range", action="store_true")
     train_group.add_argument("--codebook-pretrain-pixel-supervision", action="store_true")

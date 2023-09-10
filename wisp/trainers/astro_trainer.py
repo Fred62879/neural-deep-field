@@ -610,8 +610,8 @@ class AstroTrainer(BaseTrainer):
         """
         if self.pixel_supervision:
             length = self.dataset.get_num_coords()
-        elif self.spectra_supervision:
-            length = self.dataset.get_num_spectra_coords()
+        # elif self.spectra_supervision:
+        #     length = self.dataset.get_num_spectra_coords()
         elif self.train_spectra_pixels_only:
             length = self.dataset.get_num_validation_spectra()
         else:
@@ -699,7 +699,7 @@ class AstroTrainer(BaseTrainer):
                       save_codebook_spectra=self.save_data and \
                                             self.recon_codebook_spectra_individ
         )
-        self.timer.check('forward')
+        self.timer.check("forward")
 
         # i) reconstruction loss (taking inpaint into account)
         recon_loss, recon_pixels = 0, None
