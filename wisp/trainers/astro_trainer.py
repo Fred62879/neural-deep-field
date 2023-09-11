@@ -425,7 +425,9 @@ class AstroTrainer(BaseTrainer):
             if self.save_codebook and self.codebook is None:
                 self.codebook = ret["codebook"]
             if self.recon_gt_spectra:
-                self.recon_fluxes.extend(ret["spectra"])
+                if self.spectra_supervision:
+                    self.recon_fluxes.append(ret["sup_spectra"])
+                else: self.recon_fluxes.extend(ret["spectra"])
             if self.recon_codebook_spectra_individ:
                 self.codebook_spectra.extend(ret["codebook_spectra"])
 
@@ -908,8 +910,12 @@ class AstroTrainer(BaseTrainer):
         log.info(f"est qtz weights: {self.qtz_weights}")
 
     def _recon_gt_spectra(self):
-        # if self.spectra_supervision:
-        if self.train_spectra_pixels_only:
+        if self.spectra_supervision:
+            num_spectra = self.cur_patch.get_num_spectra()
+            self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
+            self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
+            self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
+        elif self.train_spectra_pixels_only:
             # todo, use spectra within current patch
             num_spectra = self.dataset.get_num_validation_spectra()
             val_spectra = self.dataset.get_validation_spectra()
@@ -922,28 +928,29 @@ class AstroTrainer(BaseTrainer):
             self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
             self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
 
-        # sp = (num_spectra, self.spectra_n_neighb, -1)
-        sp = (num_spectra, 1, -1)
         self.recon_fluxes = torch.stack(self.recon_fluxes)
-        # print(self.recon_fluxes.shape)
+        if self.spectra_supervision:
+            self.recon_wave = self.gt_wave
+            self.recon_masks = self.gt_masks
 
-        # if self.spectra_supervision:
-        # recon_fluxes [bsz,num_spectra_coords,num_sampeles]
-        # we get all spectra at each batch (duplications), thus average over batches
-        # self.recon_fluxes = torch.mean(self.recon_fluxes, dim=0)
+            # recon_fluxes [num_batches,num_spectra_coords,num_sampeles]
+            # we get all spectra at each batch (duplications), thus average over batches
+            self.recon_fluxes = torch.mean(self.recon_fluxes, dim=0)
+        else:
+            self.recon_wave = np.tile(
+                self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
+            self.recon_masks = np.tile(
+                self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
 
-        # all spectra are collected (no duplications) and we need
-        #   only selected ones (incl. neighbours)
-        self.recon_fluxes = self.recon_fluxes.view(
-            -1, self.recon_fluxes.shape[-1]) # [bsz,num_samples]
-        if not self.train_spectra_pixels_only:
-            self.recon_fluxes = self.recon_fluxes[self.val_spectra_map]
+            # all spectra are collected (no duplications) and we need
+            #   only selected ones (incl. neighbours)
+            self.recon_fluxes = self.recon_fluxes.view(
+                -1, self.recon_fluxes.shape[-1]) # [bsz,num_samples]
+            if not self.train_spectra_pixels_only:
+                self.recon_fluxes = self.recon_fluxes[self.val_spectra_map]
+
+        sp = (num_spectra, 1, -1)
         self.recon_fluxes = self.recon_fluxes.view(sp).detach().cpu().numpy()
-
-        self.recon_wave = np.tile(
-            self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
-        self.recon_masks = np.tile(
-            self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
 
         metrics = self.dataset.plot_spectrum(
             self.spectra_dir, self.epoch,
