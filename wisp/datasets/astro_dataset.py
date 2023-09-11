@@ -372,15 +372,19 @@ class AstroDataset(Dataset):
         """
         assert self.mode == "main_train" and self.kwargs["spectra_supervision"]
 
-        out["full_wave"] = self.get_full_wave()
+        if self.kwargs["normalize_coords"]:
+            coords = self.patch_obj.get_spectra_normed_img_coords()
+        else: coords = self.patch_obj.get_spectra_img_coords()
+        spectra_coords = torch.FloatTensor(coords)[:,None]
 
-        spectra_coords = torch.FloatTensor(self.patch_obj.get_spectra_img_coords())[:,None]
         if "coords" in out:
             out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
         else: out["coords"] = spectra_coords
-        print(out["coords"].shape)
-        out["spectra_masks"] = self.patch_obj.get_spectra_pixel_masks()
-        out["spectra_fluxes"] = self.patch_obj.get_spectra_pixel_fluxes()
+        out["sup_spectra_wave"] = torch.FloatTensor(
+            self.patch_obj.get_spectra_pixel_wave()
+        )[...,None]
+        out["sup_spectra_data"] = torch.FloatTensor(self.patch_obj.get_spectra_data())
+        out["sup_spectra_masks"] = self.patch_obj.get_spectra_pixel_masks()
 
         # the first #num_supervision_spectra are gt coords for supervision
         # the others are forwarded only for spectrum plotting

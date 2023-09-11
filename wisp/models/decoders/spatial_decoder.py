@@ -174,6 +174,8 @@ class SpatialDecoder(nn.Module):
         elif self.decode_spatial_embedding:
             z = self.decode(z)
         timer.check("spatial_decod::qtz done")
+        # print(redshift, redshift.shape)
+        # print(logits, logits.shape)
 
         ret["latents"] = z
         ret["bias"] = bias

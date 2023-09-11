@@ -83,6 +83,8 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         """ Register forward functions with the channels that they output.
         """
         channels = ["intensity","latents","spectra"]
+        if self.kwargs["spectra_supervision"]:
+            channels.append("sup_spectra")
         if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
             channels.extend(["scaler","redshift","codebook_loss",
                              "min_embed_ids","codebook","qtz_weights","codebook_spectra"])
@@ -92,7 +94,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
     def hyperspectral(self, coords, wave, wave_range,
                       trans=None, nsmpl=None,
                       specz=None, sup_id=None,
-                      full_wave=None, num_sup_spectra=-1,
+                      sup_spectra_wave=None, num_sup_spectra=-1,
                       qtz_args=None, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
@@ -131,8 +133,10 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         timer.check("nef::spatial decoding done")
 
         self.hps_decoder(latents, wave, trans, nsmpl, wave_range,
-                         qtz_args=qtz_args, ret=ret, full_wave=full_wave,
-                         codebook=self.codebook, num_sup_spectra=num_sup_spectra)
+                         codebook=self.codebook,
+                         qtz_args=qtz_args, ret=ret,
+                         num_sup_spectra=num_sup_spectra,
+                         sup_spectra_wave=sup_spectra_wave)
         timer.check("nef::hyperspectral decoding done")
 
         if self.codebook is not None:

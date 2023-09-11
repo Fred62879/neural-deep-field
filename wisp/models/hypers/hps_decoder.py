@@ -125,10 +125,10 @@ class HyperSpectralDecoder(nn.Module):
         if self.intensify:
             spectra = self.intensifier(spectra)
 
-        ret["spectra"] = spectra
+        return spectra
 
-    def forward_with_full_wave(self, latents, full_wave, full_wave_bound,
-                               num_spectra_coords, ret, codebook, qtz_args):
+    def forward_sup_spectra(self, latents, wave, full_wave_bound,
+                            num_spectra_coords, ret, codebook, qtz_args):
         """ During training, some latents will be decoded, combining with full wave.
             Currently only supports spectra coords (incl. gt, dummy that requires
               spectrum plotting during training time).
@@ -138,10 +138,9 @@ class HyperSpectralDecoder(nn.Module):
         bias = None if ret["bias"] is None else ret["bias"][-num_spectra_coords:]
         scaler = None if ret["scaler"] is None else ret["scaler"][-num_spectra_coords:]
         redshift = None if ret["redshift"] is None else ret["redshift"][-num_spectra_coords:]
-        full_wave = full_wave[None,:,None].tile(num_spectra_coords,1,1)
 
-        ret["spectra"] = self.reconstruct_spectra(
-            latents, full_wave, scaler, bias, redshift,
+        ret["sup_spectra"] = self.reconstruct_spectra(
+            latents, wave, scaler, bias, redshift,
             full_wave_bound, ret, codebook, qtz_args
         )
 
@@ -155,7 +154,7 @@ class HyperSpectralDecoder(nn.Module):
     def forward(self, latents,
                 wave, trans, nsmpl, full_wave_bound,
                 trans_mask=None,
-                full_wave=None, num_sup_spectra=-1,
+                num_sup_spectra=-1, sup_spectra_wave=None,
                 codebook=None, qtz_args=None, ret=None):
         """ @Param
               latents:   (encoded or original) coords or logits for quantization.
@@ -169,10 +168,9 @@ class HyperSpectralDecoder(nn.Module):
               full_wave_bound: min and max value of lambda
 
             - spectra supervision
-              full_wave: not None if do spectra supervision.
-                           [num_spectra_coords,full_num_samples]
               num_spectra_coords: > 0 if spectra supervision.
-
+              sup_spectra_wave: not None if do spectra supervision.
+                                [num_spectra_coords,full_num_samples]
             - spectra qtz
               codebook
               qtz_args
@@ -184,24 +182,23 @@ class HyperSpectralDecoder(nn.Module):
                 "codebook_loss": loss for codebook optimization.
               }
 
-            @Return (add new fields to input data)
-              intensity: reconstructed pixel values
+            @Return (added to `ret`)
               spectra:   reconstructed spectra
+              intensity: reconstructed pixel values
+              sup_spectra: reconstructed spectra used for spectra supervision
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.reset()
 
         if num_sup_spectra > 0:
-            # forward the last #num_spectra_coords latents with all lambda
-            print(latents.shape, full_wave.shape)
-            self.forward_with_full_wave(
-                latents, full_wave, full_wave_bound, num_sup_spectra,
-                ret, codebook, qtz_args)
-
+            self.forward_sup_spectra(
+                latents, sup_spectra_wave, full_wave_bound,
+                num_sup_spectra, ret, codebook, qtz_args
+            )
             latents = latents[:-num_sup_spectra]
             if latents.shape[0] == 0: return
 
-        self.reconstruct_spectra(
+        ret["spectra"] = self.reconstruct_spectra(
             latents, wave, ret["scaler"], ret["bias"], ret["redshift"],
             full_wave_bound, ret, codebook, qtz_args)
         timer.check("hps_decoder::spectra reconstruced")

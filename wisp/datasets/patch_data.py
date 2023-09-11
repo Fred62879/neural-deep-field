@@ -12,9 +12,9 @@ from astropy.coordinates import SkyCoord
 
 from wisp.utils.plot import plot_horizontally, mark_on_img
 from wisp.utils.common import generate_hdu, create_patch_uid
-from wisp.utils.numerical import normalize, calculate_zscale_ranges
-from wisp.datasets.data_utils import set_input_path, \
-    create_patch_fname, create_selected_patches_uid, get_mgrid_np
+from wisp.utils.numerical import normalize, normalize_coords, calculate_zscale_ranges
+from wisp.datasets.data_utils import set_input_path, create_patch_fname, \
+    create_selected_patches_uid, get_mgrid_np, get_coords_norm_range_fname
 
 
 class PatchData:
@@ -101,6 +101,8 @@ class PatchData:
     def set_path(self, dataset_path):
         self.input_patch_path, img_data_path = set_input_path(
             dataset_path, self.kwargs["sensor_collection_name"])
+
+        self.coords_norm_range_fname = get_coords_norm_range_fname(**self.kwargs)
 
         norm = self.kwargs["gt_img_norm_cho"]
         suffix = f"{norm}_{self.patch_uid}"
@@ -196,6 +198,18 @@ class PatchData:
         if idx is not None:
             return self.data["spectra_img_coords"][idx]
         return self.data["spectra_img_coords"]
+
+    def get_spectra_normed_img_coords(self, idx=None):
+        """ Get normalized img coords for spectra pixels.
+        """
+        if idx is not None:
+            return self.data["spectra_normed_img_coords"][idx]
+        return self.data["spectra_normed_img_coords"]
+
+    def get_spectra_data(self, idx=None):
+        if idx is not None:
+            return self.data["spectra_data"][idx]
+        return self.data["spectra_data"]
 
     def get_spectra_id_map(self, idx=None):
         if idx is not None:
@@ -358,6 +372,11 @@ class PatchData:
         spectra_masks = spectra_masks[valid_spectra_ids]
         pixel_ids = self.get_pixel_ids(img_coords[:,0], img_coords[:,1])
 
+        if self.kwargs["normalize_coords"]:
+            norm_range = np.load(self.coords_norm_range_fname)
+            normed_img_coords, _ = normalize_coords(
+                np.float32(img_coords), norm_range=norm_range, **self.kwargs)
+
         # convert global img coords to local img coords
         if not self.use_full_patch:
             r, c = self.cutout_start_pos
@@ -375,10 +394,14 @@ class PatchData:
         id_map[img_coords[:,0], img_coords[:,1]] = ids
         id_map = id_map.flatten()
 
+        self.data["spectra_data"] = spectra
         self.data["spectra_id_map"] = id_map
         self.data["spectra_bin_map"] = bin_map
         self.data["spectra_pixel_ids"] = pixel_ids
         self.data["spectra_img_coords"] = img_coords
+        if self.kwargs["normalize_coords"]:
+            self.data["spectra_normed_img_coords"] = normed_img_coords
+
         self.data["spectra_pixel_redshift"] = redshift
         self.data["spectra_pixel_wave"] = spectra[:,0]
         self.data["spectra_pixel_fluxes"] = spectra[:,1]

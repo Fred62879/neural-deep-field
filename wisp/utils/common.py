@@ -65,6 +65,8 @@ def print_shape(data):
             print(n, len(p), p[0].dtype, p[0].device)
         elif type(p) == torch.Tensor:
             print(n, p.shape, p.dtype, p.device)
+        elif type(p) == int:
+            print(n, p)
         else: print(n, p.shape, p.dtype)
 
 def get_input_latents_dim(**kwargs):
@@ -234,9 +236,9 @@ def forward(
             net_args["nsmpl"] = data["nsmpl"]
             # net_args["trans_mask"] = data["trans_mask"]
         if spectra_supervision:
-            net_args["full_wave"] = data["full_wave"]
-            # num of coords for gt, dummy (incl. neighbours) spectra
             net_args["num_sup_spectra"] = data["num_sup_spectra"]
+            net_args["sup_spectra_wave"] = data["sup_spectra_wave"]
+            requested_channels.append("sup_spectra")
         if qtz:
             qtz_args = defaultdict(lambda: False)
             if qtz_strategy == "soft":

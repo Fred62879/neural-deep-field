@@ -729,19 +729,20 @@ class AstroTrainer(BaseTrainer):
         # ii) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
         if self.spectra_supervision:
-            gt_spectra = data["spectra_fluxes"]
-            n = data["num_sup_spectra"]
+            recon_fluxes = ret["sup_spectra"]
+            gt_spectra = data["sup_spectra_data"]
+            spectra_masks = data["sup_spectra_masks"]
+            # print(gt_spectra.shape, recon_spectra.shape, spectra_masks.shape)
 
-            # todo: efficiently slice spectra with different bound
-            recon_spectra = ret["spectra"] #[:self.num_supervision_spectra_upper_bound,lo:hi]
-            print(gt_spectra.shape, recon_spectra.shape)
-            assert 0
-
-            if len(recon_spectra) == 0:
+            if len(recon_fluxes) == 0:
                 spectra_loss = 0
             else:
-                spectra_loss = self.spectra_loss(gt_spectra, recon_spectra) * self.spectra_beta
+                spectra_loss = self.spectra_loss(
+                    spectra_masks, gt_spectra, recon_fluxes,
+                    weight_by_wave_coverage=self.extra_args["weight_by_wave_coverage"]
+                ) * self.spectra_beta
                 self.log_dict["spectra_loss"] += spectra_loss.item()
+
             self.timer.check("spectra loss")
 
         # iii) redshift loss
@@ -771,7 +772,8 @@ class AstroTrainer(BaseTrainer):
             self.timer.check("codebook loss")
 
         torch.autograd.set_detect_anomaly(True)
-        total_loss = redshift_loss + recon_loss + spectra_loss + codebook_loss
+        total_loss = redshift_loss + spectra_loss + codebook_loss
+        # total_loss = redshift_loss + recon_loss + spectra_loss + codebook_loss
         self.log_dict["total_loss"] += total_loss.item()
         return total_loss, ret
 
@@ -906,6 +908,7 @@ class AstroTrainer(BaseTrainer):
         log.info(f"est qtz weights: {self.qtz_weights}")
 
     def _recon_gt_spectra(self):
+        # if self.spectra_supervision:
         if self.train_spectra_pixels_only:
             # todo, use spectra within current patch
             num_spectra = self.dataset.get_num_validation_spectra()
@@ -922,18 +925,19 @@ class AstroTrainer(BaseTrainer):
         # sp = (num_spectra, self.spectra_n_neighb, -1)
         sp = (num_spectra, 1, -1)
         self.recon_fluxes = torch.stack(self.recon_fluxes)
+        # print(self.recon_fluxes.shape)
 
-        if self.spectra_supervision:
-            # recon_fluxes [bsz,num_spectra_coords,num_sampeles]
-            # we get all spectra at each batch (duplications), thus average over batches
-            self.recon_fluxes = torch.mean(self.recon_fluxes, dim=0)
-        else: # self.codebook_pretrain
-            # all spectra are collected (no duplications) and we need
-            #   only selected ones (incl. neighbours)
-            self.recon_fluxes = self.recon_fluxes.view(
-                -1, self.recon_fluxes.shape[-1]) # [bsz,num_samples]
-            if not self.train_spectra_pixels_only:
-                self.recon_fluxes = self.recon_fluxes[self.val_spectra_map]
+        # if self.spectra_supervision:
+        # recon_fluxes [bsz,num_spectra_coords,num_sampeles]
+        # we get all spectra at each batch (duplications), thus average over batches
+        # self.recon_fluxes = torch.mean(self.recon_fluxes, dim=0)
+
+        # all spectra are collected (no duplications) and we need
+        #   only selected ones (incl. neighbours)
+        self.recon_fluxes = self.recon_fluxes.view(
+            -1, self.recon_fluxes.shape[-1]) # [bsz,num_samples]
+        if not self.train_spectra_pixels_only:
+            self.recon_fluxes = self.recon_fluxes[self.val_spectra_map]
         self.recon_fluxes = self.recon_fluxes.view(sp).detach().cpu().numpy()
 
         self.recon_wave = np.tile(
