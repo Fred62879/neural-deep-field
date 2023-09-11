@@ -14,7 +14,6 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux, weight_by_wave_
     ''' Loss function for spectra supervision
         @Param
           loss: l1/l2 as specified in config
-                NOTE: `reduction` for loss MUST be set as `none` for spectra loss!
           mask:       [bsz,num_smpls]
           gt_spectra: [bsz,4+2*nbanbds,num_smpls]
                       (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))

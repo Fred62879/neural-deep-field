@@ -65,12 +65,6 @@ class AstroTrainer(BaseTrainer):
         self.init_loss()
         self.init_optimizer()
 
-        # self.configure_dataset()
-        # self.set_num_batches() #max_bsz=512)
-        # self.init_dataloader()
-
-        self.total_steps = 0
-
     #############
     # Initializations
     #############
@@ -219,6 +213,7 @@ class AstroTrainer(BaseTrainer):
         self.configure_dataset()
         self.set_num_batches()
         self.init_dataloader()
+        self.total_steps = 0
 
         if self.plot_loss:
             self.losses = []
