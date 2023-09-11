@@ -20,6 +20,9 @@ from torch.utils.data._utils.collate import default_convert
 np_str_obj_array_pattern = re.compile(r'[SaUO]')
 
 
+def wave_within_bound(wave1, wave2):
+    return wave2[0] <= wave1[0] and wave2[-1] >= wave1[-1]
+
 def get_neighbourhood_center_pixel_id(neighbour_size):
     """ Get id of center pixel within a neighbourhood (defined in PatchData).
     """

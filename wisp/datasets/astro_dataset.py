@@ -373,18 +373,26 @@ class AstroDataset(Dataset):
         assert self.mode == "main_train" and self.kwargs["spectra_supervision"]
 
         if self.kwargs["normalize_coords"]:
-            coords = self.patch_obj.get_spectra_normed_img_coords()
-        else: coords = self.patch_obj.get_spectra_img_coords()
-        spectra_coords = torch.FloatTensor(coords)[:,None]
-
+            spectra_coords = self.patch_obj.get_spectra_normed_img_coords()
+        else: spectra_coords = self.patch_obj.get_spectra_img_coords()
+        spectra_coords = torch.FloatTensor(spectra_coords)[:,None]
         if "coords" in out:
             out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
         else: out["coords"] = spectra_coords
-        out["sup_spectra_wave"] = torch.FloatTensor(
-            self.patch_obj.get_spectra_pixel_wave()
-        )[...,None]
+
         out["sup_spectra_data"] = torch.FloatTensor(self.patch_obj.get_spectra_data())
-        out["sup_spectra_masks"] = self.patch_obj.get_spectra_pixel_masks()
+        out["sup_spectra_masks"] = torch.BoolTensor(self.patch_obj.get_spectra_pixel_masks())
+
+        if not self.kwargs["spectra_supervision_use_all_wave"]:
+            assert self.kwargs["uniform_sample_wave"]
+            out["sup_spectra_data"], sample_ids = batch_sample_torch(
+                out["sup_spectra_data"], self.kwargs["spectra_supervision_num_wave_samples"],
+                keep_sample_ids=True)
+            out["sup_spectra_masks"] = batch_sample_torch(
+                out["sup_spectra_masks"], self.kwargs["spectra_supervision_num_wave_samples"],
+                sample_ids=sample_ids)
+
+        out["sup_spectra_wave"] = out["sup_spectra_data"][:,0][...,None] # [bsz,nsmpl,1]
 
         # the first #num_supervision_spectra are gt coords for supervision
         # the others are forwarded only for spectrum plotting

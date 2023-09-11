@@ -414,22 +414,30 @@ class AstroTrainer(BaseTrainer):
         self.timer.check("backward and step")
 
         if self.save_data:
-            if self.save_scaler: self.scalers.extend(ret["scaler"])
-            if self.save_latents: self.latents.extend(ret["latents"])
+            if self.save_scaler:
+                self.scalers.extend(ret["scaler"])
+            if self.save_latents:
+                self.latents.extend(ret["latents"])
             if self.save_redshift:
                 self.redshift.extend(ret["redshift"])
-            if self.plot_embed_map: self.embed_ids.extend(ret["embed_ids"])
-            if self.save_qtz_weights: self.qtz_weights.extend(ret["qtz_weights"])
+            if self.plot_embed_map:
+                self.embed_ids.extend(ret["embed_ids"])
+            if self.save_qtz_weights:
+                self.qtz_weights.extend(ret["qtz_weights"])
             if self.recon_img or self.recon_crop:
                 self.recon_pixels.extend(ret["intensity"])
             if self.save_codebook and self.codebook is None:
                 self.codebook = ret["codebook"]
+            if self.recon_codebook_spectra_individ:
+                self.codebook_spectra.extend(ret["codebook_spectra"])
+
             if self.recon_gt_spectra:
                 if self.spectra_supervision:
                     self.recon_fluxes.append(ret["sup_spectra"])
-                else: self.recon_fluxes.extend(ret["spectra"])
-            if self.recon_codebook_spectra_individ:
-                self.codebook_spectra.extend(ret["codebook_spectra"])
+                    self.recon_masks.append(data["sup_spectra_masks"])
+                    self.recon_wave.append(data["sup_spectra_wave"][...,0])
+                else:
+                    self.recon_fluxes.extend(ret["spectra"])
 
     def post_step(self):
         pass
@@ -789,27 +797,24 @@ class AstroTrainer(BaseTrainer):
         log_text = "EPOCH {}/{}".format(self.epoch, self.num_epochs)
         log_text += " | total loss: {:>.3E}".format(self.log_dict["total_loss"] / n)
         log_text += " | recon loss: {:>.3E}".format(self.log_dict["recon_loss"] / n)
+
+        if self.spectra_supervision:
+            log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
+
         if self.qtz_latent and self.qtz_strategy == "hard":
             log_text += " | codebook loss: {:>.3E}".format(self.log_dict["codebook_loss"] / n)
 
-        if self.spectra_supervision and \
-           self.epoch >= self.extra_args["spectra_supervision_start_epoch"]:
-            log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
-
         if self.redshift_semi_supervision:
-            if self.log_dict["n_gt_redshift"] == 0:
-               redshift_loss = 0
-            else: redshift_loss = self.log_dict["redshift_loss"] # / self.log_dict["n_gt_redshift"]
-            # redshift_loss = self.log_dict["redshift_loss"]
+            if self.log_dict["n_gt_redshift"] > 0:
+                redshift_loss = self.log_dict["redshift_loss"] / self.log_dict["n_gt_redshift"]
+            else: redshift_loss = 0
             log_text += " | redshift loss: {:>.3E}".format(redshift_loss)
 
         log.info(log_text)
 
     def save_model(self):
-        if self.extra_args["save_as_new"]:
-            fname = f"model-ep{self.epoch}-it{self.iteration}.pth"
-            model_fname = os.path.join(self.model_dir, fname)
-        else: model_fname = os.path.join(self.model_dir, f"model.pth")
+        fname = f"model-ep{self.epoch}-it{self.iteration}.pth"
+        model_fname = os.path.join(self.model_dir, fname)
 
         if self.verbose: log.info(f"Saving model checkpoint to: {model_fname}")
 
@@ -910,38 +915,44 @@ class AstroTrainer(BaseTrainer):
         log.info(f"est qtz weights: {self.qtz_weights}")
 
     def _recon_gt_spectra(self):
-        if self.spectra_supervision:
-            num_spectra = self.cur_patch.get_num_spectra()
-            self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
-            self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
-            self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
-        elif self.train_spectra_pixels_only:
-            # todo, use spectra within current patch
-            num_spectra = self.dataset.get_num_validation_spectra()
-            val_spectra = self.dataset.get_validation_spectra()
-            self.gt_wave = val_spectra[:,0]
-            self.gt_fluxes = val_spectra[:,1]
-            self.gt_masks = self.dataset.get_validation_spectra_masks()
-        else:
-            num_spectra = self.cur_patch.get_num_spectra()
-            self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
-            self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
-            self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
+        # if self.spectra_supervision:
+        #     num_spectra = self.cur_patch.get_num_spectra()
+        #     self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
+        #     self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
+        #     self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
+        # elif self.train_spectra_pixels_only:
+        #     # todo, use spectra within current patch
+        #     num_spectra = self.dataset.get_num_validation_spectra()
+        #     val_spectra = self.dataset.get_validation_spectra()
+        #     self.gt_wave = val_spectra[:,0]
+        #     self.gt_fluxes = val_spectra[:,1]
+        #     self.gt_masks = self.dataset.get_validation_spectra_masks()
+        # else:
+        #     num_spectra = self.cur_patch.get_num_spectra()
+        #     self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
+        #     self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
+        #     self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
+
+        num_spectra = self.cur_patch.get_num_spectra()
+        self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
+        self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
+        self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
 
         self.recon_fluxes = torch.stack(self.recon_fluxes)
-        if self.spectra_supervision:
-            self.recon_wave = self.gt_wave
-            self.recon_masks = self.gt_masks
 
-            # recon_fluxes [num_batches,num_spectra_coords,num_sampeles]
+        if self.spectra_supervision:
+            self.recon_wave = torch.stack(self.recon_wave)
+            self.recon_masks = torch.stack(self.recon_masks)
+            # recon_xxx [num_batches,num_spectra_coords,num_sampeles]
+            self.recon_masks = self.recon_masks[0].detach().cpu().numpy()
             # we get all spectra at each batch (duplications), thus average over batches
+            self.recon_wave = torch.mean(self.recon_wave, dim=0).detach().cpu().numpy()
             self.recon_fluxes = torch.mean(self.recon_fluxes, dim=0)
         else:
             self.recon_wave = np.tile(
                 self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
             self.recon_masks = np.tile(
                 self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
-
             # all spectra are collected (no duplications) and we need
             #   only selected ones (incl. neighbours)
             self.recon_fluxes = self.recon_fluxes.view(
@@ -949,8 +960,9 @@ class AstroTrainer(BaseTrainer):
             if not self.train_spectra_pixels_only:
                 self.recon_fluxes = self.recon_fluxes[self.val_spectra_map]
 
-        sp = (num_spectra, 1, -1)
-        self.recon_fluxes = self.recon_fluxes.view(sp).detach().cpu().numpy()
+        self.recon_fluxes = self.recon_fluxes.view(num_spectra, -1).detach().cpu().numpy()
+        # print(self.gt_fluxes.shape, self.gt_masks.shape, self.gt_wave.shape)
+        # print(self.recon_fluxes.shape, self.recon_masks.shape, self.recon_wave.shape)
 
         metrics = self.dataset.plot_spectrum(
             self.spectra_dir, self.epoch,
@@ -962,7 +974,8 @@ class AstroTrainer(BaseTrainer):
             recon_masks=self.recon_masks,
             clip=self.extra_args["plot_clipped_spectrum"]
         )
-        log.info(f"spectra metrics: {metrics.T}")
+        if metrics is not None:
+            log.info(f"spectra metrics: {metrics.T}")
 
     def _recon_codebook_spectra_individ(self):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()

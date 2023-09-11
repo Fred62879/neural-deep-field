@@ -200,7 +200,8 @@ class HyperSpectralDecoder(nn.Module):
 
         ret["spectra"] = self.reconstruct_spectra(
             latents, wave, ret["scaler"], ret["bias"], ret["redshift"],
-            full_wave_bound, ret, codebook, qtz_args)
+            full_wave_bound, ret, codebook, qtz_args
+        )
         timer.check("hps_decoder::spectra reconstruced")
 
         intensity = self.inte(ret["spectra"], trans, trans_mask, nsmpl)

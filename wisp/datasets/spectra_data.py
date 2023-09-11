@@ -14,7 +14,7 @@ from wisp.utils.common import create_patch_uid, to_numpy
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
-    get_coords_norm_range_fname, add_dummy_dim
+    get_coords_norm_range_fname, add_dummy_dim, wave_within_bound
 
 from pathlib import Path
 from astropy.io import fits
@@ -1050,9 +1050,15 @@ class SpectraData:
                 recon_flux = recon_flux[recon_mask]
 
         if calculate_metrics and len(recon_wave) != len(gt_wave):
-            f = interp1d(recon_wave, recon_flux)
-            recon_flux = f(gt_wave)
-            recon_wave = gt_wave
+            if wave_within_bound(recon_wave, gt_wave):
+                f = interp1d(gt_wave, gt_flux)
+                gt_flux = f(recon_wave)
+                gt_wave = recon_wave
+            else:
+                assert wave_within_bound(gt_wave, recon_wave)
+                f = interp1d(recon_wave, recon_flux)
+                recon_flux = f(gt_wave)
+                recon_wave = gt_wave
 
         sub_dir, gt_flux, recon_flux = self.normalize_one_flux(
             sub_dir, is_codebook, plot_gt_spectrum, plot_recon_spectrum,

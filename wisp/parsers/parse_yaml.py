@@ -455,24 +455,27 @@ def define_cmd_line_args():
     train_group = parser.add_argument_group("trainer")
 
     train_group.add_argument("--trainer-type", type=str, help="Trainer class to use")
+    train_group.add_argument("--log-dir", type=str, default="_results/logs/runs/",
+                             help="Log file directory for checkpoints.")
 
     train_group.add_argument("--plot-loss", action="store_true")
+    train_group.add_argument("--using-wandb", action="store_true")
+
     train_group.add_argument("--num-epochs", type=int, default=250,
                              help="Number of epochs to run the training.")
     train_group.add_argument("--batch-size", type=int, default=512,
                              help="Batch size for the training.")
     train_group.add_argument("--pretrain-batch-size", type=int, default=512)
-    train_group.add_argument("--resample", action="store_true",
-                             help="Resample the dataset after every epoch.")
-    train_group.add_argument("--only-last", action="store_true",
-                             help="Train only last LOD.")
-    train_group.add_argument("--resample-every", type=int, default=1,
-                             help="Resample every N epochs")
-    train_group.add_argument("--model-format", type=str, default="full",
-                             choices=["full", "state_dict"],
-                             help="Format in which to save models.")
-    train_group.add_argument("--save-as-new", action="store_true",
-                             help="Save the model at every epoch (no overwrite).")
+    # train_group.add_argument("--resample", action="store_true",
+    #                          help="Resample the dataset after every epoch.")
+    # train_group.add_argument("--only-last", action="store_true",
+    #                          help="Train only last LOD.")
+    # train_group.add_argument("--resample-every", type=int, default=1,
+    #                          help="Resample every N epochs")
+    # train_group.add_argument("--model-format", type=str, default="full",
+    #                          choices=["full", "state_dict"],
+    #                          help="Format in which to save models.")
+
     train_group.add_argument("--render-tb-every", type=int, default=100,
                                 help="Render every N iterations")
     train_group.add_argument("--log-tb-every", type=int, default=100,
@@ -487,9 +490,10 @@ def define_cmd_line_args():
                              help="Save data locally every N epoch.")
     train_group.add_argument("--plot-grad-every", type=int, default=20,
                              help="Plot gradient at every N epoch.")
-    train_group.add_argument("--using-wandb", action="store_true")
+
     train_group.add_argument("--gpu-data", nargs="+", type=str,
                              help="data fields that can be added to gpu.")
+    train_group.add_argument("--main-train-frozen-layer", nargs="+", type=str)
 
     train_group.add_argument("--pixel-loss-cho",type=str, choices=["l1","l2"])
     train_group.add_argument("--spectra-loss-cho",type=str, choices=["l1","l2"])
@@ -498,9 +502,6 @@ def define_cmd_line_args():
     train_group.add_argument("--train-with-all-pixels", action="store_true")
     train_group.add_argument("--train-pixel-ratio", type=float, default=1,
                              help="ratio of (unmasked) pixels used for training per epoch")
-    # train_group.add_argument("--masked_pixl_ratio_per_epoch", type=float, default=1,
-    #                          help="ratio of masked pixels used for spectral inpaint training per epoch")
-    train_group.add_argument("--main-train-frozen-layer", nargs="+")
 
     train_group.add_argument("--pretrain-codebook", action="store_true")
     train_group.add_argument("--learn-spectra-within-wave-range", action="store_true")
@@ -513,7 +514,9 @@ def define_cmd_line_args():
 
     train_group.add_argument("--train-use-all-wave", action="store_true")
     train_group.add_argument("--pretrain-use-all-wave", action="store_true")
-    train_group.add_argument("--infer-during-train", action="store_true")
+    train_group.add_argument("--spectra-supervision-use-all-wave", action="store_true")
+
+    # train_group.add_argument("--infer-during-train", action="store_true")
     train_group.add_argument("--train-spectra-pixels-only", action="store_true")
     train_group.add_argument("--pixel-supervision", action="store_true",
                              help="whether training supervised by pixel values or not.")
@@ -527,7 +530,6 @@ def define_cmd_line_args():
     train_group.add_argument("--redshift-semi-supervision", action="store_true",
                              help="generate redshift w. semi supervision.")
 
-    train_group.add_argument("--spectra-supervision-start-epoch", type=int)
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")
     train_group.add_argument("--redshift-beta", type=float, help="redshift loss weight scaler.")
     train_group.add_argument("--pretrain-pixel-beta", type=float)
@@ -542,23 +544,24 @@ def define_cmd_line_args():
     train_group.add_argument("--pretrain-log-dir", type=str)
     train_group.add_argument("--pretrained-model-name", type=str)
 
-    train_group.add_argument("--train-num-wave-samples", type=int, default=40,
-                             help="# wave to sample at each training iteration.")
-    train_group.add_argument("--pretrain-num-wave-samples", type=int, default=1000,
-                             help="# wave to sample at each training iteration.")
     train_group.add_argument("--uniform-sample-wave", action="store_true",
                              help="whether uniformly sample wave or not.")
     train_group.add_argument("--mixture-avg-per-band", action="store_true",
                             help="for mixture sampling method, whether average pixel values \
                             with number of samples falling within each band")
 
+    train_group.add_argument("--train-num-wave-samples", type=int, default=40,
+                             help="# wave to sample at each training iteration.")
+    train_group.add_argument("--pretrain-num-wave-samples", type=int, default=1000,
+                             help="# wave to sample at each pretrain iteration.")
+    train_group.add_argument("--spectra-supervision-num-wave-samples", type=int, default=1000,
+                             help="# wave to sample at each training iteration \
+                             for spectra supervision.")
+
     train_group.add_argument("--spectra-neighbour-size", type=int,
                              help="size of neighbourhood to average when calculating spectra.")
     train_group.add_argument("--infer-with-multi-neighbours", action="store_true",
                              help="infer with multi pixels in the neighbourhood and average.")
-
-    train_group.add_argument("--log-dir", type=str, default="_results/logs/runs/",
-                             help="Log file directory for checkpoints.")
 
     ###################
     # Arguments for validation

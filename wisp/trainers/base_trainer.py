@@ -397,10 +397,7 @@ class BaseTrainer(ABC):
         Override this function to change model saving.
         """
 
-        if self.extra_args["save_as_new"]:
-            model_fname = os.path.join(self.log_dir, f'model-ep{self.epoch}-it{self.iteration}.pth')
-        else:
-            model_fname = os.path.join(self.log_dir, f'model.pth')
+        model_fname = os.path.join(self.log_dir, f'model-ep{self.epoch}-it{self.iteration}.pth')
 
         log.info(f'Saving model checkpoint to: {model_fname}')
         if self.extra_args["model_format"] == "full":
