@@ -73,7 +73,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]
         coords = coords[:,None]
-        # print(coords)
+        # print(coords.shape)
 
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)

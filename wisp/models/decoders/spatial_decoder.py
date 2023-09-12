@@ -158,7 +158,6 @@ class SpatialDecoder(nn.Module):
                 redshift = self.redshift_adjust(redshift + 0.5)
             elif self.redshift_model_method == "classification":
                 weights = self.redshift_decoder(z[:,0])
-                # print(self.redshift_bins)
                 weights = F.softmax(weights, dim=-1)
                 redshift = weights@self.redshift_bins
             else: raise ValueError()
@@ -174,8 +173,6 @@ class SpatialDecoder(nn.Module):
         elif self.decode_spatial_embedding:
             z = self.decode(z)
         timer.check("spatial_decod::qtz done")
-        # print(redshift, redshift.shape)
-        # print(logits, logits.shape)
 
         ret["latents"] = z
         ret["bias"] = bias

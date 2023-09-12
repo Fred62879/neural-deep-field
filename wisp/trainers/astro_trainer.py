@@ -737,7 +737,6 @@ class AstroTrainer(BaseTrainer):
             recon_fluxes = ret["sup_spectra"]
             gt_spectra = data["sup_spectra_data"]
             spectra_masks = data["sup_spectra_masks"]
-            # print(gt_spectra.shape, recon_spectra.shape, spectra_masks.shape)
 
             if len(recon_fluxes) == 0:
                 spectra_loss = 0
@@ -777,8 +776,8 @@ class AstroTrainer(BaseTrainer):
             self.timer.check("codebook loss")
 
         torch.autograd.set_detect_anomaly(True)
-        total_loss = redshift_loss + spectra_loss + codebook_loss
-        # total_loss = redshift_loss + recon_loss + spectra_loss + codebook_loss
+        # total_loss = redshift_loss + spectra_loss + codebook_loss
+        total_loss = redshift_loss + recon_loss + spectra_loss + codebook_loss
         self.log_dict["total_loss"] += total_loss.item()
         return total_loss, ret
 
@@ -956,8 +955,6 @@ class AstroTrainer(BaseTrainer):
                 self.recon_fluxes = self.recon_fluxes[self.val_spectra_map]
 
         self.recon_fluxes = self.recon_fluxes.view(num_spectra, -1).detach().cpu().numpy()
-        # print(self.gt_fluxes.shape, self.gt_masks.shape, self.gt_wave.shape)
-        # print(self.recon_fluxes.shape, self.recon_masks.shape, self.recon_wave.shape)
 
         metrics = self.dataset.plot_spectrum(
             self.spectra_dir, self.epoch,

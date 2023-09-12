@@ -1,15 +1,15 @@
-
+    
 global:
     verbose: False
     print_shape: False
     activate_model_timer: False
     activate_trainer_timer: False
     dataloader_drop_last: False
-    exp_name: 'test-ngp-nerf'
+    exp_name: 'debug-pretrain-resume'
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    # tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra','save_pixel_values','recon_codebook_spectra_individ','save_redshift','recon_img','integrate_gt_spectra']
+    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra','save_pixel_values','recon_codebook_spectra_individ','save_redshift','recon_img','integrate_gt_spectra']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -44,7 +44,7 @@ optimizer:
 net:
     nef_type: 'AstroHyperSpectralNerf' #'AstroNerf'
     model_redshift: True
-    redshift_model_method: 'regression' #'classification' # 'regression'
+    redshift_model_method: 'classification' #'regression' # 'regression'
 
     encode_wave: True
     wave_encode_method: 'positional_encoding'
@@ -108,7 +108,7 @@ qtz:
     quantization_strategy: 'soft'
     quantization_calculate_loss: False # only if hard qtz
     qtz_latent_dim: 32
-    qtz_num_embed: 32
+    qtz_num_embed: 4
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
@@ -152,11 +152,11 @@ trainer:
 
     plot_loss: True
     pixel_loss_cho: l1_mean
-    spectra_loss_cho: l2_mean #emd
+    spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
     num_epochs: 2000
     batch_size: 5500
-    pretrain_batch_size: 3200
+    pretrain_batch_size: 2200
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
@@ -195,7 +195,7 @@ trainer:
 
     apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
-    redshift_semi_supervision: False # -
+    redshift_semi_supervision: True # -
 
     train_use_all_wave: False
     pretrain_use_all_wave: False
@@ -205,12 +205,12 @@ trainer:
     spectra_supervision_num_wave_samples: 100
 
     resume_train: False
-    # resume_log_dir: '20230907-113007'
+    resume_log_dir: '20230912-130722'
 
-    pretrain_codebook: True         # these two conflict
-    spectra_supervision: True       #  each other
-    pretrain_log_dir: '20230907-223401_pretrain_32_codes_6k+_spectra_30k_epochs_conv'
-    pretrained_model_name: 'model-ep30000-it0.pth'
+    pretrain_codebook: True
+    spectra_supervision: False
+    pretrain_log_dir: '20230910-225434_pretrain_4_codes_conv'
+    pretrained_model_name: 'model-ep60000-it0.pth'
     #### ***********************************
 
 infer:
