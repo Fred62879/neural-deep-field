@@ -143,10 +143,8 @@ class SpatialDecoder(nn.Module):
             elif self.redshift_model_method == "classification":
                 bsz = z.shape[0]
                 ret["redshift"]= self.redshift_bin_center[None,:].tile(bsz,1) # [bsz,num_bins]
-                ret["redshift_bin_prob"] = F.softmax(
+                ret["redshift_logits"] = F.softmax(
                     self.redshift_decoder(z[:,0]), dim=-1) # [bsz,num_bins]
-                ret["redshift_one_hot"] = torch.argmax(
-                    ret["redshift_bin_prob"], dim=-1)
             else:
                 raise ValueError("Unsupported redshift model method!")
         timer.check("spatial_decod::redshift done")

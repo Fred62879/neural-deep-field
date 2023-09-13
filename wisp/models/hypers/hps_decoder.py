@@ -155,7 +155,6 @@ class HyperSpectralDecoder(nn.Module):
             ]).permute(1,0,2)
 
             # spectra [bsz,num_redshift_bins,nsmpl]; logits [bsz,num_redshift_bins]
-            # print(ret["redshift_logits"])
             spectra = torch.sum(spectra * ret["redshift_logits"][...,None], dim=1)
         else:
             raise ValueError()

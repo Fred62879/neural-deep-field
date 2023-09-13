@@ -938,9 +938,11 @@ class SpectraData:
 
             metrics.pop("zncc", None)
             metrics["zncc_global"] = zncc
+            metrics["zncc_sliding_avg"] = sum(zncc_sliding) / len(zncc_sliding)
             if self.kwargs["calculate_sliding_zncc_above_threshold"]:
                 zncc_sliding = zncc_sliding[zncc_sliding > thresh]
-            metrics["zncc_sliding_avg"] = sum(zncc_sliding) / len(zncc_sliding)
+                metrics["zncc_sliding_avg_above_threshold"] = \
+                    sum(zncc_sliding) / len(zncc_sliding)
 
         return sub_dir, metrics, above_threshold
 

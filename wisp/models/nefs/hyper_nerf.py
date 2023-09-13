@@ -86,8 +86,14 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         if self.kwargs["spectra_supervision"]:
             channels.append("sup_spectra")
         if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
-            channels.extend(["scaler","redshift","codebook_loss",
-                             "min_embed_ids","codebook","qtz_weights","codebook_spectra"])
+            channels.extend([
+                "scaler","codebook_loss","min_embed_ids",
+                "codebook","qtz_weights","codebook_spectra"
+            ])
+        if self.kwargs["model_redshift"]:
+            channels.append("redshift")
+            if self.kwargs["redshift_model_method"] == "classification":
+                channels.append("redshift_logits")
 
         self._register_forward_function(self.hyperspectral, channels)
 

@@ -414,7 +414,11 @@ class AstroTrainer(BaseTrainer):
             if self.save_latents:
                 self.latents.extend(ret["latents"])
             if self.save_redshift:
-                self.redshift.extend(ret["redshift"])
+                if self.extra_args["redshift_model_method"] == "regression":
+                    self.redshift.extend(ret["redshift"])
+                else:
+                    redshift = torch.sum(ret["redshift"] * ret["redshift_logits"], dim=-1)
+                    self.redshift.extend(redshift)
             if self.plot_embed_map:
                 self.embed_ids.extend(ret["embed_ids"])
             if self.save_qtz_weights:
@@ -528,7 +532,6 @@ class AstroTrainer(BaseTrainer):
                 fields.append("spectra_val_pixels")
 
         length = self.get_dataset_length()
-
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
         self.dataset.set_mode("main_train")
@@ -967,8 +970,19 @@ class AstroTrainer(BaseTrainer):
             recon_masks=self.recon_masks,
             clip=self.extra_args["plot_clipped_spectrum"]
         )
+
         if metrics is not None:
-            log.info(f"spectra metrics: {metrics.T}")
+            metric_options = metrics[0].keys()
+            metrics = np.array([
+                [ v for k,v in cur_spectra_metrics.items() ]
+                for cur_spectra_metrics in metrics
+            ]) # [n_spectra,n_metrics]
+
+            for i, metric_option in enumerate(metric_options):
+                cur_metrics = metrics[:,i]
+                avg = np.mean(cur_metrics)
+                log.info(f"avg_{metric_option}: {np.round(avg, 3)}")
+                log.info(f"{metric_option}: {np.round(cur_metrics, 3)}")
 
     def _recon_codebook_spectra_individ(self):
         self.codebook_spectra = torch.stack(self.codebook_spectra).detach().cpu().numpy()

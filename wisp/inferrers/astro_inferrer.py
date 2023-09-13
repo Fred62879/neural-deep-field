@@ -402,7 +402,10 @@ class AstroInferrer(BaseInferrer):
             for i, metric_option in enumerate(metric_options):
                 fname = join(self.metric_dir, f"spectra_{metric_option}.npy")
                 np.save(fname, self.metrics[...,i])
-                log.info(f"{metric_option}: {np.round(self.metrics[-1,:,i].T, 3)}")
+                cur_metrics = self.metrics[-1,:,i].T
+                avg = np.mean(cur_metrics)
+                log.info(f"avg_{metric_option}: {np.round(avg, 3)}")
+                log.info(f"{metric_option}: {np.round(cur_metrics, 3)}")
 
     def pre_inferrence_hardcode_coords_modified_model(self):
         """ Codebook spectra reconstruction.

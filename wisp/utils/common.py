@@ -208,8 +208,8 @@ def forward(
         qtz=False,
         qtz_strategy="none",
         apply_gt_redshift=False,
-        codebook_pretrain=False,   # | these two
-        spectra_supervision=False, # |  conflicts
+        codebook_pretrain=False,
+        spectra_supervision=False,
         perform_integration=False,
         trans_sample_method="none",
         redshift_supervision_train=False,
@@ -235,11 +235,11 @@ def forward(
         if save_spectra: requested_channels.append("spectra")
         if save_latents: requested_channels.append("latents")
         if save_codebook: requested_channels.append("codebook")
-        if save_redshift: requested_channels.append("redshift")
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if save_qtz_weights: requested_channels.append("qtz_weights")
         if save_codebook_loss: requested_channels.append("codebook_loss")
         if save_codebook_spectra: requested_channels.append("codebook_spectra")
+        if save_redshift: requested_channels.extend(["redshift","redshift_logits"])
 
         net_args["wave"] = data["wave"]
         net_args["wave_range"] = data["wave_range"] # linear normalization
