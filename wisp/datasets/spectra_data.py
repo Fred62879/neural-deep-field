@@ -10,7 +10,7 @@ import logging as log
 import matplotlib.pyplot as plt
 
 from wisp.datasets.patch_data import PatchData
-from wisp.utils.common import create_patch_uid, to_numpy
+from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
@@ -906,6 +906,44 @@ class SpectraData:
     # def integrate_spectra_over_trans(self, spectra, trans):
     #     pass
 
+    def calculate_spectra_metrics(self, gt_flux, recon_flux, sub_dir, axis):
+        metrics = calculate_metrics(
+            recon_flux, gt_flux, self.kwargs["spectra_metric_options"],
+            window_width=self.kwargs["spectra_zncc_window_width"]) # [n_metrics]
+
+        above_threshold = None
+        if "zncc" in metrics:
+            (zncc, zncc_sliding) = metrics["zncc"]
+            zncc_sliding = np.array(zncc_sliding)
+            m = len(zncc_sliding)
+
+            thresh = self.kwargs["local_zncc_threshold"]
+
+            if self.kwargs["plot_spectrum_according_to_zncc"]:
+                above_threshold = np.full(len(recon_flux), False)
+                above_threshold[:m] = zncc_sliding > thresh
+                sub_dir += f"highlight_above_{thresh}_local_zncc_"
+
+            if self.kwargs["plot_spectrum_with_sliding_zncc"]:
+                sub_dir += "with_zncc_"
+                axis.plot(gt_wave[:m], zncc_sliding, color="gray")
+
+                # n = len(recon_flux)
+                # los = np.arange(0, n, self.kwargs["spectra_zncc_window_width"])
+                # wave_lo = min(gt_wave)
+                # for val, lo in zip(zncc_sliding, los):
+                #     hi = min(lo + self.kwargs["spectra_zncc_window_width"], n)
+                #     val = (val + 1) / 2
+                #     axis.axvspan(lo + wave_lo, hi + wave_lo, color=str(val))
+
+            metrics.pop("zncc", None)
+            metrics["zncc_global"] = zncc
+            if self.kwargs["calculate_sliding_zncc_above_threshold"]:
+                zncc_sliding = zncc_sliding[zncc_sliding > thresh]
+            metrics["zncc_sliding_avg"] = sum(zncc_sliding) / len(zncc_sliding)
+
+        return sub_dir, metrics, above_threshold
+
     def normalize_one_flux(self, sub_dir, is_codebook, plot_gt_spectrum,
                            plot_recon_spectrum, flux_norm_cho, gt_flux, recon_flux
     ):
@@ -947,13 +985,10 @@ class SpectraData:
                 recon_flux = recon_flux / np.max(recon_flux) * np.max(gt_flux)
             else: raise ValueError()
 
-        if self.kwargs["plot_spectrum_with_sliding_zncc"]:
-            sub_dir += "with_zncc_"
-
         return sub_dir, gt_flux, recon_flux
 
     def plot_and_save_one_spectrum(self, name, spectra_dir, fig, axs, nrows, ncols,
-                                   save_spectra, calculate_spectra_metrics, idx, pargs):
+                                   save_spectra, calculate_metrics, idx, pargs):
         """ Plot one spectrum and save as required.
         """
         sub_dir, gt_wave, gt_flux, recon_wave, recon_flux, \
@@ -969,38 +1004,22 @@ class SpectraData:
             self.trans_obj.plot_trans(
                 axis=axis, norm_cho=self.kwargs["trans_norm_cho"], color="gray")
 
-        if calculate_spectra_metrics:
-            metrics = calculate_metrics(
-                recon_flux, gt_flux, self.kwargs["spectra_metric_options"],
-                window_width=self.kwargs["spectra_zncc_window_width"]) # [n_metrics]
-
-            if "zncc" in metrics:
-                (zncc, zncc_sliding) = metrics["zncc"]
-                metrics["zncc"] = zncc
-
-                if self.kwargs["plot_spectrum_with_sliding_zncc"]:
-                    zncc_sliding = np.repeat(
-                        zncc_sliding, self.kwargs["spectra_zncc_window_width"]
-                    )[:len(recon_flux)]
-                    axis.plot(gt_wave, zncc_sliding, color="gray")
-
-                    # n = len(recon_flux)
-                    # los = np.arange(0, n, self.kwargs["spectra_zncc_window_width"])
-                    # wave_lo = min(gt_wave)
-                    # for val, lo in zip(zncc_sliding, los):
-                    #     hi = min(lo + self.kwargs["spectra_zncc_window_width"], n)
-                    #     val = (val + 1) / 2
-                    #     axis.axvspan(lo + wave_lo, hi + wave_lo, color=str(val))
-
-            metrics = [v for k,v in metrics.items()]
-        else:
-            metrics = None
+        if calculate_metrics:
+            sub_dir, metrics, above_threshold = self.calculate_spectra_metrics(
+                gt_flux, recon_flux, sub_dir, axis)
+        else: metrics, above_threshold = None, None
 
         axis.set_title(idx)
         if plot_gt_spectrum:
             axis.plot(gt_wave, gt_flux, color="black", label="GT")
         if plot_recon_spectrum:
-            axis.plot(recon_wave, recon_flux, color="blue", label="Recon.")
+            if above_threshold is not None: # plot recon flux according to zncc
+                axis.plot(recon_wave, recon_flux, color="blue", label="Recon.")
+
+                segments = segment_bool_array(above_threshold)
+                for (lo, hi) in segments:
+                    axis.plot(recon_wave[lo:hi], recon_flux[lo:hi], color="yellow")
+            else: axis.plot(recon_wave, recon_flux, color="blue", label="Recon.")
 
         if sub_dir != "":
             if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]
@@ -1130,7 +1149,6 @@ class SpectraData:
                                 calculate_metrics)
 
         # ids = np.array([10,6,18,15,11,16,14,7])
-        # ids = np.array([4])
         metrics = []
         for idx, cur_plot_data in enumerate(
             # zip(gt_wave[ids], gt_masks[ids], gt_fluxes[ids], recon_wave[ids], recon_masks[ids], recon_fluxes[ids])

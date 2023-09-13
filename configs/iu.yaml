@@ -5,7 +5,7 @@ global:
     activate_model_timer: False
     activate_trainer_timer: False
     dataloader_drop_last: False
-    exp_name: 'test-redshift-classification' #'debug-pretrain-resume'
+    exp_name: 'test-ngp-nerf' #'test-redshift-classification' #'debug-pretrain-resume'
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
@@ -26,8 +26,8 @@ global:
     #tasks: ['main_infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['main_infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['main_infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    tasks: ['train','recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
-    #tasks: ['main_infer','recon_gt_spectra','save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
+    tasks: ['train'] #,'recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
+    tasks: ['main_infer','recon_gt_spectra'] #,'save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
     #tasks: ['test','recon_gt_spectra','save_redshift','recon_codebook_spectra_individ','save_qtz_weights','recon_img']
 
 optimizer:
@@ -44,7 +44,7 @@ optimizer:
 net:
     nef_type: 'AstroHyperSpectralNerf' #'AstroNerf'
     model_redshift: True
-    redshift_model_method: 'classification' #'regression'
+    redshift_model_method: 'regression' #'classification' #'regression'
 
     encode_wave: True
     wave_encode_method: 'positional_encoding'
@@ -81,10 +81,10 @@ grid:
     grid_multiscale_type: 'cat'
     grid_feature_dim: 2
     grid_feature_std: 1
-    grid_num_lods: 1 #16 # max / min = b**l
+    grid_num_lods: 16 # max / min = b**l
     tree_type: 'geometric'
-    min_grid_res: 64 #6
-    max_grid_res: 64 #690 #160
+    min_grid_res: 6 #64 #6
+    max_grid_res: 690 #64 #690 #160
     codebook_bitwidth: 20
     interpolation_align_corners: True
 
@@ -93,7 +93,7 @@ pretrain:
 
 decoder:
     decoder_num_hidden_layers: 1
-    decoder_hidden_dim: 128
+    decoder_hidden_dim: 64
     decoder_layer_type: 'none'
     decoder_activation_type: "relu"
     decoder_skip_layers: []
@@ -107,8 +107,8 @@ decoder:
 qtz:
     quantization_strategy: 'soft'
     quantization_calculate_loss: False # only if hard qtz
-    qtz_latent_dim: 32
-    qtz_num_embed: 4
+    qtz_latent_dim: 16
+    qtz_num_embed: 50
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
@@ -222,10 +222,11 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20230907-210503_512_main_train_no_pretrain_2k_epochs'
+    infer_log_dir: '20230904-180628_19_pixel_main_train_conv_2k_epochs'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: ['zncc']
     spectra_zncc_window_width: 100
+    calculate_sliding_zncc_above_threshold: True
     log_pixel_ratio: True
     plot_residual_map: True
     img_resid_lo: -10
@@ -253,6 +254,8 @@ infer:
     plot_spectrum_with_recon: True
     plot_spectrum_with_trans: False
     plot_spectrum_with_sliding_zncc: False
+    plot_spectrum_according_to_zncc: True
+    local_zncc_threshold: 0.5
     average_neighbour_spectra: True
     infer_spectra_individually: False
 

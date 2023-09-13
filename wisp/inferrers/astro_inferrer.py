@@ -386,11 +386,23 @@ class AstroInferrer(BaseInferrer):
         self.reset_dataloader()
 
     def post_inferrence_selected_coords_partial_model(self):
-        self.metrics = np.array(self.metrics) # [n_models,n_spectra,n_metrics]
+        """ Log and save spectra metrics.
+            @Input
+              self.metrics: [[ dict[metric_name:val] ]
+        """
         if len(self.metrics) != 0:
-            [ np.save(self.metric_fnames[i], self.metrics[...,i])
-              for i in range(self.num_metrics) ]
-            log.info(f"metrics: {np.round(self.metrics[-1,:,:].T, 3)}")
+            metric_options = self.metrics[0][0].keys()
+            self.metrics = np.array([
+                [
+                    [ v for k,v in cur_spectra_metrics.items() ]
+                    for cur_spectra_metrics in cur_model_metrics
+                ] for cur_model_metrics in self.metrics
+            ]) # [n_models,n_spectra,n_metrics]
+
+            for i, metric_option in enumerate(metric_options):
+                fname = join(self.metric_dir, f"spectra_{metric_option}.npy")
+                np.save(fname, self.metrics[...,i])
+                log.info(f"{metric_option}: {np.round(self.metrics[-1,:,i].T, 3)}")
 
     def pre_inferrence_hardcode_coords_modified_model(self):
         """ Codebook spectra reconstruction.
@@ -1142,6 +1154,4 @@ class AstroInferrer(BaseInferrer):
     def configure_spectra_metrics(self):
         self.metric_options = self.extra_args["spectra_metric_options"]
         self.num_metrics = len(self.metric_options)
-        self.metrics = [] #np.zeros((self.num_metrics, 0))
-        self.metric_fnames = [ join(self.metric_dir, f"spectra_{option}.npy")
-                               for option in self.metric_options ]
+        self.metrics = []

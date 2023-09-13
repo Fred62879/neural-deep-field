@@ -194,7 +194,7 @@ def calculate_zncc_composite(s1, s2, window_width=1):
     zncc = calculate_zncc(s1, s2)
 
     zncc_sliding = []
-    los = np.arange(0, n, window_width)
+    los = np.arange(0, n - window_width)
     for lo in los:
         hi = min(lo + window_width, n)
         cur_zncc = calculate_zncc(s1[lo:hi], s2[lo:hi])

@@ -603,6 +603,8 @@ def define_cmd_line_args():
     infer_group.add_argument("--metric-options", nargs="+", choices=["mse","psnr","ssim"])
     infer_group.add_argument("--spectra-metric-options", nargs="+", choices=["zncc"])
     infer_group.add_argument("--spectra-zncc-window-width", type=float, default=1)
+    infer_group.add_argument("--calculate-sliding-zncc-above-threshold",
+                             action="store_true", default=False)
 
     infer_group.add_argument("--infer-selected", action="store_true", default=False,
                              help="infer only selected coords/spectra.")
@@ -631,7 +633,11 @@ def define_cmd_line_args():
     infer_group.add_argument("--plot-spectrum-with-recon", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-trans", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-sliding-zncc", action="store_true")
+    infer_group.add_argument("--plot-spectrum-according-to-zncc", action="store_true")
     infer_group.add_argument("--plot-spectrum-together", action="store_true")
+    infer_group.add_argument("--local-zncc-threshold", type=float,
+                             help="if plot spectrum according to zncc, we highlight region of \
+                             the spectra above this threshold with a different color.")
     infer_group.add_argument("--infer-spectra-individually", action="store_true")
     infer_group.add_argument("--codebook-spectra-clip-range", nargs="+")
 

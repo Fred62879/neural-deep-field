@@ -16,6 +16,21 @@ from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
+def segment_bool_array(arr):
+    """ Get segments of True from a boolean array.
+    """
+    arr = arr.astype(np.bool)
+    segments = []
+    n, lo = len(arr), -1
+    for i in range(n):
+        if arr[i]:
+            if lo == -1: lo = i
+        else:
+            if lo != -1: segments.append([lo, i])
+            lo = -1
+    if lo != -1: segments.append([start, n])
+    return segments
+
 def to_numpy(tensor):
     class_name = tensor.__class__.__name__
     if class_name == "Tensor":

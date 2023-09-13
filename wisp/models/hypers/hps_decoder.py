@@ -150,9 +150,10 @@ class HyperSpectralDecoder(nn.Module):
             spectra = torch.stack([
                 self.reconstruct_emitted_spectra(
                     input, wave, scaler, bias, cur_redshift,
-                    wave_bound, ret, codebook, qtz_args)
-                for cur_redshift in redshift.T # redshift [bsz,num_redshift_bins]
+                    wave_bound, ret, codebook, qtz_args
+                ) for cur_redshift in redshift.T # redshift [bsz,num_redshift_bins]
             ]).permute(1,0,2)
+
             # spectra [bsz,num_redshift_bins,nsmpl]; logits [bsz,num_redshift_bins]
             # print(ret["redshift_logits"])
             spectra = torch.sum(spectra * ret["redshift_logits"][...,None], dim=1)
