@@ -875,6 +875,7 @@ class AstroTrainer(BaseTrainer):
             gt_redshift = self.cur_patch.get_spectra_pixel_redshift().numpy()
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
+        print(redshift.shape)
         log.info(f"est redshift: {redshift}")
         log.info(f"GT. redshift: {gt_redshift}")
 

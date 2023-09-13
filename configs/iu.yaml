@@ -5,7 +5,7 @@ global:
     activate_model_timer: False
     activate_trainer_timer: False
     dataloader_drop_last: False
-    exp_name: 'debug-pretrain-resume'
+    exp_name: 'test-redshift-classification' #'debug-pretrain-resume'
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
@@ -26,8 +26,8 @@ global:
     #tasks: ['main_infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['main_infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['main_infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    tasks: ['train'] #,'recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
-    tasks: ['main_infer','recon_gt_spectra','save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
+    tasks: ['train','recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
+    #tasks: ['main_infer','recon_gt_spectra','save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
     #tasks: ['test','recon_gt_spectra','save_redshift','recon_codebook_spectra_individ','save_qtz_weights','recon_img']
 
 optimizer:
@@ -44,7 +44,7 @@ optimizer:
 net:
     nef_type: 'AstroHyperSpectralNerf' #'AstroNerf'
     model_redshift: True
-    redshift_model_method: 'classification' #'regression' # 'regression'
+    redshift_model_method: 'classification' #'regression'
 
     encode_wave: True
     wave_encode_method: 'positional_encoding'
@@ -136,9 +136,9 @@ spatial_decod:
     redshift_decod_activation_type: 'relu'
     redshift_decod_skip_layers: []
 
-    redshift_bin_width: 0.1
+    redshift_bin_width: 0.25
     redshift_lo: 0
-    redshift_hi: 5
+    redshift_hi: 4
 
 hyperspectral:
     hps_combine_method: 'concat'
@@ -163,7 +163,7 @@ trainer:
     log_cli_every: 200
     log_gpu_every: -1
     plot_grad_every: -1
-    save_data_every: -1
+    save_data_every: 200
     save_model_every: 200
 
     train_with_all_pixels: True
@@ -195,9 +195,9 @@ trainer:
 
     apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
-    redshift_semi_supervision: True # -
+    redshift_semi_supervision: False # -
 
-    train_use_all_wave: False
+    train_use_all_wave: True
     pretrain_use_all_wave: False
     spectra_supervision_use_all_wave: False
     train_num_wave_samples: 50
@@ -209,7 +209,7 @@ trainer:
 
     pretrain_codebook: True
     spectra_supervision: False
-    pretrain_log_dir: '20230910-225434_pretrain_4_codes_conv'
+    pretrain_log_dir: '20230910-232020_pretrain_32_codes_conv'
     pretrained_model_name: 'model-ep60000-it0.pth'
     #### ***********************************
 

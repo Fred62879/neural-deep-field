@@ -94,14 +94,14 @@ class SpatialDecoder(nn.Module):
         if self.kwargs["use_gpu"]:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else: device = "cpu"
-        self.redshift_bins = torch.arange(
+        self.redshift_bin_center = torch.arange(
             self.kwargs["redshift_lo"],
             self.kwargs["redshift_hi"],
             self.kwargs["redshift_bin_width"]
         ).to(device)
-        self.num_redshift_bins = len(self.redshift_bins)
+        self.num_redshift_bins = len(self.redshift_bin_center)
         offset = self.kwargs["redshift_bin_width"] / 2
-        self.redshift_bins += offset
+        self.redshift_bin_center += offset
 
     def init_decoder(self):
         if self.quantize_z:
@@ -127,43 +127,51 @@ class SpatialDecoder(nn.Module):
             skip=self.kwargs["spatial_decod_skip_layers"]
         )
 
+    ##########
+    # Forward
+    ##########
+
+    def generate_redshift(self, z, ret, specz, timer):
+        redshift, redshift_logits = None, None
+        if self.apply_gt_redshift:
+            assert specz is not None
+            ret["redshift"] = specz
+        elif self.model_redshift:
+            if self.redshift_model_method == "regression":
+                redshift = self.redshift_decoder(z[:,0])[...,0]
+                ret["redshift"] = self.redshift_adjust(redshift + 0.5)
+            elif self.redshift_model_method == "classification":
+                bsz = z.shape[0]
+                ret["redshift"]= self.redshift_bin_center[None,:].tile(bsz,1) # [bsz,num_bins]
+                ret["redshift_logits"] = F.softmax(
+                    self.redshift_decoder(z[:,0]), dim=-1) # [bsz,num_bins]
+            else:
+                raise ValueError("Unsupported redshift model method!")
+        timer.check("spatial_decod::redshift done")
+
+    def generate_scaler(self, z, ret, timer):
+        if self.output_scaler or self.output_bias:
+            out = self.scaler_decoder(z[:,0])
+            if self.output_scaler:
+                ret["scaler"] = out[...,0]
+                if self.output_bias:
+                    ret["bias"] = out[...,1]
+        timer.check("spatial_decod::scaler done")
+
     def forward(self, z, codebook, qtz_args, ret, specz=None, sup_id=None):
-        """ Decode latent variables
+        """ Decode latent variables to various spatial information we need.
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
+              codebook: codebook used for quantization
+              qtz_args: arguments for quantization operations
               specz: spectroscopic (gt) redshift
-              sup_id: id of pixels to supervise with gt redshift
+              sup_id: id of pixels to supervise with gt redshift (OBSOLETE)
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.reset()
 
-        # forward scaler
-        scaler, bias = None, None
-        if self.output_scaler or self.output_bias:
-            out = self.scaler_decoder(z[:,0])
-            if self.output_scaler:
-                scaler = out[...,0]
-                if self.output_bias:
-                    bias = out[...,1]
-        timer.check("spatial_decod::scaler done")
-
-        # forward redshift
-        if self.apply_gt_redshift:   # dont generate redshift
-            assert specz is not None
-            redshift = specz
-            ret["redshift"] = redshift
-        elif self.model_redshift:
-            if self.redshift_model_method == "regression":
-                redshift = self.redshift_decoder(z[:,0])[...,0]
-                redshift = self.redshift_adjust(redshift + 0.5)
-            elif self.redshift_model_method == "classification":
-                weights = self.redshift_decoder(z[:,0])
-                weights = F.softmax(weights, dim=-1)
-                redshift = weights@self.redshift_bins
-            else: raise ValueError()
-        else:
-            redshift = None
-        timer.check("spatial_decod::redshift done")
+        self.generate_scaler(z, ret, timer)
+        self.generate_redshift(z, ret, specz, timer)
 
         # decode/quantize
         if self.quantize_spectra:
@@ -175,10 +183,6 @@ class SpatialDecoder(nn.Module):
         timer.check("spatial_decod::qtz done")
 
         ret["latents"] = z
-        ret["bias"] = bias
-        ret["scaler"] = scaler
-        ret["redshift"] = redshift
-
         if self.quantize_spectra: return logits
         if self.quantize_z:       return z_q
         return z

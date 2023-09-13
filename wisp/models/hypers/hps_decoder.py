@@ -91,13 +91,17 @@ class HyperSpectralDecoder(nn.Module):
             skip=self.kwargs["decoder_skip_layers"]
         )
 
-    def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
-                            wave_bound, ret, codebook, qtz_args
+    ##################
+    # model forwarding
+    ##################
+
+    def reconstruct_emitted_spectra(self, input, wave, scaler, bias, redshift,
+                                    wave_bound, ret, codebook, qtz_args
     ):
-        """ Reconstruct spectra under given wave.
+        """ Reconstruct emitted (under current redshift) spectra using given input and wave.
+            And scale spectra intensity using scaler and bias.
             @Param
-               input: logits if qtz_spectra
-                      latents o.w.
+               input: logits if qtz_spectra; latents o.w.
         """
         if self.qtz_spectra:
             bsz = wave.shape[0]
@@ -125,6 +129,35 @@ class HyperSpectralDecoder(nn.Module):
         if self.intensify:
             spectra = self.intensifier(spectra)
 
+        return spectra
+
+    def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
+                            wave_bound, ret, codebook, qtz_args
+    ):
+        """ Reconstruct emitted (under possibly multiple redshift values) spectra
+              using given input and wave. And scale spectra intensity using scaler and bias.
+            @Return
+               spectra: reconstructed emitted spectra [bsz,num_nsmpl]
+        """
+        if self.kwargs["redshift_model_method"] == "regression":
+            assert redshift.ndim == 1
+            spectra = self.reconstruct_emitted_spectra(
+                input, wave, scaler, bias, redshift,
+                wave_bound, ret, codebook, qtz_args
+            )
+        elif self.kwargs["redshift_model_method"] == "classification":
+            assert redshift.ndim != 1
+            spectra = torch.stack([
+                self.reconstruct_emitted_spectra(
+                    input, wave, scaler, bias, cur_redshift,
+                    wave_bound, ret, codebook, qtz_args)
+                for cur_redshift in redshift.T # redshift [bsz,num_redshift_bins]
+            ]).permute(1,0,2)
+            # spectra [bsz,num_redshift_bins,nsmpl]; logits [bsz,num_redshift_bins]
+            # print(ret["redshift_logits"])
+            spectra = torch.sum(spectra * ret["redshift_logits"][...,None], dim=1)
+        else:
+            raise ValueError()
         return spectra
 
     def forward_sup_spectra(self, latents, wave, full_wave_bound,
@@ -157,7 +190,7 @@ class HyperSpectralDecoder(nn.Module):
                 num_sup_spectra=-1, sup_spectra_wave=None,
                 codebook=None, qtz_args=None, ret=None):
         """ @Param
-              latents:   (encoded or original) coords or logits for quantization.
+            latents:   (encoded or original) coords or logits for quantization.
                          [bsz,1,space_dim or coords_encode_dim]
 
             - hyperspectral
@@ -166,9 +199,10 @@ class HyperSpectralDecoder(nn.Module):
               trans:     corresponding transmission values of lambda. [(bsz,)nbands,num_samples]
               nsmpl:     average number of lambda samples falling within each band. [num_bands]
               full_wave_bound: min and max value of lambda
-
+                               used for linear normalization of lambda
             - spectra supervision
               num_spectra_coords: > 0 if spectra supervision.
+                                  The last #num_spectra_coords entries in latents are for sup.
               sup_spectra_wave: not None if do spectra supervision.
                                 [num_spectra_coords,full_num_samples]
             - spectra qtz
@@ -190,7 +224,9 @@ class HyperSpectralDecoder(nn.Module):
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.reset()
 
-        if num_sup_spectra > 0:
+        perform_spectra_supervision = num_sup_spectra > 0
+
+        if perform_spectra_supervision:
             self.forward_sup_spectra(
                 latents, sup_spectra_wave, full_wave_bound,
                 num_sup_spectra, ret, codebook, qtz_args
