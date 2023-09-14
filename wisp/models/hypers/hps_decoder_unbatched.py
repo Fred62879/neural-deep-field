@@ -33,8 +33,6 @@ class HyperSpectralDecoder(nn.Module):
         self.convert = HyperSpectralConverter(
             _model_redshift=_model_redshift, **kwargs
         )
-        self.redshift_model_method = self.kwargs["redshift_model_method"]
-
         self.init_decoder()
         if self.qtz_spectra:
             self.qtz = Quantization(False, **kwargs)
@@ -97,38 +95,31 @@ class HyperSpectralDecoder(nn.Module):
     # model forwarding
     ##################
 
-    def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
-                            wave_bound, ret, codebook, qtz_args
+    def reconstruct_emitted_spectra(self, input, wave, scaler, bias, redshift,
+                                    wave_bound, ret, codebook, qtz_args
     ):
-        """ Reconstruct emitted (under possibly multiple redshift values) spectra
-              using given input and wave. And scale spectra intensity using scaler and bias.
-            @Param:
-               input: 2D coords or embedded latents or logits [bsz,1,2/embed_dim]
-               wave:  [bsz,num_samples,1]
-               codebook: nn.Parameter([num_embed,embed_dim])
-            @Return
-               spectra: reconstructed emitted spectra [bsz,num_nsmpl]
+        """ Reconstruct emitted (under current redshift) spectra using given input and wave.
+            And scale spectra intensity using scaler and bias.
+            @Param
+               input: logits if qtz_spectra; latents o.w.
         """
-        # assert (self.redshift_model_method == "regression" and redshift.ndim == 1) or \
-        #     (self.redshift_model_method == "classification" and redshift.ndim != 1)
-        bsz = wave.shape[0]
+        # [num_code,num_bins,bsz,nsmpl,dim]
+        if self.qtz_spectra:
+            bsz = wave.shape[0]
+            # each input coord has #num_code spectra generated
+            latents = torch.stack([
+                self.convert(wave, code.tile(bsz,1,1), redshift, wave_bound)
+                for code in codebook.weight
+            ], dim=0) # [num_code,bsz,nsmpl,dim]
+        else:
+            latents = self.convert(wave, input, redshift, wave_bound)
+
+        spectra = self.spectra_decoder(latents)[...,0]
 
         if self.qtz_spectra:
-            codes = codebook.weight[:,None,None].tile(1,bsz,1,1)
-            latents = self.convert(
-                wave, codes, redshift, wave_bound) # [...,num_embed,bsz,nsmpl,dim]
-            codebook_spectra = self.spectra_decoder(latents)[...,0] # [...,num_embed,bsz,nsmpl]
-
-            # input here is logits
-            _, spectra = self.qtz(input, codebook_spectra, ret, qtz_args)
-            spectra = torch.squeeze(spectra, dim=-2) # [bsz,nsmpl]
-        else:
-            latents = self.convert(wave, input, redshift, wave_bound) # [...,bsz,nsmpl,dim]
-            spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
-
-        if self.redshift_model_method == "classification":
-            # spectra [num_redshift_bins,bsz,nsmpl]; logits [bsz,num_redshift_bins]
-            spectra = torch.matmul(ret["redshift_logits"][:,None], spectra.permute(1,0,2))[:,0]
+            # input here is logits, spectra is codebook spectra for each coord
+            _, spectra = self.qtz(input, spectra, ret, qtz_args)
+            spectra = spectra[:,0] # [bsz,nsmpl]
 
         if self.scale:
             assert scaler is not None
@@ -139,6 +130,35 @@ class HyperSpectralDecoder(nn.Module):
         if self.intensify:
             spectra = self.intensifier(spectra)
 
+        return spectra
+
+    def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
+                            wave_bound, ret, codebook, qtz_args
+    ):
+        """ Reconstruct emitted (under possibly multiple redshift values) spectra
+              using given input and wave. And scale spectra intensity using scaler and bias.
+            @Return
+               spectra: reconstructed emitted spectra [bsz,num_nsmpl]
+        """
+        if self.kwargs["redshift_model_method"] == "regression":
+            assert redshift.ndim == 1
+            spectra = self.reconstruct_emitted_spectra(
+                input, wave, scaler, bias, redshift,
+                wave_bound, ret, codebook, qtz_args
+            )
+        elif self.kwargs["redshift_model_method"] == "classification":
+            # assert redshift.ndim != 1
+            spectra = torch.stack([
+                self.reconstruct_emitted_spectra(
+                    input, wave, scaler, bias, cur_redshift,
+                    wave_bound, ret, codebook, qtz_args
+                ) for cur_redshift in redshift.T # redshift [bsz,num_redshift_bins]
+            ]).permute(1,0,2)
+
+            # spectra [bsz,num_redshift_bins,nsmpl]; logits [bsz,num_redshift_bins]
+            spectra = torch.sum(spectra * ret["redshift_logits"][...,None], dim=1)
+        else:
+            raise ValueError()
         return spectra
 
     def forward_sup_spectra(self, latents, wave, full_wave_bound,
@@ -187,7 +207,7 @@ class HyperSpectralDecoder(nn.Module):
               sup_spectra_wave: not None if do spectra supervision.
                                 [num_spectra_coords,full_num_samples]
             - spectra qtz
-              codebook    nn.Parameter [num_embed,embed_dim]
+              codebook
               qtz_args
 
             ret (output from nerf and/or quantization): {

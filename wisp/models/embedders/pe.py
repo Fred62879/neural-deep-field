@@ -258,10 +258,11 @@ class RandGaus(nn.Module):
         weight = 2 * torch.pi * self.omega * weight
         return weight
 
-    ''' input:  [bsz,(nsmpl,)dim]
-        output: [bsz,(nsmpl,)pe_dim]
-    '''
     def forward(self, coords):
+        """ @Param
+              input:  [...,bsz,(nsmpl,)dim]
+              output: [...,bsz,(nsmpl,)pe_dim]
+        """
         encd_coords = self.mappings[0](coords[...,0:1])
         for i in range(1,self.dim):
             encd_coords += self.mappings[i](coords[...,i:i+1])

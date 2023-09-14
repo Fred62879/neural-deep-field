@@ -142,7 +142,8 @@ class SpatialDecoder(nn.Module):
                 ret["redshift"] = self.redshift_adjust(redshift + 0.5)
             elif self.redshift_model_method == "classification":
                 bsz = z.shape[0]
-                ret["redshift"]= self.redshift_bin_center[None,:].tile(bsz,1) # [bsz,num_bins]
+                # ret["redshift"]= self.redshift_bin_center[None,:].tile(bsz,1) # [bsz,num_bins]
+                ret["redshift"]= self.redshift_bin_center
                 ret["redshift_logits"] = F.softmax(
                     self.redshift_decoder(z[:,0]), dim=-1) # [bsz,num_bins]
             else:

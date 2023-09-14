@@ -211,8 +211,8 @@ class Quantization(nn.Module):
     def soft_quantize(self, z, codebook, ret, qtz_args):
         """ Hard quantization can be applied at both quantize latent and spectra.
             @Param
-              z: logits [bsz,1,num_embed_dim]
-              codebook: codebook spectra [num_embeds,bsz,embed_dim]
+              z: logits [bsz,1,num_embed]
+              codebook: codebook spectra [...,num_embed,bsz,embed_dim]
         """
         if qtz_args["find_embed_id"]:
             min_embed_ids = torch.argmax(z, dim=-1)
@@ -227,7 +227,15 @@ class Quantization(nn.Module):
 
         # codebook here is codebook spectra
         if self.kwargs["quantize_spectra"]:
-            codebook = codebook.permute(1,0,2) # [bsz,num_embeds,full_nsmpl]
+            if codebook.ndim == 3:
+                codebook = codebook.permute(1,0,2) # [bsz,num_embeds,nsmpl]
+            elif codebook.ndim == 4:
+                num_bins = codebook.shape[0]
+                weights = weights[None,...].tile(num_bins,1,1,1) # [...,bsz,1,num_embds]
+                codebook = codebook.permute(0,2,1,3) # [...,bsz,num_embds,nsmpl]
+            else: raise ValueError()
+
+        # [...,bsz,1,nsmpl]
         z_q = torch.matmul(weights, codebook)
 
         if qtz_args["find_embed_id"]:

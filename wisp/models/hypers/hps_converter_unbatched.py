@@ -72,82 +72,55 @@ class HyperSpectralConverter(nn.Module):
 
     def shift_wave(self, wave, redshift):
         """ Convert observed lambda to emitted lambda.
-            @Param
-              wave: [bsz,nsmpl,1]
-              redshift: [bsz] or [num_bins]
-            @Return
-              emitted_wave: [(num_bins,)bsz,nsmpl,1]
         """
         wave = wave.permute(1,2,0)
 
-        if self.kwargs["redshift_model_method"] == "classification":
-            num_bins = len(redshift)
-            wave = wave[...,None].tile(1,1,1,num_bins)
-        wave = wave / (1 + redshift) # dont use `/=` this will change wave object
-        #print(wave[:,0,1,0].T)
+        # print(wave[:,0,:].T, redshift)
+        # print(wave.shape, redshift.shape)
+        if wave.ndim == 3: # [nsmpl,1,bsz]
+            wave = wave / (1 + redshift) # dont use `/=` this will change wave object
+        elif wave.ndim == 4: # [nbands,nsmpl,1,bsz]
+            wave = wave / (1 + redshift)
+        else:
+            raise Exception("Wrong wave dimension when doing wave shifting.")
+        #print(wave[:,0,:].T)
 
-        if wave.ndim == 3:
-            wave = wave.permute(2,0,1)
-        elif wave.ndim == 4:
-            wave = wave.permute(3,2,0,1)
-        else: raise ValueError("Wrong wave dimension when redshifting.")
+        # del redshift
+        wave = wave.permute(2,0,1)
         return wave
 
     def combine_spatial_spectral(self, spatial, spectral):
         """ Combine spatial with spectral latent variables.
             @Param
-              spatial:   [(num_codes,)bsz,1,2/embed_dim]
-              spectral:  [(num_bins,)bsz,nsmpl,1/embed_dim]
+              spatial:   [bsz,num_samples,2 or embed_dim]
+              spectral:  [bsz,num_samples,1 or embed_dim]
             @Return
-              if add:    [(num_codes,num_bins,)bsz,nsmpls,embed_dim]
-              if concat: [(num_codes,num_bins,)bsz,nsmpls,spa_dim+spe_dim]
+              if add:    [bsz,num_samples,embed_dim]
+              if concat: [bsz,num_samples,3 or spa_embed_dim+spe_embed_dim]
         """
-        # print(spatial.shape, spectral.shape)
-        nsmpls = spectral.shape[-2]
-        if spatial.ndim == 4: num_codes = spatial.shape[0]
-        if spectral.ndim == 4: num_bins = spectral.shape[0]
-
-        if spatial.ndim == 3:
-            if spectral.ndim == 3:
-                spatial.tile(1,nsmpls,1)
-            elif spectral.ndim == 4:
-                spatial = spatial[None,...].tile(num_bins,1,nsmpls,1)
-            else: raise ValueError()
-
-        elif spatial.ndim == 4:
-            if spectral.ndim == 3:
-                spatial = spatial.tile(1,1,nsmpls,1)
-                spectral = spectral[None,...].tile(num_codes,1,1,1)
-            elif spectral.ndim == 4:
-                spatial = spatial[None,...].tile(num_bins,1,1,nsmpls,1)
-                spectral = spectral[:,None,...].tile(1,num_codes,1,1,1)
-        else:
-            raise ValueError("Wrong wave dimension when combining.")
-
-        # spatial and spectral now are both [...,bsz,nsmpl,?]
         if self.combine_method == "add":
             assert(spatial.shape == spectral.shape)
             latents = spatial + spectral # [...,embed_dim]
         elif self.combine_method == "concat":
             latents = torch.cat((spatial, spectral), dim=-1)
         else:
-            raise ValueError("Unsupported spatial-spectral combination method.")
+            raise ValueError("Unrecognized spatial-spectral combination method.")
+
+        del spatial, spectral
         return latents
 
     def forward(self, wave, latents, redshift, wave_bound):
         """ Process wave (shift, encode, if required) and
               combine with RA/DEC (original state or encoded) to hyperspectral latents.
             @Param
-              wave:     lambda values used for casting. [bsz,nsmpl,1]
-              latents:  2D coords / encoded coords    / codebook.
-                        [bsz,1,2] / [bsz,1,embed_dim] / [num_code,bsz,1,embed_dim]
-              redshift: redshift value, unique for each pixel.
-                        if classification modeling: [num_bins]
-                        else: [bsz]
+              wave:     lambda values used for casting.   [bsz,nsmpl,1]
+              latents:  (original or encoded) 2D coords.  [bsz,1,2 or coords_embed_dim]
+              redshift: redshift value, unique for each pixel. [bsz]
             @Return
               latents:  hyperspectral latents (i.e. ra/dec/wave)
         """
-        embed_dim = latents.shape[-1]
+        num_samples = wave.shape[-2]
+        coords_encode_dim = latents.shape[-1]
 
         if redshift is None:
             assert not self._model_redshift
@@ -155,10 +128,12 @@ class HyperSpectralConverter(nn.Module):
         wave = self.linear_norm_wave(wave, wave_bound)
 
         if self.encode_wave:
-            wave = self.wave_encoder(wave) # [...,bsz,num_samples,wave_embed_dim]
+            wave = self.wave_encoder(wave) # [bsz,num_samples,wave_embed_dim]
         else:
             # assert coords are not encoded as well, should only use siren in this case
-            assert not self.kwargs["encode_coords"] and embed_dim == 2
+            assert not self.kwargs["encode_coords"] and coords_encode_dim == 2
+            # latents = latents[...,:2] # remove dummy 3rd dim
 
+        latents = latents.tile(1,num_samples,1) # [bsz,nsamples,encode_dim or 2]
         latents = self.combine_spatial_spectral(latents, wave)
         return latents

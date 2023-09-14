@@ -61,13 +61,13 @@ class Encoder(nn.Module):
     def forward(self, coords, lod_idx=None):
         """ Encode given coords
             @Param
-              coords: [batch_size,num_samples,coord_dim]
+              coords: [...,batch_size,num_samples,coord_dim]
             @Return
               latents: [batch_size,num_samples,latent_dim]
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
 
-        batch, num_samples, _ = coords.shape
+        (batch, num_samples) = coords.shape[-3:-1]
 
         if self.encode_method == "positional_encoding":
             latents = self.embedder(coords) # [bsz,num_samples,coords_embed_dim]
