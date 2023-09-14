@@ -21,7 +21,7 @@ from wisp.datasets.patch_data import PatchData
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
-    load_pretrained_model_weights, forward, print_shape, create_patch_uid
+    load_pretrained_model_weights, forward, print_shape, create_patch_uid, classify_redshift
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
@@ -56,7 +56,7 @@ class AstroTrainer(BaseTrainer):
         self.pretrain_codebook = extra_args["pretrain_codebook"]
         self.use_all_pixels = extra_args["train_with_all_pixels"]
         self.spectra_n_neighb = extra_args["spectra_neighbour_size"]**2
-        self.redshift_classification = extra_args["model_redshift"] and extra_args["redshift_model_method"] == "classification"
+        self.classify_redshift = classify_redshift(**self.extra_args)
 
         assert self.use_all_pixels and extra_args["train_pixel_ratio"] == 1
 
@@ -304,7 +304,11 @@ class AstroTrainer(BaseTrainer):
             self.save_data = True
             if self.save_scaler: self.scalers = []
             if self.save_latents: self.latents = []
-            if self.save_redshift: self.redshift = []
+            if self.save_redshift:
+                if self.classify_redshift:
+                    self.argmax_redshift = []
+                    self.weighted_redshift = []
+                else: self.redshift = []
             if self.save_codebook: self.codebook = None
             if self.plot_embed_map: self.embed_ids = []
             if self.save_qtz_weights: self.qtz_weights = []
@@ -417,11 +421,15 @@ class AstroTrainer(BaseTrainer):
             if self.save_latents:
                 self.latents.extend(ret["latents"])
             if self.save_redshift:
-                if self.extra_args["redshift_model_method"] == "regression":
-                    self.redshift.extend(ret["redshift"])
+                if self.classify_redshift:
+                    ids = torch.argmax(ret["redshift_logits"], dim=-1)
+                    argmax_redshift = ret["redshift"][ids]
+                    self.argmax_redshift.extend(argmax_redshift)
+                    weighted_redshift = torch.sum(
+                        ret["redshift"] * ret["redshift_logits"], dim=-1)
+                    self.weighted_redshift.extend(weighted_redshift)
                 else:
-                    redshift = torch.sum(ret["redshift"] * ret["redshift_logits"], dim=-1)
-                    self.redshift.extend(redshift)
+                    self.redshift.extend(ret["redshift"])
             if self.plot_embed_map:
                 self.embed_ids.extend(ret["embed_ids"])
             if self.save_qtz_weights:
@@ -507,13 +515,15 @@ class AstroTrainer(BaseTrainer):
     def configure_dataset(self):
         """ Configure dataset with selected fields and set length accordingly.
         """
-        fields = ["coords"]
+        fields = []
 
         if self.space_dim == 3:
             fields.append("wave_data")
             self.dataset.set_wave_source("trans")
 
         if self.pixel_supervision:
+            fields.append("coords")
+            self.set_pixel_supervision_coords()
             if self.weight_train:
                 fields.append("weights")
             if self.train_spectra_pixels_only:
@@ -521,6 +531,7 @@ class AstroTrainer(BaseTrainer):
             else: fields.append("pixels")
 
         if self.spectra_supervision:
+            # spectra supervision coords are added as part of spectra data
             fields.append("spectra_data")
 
         if self.redshift_semi_supervision:
@@ -537,9 +548,8 @@ class AstroTrainer(BaseTrainer):
         self.dataset.toggle_wave_sampling(
             sample_wave=not self.extra_args["train_use_all_wave"]
         )
-        self.set_coords()
 
-    def set_coords(self):
+    def set_pixel_supervision_coords(self):
         if self.train_spectra_pixels_only:
             pixel_id = get_neighbourhood_center_pixel_id(
                 self.extra_args["spectra_neighbour_size"])
@@ -689,10 +699,10 @@ class AstroTrainer(BaseTrainer):
                       qtz=self.qtz,
                       qtz_strategy=self.qtz_strategy,
                       apply_gt_redshift=self.apply_gt_redshift,
+                      classify_redshift=self.classify_redshift,
                       perform_integration=self.perform_integration,
                       trans_sample_method=self.trans_sample_method,
                       spectra_supervision=self.spectra_supervision,
-                      redshift_classification=self.redshift_classification,
                       save_scaler=self.save_data and self.save_scaler,
                       save_latents=self.save_data and self.save_latents,
                       save_codebook=self.save_data and self.save_codebook,
@@ -774,8 +784,8 @@ class AstroTrainer(BaseTrainer):
             self.timer.check("codebook loss")
 
         torch.autograd.set_detect_anomaly(True)
-        total_loss = redshift_loss + spectra_loss + codebook_loss
-        # total_loss = redshift_loss + recon_loss + spectra_loss + codebook_loss
+        # total_loss = redshift_loss + spectra_loss + codebook_loss
+        total_loss = redshift_loss + recon_loss + spectra_loss + codebook_loss
         self.log_dict["total_loss"] += total_loss.item()
         return total_loss, ret
 
@@ -836,10 +846,14 @@ class AstroTrainer(BaseTrainer):
             np.save(fname, self.latents)
 
         if self.save_scaler: self._save_scaler()
-        if self.save_redshift: self._save_redshift()
         if self.plot_embed_map: self._plot_embed_map()
         if self.save_qtz_weights: self.log_qtz_weights()
         if self.recon_gt_spectra: self._recon_gt_spectra()
+        if self.save_redshift:
+            if self.classify_redshift:
+                self._save_redshift("argmax_redshift")
+                self._save_redshift("weighted_redshift")
+            else: self._save_redshift("redshift")
         if self.recon_img or self.recon_crop:
             self.restore_evaluate_tiles()
         if self.recon_codebook_spectra_individ:
@@ -869,8 +883,9 @@ class AstroTrainer(BaseTrainer):
         np.set_printoptions(precision=3)
         log.info(f"scaler: {scalers}")
 
-    def _save_redshift(self):
-        redshift = torch.stack(self.redshift).detach().cpu().numpy()
+    def _save_redshift(self, attr):
+        redshift = getattr(self, attr)
+        redshift = torch.stack(redshift).detach().cpu().numpy()
         if self.train_spectra_pixels_only:
             gt_redshift = self.dataset.get_semi_supervision_spectra_redshift().numpy()
         else:
@@ -878,7 +893,7 @@ class AstroTrainer(BaseTrainer):
             gt_redshift = self.cur_patch.get_spectra_pixel_redshift().numpy()
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
-        log.info(f"est redshift: {redshift}")
+        log.info(f"est {attr}: {redshift}")
         log.info(f"GT. redshift: {gt_redshift}")
 
     def _plot_embed_map(self):

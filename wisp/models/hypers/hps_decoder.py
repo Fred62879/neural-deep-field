@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import print_shape, get_input_latents_dim
+from wisp.utils.common import print_shape, get_input_latents_dim, classify_redshift
 
 from wisp.models.decoders import Decoder, BasicDecoder
 from wisp.models.activations import get_activation_class
@@ -29,11 +29,11 @@ class HyperSpectralDecoder(nn.Module):
         self.add_bias = add_bias
         self.intensify = intensify
         self.qtz_spectra = qtz_spectra
+        self.classify_redshift = classify_redshift(**kwargs)
 
         self.convert = HyperSpectralConverter(
             _model_redshift=_model_redshift, **kwargs
         )
-        self.redshift_model_method = self.kwargs["redshift_model_method"]
 
         self.init_decoder()
         if self.qtz_spectra:
@@ -113,8 +113,6 @@ class HyperSpectralDecoder(nn.Module):
             @Return
                spectra: reconstructed emitted spectra [bsz,num_nsmpl]
         """
-        # assert (self.redshift_model_method == "regression" and redshift.ndim == 1) or \
-        #     (self.redshift_model_method == "classification" and redshift.ndim != 1)
         bsz = wave.shape[0]
 
         if self.qtz_spectra:
@@ -130,7 +128,7 @@ class HyperSpectralDecoder(nn.Module):
             latents = self.convert(wave, input, redshift, wave_bound) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
 
-        if self.redshift_model_method == "classification":
+        if self.classify_redshift:
             # spectra [num_redshift_bins,bsz,nsmpl]; logits [bsz,num_redshift_bins]
             spectra = torch.matmul(ret["redshift_logits"][:,None], spectra.permute(1,0,2))[:,0]
 
@@ -162,17 +160,10 @@ class HyperSpectralDecoder(nn.Module):
             full_wave_bound, ret, codebook, qtz_args
         )
 
-        if ret["bias"] is not None:
-            ret["bias"] = ret["bias"][:-num_spectra_coords]
-        if ret["scaler"] is not None:
-            ret["scaler"] = ret["scaler"][:-num_spectra_coords]
-        if ret["redshift"] is not None:
-            ret["redshift"] = ret["redshift"][:-num_spectra_coords]
-
     def forward(self, latents,
                 wave, trans, nsmpl, full_wave_bound,
                 trans_mask=None,
-                num_sup_spectra=-1, sup_spectra_wave=None,
+                num_sup_spectra=0, sup_spectra_wave=None,
                 codebook=None, qtz_args=None, ret=None):
         """ @Param
             latents:   (encoded or original) coords or logits for quantization.
@@ -206,8 +197,12 @@ class HyperSpectralDecoder(nn.Module):
               intensity: reconstructed pixel values
               sup_spectra: reconstructed spectra used for spectra supervision
         """
+        assert num_sup_spectra >= 0
+        bsz = latents.shape[0]
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.reset()
+
+        # print(latents.shape, wave.shape)
 
         perform_spectra_supervision = num_sup_spectra > 0
 
@@ -219,8 +214,12 @@ class HyperSpectralDecoder(nn.Module):
             latents = latents[:-num_sup_spectra]
             if latents.shape[0] == 0: return
 
+        n = bsz if not perform_spectra_supervision else bsz-num_sup_spectra
         ret["spectra"] = self.reconstruct_spectra(
-            latents, wave, ret["scaler"], ret["bias"], ret["redshift"],
+            latents, wave,
+            None if ret["scaler"] is None else ret["scaler"][:n],
+            None if ret["bias"] is None else ret["bias"][:n],
+            None if ret["redshift"] is None else ret["redshift"][:n],
             full_wave_bound, ret, codebook, qtz_args
         )
         timer.check("hps_decoder::spectra reconstruced")

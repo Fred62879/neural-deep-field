@@ -9,7 +9,7 @@ global:
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    #tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra','save_pixel_values','recon_codebook_spectra_individ','save_redshift','recon_img','integrate_gt_spectra']
+    tasks: ['pretrain_infer','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra','save_pixel_values','recon_codebook_spectra_individ','save_redshift','recon_img','integrate_gt_spectra']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -44,7 +44,7 @@ optimizer:
 net:
     nef_type: 'AstroHyperSpectralNerf' #'AstroNerf'
     model_redshift: True
-    redshift_model_method: 'regression' #'classification' #'regression'
+    redshift_model_method: 'classification' #'regression'
 
     encode_wave: True
     wave_encode_method: 'positional_encoding'
@@ -156,14 +156,14 @@ trainer:
     redshift_loss_cho: l2_mean
     num_epochs: 4000
     batch_size: 5500
-    pretrain_batch_size: 2200
+    pretrain_batch_size: 1500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
     log_cli_every: 800
     log_gpu_every: -1
     plot_grad_every: -1
-    save_data_every: 800
+    save_data_every: -1
     save_model_every: 800
 
     train_with_all_pixels: True
@@ -197,9 +197,9 @@ trainer:
 
     apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
-    redshift_semi_supervision: True # -
+    redshift_semi_supervision: False # -
 
-    train_use_all_wave: True
+    train_use_all_wave: False
     pretrain_use_all_wave: False
     spectra_supervision_use_all_wave: False
     train_num_wave_samples: 50
@@ -207,11 +207,11 @@ trainer:
     spectra_supervision_num_wave_samples: 100
 
     resume_train: False
-    resume_log_dir: '20230912-130722'
+    # resume_log_dir: '20230914-130203'
 
-    pretrain_codebook: False
-    pretrain_log_dir: '20230910-232020_pretrain_32_codes_conv'
-    # pretrained_model_name: 'model-ep60000-it0.pth'
+    pretrain_codebook: True
+    pretrain_log_dir: '20230914-131128_19_spectra_pretrain_8k_epochs'
+    pretrained_model_name: 'model-ep4000-it0.pth'
     #### ***********************************
 
 infer:
@@ -225,7 +225,7 @@ infer:
     to_HDU: False
     # infer_log_dir: '20230913-131739_19_pixel_no_pretrain_old_arch'
     metric_options: ['mse','ssim','psnr']
-    spectra_metric_options: ['zncc']
+    spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 100
     calculate_sliding_zncc_above_threshold: True
     log_pixel_ratio: True

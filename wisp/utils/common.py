@@ -16,6 +16,10 @@ from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
+def classify_redshift(**kwargs):
+    return kwargs["model_redshift"] and not kwargs["apply_gt_redshift"] \
+        and kwargs["redshift_model_method"] == "classification"
+
 def segment_bool_array(arr):
     """ Get segments of True from a boolean array.
     """
@@ -209,10 +213,10 @@ def forward(
         qtz_strategy="none",
         apply_gt_redshift=False,
         codebook_pretrain=False,
+        classify_redshift=False,
         spectra_supervision=False,
         perform_integration=False,
         trans_sample_method="none",
-        redshift_classification=False,
         redshift_supervision_train=False,
         save_scaler=False,
         save_spectra=False,
@@ -241,7 +245,7 @@ def forward(
         if save_qtz_weights: requested_channels.append("qtz_weights")
         if save_codebook_loss: requested_channels.append("codebook_loss")
         if save_codebook_spectra: requested_channels.append("codebook_spectra")
-        if save_redshift and redshift_classification: requested_channels.append("redshift_logits")
+        if save_redshift and classify_redshift: requested_channels.append("redshift_logits")
 
         net_args["wave"] = data["wave"]
         net_args["wave_range"] = data["wave_range"] # linear normalization

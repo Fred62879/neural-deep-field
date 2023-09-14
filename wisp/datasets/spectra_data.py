@@ -454,15 +454,21 @@ class SpectraData:
         # if len(test_ids) == 0 or len(validation_ids) == 0:
         #     raise ValueError("Please select patches properly to make sure the number of validation and test spectra is not zero.")
 
-        # validation_ids = np.array([0])
-        log.info(f"test spectra ids: {test_ids}")
-        log.info(f"validation spectra ids: {validation_ids}")
-
         # use the rest spectra for pretrain (spectra supervision)
         supervision_ids = np.array(list(set(ids)-set(validation_ids)-set(test_ids))).astype(int)
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
-        # log.info(f"supervision spectra ids: {supervision_ids}")
+
+        ## tmp added to debug
+        a = supervision_ids
+        b = validation_ids
+        validation_ids = b
+        supervision_ids = b
+        ## ends here
+
+        # log.info(f"test spectra ids: {test_ids}")
+        # log.info(f"validation spectra ids: {validation_ids}")
+        log.info(f"supervision spectra ids: {supervision_ids}")
 
         self.num_test_spectra = len(test_ids)
         self.num_validation_spectra = len(validation_ids)

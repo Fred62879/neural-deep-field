@@ -148,6 +148,7 @@ class SpatialDecoder(nn.Module):
                     self.redshift_decoder(z[:,0]), dim=-1) # [bsz,num_bins]
             else:
                 raise ValueError("Unsupported redshift model method!")
+
         timer.check("spatial_decod::redshift done")
 
     def generate_scaler(self, z, ret, timer):

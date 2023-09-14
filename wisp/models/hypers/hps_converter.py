@@ -2,6 +2,8 @@
 import torch
 import torch.nn as nn
 
+from wisp.utils.common import classify_redshift
+
 from wisp.models.embedders import Encoder
 from wisp.models.decoders import BasicDecoder, Siren
 
@@ -22,6 +24,8 @@ class HyperSpectralConverter(nn.Module):
         self.encode_wave = kwargs["encode_wave"]
         self.quantize_spectra = kwargs["quantize_spectra"]
         self.combine_method = kwargs["hps_combine_method"]
+
+        self.classify_redshift = classify_redshift(**kwargs)
 
         self.init_encoder()
 
@@ -84,7 +88,7 @@ class HyperSpectralConverter(nn.Module):
         """
         wave = wave.permute(1,2,0)
 
-        if self.kwargs["redshift_model_method"] == "classification":
+        if self.classify_redshift:
             num_bins = len(redshift)
             wave = wave[...,None].tile(1,1,1,num_bins)
         wave = wave / (1 + redshift) # dont use `/=` this will change wave object
@@ -106,7 +110,6 @@ class HyperSpectralConverter(nn.Module):
               if add:    [(num_codes,num_bins,)bsz,nsmpls,embed_dim]
               if concat: [(num_codes,num_bins,)bsz,nsmpls,spa_dim+spe_dim]
         """
-        # print(spatial.shape, spectral.shape)
         nsmpls = spectral.shape[-2]
         if spatial.ndim == 4: num_codes = spatial.shape[0]
         if spectral.ndim == 4: num_bins = spectral.shape[0]

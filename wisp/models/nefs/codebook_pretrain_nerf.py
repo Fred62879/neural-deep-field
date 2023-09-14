@@ -69,11 +69,11 @@ class CodebookPretrainNerf(BaseNeuralField):
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.check("forward starts")
+        # print(coords.shape, wave.shape)
 
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]
         coords = coords[:,None]
-        # print(coords.shape)
 
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)

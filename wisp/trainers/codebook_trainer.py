@@ -34,8 +34,7 @@ class CodebookTrainer(BaseTrainer):
 
         assert(
             extra_args["space_dim"] == 3 and \
-            extra_args["pretrain_codebook"] and \
-            not extra_args["spectra_supervision"]
+            extra_args["pretrain_codebook"]
         )
 
         # save config file to log directory

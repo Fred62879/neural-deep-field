@@ -100,7 +100,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
     def hyperspectral(self, coords, wave, wave_range,
                       trans=None, nsmpl=None,
                       specz=None, sup_id=None,
-                      sup_spectra_wave=None, num_sup_spectra=-1,
+                      sup_spectra_wave=None, num_sup_spectra=0,
                       qtz_args=None, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:

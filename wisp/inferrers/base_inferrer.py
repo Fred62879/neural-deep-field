@@ -4,8 +4,8 @@ import torch
 import logging as log
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import create_patch_uid
 from wisp.datasets.patch_data import PatchData
+from wisp.utils.common import create_patch_uid, classify_redshift
 
 from os.path import join
 from datetime import datetime
@@ -35,6 +35,7 @@ class BaseInferrer(ABC):
         self.plot_residual_map = extra_args["plot_residual_map"]
         self.infer_last_model_only = extra_args["infer_last_model_only"]
         self.recon_spectra_pixels_only = extra_args["train_spectra_pixels_only"]
+        self.classify_redshift = classify_redshift(**extra_args)
 
         self.extra_args = extra_args
 
