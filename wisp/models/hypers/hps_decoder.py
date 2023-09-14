@@ -101,10 +101,14 @@ class HyperSpectralDecoder(nn.Module):
                             wave_bound, ret, codebook, qtz_args
     ):
         """ Reconstruct emitted (under possibly multiple redshift values) spectra
-              using given input and wave. And scale spectra intensity using scaler and bias.
+              using given input and wave.
+            Scale spectra intensity using scaler, bias, and sinh func, if needed.
             @Param:
                input: 2D coords or embedded latents or logits [bsz,1,2/embed_dim]
                wave:  [bsz,num_samples,1]
+               redshift: [num_bins] if model redshift using classification model
+                         [bsz] o.w.
+               wave_bound: lo and hi lambda values used for linear normalization [2]
                codebook: nn.Parameter([num_embed,embed_dim])
             @Return
                spectra: reconstructed emitted spectra [bsz,num_nsmpl]

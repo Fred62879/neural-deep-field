@@ -3,7 +3,7 @@ global:
     verbose: False
     print_shape: False
     activate_model_timer: False
-    activate_trainer_timer: True
+    activate_trainer_timer: False
     dataloader_drop_last: False
     exp_name: 'test-redshift-classification' #'debug-pretrain-resume'
     use_gpu: True
@@ -26,8 +26,8 @@ global:
     #tasks: ['main_infer','recon_gt_spectra','recon_codebook_spectra']
     #tasks: ['main_infer','recon_img','recon_synthetic_band','plot_embed_map']
     #tasks: ['main_infer','recon_img','plot_embed_map','plot_redshift','plot_scaler','save_qtz_weights']
-    tasks: ['train'] #,'recon_gt_spectra_during_train','recon_img_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
-    #tasks: ['main_infer','recon_gt_spectra','save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
+    tasks: ['train','save_redshift_during_train'] #'recon_gt_spectra_during_train','recon_img_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
+    tasks: ['main_infer','recon_gt_spectra','save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
     #tasks: ['test','recon_gt_spectra','save_redshift','recon_codebook_spectra_individ','save_qtz_weights','recon_img']
 
 optimizer:
@@ -44,7 +44,7 @@ optimizer:
 net:
     nef_type: 'AstroHyperSpectralNerf' #'AstroNerf'
     model_redshift: True
-    redshift_model_method: 'classification' #'regression'
+    redshift_model_method: 'regression' #'classification' #'regression'
 
     encode_wave: True
     wave_encode_method: 'positional_encoding'
@@ -154,17 +154,17 @@ trainer:
     pixel_loss_cho: l1_mean
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
-    num_epochs: 2000
+    num_epochs: 4000
     batch_size: 5500
     pretrain_batch_size: 2200
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 200
+    log_cli_every: 800
     log_gpu_every: -1
     plot_grad_every: -1
-    save_data_every: 200
-    save_model_every: 200
+    save_data_every: 800
+    save_model_every: 800
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -190,12 +190,14 @@ trainer:
     main_train_frozen_layer: ["nef.codebook.weight","spectra_decoder"]
 
     #### ******** Constantly modify ********
-    pixel_supervision: False          # these two conflict
-    train_spectra_pixels_only: True   #  each other
+    train_spectra_pixels_only: True
+
+    pixel_supervision: False
+    spectra_supervision: True
 
     apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
-    redshift_semi_supervision: False # -
+    redshift_semi_supervision: True # -
 
     train_use_all_wave: True
     pretrain_use_all_wave: False
@@ -208,8 +210,7 @@ trainer:
     resume_log_dir: '20230912-130722'
 
     pretrain_codebook: False
-    spectra_supervision: False
-    # pretrain_log_dir: '20230829-200027_pretrain_50_codes_6k+_spectra_60k_epochs_unconv'
+    pretrain_log_dir: '20230910-232020_pretrain_32_codes_conv'
     # pretrained_model_name: 'model-ep60000-it0.pth'
     #### ***********************************
 

@@ -49,9 +49,13 @@ def get_pretrain_pipelines(pipelines, tasks, args):
 
 def get_main_train_pipelines(pipelines, tasks, args):
     if "train" in tasks:
-        # full pipline for training
-        nef_train = globals()[args.nef_type](**vars(args))
-        pipelines["full"] = AstroPipeline(nef_train)
+        if args.spectra_supervision:
+            nef_train = globals()[args.nef_type](integrate=False,**vars(args))
+            pipelines["full"] = AstroPipeline(nef_train)
+        if args.pixel_supervision:
+            # override pipeline for spectra sup if we do pixel sup
+            nef_train = globals()[args.nef_type](**vars(args))
+            pipelines["full"] = AstroPipeline(nef_train)
 
     if "main_infer" in tasks or "test" in tasks:
         # full pipline for img recon

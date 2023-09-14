@@ -516,12 +516,12 @@ def define_cmd_line_args():
     train_group.add_argument("--pretrain-use-all-wave", action="store_true")
     train_group.add_argument("--spectra-supervision-use-all-wave", action="store_true")
 
-    # train_group.add_argument("--infer-during-train", action="store_true")
-    train_group.add_argument("--train-spectra-pixels-only", action="store_true")
+    train_group.add_argument("--train-spectra-pixels-only", action="store_true",
+                             help="whether sample only spectra pixels for main training.")
     train_group.add_argument("--pixel-supervision", action="store_true",
-                             help="whether training supervised by pixel values or not.")
+                             help="whether main training supervised by pixel values.")
     train_group.add_argument("--spectra-supervision", action="store_true",
-                             help="whether training supervised by spectra or not.")
+                             help="whether main training supervised by spectra.")
 
     train_group.add_argument("--apply-gt-redshift", action="store_true",
                              help="apply gt redshift instead of generating redshift.")

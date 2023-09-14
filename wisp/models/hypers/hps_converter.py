@@ -66,6 +66,10 @@ class HyperSpectralConverter(nn.Module):
         else:
             assert not self.kwargs["encode_wave"]
 
+    ####################
+    # forward operations
+    ####################
+
     def linear_norm_wave(self, wave, wave_bound):
         (lo, hi) = wave_bound # 3940, 10870
         return self.wave_multiplier * (wave - lo) / (hi - lo)

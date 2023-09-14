@@ -56,7 +56,9 @@ class AstroTrainer(BaseTrainer):
         self.pretrain_codebook = extra_args["pretrain_codebook"]
         self.use_all_pixels = extra_args["train_with_all_pixels"]
         self.spectra_n_neighb = extra_args["spectra_neighbour_size"]**2
-        # assert self.use_all_pixels and extra_args["train_pixel_ratio"] == 1
+        self.redshift_classification = extra_args["model_redshift"] and extra_args["redshift_model_method"] == "classification"
+
+        assert self.use_all_pixels and extra_args["train_pixel_ratio"] == 1
 
         self.summarize_training_tasks()
         self.set_path()
@@ -89,19 +91,20 @@ class AstroTrainer(BaseTrainer):
         self.save_qtz_weights = "save_qtz_weights_during_train" in tasks and \
             (self.qtz_spectra or (self.qtz_latent and qtz_strategy == "soft"))
 
-        self.pixel_supervision = self.extra_args["pixel_supervision"]
+        # sample only pixels with GT spectra
         self.train_spectra_pixels_only = self.extra_args["train_spectra_pixels_only"]
-        assert(self.pixel_supervision ^ self.train_spectra_pixels_only)
         if self.train_spectra_pixels_only:
             assert self.extra_args["use_full_patch"]
 
-        self.perform_integration = self.pixel_supervision or self.train_spectra_pixels_only
-        self.trans_sample_method = self.extra_args["trans_sample_method"]
-
+        self.pixel_supervision = self.extra_args["pixel_supervision"]
         self.spectra_supervision = self.space_dim == 3 and \
             self.extra_args["spectra_supervision"]
+        assert self.pixel_supervision + self.spectra_supervision >= 1
+
         self.spectral_inpaint = self.pixel_supervision and \
             self.space_dim == 3 and "spectral_inpaint" in tasks
+        self.perform_integration = self.pixel_supervision
+        self.trans_sample_method = self.extra_args["trans_sample_method"]
 
         if self.space_dim == 3 and self.qtz and self.extra_args["model_redshift"]:
             self.apply_gt_redshift = self.extra_args["apply_gt_redshift"]
@@ -120,16 +123,16 @@ class AstroTrainer(BaseTrainer):
         # save intensity of intereset for full train img
         self.recon_img = "recon_img_during_train" in tasks
         self.recon_crop = self.pixel_supervision and "recon_crop_during_train" in tasks
-        self.save_codebook = self.pixel_supervision and \
-            self.qtz and "save_codebook" in tasks
-        self.plot_embed_map = self.pixel_supervision and \
-            self.qtz and "plot_embed_map_during_train" in tasks
-        self.save_latents = self.pixel_supervision and self.qtz and \
+        self.save_codebook = self.qtz and \
+            "save_codebook_during_train" in tasks
+        self.plot_embed_map = self.qtz and \
+            "plot_embed_map_during_train" in tasks
+        self.save_latents = self.qtz and \
             ("save_latent_during_train" in tasks or "plot_latent_embed" in tasks)
-        self.save_scaler = self.pixel_supervision and self.qtz and \
-            self.extra_args["decode_scaler"] and "save_scaler_during_train" in tasks
         self.save_redshift =  self.qtz and self.extra_args["model_redshift"] and \
             "save_redshift_during_train" in tasks
+        self.save_scaler = self.pixel_supervision and self.qtz and \
+            self.extra_args["decode_scaler"] and "save_scaler_during_train" in tasks
 
         # recon spectra
         self.recon_gt_spectra = self.space_dim == 3 and \
@@ -190,7 +193,7 @@ class AstroTrainer(BaseTrainer):
             loss = self.get_loss(self.extra_args["redshift_loss_cho"])
             self.redshift_loss = partial(redshift_supervision_loss, loss)
 
-        if self.pixel_supervision or self.train_spectra_pixels_only:
+        if self.pixel_supervision:
             loss = self.get_loss(self.extra_args["pixel_loss_cho"])
             if self.spectral_inpaint:
                 loss = partial(spectral_masking_loss, loss,
@@ -504,11 +507,18 @@ class AstroTrainer(BaseTrainer):
     def configure_dataset(self):
         """ Configure dataset with selected fields and set length accordingly.
         """
-        fields = []
+        fields = ["coords"]
 
         if self.space_dim == 3:
             fields.append("wave_data")
             self.dataset.set_wave_source("trans")
+
+        if self.pixel_supervision:
+            if self.weight_train:
+                fields.append("weights")
+            if self.train_spectra_pixels_only:
+                fields.append("spectra_val_pixels")
+            else: fields.append("pixels")
 
         if self.spectra_supervision:
             fields.append("spectra_data")
@@ -519,17 +529,6 @@ class AstroTrainer(BaseTrainer):
             else:
                 fields.extend([
                     "spectra_id_map","spectra_bin_map","redshift_data"])
-
-        if self.pixel_supervision or self.train_spectra_pixels_only:
-            fields.append("coords")
-            if self.pixel_supervision:
-                fields.append("pixels")
-                if self.weight_train:
-                    fields.append("weights")
-                if self.spectral_inpaint:
-                    pass
-            elif self.train_spectra_pixels_only:
-                fields.append("spectra_val_pixels")
 
         length = self.get_dataset_length()
         self.dataset.set_length(length)
@@ -559,14 +558,10 @@ class AstroTrainer(BaseTrainer):
             (TODO: we assume that #spectra coords is far less
                    than batch size, which may not be the case soon)
         """
-        if self.pixel_supervision:
-            length = self.dataset.get_num_coords()
-        # elif self.spectra_supervision:
-        #     length = self.dataset.get_num_spectra_coords()
-        elif self.train_spectra_pixels_only:
+        if self.train_spectra_pixels_only:
             length = self.dataset.get_num_validation_spectra()
         else:
-            raise ValueError("No training tasks to perform.")
+            length = self.dataset.get_num_coords()
         return length
 
     #############
@@ -697,6 +692,7 @@ class AstroTrainer(BaseTrainer):
                       perform_integration=self.perform_integration,
                       trans_sample_method=self.trans_sample_method,
                       spectra_supervision=self.spectra_supervision,
+                      redshift_classification=self.redshift_classification,
                       save_scaler=self.save_data and self.save_scaler,
                       save_latents=self.save_data and self.save_latents,
                       save_codebook=self.save_data and self.save_codebook,
@@ -713,11 +709,10 @@ class AstroTrainer(BaseTrainer):
 
         # i) reconstruction loss (taking inpaint into account)
         recon_loss, recon_pixels = 0, None
-        if self.pixel_supervision or self.train_spectra_pixels_only:
-            if self.pixel_supervision:
-                gt_pixels = data["pixels"]
-            elif self.train_spectra_pixels_only:
+        if self.pixel_supervision:
+            if self.train_spectra_pixels_only:
                 gt_pixels = data["spectra_val_pixels"]
+            else: gt_pixels = data["pixels"]
 
             recon_pixels = ret["intensity"]
 
@@ -779,8 +774,8 @@ class AstroTrainer(BaseTrainer):
             self.timer.check("codebook loss")
 
         torch.autograd.set_detect_anomaly(True)
-        # total_loss = redshift_loss + spectra_loss + codebook_loss
-        total_loss = redshift_loss + recon_loss + spectra_loss + codebook_loss
+        total_loss = redshift_loss + spectra_loss + codebook_loss
+        # total_loss = redshift_loss + recon_loss + spectra_loss + codebook_loss
         self.log_dict["total_loss"] += total_loss.item()
         return total_loss, ret
 
@@ -793,7 +788,9 @@ class AstroTrainer(BaseTrainer):
 
         log_text = "EPOCH {}/{}".format(self.epoch, self.num_epochs)
         log_text += " | total loss: {:>.3E}".format(self.log_dict["total_loss"] / n)
-        log_text += " | recon loss: {:>.3E}".format(self.log_dict["recon_loss"] / n)
+
+        if self.pixel_supervision:
+            log_text += " | recon loss: {:>.3E}".format(self.log_dict["recon_loss"] / n)
 
         if self.spectra_supervision:
             log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
@@ -802,10 +799,13 @@ class AstroTrainer(BaseTrainer):
             log_text += " | codebook loss: {:>.3E}".format(self.log_dict["codebook_loss"] / n)
 
         if self.redshift_semi_supervision:
+            # since we do semi-supervision for redshift, at some batches there may
+            #  be no redshift sampled at all
             if self.log_dict["n_gt_redshift"] > 0:
-                redshift_loss = self.log_dict["redshift_loss"] / self.log_dict["n_gt_redshift"]
-            else: redshift_loss = 0
-            log_text += " | redshift loss: {:>.3E}".format(redshift_loss)
+                redshift_loss = self.log_dict["redshift_loss"] / n
+                log_text += " | redshift loss: {:>.3E}".format(redshift_loss)
+            else:
+                log_text += " | redshift loss: no_sample"
 
         log.info(log_text)
 
@@ -878,7 +878,6 @@ class AstroTrainer(BaseTrainer):
             gt_redshift = self.cur_patch.get_spectra_pixel_redshift().numpy()
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
-        print(redshift.shape)
         log.info(f"est redshift: {redshift}")
         log.info(f"GT. redshift: {gt_redshift}")
 
