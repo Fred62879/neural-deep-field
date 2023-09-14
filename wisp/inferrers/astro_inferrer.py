@@ -621,17 +621,27 @@ class AstroInferrer(BaseInferrer):
                 _, _ = self.dataset.restore_evaluate_tiles(self.embed_ids, **re_args)
 
         if self.save_redshift_main:
-            if self.recon_spectra_pixels_only:
-                if self.classify_redshift:
-                    self._log_data("argmax_redshift", gt_field="gt_redshift")
-                    self._log_data("weighted_redshift")
-                else:
-                    self._log_data("redshift", gt_field="gt_redshift")
-            else:
+            # if self.recon_spectra_pixels_only:
+            #     if self.classify_redshift:
+            #         self._log_data("argmax_redshift", gt_field="gt_redshift")
+            #         self._log_data("weighted_redshift")
+            #     else:
+            #         self._log_data("redshift", gt_field="gt_redshift")
+            # else:
+            #     self._plot_redshift_map(model_id)
+            #     if len(self.gt_redshift) > 0:
+            #         self._log_data(
+            #             "redshift", gt_field="gt_redshift", mask=self.val_spectra_map)
+
+            if not self.recon_spectra_pixels_only:
                 self._plot_redshift_map(model_id)
-                if len(self.gt_redshift) > 0:
-                    self._log_data(
-                        "redshift", gt_field="gt_redshift", mask=self.val_spectra_map)
+                mask=self.val_spectra_map
+            else: mask = None
+
+            if self.classify_redshift:
+                self._log_data("argmax_redshift", gt_field="gt_redshift", mask=mask)
+                self._log_data("weighted_redshift", mask=mask)
+            else: self._log_data("redshift", gt_field="gt_redshift", mask=mask)
 
         elif self.save_redshift_test:
             if self.classify_redshift:
@@ -719,6 +729,7 @@ class AstroInferrer(BaseInferrer):
         else:
             if self.main_infer:
                 if self.recon_spectra_pixels_only:
+                    # todo: adapt to patch-wise inferrence
                     num_spectra = self.dataset.get_num_validation_spectra()
                     val_spectra = self.dataset.get_validation_spectra()
                     gt_wave = val_spectra[:,0]

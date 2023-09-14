@@ -5,7 +5,7 @@ import logging as log
 
 from wisp.utils import PerfTimer
 from wisp.datasets.patch_data import PatchData
-from wisp.utils.common import create_patch_uid, classify_redshift
+from wisp.utils.common import create_patch_uid, get_bool_classify_redshift
 
 from os.path import join
 from datetime import datetime
@@ -17,6 +17,8 @@ class BaseInferrer(ABC):
     """ Base class for inferrence.
     """
     def __init__(self, pipelines, dataset, device, mode, **extra_args):
+        self.extra_args = extra_args
+
         self.mode = mode
         self.device = device
         self.dataset = dataset
@@ -35,9 +37,9 @@ class BaseInferrer(ABC):
         self.plot_residual_map = extra_args["plot_residual_map"]
         self.infer_last_model_only = extra_args["infer_last_model_only"]
         self.recon_spectra_pixels_only = extra_args["train_spectra_pixels_only"]
-        self.classify_redshift = classify_redshift(**extra_args)
+        self.use_pretrained_latents_as_coords = extra_args["main_train_with_pretrained_latents"]
 
-        self.extra_args = extra_args
+        self.classify_redshift = get_bool_classify_redshift(**extra_args)
 
         self.timer = PerfTimer(activate=extra_args["perf"])
         self.timer.reset()

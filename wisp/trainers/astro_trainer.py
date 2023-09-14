@@ -21,7 +21,8 @@ from wisp.datasets.patch_data import PatchData
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
-    load_pretrained_model_weights, forward, print_shape, create_patch_uid, classify_redshift
+    load_pretrained_model_weights, forward, print_shape, create_patch_uid, \
+    get_bool_classify_redshift
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
@@ -52,11 +53,15 @@ class AstroTrainer(BaseTrainer):
         self.shuffle_dataloader = True
         self.load_spectra = extra_args["space_dim"] == 3
         self.dataloader_drop_last = extra_args["dataloader_drop_last"]
+        self.encode_coords = self.encoder_coords = self.extra_args["encode_coords"] or not \
+            ( self.extra_args["pretrain_codebook"] and \
+              self.extra_args["main_train_with_pretrained_latents"] )
 
         self.pretrain_codebook = extra_args["pretrain_codebook"]
         self.use_all_pixels = extra_args["train_with_all_pixels"]
         self.spectra_n_neighb = extra_args["spectra_neighbour_size"]**2
-        self.classify_redshift = classify_redshift(**self.extra_args)
+        self.classify_redshift = get_bool_classify_redshift(**self.extra_args)
+        self.use_pretrained_latents_as_coords = extra_args["main_train_with_pretrained_latents"]
 
         assert self.use_all_pixels and extra_args["train_pixel_ratio"] == 1
 
@@ -93,6 +98,8 @@ class AstroTrainer(BaseTrainer):
 
         # sample only pixels with GT spectra
         self.train_spectra_pixels_only = self.extra_args["train_spectra_pixels_only"]
+        if self.use_pretrained_latents_as_coords:
+            assert self.train_spectra_pixels_only
         if self.train_spectra_pixels_only:
             assert self.extra_args["use_full_patch"]
 
@@ -121,7 +128,7 @@ class AstroTrainer(BaseTrainer):
         self.plot_loss = self.extra_args["plot_loss"]
 
         # save intensity of intereset for full train img
-        self.recon_img = "recon_img_during_train" in tasks
+        self.recon_img = self.pixel_supervision and "recon_img_during_train" in tasks
         self.recon_crop = self.pixel_supervision and "recon_crop_during_train" in tasks
         self.save_codebook = self.qtz and \
             "save_codebook_during_train" in tasks
@@ -523,16 +530,27 @@ class AstroTrainer(BaseTrainer):
 
         if self.pixel_supervision:
             fields.append("coords")
-            self.set_pixel_supervision_coords()
-            if self.weight_train:
-                fields.append("weights")
+            if self.weight_train: fields.append("weights")
+
             if self.train_spectra_pixels_only:
+                # todo: adapt to patch-wise coord loading
                 fields.append("spectra_val_pixels")
-            else: fields.append("pixels")
+                pixel_id = get_neighbourhood_center_pixel_id(
+                    self.extra_args["spectra_neighbour_size"])
+                coords = self.dataset.get_validation_spectra_coords()[:,pixel_id:pixel_id+1]
+                self.dataset.set_coords_source("spectra_coords")
+                self.dataset.set_hardcode_data("spectra_coords", coords)
+            else:
+                fields.append("pixels")
+                self.dataset.set_coords_source("fits")
 
         if self.spectra_supervision:
             # spectra supervision coords are added as part of spectra data
             fields.append("spectra_data")
+            if self.use_pretrained_latents_as_coords:
+                self.dataset.set_hardcode_data(
+                    "pretrained_latents", self.pretrained_latents[:,None] # [bsz,1,dim]
+                )
 
         if self.redshift_semi_supervision:
             if self.train_spectra_pixels_only:
@@ -548,16 +566,6 @@ class AstroTrainer(BaseTrainer):
         self.dataset.toggle_wave_sampling(
             sample_wave=not self.extra_args["train_use_all_wave"]
         )
-
-    def set_pixel_supervision_coords(self):
-        if self.train_spectra_pixels_only:
-            pixel_id = get_neighbourhood_center_pixel_id(
-                self.extra_args["spectra_neighbour_size"])
-            coords = self.dataset.get_validation_spectra_coords()[:,pixel_id:pixel_id+1]
-            self.dataset.set_coords_source("spectra_coords")
-            self.dataset.set_hardcode_data("spectra_coords", coords)
-        else:
-            self.dataset.set_coords_source("fits")
 
     def get_dataset_length(self):
         """ Get length of dataset based on training tasks.
@@ -674,6 +682,8 @@ class AstroTrainer(BaseTrainer):
                 self.pipeline, checkpoint["model_state_dict"],
                 set(self.extra_args["main_train_frozen_layer"])
             )
+            if self.use_pretrained_latents_as_coords:
+                self.pretrained_latents = checkpoint["latents"]
 
             self.pipeline.train()
             log.info("loaded pretrained model")

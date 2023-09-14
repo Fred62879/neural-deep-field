@@ -16,7 +16,12 @@ from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
-def classify_redshift(**kwargs):
+def get_bool_encode_coords(**kwargs):
+    return kwargs["encode_coords"] and not \
+        ( kwargs["pretrain_codebook"] and \
+          kwargs["main_train_with_pretrained_latents"] )
+
+def get_bool_classify_redshift(**kwargs):
     return kwargs["model_redshift"] and not kwargs["apply_gt_redshift"] \
         and kwargs["redshift_model_method"] == "classification"
 
@@ -92,8 +97,9 @@ def get_input_latents_dim(**kwargs):
     """ Get the dimension of the input RA/DEC coordinate for MLP.
     """
     if kwargs["pretrain_codebook"] and \
-         ("codebook_pretrain" in kwargs["tasks"] or \
-          "pretrain_infer" in kwargs["tasks"]):
+       ("codebook_pretrain" in kwargs["tasks"] or \
+        "pretrain_infer" in kwargs["tasks"] or \
+        kwargs["main_train_with_pretrained_latents"]):
         latents_dim = kwargs["codebook_pretrain_latent_dim"]
     elif kwargs["coords_encode_method"] == "positional_encoding":
         latents_dim = kwargs["coords_embed_dim"]

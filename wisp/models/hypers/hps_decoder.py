@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import print_shape, get_input_latents_dim, classify_redshift
+from wisp.utils.common import print_shape, get_input_latents_dim, get_bool_classify_redshift
 
 from wisp.models.decoders import Decoder, BasicDecoder
 from wisp.models.activations import get_activation_class
@@ -29,7 +29,7 @@ class HyperSpectralDecoder(nn.Module):
         self.add_bias = add_bias
         self.intensify = intensify
         self.qtz_spectra = qtz_spectra
-        self.classify_redshift = classify_redshift(**kwargs)
+        self.classify_redshift = get_bool_classify_redshift(**kwargs)
 
         self.convert = HyperSpectralConverter(
             _model_redshift=_model_redshift, **kwargs

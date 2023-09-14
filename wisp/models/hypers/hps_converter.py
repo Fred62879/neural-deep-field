@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 
-from wisp.utils.common import classify_redshift
+from wisp.utils.common import get_bool_classify_redshift
 
 from wisp.models.embedders import Encoder
 from wisp.models.decoders import BasicDecoder, Siren
@@ -25,7 +25,7 @@ class HyperSpectralConverter(nn.Module):
         self.quantize_spectra = kwargs["quantize_spectra"]
         self.combine_method = kwargs["hps_combine_method"]
 
-        self.classify_redshift = classify_redshift(**kwargs)
+        self.classify_redshift = get_bool_classify_redshift(**kwargs)
 
         self.init_encoder()
 

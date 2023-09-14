@@ -523,6 +523,11 @@ def define_cmd_line_args():
     train_group.add_argument("--spectra-supervision", action="store_true",
                              help="whether main training supervised by spectra.")
 
+    train_group.add_argument("--main-train-with-pretrained-latents", action="store_true",
+                             help="use trainable latent variable of autodecoder from \
+                             pretrain for main train as spatial embedding instead of \
+                             encoding coordinates. ")
+
     train_group.add_argument("--apply-gt-redshift", action="store_true",
                              help="apply gt redshift instead of generating redshift.")
     train_group.add_argument("--redshift-unsupervision", action="store_true",

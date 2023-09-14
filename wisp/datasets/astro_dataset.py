@@ -372,10 +372,14 @@ class AstroDataset(Dataset):
         """
         assert self.mode == "main_train" and self.kwargs["spectra_supervision"]
 
-        if self.kwargs["normalize_coords"]:
-            spectra_coords = self.patch_obj.get_spectra_normed_img_coords()
-        else: spectra_coords = self.patch_obj.get_spectra_img_coords()
-        spectra_coords = torch.FloatTensor(spectra_coords)[:,None]
+        if self.kwargs["main_train_with_pretrained_latents"]:
+            spectra_coords = self.data["pretrained_latents"]
+        else:
+            if self.kwargs["normalize_coords"]:
+                spectra_coords = self.patch_obj.get_spectra_normed_img_coords()
+            else: spectra_coords = self.patch_obj.get_spectra_img_coords()
+            spectra_coords = torch.FloatTensor(spectra_coords)[:,None]
+
         if "coords" in out:
             out["coords"] = torch.cat((out["coords"], spectra_coords), dim=0)
         else: out["coords"] = spectra_coords

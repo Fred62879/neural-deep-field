@@ -6,7 +6,8 @@ import numpy as np
 from collections import defaultdict
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import print_shape
+from wisp.utils.common import print_shape, get_bool_encode_coords
+
 from wisp.models.embedders import Encoder
 from wisp.models.layers import init_codebook
 from wisp.models.nefs import BaseNeuralField
@@ -41,7 +42,8 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         else: self.codebook = None
 
     def init_encoder(self):
-        if not self.kwargs["encode_coords"]: return
+        self.encode_coords = get_bool_encode_coords(**self.kwargs)
+        if not self.encode_coords: return
 
         embedder_args = (
             2,
@@ -104,7 +106,7 @@ class AstroHyperSpectralNerf(BaseNeuralField):
                       qtz_args=None, pidx=None, lod_idx=None):
         """ Compute hyperspectral intensity for the provided coordinates.
             @Params:
-              coords (torch.FloatTensor): tensor of shape [batch, num_samples, 2/3]
+              coords: coords or spatial embedding [bsz,nsmpls,2/3]
 
               - qtz_args:
                 temperature: temperature for soft quantization, if performed
@@ -127,9 +129,9 @@ class AstroHyperSpectralNerf(BaseNeuralField):
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.reset()
 
-        # print(coords, coords.shape)
+        # print(coords.shape)
 
-        if self.kwargs["encode_coords"]:
+        if self.encode_coords:
             latents = self.spatial_encoder(coords, lod_idx=lod_idx)
         else: latents = coords
         timer.check("nef::spatial encoding done")
