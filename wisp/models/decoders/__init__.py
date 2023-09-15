@@ -8,4 +8,6 @@
 
 from .siren import *
 from .decoder import *
+from .scaler_decoder import *
 from .spatial_decoder import *
+from .redshift_decoder import *

@@ -8,16 +8,23 @@ from wisp.models.decoders import BasicDecoder, MLP
 from wisp.utils.common import get_input_latents_dim
 from wisp.models.activations import get_activation_class
 from wisp.models.layers import get_layer_class, Quantization
+from wisp.models.decoders.scaler_decoder import ScalerDecoder
+from wisp.models.decoders.redshift_decoder import RedshiftDecoder
 
 
 class SpatialDecoder(nn.Module):
     """ Accept as input latent variables and quantize based on
           a codebook which is optimizaed simultaneously during training
     """
-    def __init__(self, output_bias, output_scaler, qtz_calculate_loss, **kwargs):
+    def __init__(self, output_bias, output_scaler, _apply_gt_redshift, qtz_calculate_loss, **kwargs):
         super(SpatialDecoder, self).__init__()
 
         self.kwargs = kwargs
+
+        self.output_bias = output_bias
+        self.output_scaler = output_scaler
+        self.model_redshift = kwargs["model_redshift"]
+        self.apply_gt_redshift = _apply_gt_redshift
 
         # we either quantize latents or spectra or none
         self.quantize_z = kwargs["quantize_latent"]
@@ -28,18 +35,6 @@ class SpatialDecoder(nn.Module):
         self.qtz_calculate_loss = qtz_calculate_loss
         self.quantization_strategy = kwargs["quantization_strategy"]
         self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
-
-        self.output_bias = self.qtz and output_bias
-        self.output_scaler = self.qtz and output_scaler
-
-        # we either pred redshift and supervise or apply gt redshift directly or semi-sup
-        assert sum([kwargs["apply_gt_redshift"],
-                    kwargs["redshift_unsupervision"],
-                    kwargs["redshift_semi_supervision"]]) <= 1
-
-        self.model_redshift = kwargs["model_redshift"]
-        self.redshift_model_method = kwargs["redshift_model_method"]
-        self.apply_gt_redshift = self.model_redshift and kwargs["apply_gt_redshift"]
 
         self.init_model()
 
@@ -53,55 +48,11 @@ class SpatialDecoder(nn.Module):
             self.qtz = Quantization(self.qtz_calculate_loss, **self.kwargs)
 
         if self.output_scaler or self.output_bias:
-            self.init_scaler_decoder()
+            self.scaler_decoder(self.output_bias, self.output_scaler, **kwargs)
 
-        if not self.apply_gt_redshift:
-            self.init_redshift_decoder()
-
-    def init_scaler_decoder(self):
-        output_dim = 0
-        if self.output_bias: output_dim += 1
-        if self.output_scaler: output_dim += 1
-
-        self.scaler_decoder = BasicDecoder(
-            self.input_dim, output_dim,
-            get_activation_class(self.kwargs["scaler_decod_activation_type"]),
-            bias=True, layer=get_layer_class(self.kwargs["scaler_decod_layer_type"]),
-            num_layers=self.kwargs["scaler_decod_num_hidden_layers"] + 1,
-            hidden_dim=self.kwargs["scaler_decod_hidden_dim"],
-            skip=self.kwargs["scaler_decod_skip_layers"]
-        )
-
-    def init_redshift_decoder(self):
-        if self.redshift_model_method == "regression":
-            output_dim = 1
-        elif self.redshift_model_method == "classification":
-            self.init_redshift_bins()
-            output_dim = self.num_redshift_bins
-        else: raise ValueError()
-
-        self.redshift_decoder = BasicDecoder(
-            self.input_dim, output_dim,
-            get_activation_class(self.kwargs["redshift_decod_activation_type"]),
-            bias=True, layer=get_layer_class(self.kwargs["redshift_decod_layer_type"]),
-            num_layers=self.kwargs["redshift_decod_num_hidden_layers"] + 1,
-            hidden_dim=self.kwargs["redshift_decod_hidden_dim"],
-            skip=self.kwargs["redshift_decod_skip_layers"]
-        )
-        self.redshift_adjust = nn.ReLU(inplace=True)
-
-    def init_redshift_bins(self):
-        if self.kwargs["use_gpu"]:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else: device = "cpu"
-        self.redshift_bin_center = torch.arange(
-            self.kwargs["redshift_lo"],
-            self.kwargs["redshift_hi"],
-            self.kwargs["redshift_bin_width"]
-        ).to(device)
-        self.num_redshift_bins = len(self.redshift_bin_center)
-        offset = self.kwargs["redshift_bin_width"] / 2
-        self.redshift_bin_center += offset
+        if self.model_redshift:
+            self.redshift_decoder = RedshiftDecoder(
+                self.apply_gt_redshift, **self.kwargs)
 
     def init_decoder(self):
         if self.quantize_z:
@@ -127,39 +78,6 @@ class SpatialDecoder(nn.Module):
             skip=self.kwargs["spatial_decod_skip_layers"]
         )
 
-    ##########
-    # Forward
-    ##########
-
-    def generate_redshift(self, z, ret, specz, timer):
-        redshift, redshift_logits = None, None
-        if self.apply_gt_redshift:
-            assert specz is not None
-            ret["redshift"] = specz
-        elif self.model_redshift:
-            if self.redshift_model_method == "regression":
-                redshift = self.redshift_decoder(z[:,0])[...,0]
-                ret["redshift"] = self.redshift_adjust(redshift + 0.5)
-            elif self.redshift_model_method == "classification":
-                bsz = z.shape[0]
-                # ret["redshift"]= self.redshift_bin_center[None,:].tile(bsz,1) # [bsz,num_bins]
-                ret["redshift"]= self.redshift_bin_center
-                ret["redshift_logits"] = F.softmax(
-                    self.redshift_decoder(z[:,0]), dim=-1) # [bsz,num_bins]
-            else:
-                raise ValueError("Unsupported redshift model method!")
-
-        timer.check("spatial_decod::redshift done")
-
-    def generate_scaler(self, z, ret, timer):
-        if self.output_scaler or self.output_bias:
-            out = self.scaler_decoder(z[:,0])
-            if self.output_scaler:
-                ret["scaler"] = out[...,0]
-                if self.output_bias:
-                    ret["bias"] = out[...,1]
-        timer.check("spatial_decod::scaler done")
-
     def forward(self, z, codebook, qtz_args, ret, specz=None, sup_id=None):
         """ Decode latent variables to various spatial information we need.
             @Param
@@ -172,8 +90,10 @@ class SpatialDecoder(nn.Module):
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
         timer.reset()
 
-        self.generate_scaler(z, ret, timer)
-        self.generate_redshift(z, ret, specz, timer)
+        if self.output_scaler or self.output_bias:
+            self.scaler_decoder(z, ret)
+        if self.model_redshift:
+            self.redshift_decoder(z, ret, specz)
 
         # decode/quantize
         if self.quantize_spectra:

@@ -21,9 +21,18 @@ def register_class(cls, name):
 
 def get_pretrain_pipelines(pipelines, tasks, args):
     if "codebook_pretrain" in tasks:
-        # assert(args.quantize_latent or args.quantize_spectra)
+        assert(args.quantize_latent or args.quantize_spectra)
         pretrain_nef = CodebookPretrainNerf(
-            args.codebook_pretrain_pixel_supervision, **vars(args))
+            pretrain_pixel_supervision=args.codebook_pretrain_pixel_supervision, **vars(args)
+        )
+        pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
+
+    elif "redshift_pretrain" in tasks:
+        pretrain_nef = CodebookPretrainNerf(
+            decode_redshift=True,
+            pretrain_pixel_supervision=args.codebook_pretrain_pixel_supervision,
+            **vars(args)
+        )
         pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
 
     if "pretrain_infer" in tasks:
