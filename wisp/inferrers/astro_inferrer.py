@@ -17,7 +17,8 @@ from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 from wisp.utils.plot import plot_horizontally, plot_embed_map, \
     plot_latent_embed, annotated_heat, plot_simple
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
-    load_model_weights, load_layer_weights, load_embed, sort_alphanumeric
+    load_model_weights, load_layer_weights, load_embed, sort_alphanumeric, \
+    get_bool_classify_redshift
 
 
 class AstroInferrer(BaseInferrer):
@@ -50,7 +51,7 @@ class AstroInferrer(BaseInferrer):
         """
         super().__init__(pipelines, dataset, device, mode, **extra_args)
 
-        if mode == "pretrain_infer":
+        if mode == "codebook_pretrain_infer" or mode == "redshift_pretrain_infer":
             self.batch_size = extra_args["pretrain_infer_batch_size"]
             if extra_args["space_dim"] == 3:
                 self.num_sup_spectra = dataset.get_num_supervision_spectra()
@@ -77,7 +78,9 @@ class AstroInferrer(BaseInferrer):
     def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         if self.verbose: log.info(f"logging to {self.log_dir}")
-        prefix = {"pretrain_infer":"pretrain", "main_infer":"val", "test":"test"}[self.mode]
+        prefix = {"codebook_pretrain_infer":"pretrain",
+                  "redshift_pretrain_infer":"pretrain",
+                  "main_infer":"val", "test":"test"}[self.mode]
 
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","recon_synthetic_dir","metric_dir",
@@ -117,7 +120,9 @@ class AstroInferrer(BaseInferrer):
 
         self.test = self.mode == "test"
         self.main_infer = self.mode == "main_infer"
-        self.pretrain_infer = self.mode == "pretrain_infer"
+        self.codebook_pretrain_infer = self.mode == "codebook_pretrain_infer"
+        self.redshift_pretrain_infer = self.mode == "redshift_pretrain_infer"
+        self.pretrain_infer = self.codebook_pretrain_infer or self.redshift_pretrain_infer
         assert sum([self.test,self.main_infer,self.pretrain_infer]) == 1
 
         # quantization setups
@@ -137,8 +142,9 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["redshift_unsupervision"]
         self.redshift_semi_supervision = self.model_redshift and \
             self.extra_args["redshift_semi_supervision"]
-        if self.pretrain_infer: assert self.apply_gt_redshift
-        # else: assert self.redshift_semi_supervision
+        if self.codebook_pretrain_infer: assert self.apply_gt_redshift
+        if self.redshift_pretrain_infer: assert not self.apply_gt_redshift
+        self.classify_redshift = get_bool_classify_redshift(**self.extra_args)
 
         # i) infer all coords using original model
         self.recon_img_all_pixels = False
@@ -794,7 +800,11 @@ class AstroInferrer(BaseInferrer):
         #         "recon_pixels", gt_field="gt_pixels", log_ratio=self.log_pixel_ratio)
 
         if self.save_redshift_pre:
-            self._log_data("redshift", gt_field="gt_redshift")
+            if self.classify_redshift:
+                self._log_data("argmax_redshift", gt_field="gt_redshift")
+                self._log_data("weighted_redshift")
+            else:
+                self._log_data("redshift", gt_field="gt_redshift")
 
         if self.save_redshift_main:
             if self.classify_redshift:
@@ -1018,9 +1028,6 @@ class AstroInferrer(BaseInferrer):
 
                 if self.save_redshift_pre:
                     self.gt_redshift.extend(data["spectra_sup_redshift"])
-                    self.redshift.extend(ret["redshift"])
-
-                elif self.save_redshift_main:
                     if self.classify_redshift:
                         ids = torch.argmax(ret["redshift_logits"], dim=-1)
                         argmax_redshift = ret["redshift"][ids]
@@ -1030,7 +1037,18 @@ class AstroInferrer(BaseInferrer):
                         self.weighted_redshift.extend(weighted_redshift)
                     else:
                         self.redshift.extend(ret["redshift"])
+
+                elif self.save_redshift_main:
                     self.gt_redshift.extend(data["spectra_semi_sup_redshift"])
+                    if self.classify_redshift:
+                        ids = torch.argmax(ret["redshift_logits"], dim=-1)
+                        argmax_redshift = ret["redshift"][ids]
+                        self.argmax_redshift.extend(argmax_redshift)
+                        weighted_redshift = torch.sum(
+                            ret["redshift"] * ret["redshift_logits"], dim=-1)
+                        self.weighted_redshift.extend(weighted_redshift)
+                    else:
+                        self.redshift.extend(ret["redshift"])
 
             except StopIteration:
                 log.info("spectra forward done")

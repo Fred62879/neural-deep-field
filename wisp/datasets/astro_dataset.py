@@ -75,7 +75,7 @@ class AstroDataset(Dataset):
     ############
 
     def set_mode(self, mode):
-        """ Possible modes: ["codebook_pretrain","main_train","pretrain_infer","main_infer","test"]
+        """ Possible modes: ["codebook_pretrain","redshift_pretrain","main_train","pretrain_infer","main_infer","test"]
         """
         self.mode = mode
 

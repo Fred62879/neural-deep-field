@@ -114,7 +114,7 @@ class HyperSpectralDecoder(nn.Module):
                spectra: reconstructed emitted spectra [bsz,num_nsmpl]
         """
         bsz = wave.shape[0]
-
+        # print(input.shape, wave.shape, redshift.shape, codebook.weight.shape)
         if self.qtz_spectra:
             codes = codebook.weight[:,None,None].tile(1,bsz,1,1)
             latents = self.convert(
@@ -215,11 +215,14 @@ class HyperSpectralDecoder(nn.Module):
             if latents.shape[0] == 0: return
 
         n = bsz if not perform_spectra_supervision else bsz-num_sup_spectra
+        redshift = None if ret["redshift"] is None else \
+            ret["redshift"] if self.classify_redshift else ret["redshift"][:n]
+
         ret["spectra"] = self.reconstruct_spectra(
             latents, wave,
             None if ret["scaler"] is None else ret["scaler"][:n],
             None if ret["bias"] is None else ret["bias"][:n],
-            None if ret["redshift"] is None else ret["redshift"][:n],
+            redshift,
             full_wave_bound, ret, codebook, qtz_args
         )
         timer.check("hps_decoder::spectra reconstruced")

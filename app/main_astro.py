@@ -18,8 +18,16 @@ if __name__ == "__main__":
     dataset = get_dataset_from_config(args)
     device, pipelines = get_pipelines_from_config(args, tasks=tasks)
 
-    # perform codebook_train, train, and infer in order
     if "codebook_pretrain" in tasks and args.pretrain_codebook:
+        optim_cls, optim_params = get_optimizer_from_config(args)
+        trainer = get_trainer_from_config(
+            CodebookTrainer,
+            [ pipelines["codebook_net"] ],
+            dataset, optim_cls, optim_params, device, args
+        )
+        trainer.train()
+
+    if "redshift_pretrain" in tasks and args.pretrain_codebook:
         optim_cls, optim_params = get_optimizer_from_config(args)
         trainer = get_trainer_from_config(
             CodebookTrainer,
@@ -34,9 +42,16 @@ if __name__ == "__main__":
             AstroTrainer, pipelines["full"], dataset, optim_cls, optim_params, device, args)
         trainer.train()
 
-    if "pretrain_infer" in tasks and args.pretrain_codebook:
+    if "codebook_pretrain_infer" in tasks and args.pretrain_codebook:
         # infer for pretrained model (recon gt spectra & codebook spectra ect.)
-        inferrer = get_inferrer_from_config(pipelines, dataset, device, "pretrain_infer", args)
+        inferrer = get_inferrer_from_config(
+            pipelines, dataset, device, "codebook_pretrain_infer", args)
+        inferrer.infer()
+
+    if "redshift_pretrain_infer" in tasks and args.pretrain_codebook:
+        # infer for pretrained model (recon gt spectra & codebook spectra ect.)
+        inferrer = get_inferrer_from_config(
+            pipelines, dataset, device, "redshift_pretrain_infer", args)
         inferrer.infer()
 
     if "main_infer" in tasks:

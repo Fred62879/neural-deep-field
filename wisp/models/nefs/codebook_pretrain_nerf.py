@@ -12,11 +12,12 @@ from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
 class CodebookPretrainNerf(BaseNeuralField):
-    def __init__(self, decode_redshift=False, pretrain_pixel_supervision=False, **kwargs):
+    def __init__(self, _decode_redshift=False, pretrain_pixel_supervision=False, **kwargs):
+        self.kwargs = kwargs
+
         super(CodebookPretrainNerf, self).__init__()
 
-        self.kwargs = kwargs
-        self.decode_redshift = decode_redshift
+        self.decode_redshift = _decode_redshift
         self.pixel_supervision = pretrain_pixel_supervision
         self.init_model()
 
@@ -26,8 +27,15 @@ class CodebookPretrainNerf(BaseNeuralField):
     def register_forward_functions(self):
         """ Register forward functions with the channels that they output.
         """
-        channels = ["intensity","spectra","redshift","qtz_weights",
+        channels = ["intensity","spectra","qtz_weights",
                     "codebook_spectra","min_embed_ids","latents"]
+
+        if self.kwargs["model_redshift"]:
+            channels.append("redshift")
+            if not self.kwargs["apply_gt_redshift"] and \
+               self.kwargs["redshift_model_method"] == "classification":
+                channels.append("redshift_logits")
+
         self._register_forward_function(self.pretrain, channels)
 
     def init_model(self):
