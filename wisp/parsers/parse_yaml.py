@@ -134,6 +134,8 @@ def define_cmd_line_args():
     net_group.add_argument("--redshift-model-method", type=str,
                            help="choice of redshift modeling",
                            choices=["none","regression","classification"])
+    net_group.add_argument("--redshift-classification-method", type=str,
+                           choices=["argmax","weighted_avg"])
     net_group.add_argument("--encode-coords", action="store_true")
     net_group.add_argument("--coords-encode-method", type=str,
                            choices=["positional","grid"],
@@ -546,6 +548,7 @@ def define_cmd_line_args():
 
     train_group.add_argument("--resume-train", action="store_true")
     train_group.add_argument("--resume-log-dir", type=str)
+    train_group.add_argument("--resume-model-name", type=str)
     train_group.add_argument("--pretrain-log-dir", type=str)
     train_group.add_argument("--pretrained-model-name", type=str)
 

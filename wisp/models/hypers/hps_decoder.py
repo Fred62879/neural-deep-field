@@ -1,6 +1,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from wisp.utils import PerfTimer
 from wisp.utils.common import print_shape, get_input_latents_dim, get_bool_classify_redshift
@@ -11,6 +12,42 @@ from wisp.models.hypers.hps_converter import HyperSpectralConverter
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
 from wisp.models.layers import Intensifier, Quantization, get_layer_class
 
+# class Exp(Function):
+#     @staticmethod
+#     def forward(ctx, i):
+#         result = i.exp()
+#         ctx.save_for_backward(result)
+#         return result
+
+#     @staticmethod
+#     def backward(ctx, grad_output):
+#         result, = ctx.saved_tensors
+#         return grad_output * result
+
+class ArgMax(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, logits, spectra):
+        # ctx.mark_dirty(input)
+        # ctx.save_for_backward(input)
+        num_bins = len(redshift)
+        print('*', input.shape)
+        # idx = torch.argmax(input.clone(), dim=-1)
+        idx = torch.sin(input.clone())
+
+        ids = torch.argmax(logits, dim=-1) # [bsz]
+        # encodings = F.one_hot(ids, num_classes=num_bins) # [bsz,num_bins]
+        # encodings = encodings.type(spectra.dtype)
+        # print(encodings.shape, spectra.shape)
+        # spectra = torch.matmul(encodings[:,None], spectra.permute(1,0,2))[:,0]
+        spectra = torch.matmul(ids[:,None], spectra.permute(1,0,2))[:,0]
+        # print(spectra.shape)
+        return idx
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        print(grad_output.shape)
+        assert 0
+        return grad_output
 
 class HyperSpectralDecoder(nn.Module):
 
@@ -29,7 +66,10 @@ class HyperSpectralDecoder(nn.Module):
         self.add_bias = add_bias
         self.intensify = intensify
         self.qtz_spectra = qtz_spectra
-        self.classify_redshift = get_bool_classify_redshift(**kwargs)
+
+        self.classify_redshift = _model_redshift and get_bool_classify_redshift(**kwargs)
+        self.argmax_redshift = kwargs["redshift_classification_method"] == "argmax"
+        self.weighted_avg_redshift = kwargs["redshift_classification_method"] == "weighted_avg"
 
         self.convert = HyperSpectralConverter(
             _model_redshift=_model_redshift, **kwargs
@@ -114,7 +154,6 @@ class HyperSpectralDecoder(nn.Module):
                spectra: reconstructed emitted spectra [bsz,num_nsmpl]
         """
         bsz = wave.shape[0]
-        # print(input.shape, wave.shape, redshift.shape, codebook.weight.shape)
         if self.qtz_spectra:
             codes = codebook.weight[:,None,None].tile(1,bsz,1,1)
             latents = self.convert(
@@ -130,7 +169,11 @@ class HyperSpectralDecoder(nn.Module):
 
         if self.classify_redshift:
             # spectra [num_redshift_bins,bsz,nsmpl]; logits [bsz,num_redshift_bins]
-            spectra = torch.matmul(ret["redshift_logits"][:,None], spectra.permute(1,0,2))[:,0]
+            if self.weighted_avg_redshift:
+                spectra = torch.matmul(
+                    ret["redshift_logits"][:,None], spectra.permute(1,0,2))[:,0]
+            elif self.argmax_redshift:
+                spectra = ArgMax.apply(ret["redshift_logits"], spectra)
 
         if self.scale:
             assert scaler is not None

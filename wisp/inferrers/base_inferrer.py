@@ -52,10 +52,9 @@ class BaseInferrer(ABC):
         if extra_args["infer_log_dir"] is not None:
             infer_log_dir = extra_args["infer_log_dir"]
         else:
-            fnames = os.listdir(join(extra_args["log_dir"],extra_args["exp_name"]))
-            fnames.sort()
-            infer_log_dir = fnames[-1]
-
+            dnames = os.listdir(join(extra_args["log_dir"],extra_args["exp_name"]))
+            dnames.sort()
+            infer_log_dir = dnames[-1]
         self.log_dir = join(extra_args["log_dir"], extra_args["exp_name"], infer_log_dir)
 
         # Default TensorBoard Logging

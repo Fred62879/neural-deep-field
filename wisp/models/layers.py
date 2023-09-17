@@ -11,8 +11,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.nn.functional import one_hot
-from wisp.utils.common import set_seed
 from wisp.utils.numerical import find_closest_tensor
+from wisp.utils.common import set_seed, get_bool_classify_redshift
 
 
 def normalize_frobenius(x):
@@ -174,6 +174,8 @@ class Quantization(nn.Module):
         self.beta = kwargs["qtz_beta"]
         self.num_embed = kwargs["qtz_num_embed"]
         self.latent_dim = kwargs["qtz_latent_dim"]
+        # todo, if we toggle between batched and unbatched hps model, we need to remove this
+        self.classify_redshift = get_bool_classify_redshift(**kwargs)
 
     def partial_loss(self, z, z_q):
         codebook_loss = torch.mean((z_q.detach() - z)**2) + \
@@ -195,7 +197,7 @@ class Quantization(nn.Module):
         min_embed_ids = find_closest_tensor(z_f, codebook) # [bsz]
 
         # replace each z with closest embedding
-        encodings = one_hot(min_embed_ids, self.num_embed) # [n,num_embed]
+        encodings = one_hot(min_embed_ids, num_classes=self.num_embed) # [bsz,num_embed]
         encodings = encodings.type(z.dtype)
 
         # codebook here is the original codebook
@@ -241,7 +243,12 @@ class Quantization(nn.Module):
         if qtz_args["find_embed_id"]:
             ret["min_embed_ids"] = min_embed_ids
         if qtz_args["save_qtz_weights"]:
-            ret["qtz_weights"] = weights
+            # todo: currently, our hps model is batched and if we classify redshift
+            # we end up with an extra dimension for each redshift bin which
+            # however is identical in terms of qtz weights, thus we keep only one
+            if self.classify_redshift:
+                ret["qtz_weights"] = weights[0]
+            else: ret["qtz_weights"] = weights
         if qtz_args["save_codebook_spectra"]:
             ret["codebook_spectra"] = codebook # [bsz,num_embeds,full_nsmpl]
         return z_q

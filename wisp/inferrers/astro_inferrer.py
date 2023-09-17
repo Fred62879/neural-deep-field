@@ -543,39 +543,40 @@ class AstroInferrer(BaseInferrer):
             self.embed = load_embed(checkpoint["model_state_dict"])
 
     def post_checkpoint_all_coords_full_model(self, model_id):
-        if self.recon_img_all_pixels:
-            re_args = {
-                "fname": model_id,
-                "dir": self.recon_dir,
-                "metric_options": self.metric_options,
-                "verbose": self.verbose,
-                "num_bands": self.extra_args["num_bands"],
-                "plot_func": plot_horizontally,
-                "zscale": True,
-                "log_max": True,
-                "save_locally": True,
-                "to_HDU": False, #self.to_HDU_now,
-                "calculate_metrics": self.calculate_metrics,
-                "recon_synthetic_band": False,
-                "zoom": self.extra_args["recon_zoomed"],
-                "cutout_patch_uids": self.extra_args["recon_cutout_patch_uids"],
-                "cutout_sizes": self.extra_args["recon_cutout_sizes"],
-                "cutout_start_pos": self.extra_args["recon_cutout_start_pos"],
-                "zoomed_recon_dir": self.zoomed_recon_dir,
-                "zoomed_recon_fname": model_id,
-                "plot_residual": self.plot_residual_map
-            }
-            cur_metrics, cur_metrics_zscale = self.dataset.restore_evaluate_tiles(
-                self.recon_pixels, **re_args)
+        if self.recon_img:
+            if self.recon_img_all_pixels:
+                re_args = {
+                    "fname": model_id,
+                    "dir": self.recon_dir,
+                    "metric_options": self.metric_options,
+                    "verbose": self.verbose,
+                    "num_bands": self.extra_args["num_bands"],
+                    "plot_func": plot_horizontally,
+                    "zscale": True,
+                    "log_max": True,
+                    "save_locally": True,
+                    "to_HDU": False, #self.to_HDU_now,
+                    "calculate_metrics": self.calculate_metrics,
+                    "recon_synthetic_band": False,
+                    "zoom": self.extra_args["recon_zoomed"],
+                    "cutout_patch_uids": self.extra_args["recon_cutout_patch_uids"],
+                    "cutout_sizes": self.extra_args["recon_cutout_sizes"],
+                    "cutout_start_pos": self.extra_args["recon_cutout_start_pos"],
+                    "zoomed_recon_dir": self.zoomed_recon_dir,
+                    "zoomed_recon_fname": model_id,
+                    "plot_residual": self.plot_residual_map
+                }
+                cur_metrics, cur_metrics_zscale = self.dataset.restore_evaluate_tiles(
+                    self.recon_pixels, **re_args)
 
-            if self.calculate_metrics:
-                # add metrics for current checkpoint
-                self.metrics = np.concatenate((self.metrics, cur_metrics[:,None]), axis=1)
-                self.metrics_zscale = np.concatenate((
-                    self.metrics_zscale, cur_metrics_zscale[:,None]), axis=1)
-        else:
-            fname = join(self.recon_dir, f"{model_id}.pth")
-            self._log_data("recon_pixels", fname=fname, gt_field="gt_pixels")
+                if self.calculate_metrics:
+                    # add metrics for current checkpoint
+                    self.metrics = np.concatenate((self.metrics, cur_metrics[:,None]), axis=1)
+                    self.metrics_zscale = np.concatenate((
+                        self.metrics_zscale, cur_metrics_zscale[:,None]), axis=1)
+            else:
+                fname = join(self.recon_dir, f"{model_id}.pth")
+                self._log_data("recon_pixels", fname=fname, gt_field="gt_pixels")
 
         if self.recon_synthetic_band:
             re_args = {

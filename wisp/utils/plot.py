@@ -16,7 +16,7 @@ def plot_grad_flow(named_parameters, gradFileName=None):
     layers, ave_grads = [], []
     for n, p in named_parameters:
         if "grid" not in n and (p.requires_grad) and ("bias" not in n):
-            # print('*', n)
+            print('*', n)
             layers.append(n[-22:-7])
             ave_grads.append(p.grad.detach().cpu().abs().mean())
 

@@ -24,7 +24,7 @@ from wisp.loss import spectra_supervision_loss, \
     spectra_supervision_emd_loss, pretrain_pixel_loss
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     select_inferrence_ids, load_embed, load_model_weights, forward, \
-    load_pretrained_model_weights
+    load_pretrained_model_weights, get_pretrained_model_fname
 
 
 class CodebookTrainer(BaseTrainer):
@@ -121,28 +121,17 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_loss:
             self.loss_fname = join(self.log_dir, "loss")
 
-        if self.extra_args["resume_train"] or self.mode == "redshift_pretrain":
-            if self.extra_args["resume_log_dir"] is not None:
-                pretrained_model_dir = join(self.log_dir, "..", self.extra_args["resume_log_dir"])
-            else:
-                # if log dir not specified, use last directory (exclude newly created one)
-                dnames = os.listdir(join(self.log_dir, ".."))
-                assert(len(dnames) > 1)
-                dnames.sort()
-                pretrained_model_dir = join(self.log_dir, "..", dnames[-2])
+        if self.mode == "redshift_pretrain":
+            self.pretrained_model_fname, _ = get_pretrained_model_fname(
+                self.log_dir,
+                self.extra_args["pretrain_log_dir"],
+                self.extra_args["pretrained_model_name"])
 
-            self.resume_loss_fname = join(pretrained_model_dir, "loss.npy")
-
-            pretrained_model_dir = join(pretrained_model_dir, "models")
-
-            if self.extra_args["pretrained_model_name"] is not None:
-                self.pretrained_model_fname = join(
-                    pretrained_model_dir, self.extra_args["pretrained_model_name"])
-            else:
-                fnames = os.listdir(pretrained_model_dir)
-                assert(len(fnames) > 0)
-                fnames = sort_alphanumeric(fnames)
-                self.pretrained_model_fname = join(pretrained_model_dir, fnames[-1])
+        if self.extra_args["resume_train"]:
+            self.pretrained_model_fname, self.resume_loss_fname = get_pretrained_model_fname(
+                self.log_dir,
+                self.extra_args["resume_log_dir"],
+                self.extra_args["resume_model_name"])
 
     def init_net(self):
         self.train_pipeline = self.pipeline[0]
@@ -507,6 +496,7 @@ class CodebookTrainer(BaseTrainer):
             self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))
 
     def load_model(self):
+        print(self.pretrained_model_fname)
         assert(exists(self.pretrained_model_fname))
         log.info(f"saved model found, loading {self.pretrained_model_fname}")
         checkpoint = torch.load(self.pretrained_model_fname)

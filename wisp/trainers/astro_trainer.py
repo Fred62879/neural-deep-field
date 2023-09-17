@@ -22,7 +22,7 @@ from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     load_pretrained_model_weights, forward, print_shape, create_patch_uid, \
-    get_bool_classify_redshift
+    get_bool_classify_redshift, get_pretrained_model_fname
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
@@ -183,13 +183,16 @@ class AstroTrainer(BaseTrainer):
             self.loss_fname = join(self.log_dir, "loss")
 
         if self.pretrain_codebook:
-            self.pretrained_model_fname = self.get_checkpoint_fname(
-                self.extra_args["pretrain_log_dir"])
+            self.pretrained_model_fname, _ = get_pretrained_model_fname(
+                self.log_dir,
+                self.extra_args["pretrain_log_dir"],
+                self.extra_args["pretrained_model_name"])
 
         if self.extra_args["resume_train"]:
-            self.resume_model_fname = self.get_checkpoint_fname(
-                self.extra_args["resume_log_dir"])
-            self.resume_loss_fname = join(self.log_dir, "..", exp_dir, "loss.npy")
+            self.resume_model_fname, self.resume_loss_fname = get_pretrained_model_fname(
+                self.log_dir,
+                self.extra_args["resume_log_dir"],
+                self.extra_args["resume_model_name"])
 
     def init_loss(self):
         if self.spectra_supervision:
@@ -1080,29 +1083,6 @@ class AstroTrainer(BaseTrainer):
                 if re_args["zscale"]:
                     plot_horizontally(recon[:,r:r+size,c:c+size], fname, zscale_ranges=zscale_ranges)
                 else: re_args["plot_func"](recon[:,r:r+size,c:c+size], fname)
-
-    def get_checkpoint_fname(self, exp_dir):
-        """ Format checkpoint fname from given experiemnt directory.
-        """
-        if exp_dir is not None:
-            pretrained_model_dir = join(self.log_dir, "..", exp_dir)
-        else:
-            # if log dir not specified, use last directory (exclude newly created one)
-            dnames = os.listdir(join(self.log_dir, ".."))
-            assert(len(dnames) > 1)
-            dnames.sort()
-            pretrained_model_dir = join(self.log_dir, "..", dnames[-2])
-
-        pretrained_model_dir = join(pretrained_model_dir, "models")
-
-        if self.extra_args["pretrained_model_name"] is not None:
-            fname = join(pretrained_model_dir, self.extra_args["pretrained_model_name"])
-        else:
-            fnames = os.listdir(pretrained_model_dir)
-            assert(len(fnames) > 0)
-            fnames = sort_alphanumeric(fnames)
-            fname = join(pretrained_model_dir, fnames[-1])
-        return fname
 
     def log_codebook(self):
         if not self.verbose: return

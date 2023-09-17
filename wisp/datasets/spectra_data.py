@@ -1140,7 +1140,8 @@ class SpectraData:
         assert recon_masks[0] is None or \
             (len(recon_fluxes) == n and len(recon_masks) == n)
 
-        gt_fluxes = to_numpy(gt_fluxes)
+        if not is_codebook:
+            gt_fluxes = to_numpy(gt_fluxes)
         recon_fluxes = to_numpy(recon_fluxes)
 
         if self.kwargs["plot_spectrum_together"]:

@@ -116,7 +116,7 @@ class HyperSpectralConverter(nn.Module):
 
         if spatial.ndim == 3:
             if spectral.ndim == 3:
-                spatial.tile(1,nsmpls,1)
+                spatial = spatial.tile(1,nsmpls,1)
             elif spectral.ndim == 4:
                 spatial = spatial[None,...].tile(num_bins,1,nsmpls,1)
             else: raise ValueError()

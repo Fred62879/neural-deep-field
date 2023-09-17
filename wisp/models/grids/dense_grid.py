@@ -98,5 +98,4 @@ class DenseGrid(nn.Module):
                                 feats.shape[-1] // self.num_lods).sum(-2)
         else:
             raise NotImplementedError
-        # print(ret.shape)
         return ret
