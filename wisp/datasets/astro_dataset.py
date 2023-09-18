@@ -108,6 +108,17 @@ class AstroDataset(Dataset):
     def set_hardcode_data(self, field, data):
         self.data[field] = data
 
+    def set_num_wave_samples(self, num_samples):
+        self.num_wave_samples = num_samples
+
+    def set_wave_sample_method(self, method="uniform"):
+        """ Set lambda sampling method.
+            @Choices
+              uniform: uniformly at random (most cases)
+              uniform_non_random: get every several wave (for pretrain infer)
+        """
+        self.wave_sample_method = method
+
     def toggle_integration(self, integrate: bool):
         self.perform_integration = integrate
 
@@ -318,15 +329,14 @@ class AstroDataset(Dataset):
             if self.sample_wave:
                 # sample from spectra data (wave, flux, ivar, and interpolated trans)
                 # sample_ids [bsz,nsmpl,2]
-                assert self.kwargs["uniform_sample_wave"]
 
                 out["spectra_sup_data"], sample_ids = batch_sample_torch(
-                    out["spectra_sup_data"], self.kwargs["pretrain_num_wave_samples"],
-                    keep_sample_ids=True)
+                    out["spectra_sup_data"], self.num_wave_samples,
+                    sample_method=self.wave_sample_method, keep_sample_ids=True)
 
                 out["spectra_sup_masks"] = batch_sample_torch(
-                    out["spectra_sup_masks"], self.kwargs["pretrain_num_wave_samples"],
-                    sample_ids=sample_ids)
+                    out["spectra_sup_masks"], self.num_wave_samples,
+                    sample_method=self.wave_sample_method, sample_ids=sample_ids)
 
             if self.perform_integration:
                 # out["trans_mask"] = out["spectra_sup_data"][:,3]              # [bsz,nsmpl]
@@ -350,10 +360,7 @@ class AstroDataset(Dataset):
                 else:
                     out["wave"], out["trans"], out["wave_smpl_ids"], out["nsmpl"] = \
                         self.trans_dataset.sample_wave(
-                            batch_size,
-                            self.kwargs["train_num_wave_samples"],
-                            use_all_wave=self.use_all_wave
-                        )
+                            batch_size, self.num_wave_samples, use_all_wave=self.use_all_wave)
 
                 if self.mode == "main_infer" and "recon_synthetic_band" in self.kwargs["tasks"]:
                     assert(self.use_all_wave) # only in inferrence

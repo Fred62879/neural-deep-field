@@ -96,7 +96,10 @@ class BaseTrainer(ABC):
             self.scene_state.graph.cameras = self.dataset.data.get("cameras", dict())
         self.scene_state.optimization.max_epochs = self.num_epochs
 
-        self.timer = PerfTimer(activate=extra_args["activate_trainer_timer"])
+        self.timer = PerfTimer(
+            activate=extra_args["activate_trainer_timer"],
+            show_memory=extra_args["show_memory"]
+        )
         self.timer.reset()
 
         self.scaler = torch.cuda.amp.GradScaler()

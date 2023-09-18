@@ -569,6 +569,8 @@ class AstroTrainer(BaseTrainer):
         self.dataset.toggle_wave_sampling(
             sample_wave=not self.extra_args["train_use_all_wave"]
         )
+        if not self.extra_args["train_use_all_wave"]:
+            self.dataset.set_num_wave_samples(self.extra_args["train_num_wave_samples"])
 
     def get_dataset_length(self):
         """ Get length of dataset based on training tasks.

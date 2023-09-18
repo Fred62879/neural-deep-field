@@ -100,7 +100,7 @@ class AstroInferrer(BaseInferrer):
         self.model_fnames = os.listdir(self.model_dir)
         self.selected_model_fnames = sort_alphanumeric(self.model_fnames)
         if self.infer_last_model_only:
-            self.selected_model_fnames = self.selected_model_fnames[-1:]
+            self.selected_model_fnames = self.selected_model_fnames #[-1:]
         self.num_models = len(self.selected_model_fnames)
         if self.verbose: log.info(f"selected {self.num_models} models")
 
@@ -275,7 +275,7 @@ class AstroInferrer(BaseInferrer):
     def pre_inferrence_all_coords_full_model(self):
         self.patch_uids = self.dataset.get_patch_uids()
 
-        self.use_full_wave = True
+        self.use_all_wave = True
         self.calculate_metrics = False
         self.perform_integration = True #self.recon_img
 
@@ -284,6 +284,8 @@ class AstroInferrer(BaseInferrer):
         if self.pretrain_infer:
             self.wave_source = "spectra"
             self.coords_source = "spectra_latents"
+            self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
+            self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
 
             self.requested_fields.append("spectra_sup_data")
             if self.recon_img: # _sup_spectra
@@ -348,13 +350,17 @@ class AstroInferrer(BaseInferrer):
     def pre_inferrence_selected_coords_partial_model(self):
         """ Spectra reconstruction.
         """
-        self.use_full_wave = True
+        self.use_all_wave = True
         self.perform_integration = False
         self.requested_fields = ["coords"]
 
         if self.pretrain_infer:
             self.wave_source = "spectra"
             self.coords_source = "spectra_latents"
+            self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
+            if not self.use_all_wave:
+                self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
+                self.wave_sample_method = self.extra_args["pretrain_infer_wave_sample_method"]
             # pretrain coords set using checkpoint
 
             self.requested_fields.extend([
@@ -416,7 +422,7 @@ class AstroInferrer(BaseInferrer):
     def pre_inferrence_hardcode_coords_modified_model(self):
         """ Codebook spectra reconstruction.
         """
-        self.use_full_wave = True
+        self.use_all_wave = True
         self.perform_integration = False
         self.requested_fields = ["coords"]
 
@@ -424,6 +430,8 @@ class AstroInferrer(BaseInferrer):
             self.wave_source = "full_spectra"
         elif self.pretrain_infer:
             self.wave_source = "spectra"
+            self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
+            self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
         else: self.wave_source = "trans"
 
         if self.recon_codebook_spectra:
@@ -1118,9 +1126,13 @@ class AstroInferrer(BaseInferrer):
         self.dataset.set_fields(self.requested_fields)
         self.dataset.set_wave_source(self.wave_source)
         self.dataset.set_coords_source(self.coords_source)
-        self.dataset.toggle_wave_sampling(not self.use_full_wave)
         self.dataset.toggle_integration(self.perform_integration)
         self.dataset.toggle_selected_inferrence(self.infer_selected)
+
+        self.dataset.toggle_wave_sampling(not self.use_all_wave)
+        if not self.use_all_wave:
+            self.dataset.set_num_wave_samples(self.num_wave_samples)
+            self.dataset.set_wave_sample_method(self.wave_sample_method)
 
         # select the same random set of spectra to recon
         if self.pretrain_infer and self.infer_selected:

@@ -113,16 +113,28 @@ def batch_sample_torch(data, nsmpl, sample_method="uniform", distrib=None,
         @Param
           data: [bsz,...,n]
           sample_ids: pre-defined ids to sample
+          sample_method:
+            uniform: uniformly at random (most cases)
+            uniform_non_random: get every several wave (for pretrain infer)
+            importance: importance sampling (not used anymore)
         @Return
           ret:  [bsz,...,nsmpl]
           sample_ids: [nsmpl,2]
     """
     sp = data.shape
+    batches_share_ids = sample_method == "uniform_non_random"
+
     if sample_ids is not None:
-        assert list(sample_ids.shape) == [sp[0], nsmpl, 2]
+        if batches_share_ids:
+            nsmpl = int(sp[-1] / (sp[-1] // nsmpl)) + 1
+            assert list(sample_ids.shape) == [nsmpl]
+        else: assert list(sample_ids.shape) == [sp[0], nsmpl, 2]
     else:
         if sample_method == "uniform":
             sample_ids = torch.zeros(sp[0], nsmpl).uniform_(0, sp[-1]).to(torch.long)
+        elif sample_method == "uniform_non_random":
+            step = sp[-1] // nsmpl
+            sample_ids = torch.arange(0, sp[-1], step)
         elif sample_method == "importance":
             sample_ids = torch.multinomial(distrib, nsmpl, replacement=True)
         else:
@@ -130,14 +142,20 @@ def batch_sample_torch(data, nsmpl, sample_method="uniform", distrib=None,
 
         if ordered:
             sample_ids, _ = torch.sort(sample_ids, dim=-1)
-        row_ids = torch.repeat_interleave(torch.arange(sp[0]), nsmpl).view(sp[0],nsmpl)
-        sample_ids = torch.cat((row_ids[...,None],sample_ids[...,None]), dim=-1)
 
-    # print(sample_ids[0], sample_ids.shape)
-    ret = data[sample_ids[...,0],...,sample_ids[...,1]]
-    mid_axis = list(np.arange(2,len(sp)))
-    reorded_axis = [0] + mid_axis + [1]
-    ret = ret.permute(reorded_axis)
+        if not batches_share_ids:
+            row_ids = torch.repeat_interleave(torch.arange(sp[0]), nsmpl).view(sp[0],nsmpl)
+            sample_ids = torch.cat((row_ids[...,None],sample_ids[...,None]), dim=-1)
+
+    # print(data.shape, sample_ids.shape)
+    if batches_share_ids:
+        ret = data[...,sample_ids]
+    else:
+        ret = data[sample_ids[...,0],...,sample_ids[...,1]]
+        mid_axis = list(np.arange(2,len(sp)))
+        reorded_axis = [0] + mid_axis + [1]
+        ret = ret.permute(reorded_axis)
+    # print(ret.shape)
 
     if keep_sample_ids: return ret, sample_ids
     return ret

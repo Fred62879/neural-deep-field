@@ -68,7 +68,8 @@ class RedshiftDecoder(nn.Module):
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
               specz: spectroscopic (gt) redshift
         """
-        timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
+        timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
+                          show_memory=self.kwargs["show_memory"])
         timer.reset()
 
         if self.apply_gt_redshift:

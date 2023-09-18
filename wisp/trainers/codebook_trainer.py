@@ -239,6 +239,8 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
 
         self.dataset.toggle_wave_sampling(self.sample_wave)
+        if self.sample_wave:
+            self.dataset.set_num_wave_samples(self.kwargs["pretrain_num_wave_samples"])
         self.dataset.toggle_integration(self.pixel_supervision)
         if self.train_within_wave_range:
             self.dataset.set_wave_range(

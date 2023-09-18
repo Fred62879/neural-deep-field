@@ -274,3 +274,48 @@ class Quantization(nn.Module):
         else:
             raise ValueError("Unsupported quantization strategy")
         return z, z_q
+
+class ArgMax(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, logits):
+        """ @Param
+              logits: [bsz,num_bins]
+              spectra: [num_bins,bsz,nsmpl]
+            @Return
+              spectra: indexed argmax spectra according to logits [bsz,nsmpl]
+        """
+        num_bins = logits.shape[1]
+        ids = torch.argmax(logits, dim=-1) # [bsz]
+        ctx.save_for_backward(ids, torch.tensor([num_bins]))
+
+        encodings = F.one_hot(ids, num_classes=num_bins) # [bsz,num_bins]
+        encodings = encodings.type(logits.dtype)
+        # spectra = torch.matmul(encodings[:,None], spectra.permute(1,0,2))[:,0]
+        # return spectra
+        return encodings
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """ Expand returned grad to fit forward spectra size.
+            Fill entries corresponds to argmax ids (according to logits) with
+              grad_output and leave the rest gradients as zero.
+
+            @Context
+              num_bins: [1]
+              argmax_ids: [bsz]
+            @Return
+              grad_updated: [num_bins,bsz,nsmpl]
+        """
+        argmax_ids, num_bins = ctx.saved_tensors
+        bsz = argmax_ids.shape[0]
+        device = grad_output.device
+
+        sp = list(num_bins) + list(grad_output.shape)
+        grad_updated = torch.zeros(sp).to(device)
+        batch_ids = torch.arange(bsz).to(device)
+        ids = torch.cat((argmax_ids[None,:], batch_ids[None,:]), dim=0)
+
+        grad_updated[ids[0,:],ids[1,:]] = grad_output
+        # print(grad_updated[13,0])
+        # print(grad_updated[9,3])
+        return grad_updated

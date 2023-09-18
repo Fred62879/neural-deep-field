@@ -100,6 +100,7 @@ def define_cmd_line_args():
     global_group.add_argument("--use_gpu", action="store_true")
     global_group.add_argument("--verbose", action="store_true")
     global_group.add_argument("--print-shape", action="store_true")
+    global_group.add_argument("--show-memory", action="store_true")
     global_group.add_argument("--activate-model-timer", action="store_true")
     global_group.add_argument("--activate-dataset-timer", action="store_true")
     global_group.add_argument("--activate-trainer-timer", action="store_true")
@@ -314,6 +315,7 @@ def define_cmd_line_args():
                            help="method to combine ra/dec coordinate with lambda.")
     hps_group.add_argument("--integration-method", type=str,
                             choices=["identity","dot_prod","trapezoid","simpson"])
+    hps_group.add_argument("--use-batched-hps-model", action="store_true")
     hps_group.add_argument("--intensify-intensity", action="store_true",
                            help="intensify pixel value with to capture high dynamic range.")
     hps_group.add_argument("--intensification-method", type=str,
@@ -594,8 +596,17 @@ def define_cmd_line_args():
     infer_group.add_argument("--infer-log-dir", type=str)
     infer_group.add_argument("--infer-batch-size", type=int, default=4096)
     infer_group.add_argument("--pretrain-infer-batch-size", type=int, default=4096)
+
     infer_group.add_argument("--infer-use-all-wave", action="store_true",
-                             help="should set this to true, implementation assumes infer with all lambda")
+                             help="should set this to true, implementation assumes \
+                             infer with all lambda")
+    infer_group.add_argument("--infer-num-wave", type=int)
+    infer_group.add_argument("--pretrain-infer-use-all-wave", action="store_true")
+    infer_group.add_argument("--pretrain-infer-num-wave", type=int)
+    infer_group.add_argument("--pretrain-infer-wave-sample-method", type=str,
+                             choices=["uniform_non_random"],
+                             help="should only sample every several wave.")
+
     infer_group.add_argument("--plot-residual-map", action="store_true")
     infer_group.add_argument("--img-resid-lo", type=int, default=-10)
     infer_group.add_argument("--img-resid-hi", type=int, default=10)

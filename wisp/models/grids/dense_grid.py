@@ -85,7 +85,8 @@ class DenseGrid(nn.Module):
              @Return
                interpolated features of shape [batch, num_samples, feature_dim]
         """
-        timer = PerfTimer(activate=False, show_memory=False)
+        timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
+                          show_memory=self.kwargs["show_memory"])
         batch, num_samples, _ = coords.shape
         feats = grid_ops.dense_grid(
             coords, self.resolutions, lod_idx, self.codebook, self.align_corners

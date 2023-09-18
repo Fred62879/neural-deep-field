@@ -12,7 +12,7 @@ from wisp.models.embedders import Encoder
 from wisp.models.layers import init_codebook
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.decoders import SpatialDecoder
-from wisp.models.hypers import HyperSpectralDecoder
+from wisp.models.hypers import HyperSpectralDecoder, HyperSpectralDecoderB
 
 
 class AstroHyperSpectralNerf(BaseNeuralField):
@@ -69,7 +69,11 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             qtz_calculate_loss=self.kwargs["quantization_calculate_loss"],
             **self.kwargs
         )
-        self.hps_decoder = HyperSpectralDecoder(
+
+        if self.kwargs["use_batched_hps_model"]:
+            hps_decoder_cls = HyperSpectralDecoderB
+        else: hps_decoder_cls = HyperSpectralDecoder
+        self.hps_decoder = hps_decoder_cls(
             scale=self.kwargs["decode_scaler"],
             add_bias=self.kwargs["decode_bias"],
             integrate=integrate,
@@ -127,7 +131,8 @@ class AstroHyperSpectralNerf(BaseNeuralField):
               }
         """
         ret = defaultdict(lambda: None)
-        timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
+        timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
+                          show_memory=self.kwargs["show_memory"])
         timer.reset()
 
         # print(coords.shape)

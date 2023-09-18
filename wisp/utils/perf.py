@@ -9,6 +9,8 @@
 import time
 import torch
 
+from wisp.utils.common import query_GPU_mem
+
 
 """ This module contains utility function and classes for measuring latency / memory. """
 
@@ -84,7 +86,8 @@ class PerfTimer():
                     # print("CPU Checkpoint {}: {} s".format(self.counter, cpu_time_disp))
                     print("GPU Checkpoint {}: {} s".format(self.counter, gpu_time_disp))
                 if self.show_memory:
-                    print(f"{torch.cuda.memory_allocated()//1048576}MB")
+                    # print(f"{torch.cuda.memory_allocated()//1048576}MB")
+                    query_GPU_mem()
 
             self.prev_time = time.process_time()
             self.prev_time_gpu = self.start.record()

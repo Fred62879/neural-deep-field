@@ -7,9 +7,9 @@ from wisp.utils.common import print_shape, get_input_latents_dim
 
 from wisp.models.decoders import Decoder, BasicDecoder
 from wisp.models.activations import get_activation_class
-from wisp.models.hypers.hps_converter import HyperSpectralConverter
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
 from wisp.models.layers import Intensifier, Quantization, get_layer_class
+from wisp.models.hypers.hps_converter_unbatched import HyperSpectralConverter
 
 
 class HyperSpectralDecoder(nn.Module):
@@ -137,6 +137,10 @@ class HyperSpectralDecoder(nn.Module):
     ):
         """ Reconstruct emitted (under possibly multiple redshift values) spectra
               using given input and wave. And scale spectra intensity using scaler and bias.
+            @Param
+              input: spatial embeddings or logits [bsz,1,dim/num_embed]
+              wave: [bsz,nsmpl,1]
+              redshift: [num_bins] if classify redshift else [bsz]
             @Return
                spectra: reconstructed emitted spectra [bsz,num_nsmpl]
         """
@@ -152,7 +156,7 @@ class HyperSpectralDecoder(nn.Module):
                 self.reconstruct_emitted_spectra(
                     input, wave, scaler, bias, cur_redshift,
                     wave_bound, ret, codebook, qtz_args
-                ) for cur_redshift in redshift.T # redshift [bsz,num_redshift_bins]
+                ) for cur_redshift in redshift # redshift [num_redshift_bins]
             ]).permute(1,0,2)
 
             # spectra [bsz,num_redshift_bins,nsmpl]; logits [bsz,num_redshift_bins]
@@ -222,7 +226,8 @@ class HyperSpectralDecoder(nn.Module):
               intensity: reconstructed pixel values
               sup_spectra: reconstructed spectra used for spectra supervision
         """
-        timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
+        timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
+                          show_memory=self.kwargs["show_memory"])
         timer.reset()
 
         perform_spectra_supervision = num_sup_spectra > 0

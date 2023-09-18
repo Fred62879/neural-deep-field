@@ -50,7 +50,8 @@ class ScalerDecoder(nn.Module):
               specz: spectroscopic (gt) redshift
               sup_id: id of pixels to supervise with gt redshift (OBSOLETE)
         """
-        timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
+        timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
+                          show_memory=self.kwargs["show_memory"])
         timer.reset()
 
         if self.output_scaler or self.output_bias:

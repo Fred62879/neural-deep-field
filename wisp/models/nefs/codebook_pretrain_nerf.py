@@ -6,8 +6,8 @@ from wisp.utils import PerfTimer
 from collections import defaultdict
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.embedders.encoder import Encoder
-from wisp.models.hypers import HyperSpectralDecoder
 from wisp.models.decoders import BasicDecoder, SpatialDecoder
+from wisp.models.hypers import HyperSpectralDecoder, HyperSpectralDecoderB
 from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
@@ -58,7 +58,10 @@ class CodebookPretrainNerf(BaseNeuralField):
             qtz_calculate_loss=False,
             **self.kwargs)
 
-        self.hps_decoder = HyperSpectralDecoder(
+        if self.kwargs["use_batched_hps_model"]:
+            hps_decoder_cls = HyperSpectralDecoderB
+        else: hps_decoder_cls = HyperSpectralDecoder
+        self.hps_decoder = hps_decoder_cls(
             scale=False,
             add_bias=False,
             integrate=self.pixel_supervision,
@@ -78,7 +81,8 @@ class CodebookPretrainNerf(BaseNeuralField):
               trans:  transmission values (padded with -1 at two ends)
               trans_mask: mask for trans (0 for padded region, 1 for actual trans region)
         """
-        timer = PerfTimer(activate=self.kwargs["activate_model_timer"], show_memory=False)
+        timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
+                          show_memory=self.kwargs["show_memory"])
         timer.check("forward starts")
         # print(coords.shape, wave.shape)
 
