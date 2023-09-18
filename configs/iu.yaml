@@ -165,7 +165,7 @@ trainer:
     log_tb_every: -1
     log_cli_every: 6
     log_gpu_every: -1
-    plot_grad_every: -1
+    plot_grad_every: 1
     save_data_every: -1
     save_model_every: 6
 
