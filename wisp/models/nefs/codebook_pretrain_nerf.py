@@ -84,7 +84,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
                           show_memory=self.kwargs["show_memory"])
         timer.check("forward starts")
-        # print(coords.shape, wave.shape)
+        # print(coords.shape, coords)
 
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]
@@ -93,6 +93,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)
         timer.check("spatial decoding done")
+        # print(ret["redshift"].shape)
 
         self.hps_decoder(
             latents, wave, trans, nsmpl, wave_range,

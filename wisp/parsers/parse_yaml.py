@@ -523,6 +523,8 @@ def define_cmd_line_args():
     train_group.add_argument("--spectra-supervision", action="store_true",
                              help="whether main training supervised by spectra.")
 
+    train_group.add_argument("--redshift-pretrain-with-same-latents", action="store_true",
+                             help="use same latents as codebook pretrain during redshift pretrain")
     train_group.add_argument("--main-train-with-pretrained-latents", action="store_true",
                              help="use trainable latent variable of autodecoder from \
                              pretrain for main train as spatial embedding instead of \

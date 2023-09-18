@@ -72,6 +72,7 @@ class RedshiftDecoder(nn.Module):
                           show_memory=self.kwargs["show_memory"])
         timer.reset()
 
+        # print(specz, self.apply_gt_redshift)
         if self.apply_gt_redshift:
             assert specz is not None
             ret["redshift"] = specz
@@ -86,4 +87,5 @@ class RedshiftDecoder(nn.Module):
             else:
                 raise ValueError("Unsupported redshift model method!")
 
+        # print(ret["redshift"].shape)
         timer.check("spatial_decod::redshift done")

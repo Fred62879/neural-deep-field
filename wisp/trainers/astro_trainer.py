@@ -49,14 +49,6 @@ class AstroTrainer(BaseTrainer):
         self.spectra_beta = self.extra_args["spectra_beta"]
         self.redshift_beta = self.extra_args["redshift_beta"]
 
-        self.save_data = False
-        self.shuffle_dataloader = True
-        self.load_spectra = extra_args["space_dim"] == 3
-        self.dataloader_drop_last = extra_args["dataloader_drop_last"]
-        self.encode_coords = self.encoder_coords = self.extra_args["encode_coords"] or not \
-            ( self.extra_args["pretrain_codebook"] and \
-              self.extra_args["main_train_with_pretrained_latents"] )
-
         self.pretrain_codebook = extra_args["pretrain_codebook"]
         self.use_all_pixels = extra_args["train_with_all_pixels"]
         self.spectra_n_neighb = extra_args["spectra_neighbour_size"]**2
@@ -469,7 +461,7 @@ class AstroTrainer(BaseTrainer):
     def get_cur_patch_data(self, i, tract, patch):
         self.cur_patch = PatchData(
             tract, patch,
-            load_spectra=self.load_spectra,
+            load_spectra=extra_args["space_dim"] == 3,
             cutout_num_rows=self.extra_args["patch_cutout_num_rows"][i],
             cutout_num_cols=self.extra_args["patch_cutout_num_cols"][i],
             cutout_start_pos=self.extra_args["patch_cutout_start_pos"][i],
@@ -480,7 +472,7 @@ class AstroTrainer(BaseTrainer):
         self.dataset.set_patch(self.cur_patch)
 
         self.cur_patch_uid = create_patch_uid(tract, patch)
-        if self.load_spectra:
+        if extra_args["space_dim"] == 3:
             self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
 
     def init_dataloader(self):
@@ -530,6 +522,7 @@ class AstroTrainer(BaseTrainer):
         if self.space_dim == 3:
             fields.append("wave_data")
             self.dataset.set_wave_source("trans")
+            self.dataset.set_spectra_source("val")
 
         if self.pixel_supervision:
             fields.append("coords")
@@ -537,7 +530,7 @@ class AstroTrainer(BaseTrainer):
 
             if self.train_spectra_pixels_only:
                 # todo: adapt to patch-wise coord loading
-                fields.append("spectra_val_pixels")
+                fields.append("spectra_pixels")
                 pixel_id = get_neighbourhood_center_pixel_id(
                     self.extra_args["spectra_neighbour_size"])
                 coords = self.dataset.get_validation_spectra_coords()[:,pixel_id:pixel_id+1]
@@ -557,7 +550,7 @@ class AstroTrainer(BaseTrainer):
 
         if self.redshift_semi_supervision:
             if self.train_spectra_pixels_only:
-                fields.append("spectra_semi_sup_redshift")
+                fields.append("spectra_redshift")
             else:
                 fields.extend([
                     "spectra_id_map","spectra_bin_map","redshift_data"])
@@ -736,7 +729,7 @@ class AstroTrainer(BaseTrainer):
         recon_loss, recon_pixels = 0, None
         if self.pixel_supervision:
             if self.train_spectra_pixels_only:
-                gt_pixels = data["spectra_val_pixels"]
+                gt_pixels = data["spectra_pixels"]
             else: gt_pixels = data["pixels"]
 
             recon_pixels = ret["intensity"]

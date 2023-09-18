@@ -152,6 +152,7 @@ class HyperSpectralDecoder(nn.Module):
             )
         elif self.kwargs["redshift_model_method"] == "classification":
             # assert redshift.ndim != 1
+            print(redshift)
             spectra = torch.stack([
                 self.reconstruct_emitted_spectra(
                     input, wave, scaler, bias, cur_redshift,

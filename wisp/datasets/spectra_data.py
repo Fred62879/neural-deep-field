@@ -255,7 +255,7 @@ class SpectraData:
             return self.data["validation_masks"]
         return self.data["validation_masks"][idx]
 
-    def get_semi_supervision_redshift(self, idx=None):
+    def get_validation_redshift(self, idx=None):
         if idx is not None:
             return self.data["semi_supervision_redshift"][idx]
         return self.data["semi_supervision_redshift"]
@@ -462,8 +462,8 @@ class SpectraData:
         ## tmp added to debug
         a = supervision_ids
         b = validation_ids
-        validation_ids = b
-        supervision_ids = b
+        validation_ids = b[10:]
+        supervision_ids = b[:10]
         ## ends here
 
         # log.info(f"test spectra ids: {test_ids}")

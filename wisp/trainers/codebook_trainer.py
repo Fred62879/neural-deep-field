@@ -47,23 +47,21 @@ class CodebookTrainer(BaseTrainer):
         self.space_dim = extra_args["space_dim"]
         self.gpu_fields = extra_args["gpu_data"]
         self.recon_beta = extra_args["pretrain_pixel_beta"]
-        self.num_sup_spectra = dataset.get_num_supervision_spectra()
-
-        self.total_steps = 0
-        self.save_data = False
-        self.shuffle_dataloader = False
-        self.dataloader_drop_last = False
 
         self.summarize_training_tasks()
         self.set_path()
 
+        if self.mode == "redshift_pretrain" and \
+           not self.extra_args["redshift_pretrain_with_same_latents"]:
+            # codebook pretrain with supervision spectra
+            # redshift pretrain with validation spectra
+            self.num_spectra = self.dataset.get_num_validation_spectra()
+        else: self.num_spectra = self.dataset.get_num_supervision_spectra()
+
         self.init_net()
+        self.init_data()
         self.init_loss()
         self.init_optimizer()
-
-        self.configure_dataset()
-        self.set_num_batches()
-        self.init_dataloader()
 
     #############
     # Initializations
@@ -93,7 +91,10 @@ class CodebookTrainer(BaseTrainer):
 
         # as long as we model redshift, we should apply gt redshift to spectra during pretrain
         #  and we should never do redshift supervision during pretrain
-        self.apply_gt_redshift = self.extra_args["model_redshift"]
+        self.apply_gt_redshift = self.extra_args["model_redshift"] and self.extra_args["apply_gt_redshift"]
+        if self.mode == "codebook_pretrain":
+            assert self.apply_gt_redshift
+        else: assert not self.apply_gt_redshift
 
         self.sample_wave = not self.extra_args["pretrain_use_all_wave"] # True
         self.train_within_wave_range = not self.pixel_supervision and \
@@ -133,15 +134,27 @@ class CodebookTrainer(BaseTrainer):
                 self.extra_args["resume_log_dir"],
                 self.extra_args["resume_model_name"])
 
+    def init_data(self):
+        self.total_steps = 0
+        self.save_data = False
+        self.shuffle_dataloader = True
+        self.dataloader_drop_last = False
+
+        self.configure_dataset()
+        self.set_num_batches()
+        self.init_dataloader()
+
     def init_net(self):
         self.train_pipeline = self.pipeline[0]
 
         if self.mode == "codebook_pretrain":
-            self.latents = nn.Embedding(
-                self.num_sup_spectra,
-                self.extra_args["codebook_pretrain_latent_dim"])
-        else: # elif self.mode == "redshift_pretrain":
-            self.load_model()
+            self.init_trainable_latents()
+        elif self.mode == "redshift_pretrain":
+            checkpoint = self.load_model()
+            if self.extra_args["redshift_pretrain_with_same_latents"]:
+                self.latents = nn.Embedding.from_pretrained(checkpoint["latents"])
+            else: self.init_trainable_latents()
+        else: raise ValueError()
 
         log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(
@@ -205,14 +218,20 @@ class CodebookTrainer(BaseTrainer):
             params.append({"params": net_params,
                            "lr": self.extra_args["codebook_pretrain_lr"]})
 
-        else: # elif self.mode == "redshift_pretrain":
-            net_params = []
+        elif self.mode == "redshift_pretrain":
+            net_params, latents = [], []
             for name in self.params_dict:
-                if "redshift_decoder" in name:
+                if "spectra_latents" in name:
+                    latents.append(self.params_dict[name])
+                elif "redshift_decoder" in name:
                     net_params.append(self.params_dict[name])
 
             params.append({"params": net_params,
                            "lr": self.extra_args["codebook_pretrain_lr"]})
+            if self.extra_args["redshift_pretrain_with_same_latents"]:
+                params.append({"params": latents,
+                               "lr": self.extra_args["codebook_pretrain_lr"]})
+        else: raise ValueError()
 
         self.optimizer = self.optim_cls(params, **self.optim_params)
         if self.verbose: log.info(self.optimizer)
@@ -223,16 +242,20 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_mode(self.mode)
 
         # set required fields from dataset
-        fields = ["coords","wave_data",
-                  "spectra_sup_data",
-                  "spectra_sup_masks",
-                  "spectra_sup_redshift"]
+        fields = ["coords","wave_data","spectra_source_data","spectra_masks","spectra_redshift"]
+
         if self.pixel_supervision:
-            fields.append("spectra_sup_pixels")
+            fields.append("spectra_pixels")
         self.dataset.set_fields(fields)
 
         # use original spectra wave
         self.dataset.set_wave_source("spectra")
+
+        # set spectra data source
+        if self.mode == "pretrain_redshift" and \
+           not self.extra_args["redshift_pretrain_with_same_latents"]:
+            self.dataset.set_spectra_source("val")
+        else: self.dataset.set_spectra_source("sup")
 
         # set input latents for codebook net
         self.dataset.set_coords_source("spectra_latents")
@@ -248,13 +271,13 @@ class CodebookTrainer(BaseTrainer):
                 self.extra_args["spectra_supervision_wave_lo"],
                 self.extra_args["spectra_supervision_wave_hi"])
 
-        self.dataset.set_length(self.num_sup_spectra)
+        self.dataset.set_length(self.num_spectra)
         if self.extra_args["infer_selected"]:
             self.selected_ids = select_inferrence_ids(
-                self.num_sup_spectra,
+                self.num_spectra,
                 self.extra_args["pretrain_num_infer_upper_bound"]
             )
-        else: self.selected_ids = np.arange(self.num_sup_spectra)
+        else: self.selected_ids = np.arange(self.num_spectra)
 
     #############
     # Training logic
@@ -460,23 +483,23 @@ class CodebookTrainer(BaseTrainer):
 
         if self.save_data:
             if self.save_redshift:
-                self.redshift.extend(data["spectra_sup_redshift"])
+                self.redshift.extend(data["spectra_redshift"])
             if self.save_pixel_values:
                 self.recon_pixel_vals.extend(ret["intensity"])
-                self.gt_pixel_vals.extend(data["spectra_sup_pixels"])
+                self.gt_pixel_vals.extend(data["spectra_pixels"])
             if self.save_qtz_weights:
                 self.qtz_weights.extend(ret["qtz_weights"])
 
             if self.recon_gt_spectra:
                 self.recon_fluxes.extend(ret["spectra"])
-                self.gt_fluxes.extend(data["spectra_sup_data"][:,1])
-                self.spectra_wave.extend(data["spectra_sup_data"][:,0])
-                self.spectra_masks.extend(data["spectra_sup_masks"])
+                self.gt_fluxes.extend(data["spectra_source_data"][:,1])
+                self.spectra_wave.extend(data["spectra_source_data"][:,0])
+                self.spectra_masks.extend(data["spectra_masks"])
 
             if self.recon_codebook_spectra_individ:
                 self.codebook_spectra.extend(ret["codebook_spectra"])
-                self.spectra_wave_c.extend(data["spectra_sup_data"][:,0])
-                self.spectra_masks_c.extend(data["spectra_sup_masks"])
+                self.spectra_wave_c.extend(data["spectra_source_data"][:,0])
+                self.spectra_masks_c.extend(data["spectra_masks"])
 
     def post_step(self):
         pass
@@ -498,6 +521,11 @@ class CodebookTrainer(BaseTrainer):
         else:
             self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))
 
+    def init_trainable_latents(self):
+        self.latents = nn.Embedding(
+            self.num_spectra,
+            self.extra_args["codebook_pretrain_latent_dim"])
+
     def load_model(self):
         assert(exists(self.pretrained_model_fname))
         log.info(f"saved model found, loading {self.pretrained_model_fname}")
@@ -507,7 +535,7 @@ class CodebookTrainer(BaseTrainer):
         load_pretrained_model_weights(
             self.train_pipeline, checkpoint["model_state_dict"])
         self.train_pipeline.train()
-        self.latents = nn.Embedding.from_pretrained(checkpoint["latents"])
+        return checkpoint
 
     def resume_train(self):
         try:
@@ -553,8 +581,8 @@ class CodebookTrainer(BaseTrainer):
         # i) spectra supervision loss
         spectra_loss = 0
         recon_flux = ret["spectra"]
-        gt_spectra = data["spectra_sup_data"]
-        spectra_masks = data["spectra_sup_masks"]
+        gt_spectra = data["spectra_source_data"]
+        spectra_masks = data["spectra_masks"]
 
         if len(recon_flux) == 0:
             spectra_loss = 0
@@ -568,7 +596,7 @@ class CodebookTrainer(BaseTrainer):
         # ii) pixel supervision loss
         recon_loss = 0
         if self.pixel_supervision:
-            gt_pixels = data["spectra_sup_pixels"]
+            gt_pixels = data["spectra_pixels"]
             recon_pixels = ret["intensity"]
 
             recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
@@ -674,17 +702,17 @@ class CodebookTrainer(BaseTrainer):
         log.info("reconstructing gt spectrum")
 
         self.gt_fluxes = torch.stack(self.gt_fluxes).view(
-            self.num_sup_spectra, -1).detach().cpu().numpy()[self.selected_ids]
+            self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
         # [n_spectra,nsmpl]
         # self.plotspectra(self.gt_fluxes)
 
         self.recon_fluxes = torch.stack(self.recon_fluxes).view(
-            self.num_sup_spectra, self.extra_args["spectra_neighbour_size"]**2, -1
+            self.num_spectra, self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()[self.selected_ids]
         self.spectra_wave = torch.stack(self.spectra_wave).view(
-            self.num_sup_spectra, -1).detach().cpu().numpy()[self.selected_ids]
+            self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
         self.spectra_masks = torch.stack(self.spectra_masks).bool().view(
-            self.num_sup_spectra, -1).detach().cpu().numpy()[self.selected_ids]
+            self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
 
         # plot spectrum in multiple figures, each figure contains several spectrum
         n_spectrum = len(self.selected_ids)
@@ -712,12 +740,12 @@ class CodebookTrainer(BaseTrainer):
         log.info("reconstructing codebook spectrum")
 
         self.codebook_spectra = torch.stack(self.codebook_spectra).view(
-            self.num_sup_spectra, self.qtz_n_embd, -1
+            self.num_spectra, self.qtz_n_embd, -1
         ).detach().cpu().numpy()[self.selected_ids]
         self.spectra_wave_c = torch.stack(self.spectra_wave_c).view(
-            self.num_sup_spectra, -1).detach().cpu().numpy()[self.selected_ids]
+            self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
         self.spectra_masks_c = torch.stack(self.spectra_masks_c).bool().view(
-            self.num_sup_spectra, -1).detach().cpu().numpy()[self.selected_ids]
+            self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
 
         if self.extra_args["infer_selected"]:
             input("plot codebook spectra for all spectra, press Enter to confirm...")

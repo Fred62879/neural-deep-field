@@ -3,7 +3,7 @@ import torch
 
 from collections import defaultdict
 from wisp.models.nefs import BaseNeuralField
-from wisp.models.hypers import HyperSpectralDecoder
+from wisp.models.hypers import HyperSpectralDecoder, HyperSpectralDecoderB
 
 
 class CodebookNef(BaseNeuralField):
@@ -14,7 +14,10 @@ class CodebookNef(BaseNeuralField):
     def __init__(self, **kwargs):
         super(CodebookNef, self).__init__()
 
-        self.hps_decoder = HyperSpectralDecoder(
+        if kwargs["use_batched_hps_model"]:
+            hps_decoder_cls = HyperSpectralDecoderB
+        else: hps_decoder_cls = HyperSpectralDecoder
+        self.hps_decoder = hps_decoder_cls(
             scale=False,
             add_bias=False,
             integrate=False,
