@@ -519,7 +519,10 @@ def increment_repeat(counts, ids):
     bu = torch.unique(sids)
     counts[bu] += incr
 
-def batch_sample_wave(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, **kwargs):
+def batch_sample_wave(bsz, nsmpls, trans_data,
+                      use_all_wave=False,
+                      wave_sample_method="uniform",
+                      sort=False, **kwargs):
     """ Sample wave and trans for all bands together (mixture sampling)
         @Param  wave        [nsmpl_full]
                 trans       [nbands,nsmpl_full]
@@ -533,27 +536,16 @@ def batch_sample_wave(bsz, nsmpls, trans_data, use_all_wave=False, sort=False, *
     (wave, trans, distrib, band_mask) = trans_data
     (nbands, nsmpl_full) = trans.shape
 
-    '''
-    elif uniform_sample:
-        grid = kwargs["grid"]
-
-        ids = torch.arange(nsmpl_full)
-        torch.randperm(ids)
-        ids_all = torch.cat((ids,ids[:nsmpl]))
-
-        coord_ids = torch.randint(nsmpl_full,(bsz,))
-        coord_ids = torch.arange(nsmpl_full)
-        torch.randperm(coord_ids)
-    '''
-
     if use_all_wave:
         ids = torch.arange(nsmpl_full)
         ids = ids[None,:].tile((bsz,1))
-    elif kwargs["uniform_sample_wave"]:
-        ids = torch.zeros(bsz,nsmpls).uniform_(0,nsmpl_full).to(torch.long)
     else:
-        distrib = distrib[None,:].tile(bsz,1)
-        ids = torch.multinomial(distrib, nsmpls, replacement=True)
+        if wave_sample_method == "uniform": # kwargs["uniform_sample_wave"]:
+            ids = torch.zeros(bsz,nsmpls).uniform_(0,nsmpl_full).to(torch.long)
+        elif wave_sample_method == "importance":
+            distrib = distrib[None,:].tile(bsz,1)
+            ids = torch.multinomial(distrib, nsmpls, replacement=True)
+        else: raise ValueError("Unsupported wave sampling method!")
 
     if band_mask is None:
         avg_nsmpl = torch.zeros(bsz, nbands).type(trans.dtype)

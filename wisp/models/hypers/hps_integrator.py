@@ -21,7 +21,6 @@ class HyperSpectralIntegrator(nn.Module):
         super(HyperSpectralIntegrator, self).__init__()
 
         self.num_bands = kwargs["num_bands"]
-        self.uniform_sample = kwargs["uniform_sample_wave"]
         self.trans_sample_method = kwargs["trans_sample_method"]
 
         if not integrate:

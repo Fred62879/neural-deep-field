@@ -516,10 +516,6 @@ def define_cmd_line_args():
     train_group.add_argument("--weight-by-wave-coverage", action="store_true",
                              help="spectra loss weighted by emitted lambda coverage or not.")
 
-    train_group.add_argument("--train-use-all-wave", action="store_true")
-    train_group.add_argument("--pretrain-use-all-wave", action="store_true")
-    train_group.add_argument("--spectra-supervision-use-all-wave", action="store_true")
-
     train_group.add_argument("--train-spectra-pixels-only", action="store_true",
                              help="whether sample only spectra pixels for main training.")
     train_group.add_argument("--pixel-supervision", action="store_true",
@@ -555,10 +551,16 @@ def define_cmd_line_args():
     train_group.add_argument("--pretrained-model-name", type=str)
 
     train_group.add_argument("--uniform-sample-wave", action="store_true",
-                             help="whether uniformly sample wave or not.")
+                             help="whether uniformly sample source wave or not.")
     train_group.add_argument("--mixture-avg-per-band", action="store_true",
                             help="for mixture sampling method, whether average pixel values \
                             with number of samples falling within each band")
+
+    train_group.add_argument("--train-use-all-wave", action="store_true")
+    train_group.add_argument("--pretrain-use-all-wave", action="store_true")
+    train_group.add_argument("--spectra-supervision-use-all-wave", action="store_true")
+
+    train_group.add_argument("--pretrain-wave-sample-method", type=str, default="uniform")
 
     train_group.add_argument("--train-num-wave-samples", type=int, default=40,
                              help="# wave to sample at each training iteration.")

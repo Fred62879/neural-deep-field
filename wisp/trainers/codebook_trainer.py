@@ -240,7 +240,8 @@ class CodebookTrainer(BaseTrainer):
 
         self.dataset.toggle_wave_sampling(self.sample_wave)
         if self.sample_wave:
-            self.dataset.set_num_wave_samples(self.kwargs["pretrain_num_wave_samples"])
+            self.dataset.set_num_wave_samples(self.extra_args["pretrain_num_wave_samples"])
+            self.dataset.set_wave_sample_method(self.extra_args["pretrain_wave_sample_method"])
         self.dataset.toggle_integration(self.pixel_supervision)
         if self.train_within_wave_range:
             self.dataset.set_wave_range(
@@ -498,7 +499,6 @@ class CodebookTrainer(BaseTrainer):
             self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))
 
     def load_model(self):
-        print(self.pretrained_model_fname)
         assert(exists(self.pretrained_model_fname))
         log.info(f"saved model found, loading {self.pretrained_model_fname}")
         checkpoint = torch.load(self.pretrained_model_fname)

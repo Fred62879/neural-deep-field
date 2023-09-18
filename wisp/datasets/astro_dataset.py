@@ -65,6 +65,7 @@ class AstroDataset(Dataset):
         self.wave_source = "trans"
         self.coords_source = "fits"
         self.sample_wave = False
+        self.wave_sample_method = "NA"
         self.use_all_wave = True
         self.infer_selected = False
         self.perform_integration = True
@@ -395,13 +396,19 @@ class AstroDataset(Dataset):
         out["sup_spectra_masks"] = torch.BoolTensor(self.patch_obj.get_spectra_pixel_masks())
 
         if not self.kwargs["spectra_supervision_use_all_wave"]:
-            assert self.kwargs["uniform_sample_wave"]
+            assert self.kwargs["pretrain_wave_sample_method"] == "uniform"
             out["sup_spectra_data"], sample_ids = batch_sample_torch(
-                out["sup_spectra_data"], self.kwargs["spectra_supervision_num_wave_samples"],
-                keep_sample_ids=True)
+                out["sup_spectra_data"],
+                self.kwargs["spectra_supervision_num_wave_samples"],
+                wave_sample_method=self.kwargs["pretrain_wave_sample_method"],
+                keep_sample_ids=True
+            )
             out["sup_spectra_masks"] = batch_sample_torch(
-                out["sup_spectra_masks"], self.kwargs["spectra_supervision_num_wave_samples"],
-                sample_ids=sample_ids)
+                out["sup_spectra_masks"],
+                self.kwargs["spectra_supervision_num_wave_samples"],
+                wave_sample_method=self.kwargs["pretrain_wave_sample_method"],
+                sample_ids=sample_ids
+            )
 
         out["sup_spectra_wave"] = out["sup_spectra_data"][:,0][...,None] # [bsz,nsmpl,1]
 
