@@ -548,7 +548,7 @@ def define_cmd_line_args():
 
     train_group.add_argument("--resume-train", action="store_true")
     train_group.add_argument("--resume-log-dir", type=str)
-    train_group.add_argument("--resume-model-name", type=str)
+    train_group.add_argument("--resume-model-fname", type=str)
     train_group.add_argument("--pretrain-log-dir", type=str)
     train_group.add_argument("--pretrained-model-name", type=str)
 

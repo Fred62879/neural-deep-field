@@ -460,10 +460,10 @@ class SpectraData:
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
 
         ## tmp added to debug
-        a = supervision_ids
-        b = validation_ids
-        validation_ids = b[10:]
-        supervision_ids = b[:10]
+        # a = supervision_ids
+        # b = validation_ids
+        # validation_ids = b[10:]
+        # supervision_ids = b[:10]
         ## ends here
 
         # log.info(f"test spectra ids: {test_ids}")
@@ -1013,6 +1013,8 @@ class SpectraData:
                 axis=axis, norm_cho=self.kwargs["trans_norm_cho"], color="gray")
 
         if calculate_metrics:
+            print(gt_wave)
+            # print(len(gt_wave), len(recon_wave), len(gt_flux), len(recon_flux)
             sub_dir, metrics, above_threshold = self.calculate_spectra_metrics(
                 gt_flux, recon_flux, sub_dir, axis)
         else: metrics, above_threshold = None, None

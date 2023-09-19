@@ -15,10 +15,10 @@ from wisp.datasets.data_utils import get_bound_id
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
 from wisp.utils.plot import plot_horizontally, plot_embed_map, \
-    plot_latent_embed, annotated_heat, plot_simple
+    plot_latent_embed, annotated_heat, plot_simple, batch_hist
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
     load_model_weights, load_layer_weights, load_embed, sort_alphanumeric, \
-    get_bool_classify_redshift
+    get_bool_classify_redshift, init_redshift_bins
 
 
 class AstroInferrer(BaseInferrer):
@@ -240,6 +240,7 @@ class AstroInferrer(BaseInferrer):
         #   `recon_img_sup_spectra` during pretran infer &
         #   `recon_img_val_spectra` during main train infer
         self.save_pixel_values = "save_pixel_values" in tasks
+        self.plot_redshift_logits = "plot_redshift_logits" in tasks
 
         # iii) infer all coords using modified model (recon codebook spectra)
         #   either we have the codebook spectra for all coords
@@ -726,15 +727,15 @@ class AstroInferrer(BaseInferrer):
             self.gt_fluxes = []
             self.spectra_wave = []
             self.spectra_masks = []
-        if self.save_pixel_values:
-            self.spectra_trans = []
+        if self.save_qtz_weights: self.qtz_weights = []
+        if self.save_pixel_values: self.spectra_trans = []
+        if self.plot_redshift_logits: self.redshift_logits = []
         if self.save_redshift:
             if self.classify_redshift:
                 self.argmax_redshift = []
                 self.weighted_redshift = []
             else: self.redshift = []
             self.gt_redshift = []
-        if self.save_qtz_weights: self.qtz_weights = []
 
     def run_checkpoint_selected_coords_partial_model(self, model_id, checkpoint):
         if self.pretrain_infer:
@@ -837,6 +838,13 @@ class AstroInferrer(BaseInferrer):
                 self._log_data("weighted_redshift")
             else:
                 self._log_data("redshift", gt_field="gt_redshift")
+
+        if self.plot_redshift_logits:
+            redshift_logits = torch.stack(self.redshift_logits).detach().cpu().numpy()
+            fname = join(self.redshift_dir, f"{model_id}_logits.png")
+            bin_centers = init_redshift_bins(**self.extra_args)
+            batch_hist(bin_centers, redshift_logits, fname,
+                       self.extra_args["num_spectrum_per_row"], is_counts=True)
 
         if self.save_qtz_weights:
             fname = join(self.qtz_weights_dir, str(model_id))
@@ -1074,6 +1082,9 @@ class AstroInferrer(BaseInferrer):
                         self.weighted_redshift.extend(weighted_redshift)
                     else:
                         self.redshift.extend(ret["redshift"])
+
+                if self.plot_redshift_logits:
+                    self.redshift_logits.extend(ret["redshift_logits"])
 
             except StopIteration:
                 log.info("spectra forward done")

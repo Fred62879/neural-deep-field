@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import get_input_latents_dim
+from wisp.utils.common import get_input_latents_dim, init_redshift_bins
 
 from wisp.models.decoders import BasicDecoder
 from wisp.models.layers import get_layer_class
@@ -51,16 +51,12 @@ class RedshiftDecoder(nn.Module):
         )
 
     def init_redshift_bins(self):
+        self.redshift_bin_center = init_redshift_bins(**self.kwargs)
         if self.kwargs["use_gpu"]:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else: device = "cpu"
-        self.redshift_bin_center = torch.arange(
-            self.kwargs["redshift_lo"],
-            self.kwargs["redshift_hi"],
-            self.kwargs["redshift_bin_width"]).to(device)
+        self.redshift_bin_center = self.redshift_bin_center.to(device)
         self.num_redshift_bins = len(self.redshift_bin_center)
-        offset = self.kwargs["redshift_bin_width"] / 2
-        self.redshift_bin_center += offset
 
     def forward(self, z, ret, specz=None):
         """ Decode latent variables to various spatial information we need.

@@ -25,6 +25,15 @@ def get_bool_classify_redshift(**kwargs):
     return kwargs["model_redshift"] and not kwargs["apply_gt_redshift"] \
         and kwargs["redshift_model_method"] == "classification"
 
+def init_redshift_bins(**kwargs):
+    redshift_bin_center = torch.arange(
+        kwargs["redshift_lo"],
+        kwargs["redshift_hi"],
+        kwargs["redshift_bin_width"])
+    offset = kwargs["redshift_bin_width"] / 2
+    redshift_bin_center += offset
+    return redshift_bin_center
+
 def segment_bool_array(arr):
     """ Get segments of True from a boolean array.
     """
@@ -276,8 +285,8 @@ def forward(
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if save_qtz_weights: requested_channels.append("qtz_weights")
         if save_codebook_loss: requested_channels.append("codebook_loss")
+        if classify_redshift: requested_channels.append("redshift_logits")
         if save_codebook_spectra: requested_channels.append("codebook_spectra")
-        if save_redshift and classify_redshift: requested_channels.append("redshift_logits")
 
         net_args["wave"] = data["wave"]
         net_args["wave_range"] = data["wave_range"] # linear normalization

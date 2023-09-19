@@ -198,6 +198,22 @@ def plot_simple(img, png_fname):
     plt.savefig(png_fname)
     plt.close()
 
+# def plot_histogram():
+
+def batch_hist(x, data, fname, n_per_row, is_counts=False):
+    n = data.shape[0]
+    ncols = min(n, n_per_row)
+    nrows = int(np.ceil(n / ncols))
+    fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
+
+    for idx, cur_data in enumerate(data):
+        if nrows == 1:
+            axis = axs if ncols == 1 else axs[idx%ncols]
+        else: axis = axs[idx//ncols, idx%ncols]
+        if is_counts: axis.plot(x, cur_data)
+        else: raise NotImplementedError()
+
+    fig.tight_layout(); plt.savefig(fname); plt.close()
 
 ############
 # heatmap plot

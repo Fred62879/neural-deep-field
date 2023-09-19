@@ -2,8 +2,11 @@
 import torch
 import torch.nn as nn
 
-from wisp.utils import PerfTimer
 from collections import defaultdict
+
+from wisp.utils import PerfTimer
+from wisp.utils.common import get_bool_classify_redshift
+
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.embedders.encoder import Encoder
 from wisp.models.decoders import BasicDecoder, SpatialDecoder
@@ -32,8 +35,7 @@ class CodebookPretrainNerf(BaseNeuralField):
 
         if self.kwargs["model_redshift"]:
             channels.append("redshift")
-            if not self.kwargs["apply_gt_redshift"] and \
-               self.kwargs["redshift_model_method"] == "classification":
+            if get_bool_classify_redshift(**self.kwargs):
                 channels.append("redshift_logits")
 
         self._register_forward_function(self.pretrain, channels)
@@ -93,7 +95,6 @@ class CodebookPretrainNerf(BaseNeuralField):
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)
         timer.check("spatial decoding done")
-        # print(ret["redshift"].shape)
 
         self.hps_decoder(
             latents, wave, trans, nsmpl, wave_range,

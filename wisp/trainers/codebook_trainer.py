@@ -9,6 +9,7 @@ import numpy as np
 import torch.nn as nn
 import logging as log
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 from tqdm import tqdm
 from pathlib import Path
@@ -24,7 +25,8 @@ from wisp.loss import spectra_supervision_loss, \
     spectra_supervision_emd_loss, pretrain_pixel_loss
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     select_inferrence_ids, load_embed, load_model_weights, forward, \
-    load_pretrained_model_weights, get_pretrained_model_fname
+    load_pretrained_model_weights, get_pretrained_model_fname, \
+    get_bool_classify_redshift
 
 
 class CodebookTrainer(BaseTrainer):
@@ -89,8 +91,8 @@ class CodebookTrainer(BaseTrainer):
         self.pixel_supervision = self.extra_args["codebook_pretrain_pixel_supervision"]
         self.trans_sample_method = self.extra_args["trans_sample_method"]
 
-        # as long as we model redshift, we should apply gt redshift to spectra during pretrain
-        #  and we should never do redshift supervision during pretrain
+        # redshift setup
+        self.classify_redshift = get_bool_classify_redshift(**self.extra_args)
         self.apply_gt_redshift = self.extra_args["model_redshift"] and self.extra_args["apply_gt_redshift"]
         if self.mode == "codebook_pretrain":
             assert self.apply_gt_redshift
@@ -132,7 +134,7 @@ class CodebookTrainer(BaseTrainer):
             self.pretrained_model_fname, self.resume_loss_fname = get_pretrained_model_fname(
                 self.log_dir,
                 self.extra_args["resume_log_dir"],
-                self.extra_args["resume_model_name"])
+                self.extra_args["resume_model_fname"])
 
     def init_data(self):
         self.total_steps = 0
@@ -154,6 +156,7 @@ class CodebookTrainer(BaseTrainer):
             if self.extra_args["redshift_pretrain_with_same_latents"]:
                 self.latents = nn.Embedding.from_pretrained(checkpoint["latents"])
             else: self.init_trainable_latents()
+            self.freeze_layers(self.train_pipeline)
         else: raise ValueError()
 
         log.info(self.train_pipeline)
@@ -452,6 +455,7 @@ class CodebookTrainer(BaseTrainer):
         super().init_log_dict()
         self.log_dict["pixel_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
+        self.log_dict["redshift_logits_regu"] = 0.0
 
     def pre_step(self):
         # since we are optimizing latents which are inputs for the pipeline
@@ -521,6 +525,11 @@ class CodebookTrainer(BaseTrainer):
         else:
             self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))
 
+    def freeze_layers(self, model):
+        for n, p in model.named_parameters():
+            if "redshift" not in n:
+                p.requires_grad = False
+
     def init_trainable_latents(self):
         self.latents = nn.Embedding(
             self.num_spectra,
@@ -568,6 +577,7 @@ class CodebookTrainer(BaseTrainer):
             qtz=self.qtz,
             qtz_strategy=self.qtz_strategy,
             apply_gt_redshift=self.apply_gt_redshift,
+            classify_redshift=self.classify_redshift,
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
             save_spectra=True, # we always need recon flux to calculate loss
@@ -602,7 +612,16 @@ class CodebookTrainer(BaseTrainer):
             recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
             self.log_dict["pixel_loss"] += recon_loss.item()
 
-        total_loss = spectra_loss + recon_loss*self.recon_beta
+        # iii)
+        redshift_logits_regu = 0
+        if self.classify_redshift and \
+           self.extra_args["redshift_classification_method"] == "weighted_avg":
+            logits = ret["redshift_logits"]
+            largest, _ = torch.max(logits, dim=-1)
+            redshift_logits_regu = F.l1_loss(torch.sum(logits, dim=-1), largest)
+            self.log_dict["redshift_logits_regu"] += redshift_logits_regu.item()
+
+        total_loss = spectra_loss + recon_loss*self.recon_beta + redshift_logits_regu
 
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss calculated")
@@ -621,6 +640,11 @@ class CodebookTrainer(BaseTrainer):
         log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
         if self.pixel_supervision:
             log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / n)
+        if self.classify_redshift and \
+           self.extra_args["redshift_classification_method"] == "weighted_avg":
+            log_text += " | redshift logits regu: {:>.3E}".format(
+                self.log_dict["redshift_logits_regu"] / n)
+
         log.info(log_text)
 
     def save_model(self):

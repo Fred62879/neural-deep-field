@@ -174,6 +174,10 @@ def zscale_img(data, gt):
     return data
 
 def calculate_zncc(s1, s2):
+    """ Calculate zero-mean normalized cross correlation between two signals.
+        @Ref
+          https://stackoverflow.com/questions/13439718/how-to-interpret-the-values-returned-by-numpy-correlate-and-numpy-corrcoef
+    """
     n = len(s1)
     m1, m2 = np.mean(s1), np.mean(s2)
     std1, std2 = np.std(s1), np.std(s2)
@@ -183,11 +187,9 @@ def calculate_zncc(s1, s2):
     return zncc
 
 def calculate_zncc_composite(s1, s2, window_width=1):
-    """ Calculate zero-mean normalized cross correlation between two signals.
+    """ Calcualte global and local sliding zncc between s1 and s2.
         @Param
           s1, s2: 1D signals of the same length
-        @Ref
-          https://stackoverflow.com/questions/13439718/how-to-interpret-the-values-returned-by-numpy-correlate-and-numpy-corrcoef
     """
     assert s1.shape == s2.shape and s1.ndim == 1 and window_width >= 1
     n = len(s1)
@@ -195,6 +197,8 @@ def calculate_zncc_composite(s1, s2, window_width=1):
 
     zncc_sliding = []
     los = np.arange(0, n - window_width)
+    print(len(s1), window_width)
+    print(los)
     for lo in los:
         hi = min(lo + window_width, n)
         cur_zncc = calculate_zncc(s1[lo:hi], s2[lo:hi])
