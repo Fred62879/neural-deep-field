@@ -18,12 +18,12 @@ def plot_grad_flow(named_parameters, gradFileName=None):
         if "grid" not in n and (p.requires_grad) and ("bias" not in n):
             # print('*', n)
             # if "redshift" in n: print(p.grad)
-            layers.append(n[-30:-7])
+            layers.append(n[-32:])
             ave_grads.append(p.grad.detach().cpu().abs().mean())
 
     plt.plot(ave_grads, alpha=0.3, color="b")
     plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k")
-    plt.xticks(range(0,len(ave_grads), 1), layers, fontsize=6, rotation=20)
+    plt.xticks(range(0,len(ave_grads), 1), layers, fontsize=6, rotation=10)
     plt.xlim(xmin=0, xmax=len(ave_grads))
     plt.xlabel("Layers");plt.ylabel("average gradient")
     plt.title("Gradient flow");plt.grid(True)

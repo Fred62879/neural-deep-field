@@ -78,7 +78,7 @@ class AstroDataset(Dataset):
     ############
 
     def set_mode(self, mode):
-        """ Possible modes: ["codebook_pretrain","redshift_pretrain","main_train","pretrain_infer","main_infer","test"]
+        """ Possible modes: ["codebook_pretrain","redshift_pretrain","main_train","codebook_pretrain_infer","redshift_pretrain_infer","main_infer","test"]
         """
         self.mode = mode
 
@@ -138,6 +138,9 @@ class AstroDataset(Dataset):
     ############
     # Getters
     ############
+
+    def get_redshift_pretrain_spectra_ids(self):
+        return self.spectra_dataset.get_redshift_pretrain_spectra_ids()
 
     def get_trans_data_obj(self):
         return self.trans_dataset
@@ -256,7 +259,7 @@ class AstroDataset(Dataset):
                selected_ids: select from source data (filter index)
                idx: dataset index (batch index)
         """
-        if self.mode == "pretrain_infer" and self.infer_selected:
+        if self.mode == "codebook_pretrain_infer" and self.infer_selected:
             assert "selected_ids" in self.data
             data = data[self.data["selected_ids"]]
         return data[idx]

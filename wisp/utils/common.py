@@ -25,6 +25,16 @@ def get_bool_classify_redshift(**kwargs):
     return kwargs["model_redshift"] and not kwargs["apply_gt_redshift"] \
         and kwargs["redshift_model_method"] == "classification"
 
+def freeze_layers(model, excls):
+    """ Freeze layers in model (excluding those in `excls`).
+    """
+    for n, p in model.named_parameters():
+        to_exclude = False
+        for excl in excls:
+            if excl in n: to_exclude = True
+        if not to_exclude:
+            p.requires_grad = False
+
 def init_redshift_bins(**kwargs):
     redshift_bin_center = torch.arange(
         kwargs["redshift_lo"],
@@ -292,7 +302,7 @@ def forward(
         net_args["wave_range"] = data["wave_range"] # linear normalization
 
         if apply_gt_redshift:
-            net_args["specz"] = data["spectra_sup_redshift"]
+            net_args["specz"] = data["spectra_redshift"]
         if perform_integration:
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
@@ -331,9 +341,9 @@ def includes_layer(target_layers, source_layer):
     return False
 
 def load_pretrained_model_weights(model, pretrained_state, shared_layer_names=None):
-    """ Load weights from pretrained model.
+    """ Load weights from saved model.
         Loading is performed for only layers in both the given model and
-          the pretrained state.
+          the pretrained state and in `shared_layer_names` if not None.
     """
     pretrained_dict = {}
     cur_state = model.state_dict()

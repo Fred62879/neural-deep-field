@@ -161,6 +161,9 @@ class SpectraData:
     # Getters
     #############
 
+    def get_redshift_pretrain_spectra_ids(self):
+        return self.redshift_pretrain_ids
+
     def get_full_wave_coverage(self):
         """ Get full coverage range of emitted wave.
         """
@@ -460,10 +463,13 @@ class SpectraData:
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
 
         ## tmp added to debug
-        # a = supervision_ids
-        # b = validation_ids
-        # validation_ids = b[10:]
-        # supervision_ids = b[:10]
+        a = supervision_ids
+        b = validation_ids
+        c = np.arange(len(a))
+        np.random.shuffle(c)
+        self.redshift_pretrain_ids = c[:self.kwargs["redshift_pretrain_num_spectra"]]
+        validation_ids = a[self.redshift_pretrain_ids] #[10:]
+        supervision_ids = a #[:10]
         ## ends here
 
         # log.info(f"test spectra ids: {test_ids}")
@@ -1013,7 +1019,7 @@ class SpectraData:
                 axis=axis, norm_cho=self.kwargs["trans_norm_cho"], color="gray")
 
         if calculate_metrics:
-            print(gt_wave)
+            # print(gt_wave)
             # print(len(gt_wave), len(recon_wave), len(gt_flux), len(recon_flux)
             sub_dir, metrics, above_threshold = self.calculate_spectra_metrics(
                 gt_flux, recon_flux, sub_dir, axis)
@@ -1028,7 +1034,7 @@ class SpectraData:
 
                 segments = segment_bool_array(above_threshold)
                 for (lo, hi) in segments:
-                    axis.plot(recon_wave[lo:hi], recon_flux[lo:hi], color="yellow")
+                    axis.plot(recon_wave[lo:hi], recon_flux[lo:hi], color="purple")
             else: axis.plot(recon_wave, recon_flux, color="blue", label="Recon.")
 
         if sub_dir != "":
@@ -1078,7 +1084,7 @@ class SpectraData:
                 recon_wave = recon_wave[recon_mask]
                 recon_flux = recon_flux[recon_mask]
 
-        if calculate_metrics and len(recon_wave) != len(gt_wave):
+        if calculate_metrics and not (recon_wave == gt_wave).all():
             if wave_within_bound(recon_wave, gt_wave):
                 f = interp1d(gt_wave, gt_flux)
                 gt_flux = f(recon_wave)

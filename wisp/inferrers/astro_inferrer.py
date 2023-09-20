@@ -88,10 +88,11 @@ class AstroInferrer(BaseInferrer):
         if self.mode == "codebook_pretrain_infer" or self.mode == "redshift_pretrain_infer":
             self.batch_size = self.extra_args["pretrain_infer_batch_size"]
 
-            if self.mode == "redshift_pretrain_infer" and \
-               not self.extra_args["redshift_pretrain_with_same_latents"]:
+            if self.mode == "redshift_pretrain_infer":
                 self.dataset.set_spectra_source("val")
-                self.num_spectra = self.dataset.get_num_validation_spectra()
+                if self.extra_args["redshift_pretrain_with_same_latents"]:
+                    self.num_spectra = self.extra_args["redshift_pretrain_num_spectra"]
+                else: self.num_spectra = self.dataset.get_num_validation_spectra()
             else:
                 self.dataset.set_spectra_source("sup")
                 self.num_spectra = self.dataset.get_num_supervision_spectra()
@@ -305,9 +306,11 @@ class AstroInferrer(BaseInferrer):
             if self.apply_gt_redshift:
                 self.requested_fields.append("spectra_redshift")
 
+            # tmp changed (to check codebook pretrain spectra)
             if self.infer_selected:
-                self.dataset_length = min(
-                    self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
+                # self.dataset_length = min(
+                #     self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
+                self.dataset_length = self.extra_args["redshift_pretrain_num_spectra"]
             else: self.dataset_length = self.num_spectra
 
         elif self.main_infer:
@@ -380,9 +383,11 @@ class AstroInferrer(BaseInferrer):
             self.requested_fields.extend([
                 "spectra_source_data","spectra_masks","spectra_redshift"])
 
+            # tmp changed (to check codebook pretrain spectra)
             if self.infer_selected:
-                self.dataset_length = min(
-                    self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
+                # self.dataset_length = min(
+                #     self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
+                self.dataset_length = self.extra_args["redshift_pretrain_num_spectra"]
             else: self.dataset_length = self.num_spectra
 
         elif self.main_infer:
@@ -460,10 +465,11 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.extend([
                     "spectra_source_data","spectra_masks","spectra_redshift"])
 
+                # tmp changed (to check codebook pretrain spectra)
                 if self.infer_selected:
-                    self.dataset_length = min(
-                        self.extra_args["pretrain_num_infer_upper_bound"],
-                        self.num_spectra)
+                    # self.dataset_length = min(
+                    #     self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
+                    self.dataset_length = self.extra_args["redshift_pretrain_num_spectra"]
                 else:
                     input("plot codebook spectra for all spectra, press Enter to confirm...")
                     self.dataset_length = self.num_spectra
@@ -1163,10 +1169,11 @@ class AstroInferrer(BaseInferrer):
 
         # select the same random set of spectra to recon
         if self.pretrain_infer and self.infer_selected:
-            ids = select_inferrence_ids(
-                self.num_spectra,
-                self.extra_args["pretrain_num_infer_upper_bound"]
-            )
+            # ids = select_inferrence_ids(
+            #     self.num_spectra,
+            #     self.extra_args["pretrain_num_infer_upper_bound"]
+            # )
+            ids = self.dataset.get_redshift_pretrain_spectra_ids()
             self.dataset.set_hardcode_data("selected_ids", ids)
 
     def _set_coords_from_checkpoint(self, checkpoint):

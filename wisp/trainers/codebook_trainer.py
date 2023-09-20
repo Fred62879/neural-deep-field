@@ -9,7 +9,6 @@ import numpy as np
 import torch.nn as nn
 import logging as log
 import matplotlib.pyplot as plt
-import torch.nn.functional as F
 
 from tqdm import tqdm
 from pathlib import Path
@@ -26,7 +25,7 @@ from wisp.loss import spectra_supervision_loss, \
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     select_inferrence_ids, load_embed, load_model_weights, forward, \
     load_pretrained_model_weights, get_pretrained_model_fname, \
-    get_bool_classify_redshift
+    get_bool_classify_redshift, freeze_layers
 
 
 class CodebookTrainer(BaseTrainer):
@@ -53,13 +52,7 @@ class CodebookTrainer(BaseTrainer):
         self.summarize_training_tasks()
         self.set_path()
 
-        if self.mode == "redshift_pretrain" and \
-           not self.extra_args["redshift_pretrain_with_same_latents"]:
-            # codebook pretrain with supervision spectra
-            # redshift pretrain with validation spectra
-            self.num_spectra = self.dataset.get_num_validation_spectra()
-        else: self.num_spectra = self.dataset.get_num_supervision_spectra()
-
+        self.set_num_spectra()
         self.init_net()
         self.init_data()
         self.init_loss()
@@ -125,16 +118,26 @@ class CodebookTrainer(BaseTrainer):
             self.loss_fname = join(self.log_dir, "loss")
 
         if self.mode == "redshift_pretrain":
+            # redshift pretrain use pretrained model from codebook pretrain
             self.pretrained_model_fname, _ = get_pretrained_model_fname(
                 self.log_dir,
                 self.extra_args["pretrain_log_dir"],
                 self.extra_args["pretrained_model_name"])
 
         if self.extra_args["resume_train"]:
-            self.pretrained_model_fname, self.resume_loss_fname = get_pretrained_model_fname(
+            self.resume_train_model_fname, self.resume_loss_fname = get_pretrained_model_fname(
                 self.log_dir,
                 self.extra_args["resume_log_dir"],
                 self.extra_args["resume_model_fname"])
+
+    def set_num_spectra(self):
+        if self.mode == "redshift_pretrain":
+            if self.extra_args["redshift_pretrain_with_same_latents"]:
+                self.num_spectra = self.extra_args["redshift_pretrain_num_spectra"]
+            else: self.num_spectra = self.dataset.get_num_validation_spectra()
+        elif self.mode == "codebook_pretrain":
+            self.num_spectra = self.dataset.get_num_supervision_spectra()
+        else: raise ValueError("Invalid mode!")
 
     def init_data(self):
         self.total_steps = 0
@@ -152,12 +155,18 @@ class CodebookTrainer(BaseTrainer):
         if self.mode == "codebook_pretrain":
             self.init_trainable_latents()
         elif self.mode == "redshift_pretrain":
-            checkpoint = self.load_model()
+            checkpoint = self.load_model(self.pretrained_model_fname)
             if self.extra_args["redshift_pretrain_with_same_latents"]:
-                self.latents = nn.Embedding.from_pretrained(checkpoint["latents"])
-            else: self.init_trainable_latents()
-            self.freeze_layers(self.train_pipeline)
-        else: raise ValueError()
+                self.latents = nn.Embedding.from_pretrained(
+                    checkpoint["latents"][self.dataset.get_redshift_pretrain_spectra_ids()]
+                )
+                freeze_layers(self.train_pipeline, ["redshift_decoder"])
+            else:
+                self.init_trainable_latents()
+                freeze_layers(
+                    self.train_pipeline, ["redshift_decoder","spatial_decoder.decode"])
+        else:
+            raise ValueError("Invalid pretrainer mode.")
 
         log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(
@@ -222,18 +231,23 @@ class CodebookTrainer(BaseTrainer):
                            "lr": self.extra_args["codebook_pretrain_lr"]})
 
         elif self.mode == "redshift_pretrain":
-            net_params, latents = [], []
+            latents, redshift_params, codebook_logit_params = [], [], []
             for name in self.params_dict:
                 if "spectra_latents" in name:
                     latents.append(self.params_dict[name])
                 elif "redshift_decoder" in name:
-                    net_params.append(self.params_dict[name])
+                    redshift_params.append(self.params_dict[name])
+                elif "spatial.decoder.decode" in name:
+                    codebook_logit_params.append(self.params_dict[name])
 
-            params.append({"params": net_params,
+            params.append({"params": redshift_params,
                            "lr": self.extra_args["codebook_pretrain_lr"]})
             if self.extra_args["redshift_pretrain_with_same_latents"]:
                 params.append({"params": latents,
                                "lr": self.extra_args["codebook_pretrain_lr"]})
+                params.append({"params": codebook_logit_params,
+                               "lr": self.extra_args["codebook_pretrain_lr"]})
+
         else: raise ValueError()
 
         self.optimizer = self.optim_cls(params, **self.optim_params)
@@ -246,7 +260,6 @@ class CodebookTrainer(BaseTrainer):
 
         # set required fields from dataset
         fields = ["coords","wave_data","spectra_source_data","spectra_masks","spectra_redshift"]
-
         if self.pixel_supervision:
             fields.append("spectra_pixels")
         self.dataset.set_fields(fields)
@@ -255,8 +268,8 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_wave_source("spectra")
 
         # set spectra data source
-        if self.mode == "pretrain_redshift" and \
-           not self.extra_args["redshift_pretrain_with_same_latents"]:
+        # tmp: in sanity check mode, we manually change sup_id and val_id in spectra_data
+        if self.mode == "redshift_pretrain":
             self.dataset.set_spectra_source("val")
         else: self.dataset.set_spectra_source("sup")
 
@@ -525,22 +538,15 @@ class CodebookTrainer(BaseTrainer):
         else:
             self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))
 
-    def freeze_layers(self, model):
-        for n, p in model.named_parameters():
-            if "redshift" not in n:
-                p.requires_grad = False
-
     def init_trainable_latents(self):
         self.latents = nn.Embedding(
             self.num_spectra,
             self.extra_args["codebook_pretrain_latent_dim"])
 
-    def load_model(self):
-        assert(exists(self.pretrained_model_fname))
-        log.info(f"saved model found, loading {self.pretrained_model_fname}")
-        checkpoint = torch.load(self.pretrained_model_fname)
-
-        # self.train_pipeline.load_state_dict(checkpoint["model_state_dict"])
+    def load_model(self, model_fname):
+        assert(exists(model_fname))
+        log.info(f"saved model found, loading {model_fname}")
+        checkpoint = torch.load(model_fname)
         load_pretrained_model_weights(
             self.train_pipeline, checkpoint["model_state_dict"])
         self.train_pipeline.train()
@@ -548,11 +554,11 @@ class CodebookTrainer(BaseTrainer):
 
     def resume_train(self):
         try:
-            self.load_model()
+            checkpoint = self.load_model(self.resume_train_model_fname)
             # a = checkpoint["optimizer_state_dict"]
             # b = a["state"];c = a["param_groups"];print(b[0])
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-            log.info("resume training")
+            log.info("resumed training")
 
             if self.plot_loss:
                 self.losses = list(np.load(self.resume_loss_fname))
@@ -617,11 +623,12 @@ class CodebookTrainer(BaseTrainer):
         if self.classify_redshift and \
            self.extra_args["redshift_classification_method"] == "weighted_avg":
             logits = ret["redshift_logits"]
-            largest, _ = torch.max(logits, dim=-1)
-            redshift_logits_regu = F.l1_loss(torch.sum(logits, dim=-1), largest)
-            self.log_dict["redshift_logits_regu"] += redshift_logits_regu.item()
+            # largest, _ = torch.max(logits, dim=-1)
+            # redshift_logits_regu = torch.mean(torch.sum(logits, dim=-1) - largest)
+            redshift_logits_regu = torch.mean(torch.sum(logits, dim=-1))
+            self.log_dict["redshift_logits_regu"] += redshift_logits_regu #.item()
 
-        total_loss = spectra_loss + recon_loss*self.recon_beta + redshift_logits_regu
+        total_loss = spectra_loss + recon_loss*self.recon_beta # + redshift_logits_regu
 
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss calculated")

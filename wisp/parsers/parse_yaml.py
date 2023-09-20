@@ -525,6 +525,9 @@ def define_cmd_line_args():
 
     train_group.add_argument("--redshift-pretrain-with-same-latents", action="store_true",
                              help="use same latents as codebook pretrain during redshift pretrain")
+    train_group.add_argument("--redshift-pretrain-num-spectra", type=float, default=1,
+                             help="num of spectra used for redshift pretrain, used to sample \
+                             a subset of spectra from codebook pretrain spectra.")
     train_group.add_argument("--main-train-with-pretrained-latents", action="store_true",
                              help="use trainable latent variable of autodecoder from \
                              pretrain for main train as spatial embedding instead of \
