@@ -24,6 +24,7 @@ class BaseInferrer(ABC):
         self.dataset = dataset
         self.pipelines = pipelines
         self.run_model = True
+        self.cuda = "cuda" in str(device)
 
         self.space_dim = extra_args["space_dim"]
         self.num_bands = extra_args["num_bands"]

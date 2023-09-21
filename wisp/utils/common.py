@@ -7,6 +7,7 @@ import random
 import logging
 import nvidia_smi
 import numpy as np
+import torch.nn as nn
 
 from os.path import join
 from astropy.io import fits
@@ -24,6 +25,24 @@ def get_bool_encode_coords(**kwargs):
 def get_bool_classify_redshift(**kwargs):
     return kwargs["model_redshift"] and not kwargs["apply_gt_redshift"] \
         and kwargs["redshift_model_method"] == "classification"
+
+def get_loss(cho, cuda):
+    if cho == "l1_mean":
+        loss = nn.L1Loss()
+    elif cho == "l1_sum":
+        loss = nn.L1Loss(reduction="sum")
+    elif cho == "l1_none":
+        loss = nn.L1Loss(reduction="none")
+    elif cho == "l2_mean":
+        loss = nn.MSELoss()
+    elif cho == "l2_sum":
+        loss = nn.MSELoss(reduction="sum")
+    elif cho == "l2_none":
+        loss = nn.MSELoss(reduction="none")
+    else:
+        raise Exception("Unsupported loss choice")
+    if cuda: loss = loss.cuda()
+    return loss
 
 def freeze_layers(model, excls):
     """ Freeze layers in model (excluding those in `excls`).

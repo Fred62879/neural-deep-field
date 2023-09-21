@@ -27,6 +27,9 @@ class CodebookPretrainNerf(BaseNeuralField):
     def get_nef_type(self):
         return "codebook_pretrain"
 
+    def set_bayesian_redshift_logits_calculation(self, loss, mask, gt_spectra):
+        self.hps_decoder.set_bayesian_redshift_logits_calculation(loss, mask, gt_spectra)
+
     def register_forward_functions(self):
         """ Register forward functions with the channels that they output.
         """

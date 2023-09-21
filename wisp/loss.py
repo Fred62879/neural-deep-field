@@ -3,6 +3,7 @@ import numpy as np
 
 from wisp.utils.numerical import calculate_emd
 
+
 def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     gt_pixels = gt_pixels / (torch.sum(gt_pixels, dim=-1)[...,None])
     recon_pixels = recon_pixels / (torch.sum(recon_pixels, dim=-1)[...,None])
@@ -10,31 +11,49 @@ def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     emd = torch.mean(torch.abs(emd))
     return emd
 
-def spectra_supervision_loss(loss, mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):
-    ''' Loss function for spectra supervision
+def spectra_supervision_loss(loss, mask, gt_spectra, recon_fluxes, redshift_logits, weight_by_wave_coverage=True):
+    """ Loss function for spectra supervision
         @Param
           loss: l1/l2 as specified in config
           mask:       [bsz,num_smpls]
           gt_spectra: [bsz,4+2*nbanbds,num_smpls]
                       (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
-          recon_flux: [bsz,num_smpls]
-    '''
+          recon_fluxes: [num_bins,bsz,num_smpls]
+          redshift_logits: [bsz,num_bins]
+    """
+    num_bins = len(recon_fluxes)
+    gt_fluxes = gt_spectra[:,1]*mask[None,...].tile(num_bins,1,1)
+    spectra_loss_bin_wise = loss(gt_fluxes, recon_fluxes*mask)
+    spectra_loss_bin_wise = torch.mean(spectra_loss_bin_wise, dim=-1)
+    logits = redshift_logits * spectra_loss_bin_wise.T
+    return spectra_supervision_loss(
+        loss, mask, gt_spectra, recon_fluxes, weight_by_wave_coverage=True)
+
+def spectra_supervision_loss(loss, mask, gt_spectra, recon_fluxes, weight_by_wave_coverage=True):
+    """ Loss function for spectra supervision
+        @Param
+          loss: l1/l2 as specified in config
+          mask:       [bsz,num_smpls]
+          gt_spectra: [bsz,4+2*nbanbds,num_smpls]
+                      (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
+          recon_fluxes: [bsz,num_smpls]
+    """
     if weight_by_wave_coverage:
         weight = gt_spectra[:,3]
-        ret = loss(gt_spectra[:,1]*mask*weight, recon_flux*mask*weight)
+        ret = loss(gt_spectra[:,1]*mask*weight, recon_fluxes*mask*weight)
     else:
-        ret = loss(gt_spectra[:,1]*mask, recon_flux*mask)
+        ret = loss(gt_spectra[:,1]*mask, recon_fluxes*mask)
     ret = torch.mean(torch.sum(ret, dim=-1), dim=-1)
     return ret
 
 def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):
-    ''' Loss function for spectra supervision
+    """ Loss function for spectra supervision
         @Param
           mask:       [bsz,num_smpls]
           gt_spectra: [bsz,4+2*nbanbds,num_smpls]
                       (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
           recon_flux: [bsz,num_smpls]
-    '''
+    """
     # norm spectra each so they sum to 1 (earth movers distance)
     # DON'T use /= or spectra will be modified in place and
     #   if we save spectra later on the spectra will be inaccurate

@@ -18,7 +18,7 @@ from wisp.utils.plot import plot_horizontally, plot_embed_map, \
     plot_latent_embed, annotated_heat, plot_simple, batch_hist
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
     sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, \
-    load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed
+    load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, get_loss
 
 
 class AstroInferrer(BaseInferrer):
@@ -1038,6 +1038,13 @@ class AstroInferrer(BaseInferrer):
             try:
                 data = self.next_batch()
                 add_to_device(data, self.extra_args["gpu_data"], self.device)
+
+                if self.classify_redshift and \
+                   self.extra_args["redshift_classification_method"] == "bayesian_weighted_avg":
+                    self.spectra_infer_pipeline.set_bayesian_redshift_logits_calculation(
+                        get_loss(self.extra_args["spectra_loss_cho"], self.cuda),
+                        data["spectra_masks"], data["spectra_source_data"]
+                    )
 
                 with torch.no_grad():
                     ret = forward(

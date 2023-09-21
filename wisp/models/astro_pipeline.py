@@ -36,5 +36,8 @@ class AstroPipeline(nn.Module):
 
         self.nef: BaseNeuralField = nef
 
+    def set_bayesian_redshift_logits_calculation(self, loss, mask, gt_spectra):
+        self.nef.set_bayesian_redshift_logits_calculation(loss, mask, gt_spectra)
+
     def forward(self, *args, **kwargs):
         return self.nef(*args, **kwargs)

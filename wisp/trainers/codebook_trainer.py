@@ -25,7 +25,7 @@ from wisp.loss import spectra_supervision_loss, \
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     select_inferrence_ids, load_embed, load_model_weights, forward, \
     load_pretrained_model_weights, get_pretrained_model_fname, \
-    get_bool_classify_redshift, freeze_layers
+    get_bool_classify_redshift, freeze_layers, get_loss
 
 
 class CodebookTrainer(BaseTrainer):
@@ -184,12 +184,11 @@ class CodebookTrainer(BaseTrainer):
         if self.extra_args["spectra_loss_cho"] == "emd":
             self.spectra_loss = spectra_supervision_emd_loss
         else:
-            # assert self.extra_args["spectra_loss_cho"][-4:] == "none"
-            loss = self.get_loss(self.extra_args["spectra_loss_cho"])
+            loss = get_loss(self.extra_args["spectra_loss_cho"], self.cuda)
             self.spectra_loss = partial(spectra_supervision_loss, loss)
 
         if self.pixel_supervision:
-            loss = self.get_loss(self.extra_args["pixel_loss_cho"])
+            loss = get_loss(self.extra_args["pixel_loss_cho"], self.cuda)
             self.pixel_loss = partial(pretrain_pixel_loss, loss)
 
     def init_dataloader(self):
@@ -576,6 +575,13 @@ class CodebookTrainer(BaseTrainer):
         add_to_device(data, self.gpu_fields, self.device)
         self.timer.check("added to gpu")
 
+        if self.classify_redshift and \
+           self.extra_args["redshift_classification_method"] == "bayesian_weighted_avg":
+            self.train_pipeline.set_bayesian_redshift_logits_calculation(
+                get_loss(self.extra_args["spectra_loss_cho"], self.cuda),
+                data["spectra_masks"], data["spectra_source_data"]
+            )
+
         ret = forward(
             data,
             self.train_pipeline,
@@ -587,7 +593,7 @@ class CodebookTrainer(BaseTrainer):
             classify_redshift=self.classify_redshift,
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
-            save_spectra=True, # we always need recon flux to calculate loss
+            save_spectra=not self.classify_redshift,
             save_redshift=self.save_data and self.save_redshift,
             save_qtz_weights=self.save_data and self.save_qtz_weights,
             save_codebook_spectra=self.save_data and \
@@ -597,15 +603,15 @@ class CodebookTrainer(BaseTrainer):
 
         # i) spectra supervision loss
         spectra_loss = 0
-        recon_flux = ret["spectra"]
-        gt_spectra = data["spectra_source_data"]
+        recon_fluxes = ret["intensity"]
         spectra_masks = data["spectra_masks"]
+        gt_spectra = data["spectra_source_data"]
 
-        if len(recon_flux) == 0:
+        if len(recon_fluxes) == 0:
             spectra_loss = 0
         else:
             spectra_loss = self.spectra_loss(
-                spectra_masks, gt_spectra, recon_flux,
+                spectra_masks, gt_spectra, recon_fluxes,
                 weight_by_wave_coverage=self.extra_args["weight_by_wave_coverage"]
             )
             self.log_dict["spectra_loss"] += spectra_loss.item()

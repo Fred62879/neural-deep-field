@@ -319,3 +319,19 @@ class ArgMax(torch.autograd.Function):
         # print(grad_updated[13,0])
         # print(grad_updated[9,3])
         return grad_updated
+
+def calculate_bayesian_redshift_logits(loss, mask, gt_spectra, recon_fluxes, redshift_logits):
+    """ Calculate bayesian logits for redshfit classification.
+        @Param
+          mask:       [bsz,num_smpls]
+          gt_spectra: [bsz,4+2*nbanbds,num_smpls]
+                      (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
+          recon_fluxes: [num_bins,bsz,num_smpls]
+          redshift_logits: [bsz,num_bins]
+    """
+    num_bins = len(recon_fluxes)
+    gt_fluxes = gt_spectra[:,1]*mask[None,...].tile(num_bins,1,1)
+    spectra_loss_bin_wise = loss(gt_fluxes, recon_fluxes*mask)
+    spectra_loss_bin_wise = torch.mean(spectra_loss_bin_wise, dim=-1)
+    logits = redshift_logits * spectra_loss_bin_wise.T
+    return logits

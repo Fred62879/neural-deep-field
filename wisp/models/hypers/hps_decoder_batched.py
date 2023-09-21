@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from functools import partial
 from wisp.utils import PerfTimer
 from wisp.utils.common import print_shape, \
     get_input_latents_dim, get_bool_classify_redshift
@@ -11,7 +12,8 @@ from wisp.models.decoders import Decoder, BasicDecoder
 from wisp.models.activations import get_activation_class
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
 from wisp.models.hypers.hps_converter_batched import HyperSpectralConverter
-from wisp.models.layers import Intensifier, Quantization, get_layer_class, ArgMax
+from wisp.models.layers import Intensifier, Quantization, get_layer_class, ArgMax, \
+    calculate_bayesian_redshift_logits
 
 class HyperSpectralDecoderB(nn.Module):
 
@@ -32,8 +34,6 @@ class HyperSpectralDecoderB(nn.Module):
         self.qtz_spectra = qtz_spectra
 
         self.classify_redshift = _model_redshift and get_bool_classify_redshift(**kwargs)
-        self.argmax_redshift = kwargs["redshift_classification_method"] == "argmax"
-        self.weighted_avg_redshift = kwargs["redshift_classification_method"] == "weighted_avg"
 
         self.convert = HyperSpectralConverter(
             _model_redshift=_model_redshift, **kwargs
@@ -45,6 +45,12 @@ class HyperSpectralDecoderB(nn.Module):
         if self.intensify:
             self.intensifier = Intensifier(kwargs["intensification_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
+
+    def set_bayesian_redshift_logits_calculation(self, loss, mask, gt_spectra):
+        """ Set function to calculate bayesian logits for redshift classification.
+        """
+        self.calculate_bayesian_redshift_logits = partial(
+            calculate_bayesian_redshift_logits, loss, mask, gt_spectra)
 
     def get_input_dim(self):
         if self.kwargs["space_dim"] == 2:
@@ -135,13 +141,20 @@ class HyperSpectralDecoderB(nn.Module):
             # spectra [num_redshift_bins,bsz,nsmpl]; logits [bsz,num_redshift_bins]
             ret["spectra_all_bins"] = spectra
 
-            if self.weighted_avg_redshift:
+            if self.kwargs["redshift_classification_method"] == "weighted_avg":
                 spectra = torch.matmul(
                     ret["redshift_logits"][:,None], spectra.permute(1,0,2))[:,0]
-            elif self.argmax_redshift:
+
+            elif self.kwargs["redshift_classification_method"] == "argmax":
                 # spectra = ArgMax.apply(ret["redshift_logits"], spectra)
                 ids = ArgMax.apply(ret["redshift_logits"])
                 spectra = torch.matmul(ids[:,None], spectra.permute(1,0,2))[:,0]
+
+            elif self.kwargs["redshift_classification_method"] == "bayesian_weighted_avg":
+                logits = self.calculate_bayesian_redshift_logits(
+                    spectra, ret["redshift_logits"]) # [bsz,num_bins]
+                logits = logits / torch.sum(logits, dim=-1)[:,None]
+                spectra = torch.matmul(logits, spectra.permute(1,0,2))[:,0]
 
         if self.scale:
             assert scaler is not None

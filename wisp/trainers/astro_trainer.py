@@ -22,7 +22,7 @@ from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     load_pretrained_model_weights, forward, print_shape, create_patch_uid, \
-    get_bool_classify_redshift, get_pretrained_model_fname
+    get_bool_classify_redshift, get_pretrained_model_fname, get_loss
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
 
@@ -188,15 +188,15 @@ class AstroTrainer(BaseTrainer):
 
     def init_loss(self):
         if self.spectra_supervision:
-            loss = self.get_loss(self.extra_args["spectra_loss_cho"])
+            loss = get_loss(self.extra_args["spectra_loss_cho"], self.cuda)
             self.spectra_loss = partial(spectra_supervision_loss, loss)
 
         if self.redshift_semi_supervision:
-            loss = self.get_loss(self.extra_args["redshift_loss_cho"])
+            loss = get_loss(self.extra_args["redshift_loss_cho"], self.cuda)
             self.redshift_loss = partial(redshift_supervision_loss, loss)
 
         if self.pixel_supervision:
-            loss = self.get_loss(self.extra_args["pixel_loss_cho"])
+            loss = get_loss(self.extra_args["pixel_loss_cho"], self.cuda)
             if self.spectral_inpaint:
                 loss = partial(spectral_masking_loss, loss,
                                self.extra_args["relative_train_bands"],
