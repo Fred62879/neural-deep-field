@@ -39,7 +39,7 @@ def get_pretrain_pipelines(pipelines, tasks, args):
         )
         pipelines["full"] = AstroPipeline(pretrain_nef)
 
-        if "recon_gt_spectra" in tasks:
+        if "recon_gt_spectra" in tasks or "recon_gt_spectra_all_bins" in tasks:
             spectra_nef = CodebookPretrainNerf(
                 _decode_redshift=decode_redshift, **vars(args))
             pipelines["spectra_infer"] = AstroPipeline(spectra_nef)

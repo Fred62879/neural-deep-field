@@ -631,6 +631,11 @@ class CodebookTrainer(BaseTrainer):
                 largest, _ = torch.max(logits, dim=-1)
                 redshift_logits_regu = torch.mean(torch.sum(logits, dim=-1) - largest)
             elif self.redshift_logits_regu_method == "laplace":
+                a = -torch.log(
+                        torch.exp(-logits) + torch.exp( -(1-logits) )
+                    )
+                print(a, a.shape)
+                assert 0
                 redshift_logits_regu = torch.mean(
                     -torch.log(
                         torch.exp(-logits) + torch.exp( -(1-logits) )

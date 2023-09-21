@@ -492,7 +492,8 @@ class AstroDataset(Dataset):
                       is_codebook=False, spectra_ids=None,
                       save_spectra=False, save_spectra_together=False,
                       gt_masks=None, recon_masks=None,
-                      clip=False, spectra_clipped=False
+                      clip=False, spectra_clipped=False,
+                      calculate_metrics=True
     ):
         return self.spectra_dataset.plot_spectrum(
             spectra_dir, name, flux_norm_cho,
@@ -503,4 +504,5 @@ class AstroDataset(Dataset):
             spectra_ids=spectra_ids,
             gt_masks=gt_masks, recon_masks=recon_masks,
             clip=clip, spectra_clipped=spectra_clipped,
+            calculate_metrics=True
         )

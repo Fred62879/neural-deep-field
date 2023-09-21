@@ -112,7 +112,7 @@ class AstroInferrer(BaseInferrer):
     def init_model(self):
         self.full_pipeline = self.pipelines["full"]
         log.info(self.full_pipeline)
-        if self.recon_gt_spectra:
+        if self.recon_gt_spectra or self.recon_gt_spectra_all_bins:
             self.spectra_infer_pipeline = self.pipelines["spectra_infer"]
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
             self.codebook_spectra_infer_pipeline = self.pipelines["codebook_spectra_infer"]
@@ -238,6 +238,8 @@ class AstroInferrer(BaseInferrer):
 
         # ii) infer selected coords using partial model
         self.recon_gt_spectra = "recon_gt_spectra" in tasks and self.space_dim == 3
+        self.recon_gt_spectra_all_bins = "recon_gt_spectra_all_bins" in tasks and \
+            self.space_dim == 3 and self.classify_redshift
         # save spectra pixel values, doing same job as
         #   `recon_img_sup_spectra` during pretran infer &
         #   `recon_img_val_spectra` during main train infer
@@ -264,7 +266,8 @@ class AstroInferrer(BaseInferrer):
            self.plot_embed_map or self.plot_latent_embed:
             self.group_tasks.append("infer_all_coords_full_model")
 
-        if self.recon_gt_spectra or self.save_qtz_weights or self.save_redshift:
+        if self.recon_gt_spectra or self.recon_gt_spectra_all_bins or \
+           self.save_qtz_weights or self.save_redshift:
             self.group_tasks.append("infer_selected_coords_partial_model")
 
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
@@ -723,14 +726,22 @@ class AstroInferrer(BaseInferrer):
 
     def pre_checkpoint_selected_coords_partial_model(self, model_id):
         self.reset_data_iterator()
-        self.recon_fluxes = []
+
         if self.pretrain_infer:
             self.gt_fluxes = []
             self.spectra_wave = []
             self.spectra_masks = []
+
+            if self.recon_gt_spectra:
+                self.recon_fluxes = []
+
+            if self.recon_gt_spectra_all_bins:
+                self.recon_fluxes_all = []
+
         if self.save_qtz_weights: self.qtz_weights = []
         if self.save_pixel_values: self.spectra_trans = []
         if self.plot_redshift_logits: self.redshift_logits = []
+
         if self.save_redshift:
             if self.classify_redshift:
                 self.argmax_redshift = []
@@ -747,76 +758,58 @@ class AstroInferrer(BaseInferrer):
     def post_checkpoint_selected_coords_partial_model(self, model_id):
         if self.pretrain_infer:
             num_spectra = self.dataset_length
-            gt_wave = torch.stack(self.spectra_wave).view(
+            self.gt_wave = torch.stack(self.spectra_wave).view(
                 num_spectra, -1).detach().cpu().numpy()
-            gt_masks = torch.stack(self.spectra_masks).bool().view(
+            self.gt_masks = torch.stack(self.spectra_masks).bool().view(
                 num_spectra, -1).detach().cpu().numpy()
-            gt_fluxes = torch.stack(self.gt_fluxes).view(
+            self.gt_fluxes = torch.stack(self.gt_fluxes).view(
                 num_spectra, -1).detach().cpu().numpy()
-            recon_wave = gt_wave
-            recon_masks = gt_masks
-            recon_fluxes = torch.stack(self.recon_fluxes).view(
-                self.dataset_length, 1, -1).detach().cpu().numpy()
+            self.recon_wave = self.gt_wave
+            self.recon_masks = self.gt_masks
+
+            if self.recon_gt_spectra:
+                self.recon_fluxes = torch.stack(self.recon_fluxes).view(
+                    self.dataset_length, 1, -1).detach().cpu().numpy()
+            if self.recon_gt_spectra_all_bins:
+                self.recon_fluxes_all = torch.stack(
+                    self.recon_fluxes_all).detach().cpu().numpy()
         else:
             if self.main_infer:
                 if self.recon_spectra_pixels_only:
                     # todo: adapt to patch-wise inferrence
                     num_spectra = self.dataset.get_num_validation_spectra()
                     val_spectra = self.dataset.get_validation_spectra()
-                    gt_wave = val_spectra[:,0]
-                    gt_fluxes = val_spectra[:,1]
-                    gt_masks = self.dataset.get_validation_spectra_masks()
+                    self.gt_wave = val_spectra[:,0]
+                    self.gt_fluxes = val_spectra[:,1]
+                    self.gt_masks = self.dataset.get_validation_spectra_masks()
                 else:
                     num_spectra = self.cur_patch.get_num_spectra()
-                    gt_wave = self.cur_patch.get_spectra_pixel_wave()
-                    gt_masks = self.cur_patch.get_spectra_pixel_masks()
-                    gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
+                    self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
+                    self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
+                    self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
             elif self.test:
                 assert 0
                 # todo: replace with patch-wise test spectra
                 num_spectra = self.dataset.get_num_test_spectra()
                 test_spectra = self.dataset.get_test_spectra()
-                gt_wave = test_spectra[:,0]
-                gt_fluxes = test_spectra[:,1]
-                gt_masks = self.dataset.get_test_spectra_masks()
+                self.gt_wave = test_spectra[:,0]
+                self.gt_fluxes = test_spectra[:,1]
+                self.gt_masks = self.dataset.get_test_spectra_masks()
             else:
                 raise ValueError()
 
-            recon_wave = np.tile(
+            self.recon_wave = np.tile(
                 self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
-            recon_masks = np.tile(
+            self.recon_masks = np.tile(
                 self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
-            recon_fluxes = torch.stack(self.recon_fluxes).view(
-                num_spectra, self.neighbour_size**2, -1
-            ).detach().cpu().numpy()
+            self.recon_fluxes = torch.stack(self.recon_fluxes).view(
+                num_spectra, self.neighbour_size**2, -1).detach().cpu().numpy()
 
-        # plot spectrum in multiple figures, each figure contains several spectrum
-        n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
-        n_figs = int(np.ceil(num_spectra / n_spectrum_per_fig))
+        if self.recon_gt_spectra:
+            self._recon_gt_spectra(num_spectra, model_id)
 
-        cur_checkpoint_metrics = []
-        for i in range(n_figs):
-            fname = f"model{model_id}-plot{i}"
-            lo = i * n_spectrum_per_fig
-            hi = min(lo + n_spectrum_per_fig, num_spectra)
-
-            cur_metrics = self.dataset.plot_spectrum(
-                self.spectra_dir, fname,
-                self.extra_args["flux_norm_cho"],
-                gt_wave[lo:hi], gt_fluxes[lo:hi],
-                recon_wave[lo:hi], recon_fluxes[lo:hi],
-                # save_spectra_together=True,
-                clip=self.extra_args["plot_clipped_spectrum"],
-                gt_masks=gt_masks[lo:hi],
-                recon_masks=recon_masks[lo:hi]
-            )
-            if cur_metrics is not None:
-                cur_checkpoint_metrics.extend(cur_metrics)
-
-        log.info("spectrum plotting done")
-
-        if len(cur_checkpoint_metrics) != 0:
-            self.metrics.append(cur_checkpoint_metrics)
+        if self.recon_gt_spectra_all_bins:
+            self._recon_gt_spectra_all_bins(num_spectra, model_id)
 
         # if self.save_pixel_values:
         #     self.recon_pixels = self.trans_obj.integrate(recon_fluxes)
@@ -1026,17 +1019,17 @@ class AstroInferrer(BaseInferrer):
         iterations = checkpoint["epoch_trained"]
         model_state = checkpoint["model_state_dict"]
 
-        # load_model_weights(self.spectra_infer_pipeline, model_state)
+        load_model_weights(self.spectra_infer_pipeline, model_state)
 
         ## debug, test apply_gt_spectra in redshift_pretrain_infer
-        shared_layers = set(self.spectra_infer_pipeline.state_dict().keys())
-        to_remove = []
-        for k in shared_layers:
-            if "redshift" in k: to_remove.append(k)
-        for k in to_remove: shared_layers.remove(k)
-        load_pretrained_model_weights(
-            self.spectra_infer_pipeline, model_state, shared_layer_names=shared_layers
-        )
+        # shared_layers = set(self.spectra_infer_pipeline.state_dict().keys())
+        # to_remove = []
+        # for k in shared_layers:
+        #     if "redshift" in k: to_remove.append(k)
+        # for k in to_remove: shared_layers.remove(k)
+        # load_pretrained_model_weights(
+        #     self.spectra_infer_pipeline, model_state, shared_layer_names=shared_layers
+        # )
         ## ends here
 
         self.spectra_infer_pipeline.eval()
@@ -1056,9 +1049,10 @@ class AstroInferrer(BaseInferrer):
                         qtz_strategy=self.qtz_strategy,
                         apply_gt_redshift=self.apply_gt_redshift,
                         classify_redshift=self.classify_redshift,
-                        save_spectra=True,
+                        save_spectra=self.recon_gt_spectra,
                         save_redshift=self.save_redshift,
-                        save_qtz_weights=self.save_qtz_weights
+                        save_qtz_weights=self.save_qtz_weights,
+                        save_spectra_all_bins=self.recon_gt_spectra_all_bins
                     )
 
                 if self.pretrain_infer:
@@ -1066,10 +1060,15 @@ class AstroInferrer(BaseInferrer):
                     self.spectra_wave.extend(data["spectra_source_data"][:,0])
                     self.spectra_masks.extend(data["spectra_masks"])
 
-                fluxes = ret["intensity"]
-                if fluxes.ndim == 3: # bandwise
-                    fluxes = fluxes.flatten(1,2) # [bsz,nsmpl]
-                self.recon_fluxes.extend(fluxes)
+                if self.recon_gt_spectra:
+                    fluxes = ret["intensity"]
+                    if fluxes.ndim == 3: # bandwise
+                        fluxes = fluxes.flatten(1,2) # [bsz,nsmpl]
+                    self.recon_fluxes.extend(fluxes)
+
+                if self.recon_gt_spectra_all_bins:
+                    fluxes = ret["spectra_all_bins"]
+                    self.recon_fluxes_all.extend(fluxes) # [num_bins,bsz,nsmpl]
 
                 if self.save_qtz_weights:
                     self.qtz_weights.extend(ret["qtz_weights"])
@@ -1267,6 +1266,64 @@ class AstroInferrer(BaseInferrer):
         }
         # plot redshift img
         _, _ = self.dataset.restore_evaluate_tiles(self.redshift, **re_args)
+
+    def _recon_gt_spectra(self, num_spectra, model_id):
+        # plot spectrum in multiple figures, each figure contains several spectrum
+        n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
+        n_figs = int(np.ceil(num_spectra / n_spectrum_per_fig))
+
+        cur_checkpoint_metrics = []
+        for i in range(n_figs):
+            fname = f"model{model_id}-plot{i}"
+            lo = i * n_spectrum_per_fig
+            hi = min(lo + n_spectrum_per_fig, num_spectra)
+
+            cur_metrics = self.dataset.plot_spectrum(
+                self.spectra_dir, fname,
+                self.extra_args["flux_norm_cho"],
+                self.gt_wave[lo:hi], self.gt_fluxes[lo:hi],
+                self.recon_wave[lo:hi], self.recon_fluxes[lo:hi],
+                # save_spectra_together=True,
+                clip=self.extra_args["plot_clipped_spectrum"],
+                gt_masks=self.gt_masks[lo:hi],
+                recon_masks=self.recon_masks[lo:hi]
+            )
+            if cur_metrics is not None:
+                cur_checkpoint_metrics.extend(cur_metrics)
+
+        log.info("spectrum plotting done")
+
+        if len(cur_checkpoint_metrics) != 0:
+            self.metrics.append(cur_checkpoint_metrics)
+
+    def _recon_gt_spectra_all_bins(self, num_spectra, model_id):
+        # plot spectrum in multiple figures, each figure contains several spectrum
+        n_figs = num_spectra
+        n_spectrum_per_fig = len(self.recon_fluxes_all)
+
+        def change_shape(data):
+            return np.tile(data, n_spectrum_per_fig).reshape(n_spectrum_per_fig, -1)
+
+        for i in range(n_figs):
+            fname = f"model{model_id}-plot{i}-all_bins"
+            lo = i * n_spectrum_per_fig
+            hi = min(lo + n_spectrum_per_fig, num_spectra)
+
+            _ = self.dataset.plot_spectrum(
+                self.spectra_dir, fname,
+                self.extra_args["flux_norm_cho"],
+                change_shape(self.gt_wave[i]),
+                change_shape(self.gt_fluxes[i]),
+                change_shape(self.recon_wave[i]),
+                self.recon_fluxes_all[:,i],
+                # save_spectra_together=True,
+                clip=self.extra_args["plot_clipped_spectrum"],
+                gt_masks=change_shape(self.gt_masks[i]),
+                recon_masks=change_shape(self.recon_masks[i]),
+                calculate_metrics=False)
+
+        log.info("all bin spectrum plotting done")
+
 
     def configure_img_metrics(self):
         self.metric_options = self.extra_args["metric_options"]

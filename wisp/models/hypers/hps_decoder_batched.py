@@ -126,13 +126,15 @@ class HyperSpectralDecoderB(nn.Module):
 
             # input here is logits
             _, spectra = self.qtz(input, codebook_spectra, ret, qtz_args)
-            spectra = torch.squeeze(spectra, dim=-2) # [bsz,nsmpl]
+            spectra = torch.squeeze(spectra, dim=-2) # [...,bsz,nsmpl]
         else:
             latents = self.convert(wave, input, redshift, wave_bound) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
 
         if self.classify_redshift:
             # spectra [num_redshift_bins,bsz,nsmpl]; logits [bsz,num_redshift_bins]
+            ret["spectra_all_bins"] = spectra
+
             if self.weighted_avg_redshift:
                 spectra = torch.matmul(
                     ret["redshift_logits"][:,None], spectra.permute(1,0,2))[:,0]

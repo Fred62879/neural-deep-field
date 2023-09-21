@@ -1134,7 +1134,8 @@ class SpectraData:
                       save_spectra_together=False,
                       spectra_ids=None,
                       gt_masks=None, recon_masks=None,
-                      clip=False, spectra_clipped=False
+                      clip=False, spectra_clipped=False,
+                      calculate_metrics=True
     ):
         """ Plot all given spectra.
             @Param
@@ -1158,13 +1159,16 @@ class SpectraData:
              metrics: [n_spectra,n_metrics]
         """
         assert not clip or (recon_masks is not None or spectra_clipped)
-        calculate_metrics = not is_codebook and (clip or spectra_clipped)
+        calculate_metrics = not is_codebook and (clip or spectra_clipped) and calculate_metrics
 
         n = len(recon_wave)
         if gt_wave is None: gt_wave = [None]*n
         if gt_masks is None: gt_masks = [None]*n
         if gt_fluxes is None: gt_fluxes = [None]*n
         if recon_masks is None: recon_masks = [None]*n
+
+        # print(gt_fluxes.shape, gt_wave.shape, gt_masks.shape)
+        # print(recon_fluxes.shape, recon_wave.shape, recon_masks.shape)
 
         assert gt_fluxes[0] is None or \
             (len(gt_wave) == n and len(gt_fluxes) == n and len(gt_masks) == n)

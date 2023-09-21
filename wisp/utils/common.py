@@ -278,6 +278,7 @@ def forward(
         save_qtz_weights=False,
         save_codebook_loss=False,
         save_codebook_spectra=False,
+        save_spectra_all_bins=False
 ):
     requested_channels = []
     net_args = {"coords": data["coords"] }
@@ -297,6 +298,7 @@ def forward(
         if save_codebook_loss: requested_channels.append("codebook_loss")
         if classify_redshift: requested_channels.append("redshift_logits")
         if save_codebook_spectra: requested_channels.append("codebook_spectra")
+        if save_spectra_all_bins: requested_channels.append("spectra_all_bins")
 
         net_args["wave"] = data["wave"]
         net_args["wave_range"] = data["wave_range"] # linear normalization
