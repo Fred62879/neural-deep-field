@@ -332,6 +332,16 @@ class SpectraData:
         if self.kwargs["codebook_pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][sup_ids]
 
+        ## debug
+        # a = self.data["supervision_spectra"]
+        # b = self.data["supervision_masks"]
+        # fig, axs = plt.subplots(4, 5, figsize=(5*5,5*4))
+        # for i in range(20):
+        #     axis = axs[i//5, i%5]
+        #     axis.plot(a[i][0][b[i]],a[i][1][b[i]])
+        # fig.tight_layout(); plt.savefig('tmp-sup.png'); plt.close()
+        ## ends here
+
         # valiation(and semi sup) spectra data (used during main train)
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
         self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids]
@@ -340,8 +350,17 @@ class SpectraData:
         self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
 
         self.data["validation_coords"] = self.data["gt_spectra_coords"][val_ids] # [n_valid,n_neighbr**2,2/3]
-        # self.data["validation_coords"] = valid_coords.view(-1, valid_coords.shape[-1])[:,None]
-        # [n_valid*n_neighbr**2,1,2/3]
+
+        ## debug
+        # a = self.data["validation_spectra"]
+        # b = self.data["validation_masks"]
+        # fig, axs = plt.subplots(4, 5, figsize=(5*5,5*4))
+        # for i in range(20):
+        #     axis = axs[i//5, i%5]
+        #     axis.plot(a[i][0][b[i]],a[i][1][b[i]])
+        # fig.tight_layout(); plt.savefig('tmp-val.png'); plt.close()
+        # assert 0
+        ## ends here
 
         # test spectra data (used during main inferrence only)
         self.data["test_spectra"] = self.data["gt_spectra"][test_ids]
@@ -462,18 +481,20 @@ class SpectraData:
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
 
-        ## tmp added to debug
+        ## debug, pretrain sanity check
         a = supervision_ids
         b = validation_ids
-        c = np.arange(len(a))
+        supervision_ids = a #[:10]
+        c = np.arange(len(supervision_ids))
+        np.random.seed(0)
         np.random.shuffle(c)
         self.redshift_pretrain_ids = c[:self.kwargs["redshift_pretrain_num_spectra"]]
-        validation_ids = a[self.redshift_pretrain_ids] #[10:]
-        supervision_ids = a #[:10]
+        print(self.redshift_pretrain_ids)
+        validation_ids = supervision_ids[self.redshift_pretrain_ids] #[10:]
         ## ends here
 
         # log.info(f"test spectra ids: {test_ids}")
-        # log.info(f"validation spectra ids: {validation_ids}")
+        log.info(f"validation spectra ids: {validation_ids}")
         log.info(f"supervision spectra ids: {supervision_ids}")
 
         self.num_test_spectra = len(test_ids)
@@ -1081,10 +1102,12 @@ class SpectraData:
                 if plot_gt_spectrum:
                     gt_wave = gt_wave[gt_mask]
                     gt_flux = gt_flux[gt_mask]
-                recon_wave = recon_wave[recon_mask]
-                recon_flux = recon_flux[recon_mask]
+                if plot_recon_spectrum:
+                    recon_wave = recon_wave[recon_mask]
+                    recon_flux = recon_flux[recon_mask]
 
-        if calculate_metrics and not (recon_wave == gt_wave).all():
+        if calculate_metrics and not \
+           ( recon_wave.shape == gt_wave.shape and (recon_wave == gt_wave).all() ):
             if wave_within_bound(recon_wave, gt_wave):
                 f = interp1d(gt_wave, gt_flux)
                 gt_flux = f(recon_wave)

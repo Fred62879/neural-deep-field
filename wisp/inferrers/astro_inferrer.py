@@ -17,8 +17,8 @@ from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 from wisp.utils.plot import plot_horizontally, plot_embed_map, \
     plot_latent_embed, annotated_heat, plot_simple, batch_hist
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
-    load_model_weights, load_layer_weights, load_embed, sort_alphanumeric, \
-    get_bool_classify_redshift, init_redshift_bins
+    sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, \
+    load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed
 
 
 class AstroInferrer(BaseInferrer):
@@ -173,6 +173,7 @@ class AstroInferrer(BaseInferrer):
         self.redshift_pretrain_infer = self.mode == "redshift_pretrain_infer"
         self.pretrain_infer = self.codebook_pretrain_infer or self.redshift_pretrain_infer
         assert sum([self.test,self.main_infer,self.pretrain_infer]) == 1
+        if self.redshift_pretrain_infer: assert not self.infer_selected
 
         # quantization setups
         self.qtz_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
@@ -192,7 +193,7 @@ class AstroInferrer(BaseInferrer):
         self.redshift_semi_supervision = self.model_redshift and \
             self.extra_args["redshift_semi_supervision"]
         if self.codebook_pretrain_infer: assert self.apply_gt_redshift
-        if self.redshift_pretrain_infer: assert not self.apply_gt_redshift
+        # if self.redshift_pretrain_infer: assert not self.apply_gt_redshift
         self.classify_redshift = get_bool_classify_redshift(**self.extra_args)
 
         # i) infer all coords using original model
@@ -306,11 +307,9 @@ class AstroInferrer(BaseInferrer):
             if self.apply_gt_redshift:
                 self.requested_fields.append("spectra_redshift")
 
-            # tmp changed (to check codebook pretrain spectra)
             if self.infer_selected:
-                # self.dataset_length = min(
-                #     self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
-                self.dataset_length = self.extra_args["redshift_pretrain_num_spectra"]
+                self.dataset_length = min(
+                    self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
             else: self.dataset_length = self.num_spectra
 
         elif self.main_infer:
@@ -378,16 +377,14 @@ class AstroInferrer(BaseInferrer):
             if not self.use_all_wave:
                 self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
                 self.wave_sample_method = self.extra_args["pretrain_infer_wave_sample_method"]
-            # pretrain coords set using checkpoint
+            # pretrain coords set use checkpoint
 
             self.requested_fields.extend([
                 "spectra_source_data","spectra_masks","spectra_redshift"])
 
-            # tmp changed (to check codebook pretrain spectra)
             if self.infer_selected:
-                # self.dataset_length = min(
-                #     self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
-                self.dataset_length = self.extra_args["redshift_pretrain_num_spectra"]
+                self.dataset_length = min(
+                    self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
             else: self.dataset_length = self.num_spectra
 
         elif self.main_infer:
@@ -465,11 +462,9 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.extend([
                     "spectra_source_data","spectra_masks","spectra_redshift"])
 
-                # tmp changed (to check codebook pretrain spectra)
                 if self.infer_selected:
-                    # self.dataset_length = min(
-                    #     self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
-                    self.dataset_length = self.extra_args["redshift_pretrain_num_spectra"]
+                    self.dataset_length = min(
+                        self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
                 else:
                     input("plot codebook spectra for all spectra, press Enter to confirm...")
                     self.dataset_length = self.num_spectra
@@ -815,7 +810,8 @@ class AstroInferrer(BaseInferrer):
                 gt_masks=gt_masks[lo:hi],
                 recon_masks=recon_masks[lo:hi]
             )
-            cur_checkpoint_metrics.extend(cur_metrics)
+            if cur_metrics is not None:
+                cur_checkpoint_metrics.extend(cur_metrics)
 
         log.info("spectrum plotting done")
 
@@ -1029,7 +1025,20 @@ class AstroInferrer(BaseInferrer):
     def infer_spectra(self, model_id, checkpoint):
         iterations = checkpoint["epoch_trained"]
         model_state = checkpoint["model_state_dict"]
-        load_model_weights(self.spectra_infer_pipeline, model_state)
+
+        # load_model_weights(self.spectra_infer_pipeline, model_state)
+
+        ## debug, test apply_gt_spectra in redshift_pretrain_infer
+        shared_layers = set(self.spectra_infer_pipeline.state_dict().keys())
+        to_remove = []
+        for k in shared_layers:
+            if "redshift" in k: to_remove.append(k)
+        for k in to_remove: shared_layers.remove(k)
+        load_pretrained_model_weights(
+            self.spectra_infer_pipeline, model_state, shared_layer_names=shared_layers
+        )
+        ## ends here
+
         self.spectra_infer_pipeline.eval()
 
         while True:
@@ -1168,27 +1177,29 @@ class AstroInferrer(BaseInferrer):
             self.dataset.set_wave_sample_method(self.wave_sample_method)
 
         # select the same random set of spectra to recon
-        if self.pretrain_infer and self.infer_selected:
-            # ids = select_inferrence_ids(
-            #     self.num_spectra,
-            #     self.extra_args["pretrain_num_infer_upper_bound"]
-            # )
-            ids = self.dataset.get_redshift_pretrain_spectra_ids()
+        if self.codebook_pretrain_infer and self.infer_selected:
+            ids = select_inferrence_ids(
+                self.num_spectra,
+                self.extra_args["pretrain_num_infer_upper_bound"])
             self.dataset.set_hardcode_data("selected_ids", ids)
 
     def _set_coords_from_checkpoint(self, checkpoint):
         """ Set dataset coords using saved model checkpoint.
         """
         if self.coords_source == "spectra_latents":
+            # trainable code for each spectra during pretrain
             latents = checkpoint["latents"]
             self.dataset.set_hardcode_data(self.coords_source, latents)
+
         elif self.coords_source == "codebook_latents":
+            # latent code in codebook
             codebook_latents = load_layer_weights(
                 checkpoint["model_state_dict"], lambda n: "grid" not in n and "codebook" in n)
             codebook_latents = codebook_latents[:,None] # [num_embd, 1, latent_dim]
             codebook_latents = codebook_latents.detach().cpu().numpy()
             self.dataset.set_hardcode_data(self.coords_source, codebook_latents)
-        else: raise ValueError()
+        else:
+            raise ValueError()
 
     def _set_coords_from_spectra_source(self, coords, w_neighbour=True):
         """ Set dataset coords using spectra coords.

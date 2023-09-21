@@ -446,6 +446,18 @@ class AstroDataset(Dataset):
         if "redshift_data" in self.requested_fields:
            self.get_redshift_data(out)
 
+        ## debug
+        # import matplotlib.pyplot as plt
+        # a = out["spectra_source_data"]
+        # b = out["spectra_masks"]
+        # fig, axs = plt.subplots(4, 5, figsize=(5*5,5*4))
+        # for i in range(20):
+        #     axis = axs[i//5, i%5]
+        #     axis.plot(a[i][0][b[i]],a[i][1][b[i]])
+        # fig.tight_layout(); plt.savefig('tmp-val.png'); plt.close()
+        # assert 0
+        ## ends here
+
         # print_shape(out)
         if self.transform is not None:
             out = self.transform(out)

@@ -503,6 +503,10 @@ def define_cmd_line_args():
     train_group.add_argument("--spectra-loss-cho",type=str, choices=["l1","l2"])
     train_group.add_argument("--redshift-loss-cho",type=str, choices=["l1","l2"])
 
+    train_group.add_argument("--regu-redshift-logits", action="store_true")
+    train_group.add_argument("--redshift-logits-regu-method",type=str,
+                             choices=["l1","l1_excl_largest","laplace"])
+
     train_group.add_argument("--train-with-all-pixels", action="store_true")
     train_group.add_argument("--train-pixel-ratio", type=float, default=1,
                              help="ratio of (unmasked) pixels used for training per epoch")

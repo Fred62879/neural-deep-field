@@ -7,6 +7,7 @@ __pycache__
 sandbox.ipynb
 logs
 *.so
+*png
 _*/
 *npy
 .polyscope.ini

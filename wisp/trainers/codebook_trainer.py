@@ -48,6 +48,7 @@ class CodebookTrainer(BaseTrainer):
         self.space_dim = extra_args["space_dim"]
         self.gpu_fields = extra_args["gpu_data"]
         self.recon_beta = extra_args["pretrain_pixel_beta"]
+        self.redshift_logits_regu_method = extra_args["redshift_logits_regu_method"]
 
         self.summarize_training_tasks()
         self.set_path()
@@ -156,7 +157,10 @@ class CodebookTrainer(BaseTrainer):
             self.init_trainable_latents()
         elif self.mode == "redshift_pretrain":
             checkpoint = self.load_model(self.pretrained_model_fname)
+
             if self.extra_args["redshift_pretrain_with_same_latents"]:
+                # checkpoint comes from codebook pretrain (using sup spectra)
+                # redshift pretrain use val spectra which is a permute of sup spectra
                 self.latents = nn.Embedding.from_pretrained(
                     checkpoint["latents"][self.dataset.get_redshift_pretrain_spectra_ids()]
                 )
@@ -167,6 +171,9 @@ class CodebookTrainer(BaseTrainer):
                     self.train_pipeline, ["redshift_decoder","spatial_decoder.decode"])
         else:
             raise ValueError("Invalid pretrainer mode.")
+
+        if self.extra_args["resume_train"]:
+            self.resume_train()
 
         log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(
@@ -302,12 +309,6 @@ class CodebookTrainer(BaseTrainer):
     def begin_train(self):
         if self.plot_loss:
             self.losses = []
-
-        if self.extra_args["resume_train"]:
-            self.resume_train()
-
-        if self.mode == "pretrain_redshift":
-            self.load_latents()
 
         log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
 
@@ -620,15 +621,27 @@ class CodebookTrainer(BaseTrainer):
 
         # iii)
         redshift_logits_regu = 0
-        if self.classify_redshift and \
+        if self.classify_redshift and self.extra_args["regu_redshift_logits"] and \
            self.extra_args["redshift_classification_method"] == "weighted_avg":
-            logits = ret["redshift_logits"]
-            # largest, _ = torch.max(logits, dim=-1)
-            # redshift_logits_regu = torch.mean(torch.sum(logits, dim=-1) - largest)
-            redshift_logits_regu = torch.mean(torch.sum(logits, dim=-1))
-            self.log_dict["redshift_logits_regu"] += redshift_logits_regu #.item()
 
-        total_loss = spectra_loss + recon_loss*self.recon_beta # + redshift_logits_regu
+            logits = ret["redshift_logits"]
+            if self.redshift_logits_regu_method == "l1":
+                redshift_logits_regu = torch.mean(torch.sum(logits, dim=-1))
+            elif self.redshift_logits_regu_method == "l1_excl_largest":
+                largest, _ = torch.max(logits, dim=-1)
+                redshift_logits_regu = torch.mean(torch.sum(logits, dim=-1) - largest)
+            elif self.redshift_logits_regu_method == "laplace":
+                redshift_logits_regu = torch.mean(
+                    -torch.log(
+                        torch.exp(-logits) + torch.exp( -(1-logits) )
+                    )
+                )
+            else:
+                raise ValueError("Invalid redshift logit regularization method!")
+
+            self.log_dict["redshift_logits_regu"] += redshift_logits_regu
+
+        total_loss = spectra_loss + recon_loss*self.recon_beta + redshift_logits_regu
 
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss calculated")

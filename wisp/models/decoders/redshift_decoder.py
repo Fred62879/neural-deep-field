@@ -73,8 +73,9 @@ class RedshiftDecoder(nn.Module):
             ret["redshift"] = specz
         else:
             if self.redshift_model_method == "regression":
-                redshift = self.redshift_decoder(z[:,0])[...,0]
-                ret["redshift"] = self.redshift_adjust(redshift + 0.5)
+                # redshift = self.redshift_decoder(z[:,0])[...,0]
+                # ret["redshift"] = self.redshift_adjust(redshift + 0.5)
+                ret["redshift"] = specz
             elif self.redshift_model_method == "classification":
                 ret["redshift"]= self.redshift_bin_center # [num_bins]
                 ret["redshift_logits"] = F.softmax(
