@@ -1304,7 +1304,8 @@ class AstroInferrer(BaseInferrer):
             self.metrics.append(cur_checkpoint_metrics)
 
     def _recon_gt_spectra_all_bins(self, num_spectra, model_id):
-        # plot spectrum in multiple figures, each figure contains several spectrum
+        """ Plot spectrum under all redshift for each spectra
+        """
         n_figs = num_spectra
         n_spectrum_per_fig = len(self.recon_fluxes_all)
 
@@ -1330,7 +1331,6 @@ class AstroInferrer(BaseInferrer):
                 calculate_metrics=False)
 
         log.info("all bin spectrum plotting done")
-
 
     def configure_img_metrics(self):
         self.metric_options = self.extra_args["metric_options"]

@@ -48,7 +48,7 @@ net:
     nef_type: 'AstroHyperSpectralNerf' #'AstroNerf'
     model_redshift: True
     redshift_model_method: 'classification' #'regression'
-    redshift_classification_method: 'bayesian_weighted_avg' #'argmax'
+    redshift_classification_method: 'weighted_avg' #'bayesian_weighted_avg' #'argmax'
 
     encode_wave: True
     wave_encode_method: 'positional_encoding'
@@ -140,7 +140,7 @@ spatial_decod:
     redshift_decod_activation_type: 'relu'
     redshift_decod_skip_layers: []
 
-    redshift_bin_width: 0.2
+    redshift_bin_width: 0.02
     redshift_lo: 0
     redshift_hi: 6.5
 
@@ -165,7 +165,7 @@ trainer:
 
     num_epochs: 2000
     batch_size: 5500
-    pretrain_batch_size: 20 #1500
+    pretrain_batch_size: 1 #1500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
@@ -216,7 +216,7 @@ trainer:
     pretrain_use_all_wave: False
     spectra_supervision_use_all_wave: False
 
-    pretrain_wave_sample_method: 'uniform'
+    pretrain_wave_sample_method: 'uniform_non_random'
 
     train_num_wave_samples: 50
     pretrain_num_wave_samples: 100 #30
@@ -236,17 +236,17 @@ infer:
     infer_last_model_only: True
 
     infer_batch_size: 700
-    pretrain_infer_batch_size: 20
+    pretrain_infer_batch_size: 1
 
     infer_use_all_wave: True
     # infer_num_wave: 
     pretrain_infer_use_all_wave: False
     pretrain_infer_num_wave: 500 #200
-    pretrain_infer_wave_sample_method: 'uniform' #_non_random'
+    pretrain_infer_wave_sample_method: 'uniform_non_random'
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20230920-195928_redshift_pretrain_10_spectra_no_regu'
+    # infer_log_dir: '20230920-203555_redshift_pretrain_10_spectra_l1_excl_max_bin_width_0.02'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
@@ -284,7 +284,7 @@ infer:
     infer_spectra_individually: False
 
     num_spectrum_per_fig: 35
-    num_spectrum_per_row: 5 # 5 cols x 5 rows
+    num_spectrum_per_row: 7
 
 dataset:
     dataset_num_workers: 0

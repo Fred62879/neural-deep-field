@@ -10,7 +10,8 @@ import logging as log
 import matplotlib.pyplot as plt
 
 from wisp.datasets.patch_data import PatchData
-from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array
+from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array, \
+    init_redshift_bins
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
@@ -1040,13 +1041,16 @@ class SpectraData:
                 axis=axis, norm_cho=self.kwargs["trans_norm_cho"], color="gray")
 
         if calculate_metrics:
-            # print(gt_wave)
-            # print(len(gt_wave), len(recon_wave), len(gt_flux), len(recon_flux)
             sub_dir, metrics, above_threshold = self.calculate_spectra_metrics(
                 gt_flux, recon_flux, sub_dir, axis)
         else: metrics, above_threshold = None, None
 
+        ## debug
+        # redshift_bins = init_redshift_bins(**self.kwargs).numpy()
+        # axis.set_title(redshift_bins[idx])
+        ## ends here
         axis.set_title(idx)
+
         if plot_gt_spectrum:
             axis.plot(gt_wave, gt_flux, color="black", label="GT")
         if plot_recon_spectrum:

@@ -152,9 +152,10 @@ class HyperSpectralDecoderB(nn.Module):
 
             elif self.kwargs["redshift_classification_method"] == "bayesian_weighted_avg":
                 logits = self.calculate_bayesian_redshift_logits(
-                    spectra, ret["redshift_logits"]) # [bsz,num_bins]
-                logits = logits / torch.sum(logits, dim=-1)[:,None]
+                    spectra, ret["redshift_logits"], **self.kwargs) # [bsz,num_bins]
                 spectra = torch.matmul(logits, spectra.permute(1,0,2))[:,0]
+
+            else: raise ValueError()
 
         if self.scale:
             assert scaler is not None

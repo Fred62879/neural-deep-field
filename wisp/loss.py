@@ -11,23 +11,23 @@ def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     emd = torch.mean(torch.abs(emd))
     return emd
 
-def spectra_supervision_loss(loss, mask, gt_spectra, recon_fluxes, redshift_logits, weight_by_wave_coverage=True):
-    """ Loss function for spectra supervision
-        @Param
-          loss: l1/l2 as specified in config
-          mask:       [bsz,num_smpls]
-          gt_spectra: [bsz,4+2*nbanbds,num_smpls]
-                      (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
-          recon_fluxes: [num_bins,bsz,num_smpls]
-          redshift_logits: [bsz,num_bins]
-    """
-    num_bins = len(recon_fluxes)
-    gt_fluxes = gt_spectra[:,1]*mask[None,...].tile(num_bins,1,1)
-    spectra_loss_bin_wise = loss(gt_fluxes, recon_fluxes*mask)
-    spectra_loss_bin_wise = torch.mean(spectra_loss_bin_wise, dim=-1)
-    logits = redshift_logits * spectra_loss_bin_wise.T
-    return spectra_supervision_loss(
-        loss, mask, gt_spectra, recon_fluxes, weight_by_wave_coverage=True)
+# def spectra_supervision_loss(loss, mask, gt_spectra, recon_fluxes, redshift_logits, weight_by_wave_coverage=True):
+#     """ Loss function for spectra supervision
+#         @Param
+#           loss: l1/l2 as specified in config
+#           mask:       [bsz,num_smpls]
+#           gt_spectra: [bsz,4+2*nbanbds,num_smpls]
+#                       (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
+#           recon_fluxes: [num_bins,bsz,num_smpls]
+#           redshift_logits: [bsz,num_bins]
+#     """
+#     num_bins = len(recon_fluxes)
+#     gt_fluxes = gt_spectra[:,1]*mask[None,...].tile(num_bins,1,1)
+#     spectra_loss_bin_wise = loss(gt_fluxes, recon_fluxes*mask)
+#     spectra_loss_bin_wise = torch.mean(spectra_loss_bin_wise, dim=-1)
+#     logits = redshift_logits * spectra_loss_bin_wise.T
+#     return spectra_supervision_loss(
+#         loss, mask, gt_spectra, recon_fluxes, weight_by_wave_coverage=True)
 
 def spectra_supervision_loss(loss, mask, gt_spectra, recon_fluxes, weight_by_wave_coverage=True):
     """ Loss function for spectra supervision
