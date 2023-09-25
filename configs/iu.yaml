@@ -6,13 +6,13 @@ global:
     activate_model_timer: False
     activate_trainer_timer: False
     dataloader_drop_last: False
-    exp_name: 'pretrain-sanity-check-generalization' #'spectral-inpainting'
+    exp_name: 'pretrain-sanity-check-overfit' #'spectral-inpainting'
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
     tasks: ['codebook_pretrain_infer','save_redshift','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra','save_pixel_values','recon_codebook_spectra_individ','recon_img','integrate_gt_spectra']
     tasks: ['redshift_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    #tasks: ['redshift_pretrain_infer','save_redshift','recon_gt_spectra','plot_redshift_logits'] #'recon_gt_spectra_all_bins'
+    tasks: ['redshift_pretrain_infer','save_redshift','recon_gt_spectra','plot_redshift_logits'] #'recon_gt_spectra_all_bins'
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -163,17 +163,17 @@ trainer:
     regu_redshift_logits: True
     redshift_logits_regu_method: 'l1_excl_largest'
 
-    num_epochs: 4000
+    num_epochs: 1000
     batch_size: 5500
     pretrain_batch_size: 7 #1500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 200
+    log_cli_every: 100
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 200
+    save_model_every: 100
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -205,10 +205,10 @@ trainer:
     spectra_supervision: True
 
     main_train_with_pretrained_latents: False
-    redshift_pretrain_with_same_latents: False
-    redshift_pretrain_num_spectra: 20
+    redshift_pretrain_with_same_latents: True
+    redshift_pretrain_num_spectra: 10
 
-    apply_gt_redshift: True         # -
+    apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
     redshift_semi_supervision: False # -
 
@@ -223,12 +223,12 @@ trainer:
     spectra_supervision_num_wave_samples: 100
 
     resume_train: True
-    resume_log_dir: '20230925-153351'
-    resume_model_fname: 'model-ep2000-it0.pth'
+    resume_log_dir: '20230925-163751'
+    resume_model_fname: 'model-ep1000-it0.pth'
 
     pretrain_codebook: True
-    pretrain_log_dir: '20230910-232020_codebook_pretrain_32_codes_6k_spectra_60k_epochs'
-    pretrained_model_name: 'model-ep60000-it0.pth'
+    pretrain_log_dir: '20230920-172534_codebook_pretrain_10_spectra_10k_epochs'
+    pretrained_model_name: 'model-ep10000-it0.pth'
     #### ***********************************
 
 infer:
@@ -373,7 +373,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000  # #spectra to load
-    num_supervision_spectra_upper_bound: 7000
+    num_supervision_spectra_upper_bound: 10 #7000
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 
