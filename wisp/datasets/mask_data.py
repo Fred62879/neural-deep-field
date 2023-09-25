@@ -174,7 +174,7 @@ class MaskData:
         acc_npixels = 0
         num_rows = self.fits_obj.get_num_rows()
         num_cols = self.fits_obj.get_num_cols()
-        fits_uids = self.fits_obj.get_fits_uids()
+        fits_uids = self.fits_obj.get_patch_uids()
 
         if self.plot_masked_gt:
             gt_paths = self.fits_obj.get_gt_paths()

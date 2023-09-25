@@ -349,9 +349,10 @@ class AstroDataset(Dataset):
                     out["trans"] = self.trans_dataset.get_hdcd_trans()
                     out["nsmpl"] = self.trans_dataset.get_hdcd_nsmpl()
                 else:
+                    nsmpls = -1 if self.use_all_wave else self.num_wave_samples
                     out["wave"], out["trans"], out["wave_smpl_ids"], out["nsmpl"] = \
                         self.trans_dataset.sample_wave(
-                            batch_size, self.num_wave_samples, use_all_wave=self.use_all_wave)
+                            batch_size, nsmpls, use_all_wave=self.use_all_wave)
 
                 if self.mode == "main_infer" and "recon_synthetic_band" in self.kwargs["tasks"]:
                     assert(self.use_all_wave) # only in inferrence

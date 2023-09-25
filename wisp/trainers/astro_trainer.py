@@ -214,6 +214,10 @@ class AstroTrainer(BaseTrainer):
     #############
 
     def begin_train(self, i, tract, patch):
+        self.save_data = False
+        self.shuffle_dataloader = True
+        self.drop_last = self.extra_args["dataloader_drop_last"]
+
         self.get_cur_patch_data(i, tract, patch)
         self.configure_dataset()
         self.set_num_batches()
@@ -461,7 +465,7 @@ class AstroTrainer(BaseTrainer):
     def get_cur_patch_data(self, i, tract, patch):
         self.cur_patch = PatchData(
             tract, patch,
-            load_spectra=extra_args["space_dim"] == 3,
+            load_spectra=self.extra_args["space_dim"] == 3,
             cutout_num_rows=self.extra_args["patch_cutout_num_rows"][i],
             cutout_num_cols=self.extra_args["patch_cutout_num_cols"][i],
             cutout_start_pos=self.extra_args["patch_cutout_start_pos"][i],
@@ -472,7 +476,7 @@ class AstroTrainer(BaseTrainer):
         self.dataset.set_patch(self.cur_patch)
 
         self.cur_patch_uid = create_patch_uid(tract, patch)
-        if extra_args["space_dim"] == 3:
+        if self.extra_args["space_dim"] == 3:
             self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
 
     def init_dataloader(self):
@@ -489,7 +493,7 @@ class AstroTrainer(BaseTrainer):
             sampler=BatchSampler(
                 sampler_cls(self.dataset),
                 batch_size=self.batch_size,
-                drop_last=self.dataloader_drop_last
+                drop_last=self.drop_last
             ),
             pin_memory=True,
             num_workers=self.extra_args["dataset_num_workers"]
@@ -508,7 +512,7 @@ class AstroTrainer(BaseTrainer):
         if max_bsz is not None: # when we use all wave, we need to control bsz
             self.batch_size = min(self.batch_size, max_bsz)
 
-        if self.dataloader_drop_last:
+        if self.drop_last:
             self.num_iterations_cur_epoch = int(length // self.batch_size)
         else:
             self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))

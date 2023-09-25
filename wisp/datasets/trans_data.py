@@ -176,7 +176,7 @@ class TransData:
         interp_trans = f(self.data["full_wave"])
         return interp_trans
 
-    def sample_wave(self, batch_size, num_samples, use_all_wave=False):
+    def sample_wave(self, batch_size, num_samples=-1, use_all_wave=False):
         """ Sample lambda and transmission data for given sampling methods.
             @Return
               wave:  [bsz,nsmpl,1]/[bsz,nbands,nsmpl,1]
@@ -195,15 +195,18 @@ class TransData:
                 smpl_wave = np.tile(smpl_wave, (batch_size,1,1))
             elif type(smpl_wave).__module__ == "torch":
                 smpl_wave = smpl_wave.tile(batch_size,1,1)
+            else: raise ValueError()
 
         elif self.sample_method == "hardcode":
             smpl_wave, smpl_trans = None, self.trans
 
         elif self.sample_method == "bandwise":
+            assert num_samples != -1
             smpl_wave, smpl_trans, _ = batch_sample_wave_bandwise(
                 batch_size, num_samples, self.trans_data, waves=self.wave, sort=False)
 
         elif self.sample_method == "mixture":
+            assert num_samples != -1
             smpl_wave, smpl_trans, smpl_ids, nsmpl_within_each_band = batch_sample_wave(
                 batch_size, num_samples, self.trans_data, **self.kwargs)
         else:

@@ -48,7 +48,8 @@ class SpatialDecoder(nn.Module):
             self.qtz = Quantization(self.qtz_calculate_loss, **self.kwargs)
 
         if self.output_scaler or self.output_bias:
-            self.scaler_decoder(self.output_bias, self.output_scaler, **kwargs)
+            self.scaler_decoder = ScalerDecoder(
+                self.output_bias, self.output_scaler, qtz=self.qtz, **self.kwargs)
 
         if self.model_redshift:
             self.redshift_decoder = RedshiftDecoder(

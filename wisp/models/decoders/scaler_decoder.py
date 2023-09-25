@@ -15,12 +15,12 @@ class ScalerDecoder(nn.Module):
     """ Accept as input latent variables and quantize based on
           a codebook which is optimizaed simultaneously during training
     """
-    def __init__(self, output_bias, output_scaler, **kwargs):
+    def __init__(self, output_bias, output_scaler, qtz, **kwargs):
         super(ScalerDecoder, self).__init__()
         self.kwargs = kwargs
 
-        self.output_bias = self.qtz and output_bias
-        self.output_scaler = self.qtz and output_scaler
+        self.output_bias = qtz and output_bias
+        self.output_scaler = qtz and output_scaler
 
         if self.output_scaler or self.output_bias:
             self.init_model()

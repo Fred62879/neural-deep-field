@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import logging as log
 
+from collections import defaultdict
 from wisp.utils.common import to_numpy
 from scipy.interpolate import interp1d
 from astropy.visualization import ZScaleInterval
@@ -234,6 +235,7 @@ def calculate_metric(recon, gt, band, option, **kwargs):
     elif option == 'psnr':
         metric = calculate_psnr(recon[band], gt[band])
     elif option == 'ssim':
+
         metric = calculate_ssim(recon[band], gt[band])
     elif option == 'sam':
         metric = calculate_sam(recon[:,:,band:band+1], gt[:,:,band:band+1])
@@ -255,16 +257,19 @@ def calculate_metrics(recon, gt, options, zscale=False, **kwargs):
            metrics: [n_metrics(,n_bands)]
     """
     assert recon.shape == gt.shape
-    if recon.ndim == 2:
+    if recon.ndim == 3: # [nbands,sz,sz]
+        metrics = np.zeros((len(options), recon.shape[0]))
         num_bands = len(recon)
         if zscale: recon = zscale_img(recon, gt)
-    else: assert recon.ndim == 1
+    else:
+        metrics = {}
+        assert recon.ndim == 1
 
-    metrics = {}
     for i, option in enumerate(options):
-        if recon.ndim == 2:
+        if recon.ndim == 3:
             for band in range(num_bands):
-                metrics[option].append(calculate_metric(recon, gt, band, option, **kwargs))
+                cur_metrics = calculate_metric(recon, gt, band, option, **kwargs)
+                metrics[i, band] = cur_metrics
         else:
             metrics[option] = calculate_metric(recon, gt, None, option, **kwargs)
     return metrics

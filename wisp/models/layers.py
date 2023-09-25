@@ -337,40 +337,47 @@ def calculate_bayesian_redshift_logits(loss, mask, gt_spectra, recon_fluxes, red
     spectra_loss_bin_wise = torch.mean(spectra_loss_bin_wise, dim=-1) # [num_bins,bsz]
     spectra_logits = torch.exp(-spectra_loss_bin_wise) # p(spectra_recon | spectra_gt)
 
-    logits = redshift_logits * spectra_loss_bin_wise.T # [bsz,num_bins]
+    logits = redshift_logits * spectra_logits.T # [bsz,num_bins]
     logits = logits / torch.sum(logits, dim=-1)[:,None]
 
     ## debug
-    import numpy as np
-    import matplotlib.pyplot as plt
+    # print(redshift_logits[2])
+    # print(spectra_logits[:,2])
+    # print(logits[2])
+    # assert 0
+    ## ends here
 
-    id = 2
-    mask = mask.detach().cpu().numpy()[id]
-    gt_spectra = gt_spectra.detach().cpu().numpy()[id]
-    recon_fluxes = recon_fluxes.detach().cpu().numpy()[:,id]
-    spectra_logits = spectra_logits.detach().cpu().numpy()[:,id]
+    ## debug
+    # import numpy as np
+    # import matplotlib.pyplot as plt
 
-    n = recon_fluxes.shape[0]
-    n_spectrum_per_fig = 35
-    n_spectrum_per_row = 7
-    nrow, ncol = int(n_spectrum_per_fig / n_spectrum_per_row), n_spectrum_per_row
-    n_figs = int(np.ceil(n / n_spectrum_per_fig))
-    redshift_bins = init_redshift_bins(**kwargs).numpy()
+    # id = 2
+    # mask = mask.detach().cpu().numpy()[id]
+    # gt_spectra = gt_spectra.detach().cpu().numpy()[id]
+    # recon_fluxes = recon_fluxes.detach().cpu().numpy()[:,id]
+    # spectra_logits = spectra_logits.detach().cpu().numpy()[:,id]
 
-    for i in range(n_figs):
-        fig, axs = plt.subplots(nrow, ncol, figsize=(5*ncol,5*nrow))
-        lo = i*n_spectrum_per_fig
+    # n = recon_fluxes.shape[0]
+    # n_spectrum_per_fig = 35
+    # n_spectrum_per_row = 7
+    # nrow, ncol = int(n_spectrum_per_fig / n_spectrum_per_row), n_spectrum_per_row
+    # n_figs = int(np.ceil(n / n_spectrum_per_fig))
+    # redshift_bins = init_redshift_bins(**kwargs).numpy()
 
-        hi = min(n_spectrum_per_fig, n-lo)
-        for j in range(hi):
-            axis = axs[j//n_spectrum_per_row,j%n_spectrum_per_row]
-            axis.plot(recon_fluxes[lo+j][mask], color='blue')
-            axis.plot(gt_spectra[1][mask], color='gray')
-            logit = np.round(spectra_logits[lo+j],5)
-            bin_center = np.round(redshift_bins[lo+j], 2)
-            axis.set_title(str(logit) + '-' + str(bin_center))
-        fig.tight_layout(); plt.savefig(f'{i}.png'); plt.close()
-    assert 0
+    # for i in range(n_figs):
+    #     fig, axs = plt.subplots(nrow, ncol, figsize=(5*ncol,5*nrow))
+    #     lo = i*n_spectrum_per_fig
+
+    #     hi = min(n_spectrum_per_fig, n-lo)
+    #     for j in range(hi):
+    #         axis = axs[j//n_spectrum_per_row,j%n_spectrum_per_row]
+    #         axis.plot(recon_fluxes[lo+j][mask], color='blue')
+    #         axis.plot(gt_spectra[1][mask], color='gray')
+    #         logit = np.round(spectra_logits[lo+j],5)
+    #         bin_center = np.round(redshift_bins[lo+j], 2)
+    #         axis.set_title(str(logit) + '-' + str(bin_center))
+    #     fig.tight_layout(); plt.savefig(f'{i}.png'); plt.close()
+    # assert 0
     ## ends here
 
     return logits

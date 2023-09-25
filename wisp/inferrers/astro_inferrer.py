@@ -98,12 +98,12 @@ class AstroInferrer(BaseInferrer):
                 self.num_spectra = self.dataset.get_num_supervision_spectra()
 
         elif self.mode == "main_infer":
-            self.batch_size = extra_args["infer_batch_size"]
+            self.batch_size = self.extra_args["infer_batch_size"]
             self.dataset.set_spectra_source("val")
             self.num_spectra = self.dataset.get_num_validation_spectra()
 
         elif self.mode == "test":
-            self.batch_size = extra_args["infer_batch_size"]
+            self.batch_size = self.extra_args["infer_batch_size"]
             self.dataset.set_spectra_source("test")
             self.num_spectra = self.dataset.get_num_test_spectra()
 

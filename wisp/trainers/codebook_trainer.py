@@ -172,9 +172,6 @@ class CodebookTrainer(BaseTrainer):
         else:
             raise ValueError("Invalid pretrainer mode.")
 
-        if self.extra_args["resume_train"]:
-            self.resume_train()
-
         log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.train_pipeline.parameters()))
@@ -308,6 +305,9 @@ class CodebookTrainer(BaseTrainer):
     def begin_train(self):
         if self.plot_loss:
             self.losses = []
+
+        if self.extra_args["resume_train"]:
+            self.resume_train()
 
         log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
 

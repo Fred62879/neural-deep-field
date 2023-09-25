@@ -441,9 +441,9 @@ class FitsData:
             log.info(f"GT. pixel max {gt_max}")
 
             metrics = calculate_metrics(
-                recon_patch, gt_tile, re_args["metric_options"])[:,None]
+                recon_patch, gt_tile, re_args["metric_options"]) #[:,None]
             metrics_zscale = calculate_metrics(
-                recon_patch, gt_tile, re_args["metric_options"], zscale=True)[:,None]
+                recon_patch, gt_tile, re_args["metric_options"], zscale=True) #[:,None]
             return metrics, metrics_zscale
         return None, None
 
@@ -510,8 +510,9 @@ class FitsData:
                 index, patch_uid, num_pixels_acc, pixels, **re_args)
 
             if re_args["calculate_metrics"]:
-                metrics = np.concatenate((metrics, cur_metrics), axis=1)
-                metrics_zscale = np.concatenate((metrics_zscale, cur_metrics_zscale), axis=1)
+                metrics = np.concatenate((metrics, cur_metrics[:,None]), axis=1)
+                metrics_zscale = np.concatenate(
+                    (metrics_zscale, cur_metrics_zscale[:,None]), axis=1)
 
         return metrics, metrics_zscale
 

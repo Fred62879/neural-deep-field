@@ -96,13 +96,11 @@ class BasicDecoder(nn.Module):
 
     def forward(self, x, return_h=False):
         """ Run the MLP!
-
-        Args:
-            x (torch.FloatTensor): Some tensor of shape [batch, ..., input_dim]
-            return_h (bool): If True, also returns the last hidden layer.
-
-        Returns:
-            (torch.FloatTensor, (optional) torch.FloatTensor):
+            @Params
+              x (torch.FloatTensor): Some tensor of shape [batch, ..., input_dim]
+              return_h (bool): If True, also returns the last hidden layer.
+            @Return
+              (torch.FloatTensor, (optional) torch.FloatTensor):
                 - The output tensor of shape [batch, ..., output_dim]
                 - The last hidden layer of shape [batch, ..., hidden_dim]
         """
@@ -123,14 +121,23 @@ class BasicDecoder(nn.Module):
         else:
             return out
 
+    def initialize_last_layer_equal(self):
+        """ Initialize last layer (w and bias) such that outputs are the same.
+        """
+        w = self.lout.weight
+        w_sp = list(w.shape)
+        self.lout.weight = nn.Parameter( torch.full(w_sp, torch.mean(w).item()) )
+        if self.bias:
+            bias = self.lout.bias
+            b_sp = list(bias.shape)
+            self.lout.bias = nn.Parameter( torch.full(b_sp, torch.mean(bias).item()) )
+
     def initialize(self, get_weight):
-        """Initializes the MLP layers with some initialization functions.
-
-        Args:
-            get_weight (function): A function which returns a matrix given a matrix.
-
-        Returns:
-            (void): Initializes the layer weights.
+        """ Initializes the MLP layers with some initialization functions.
+            @Params
+              get_weight (function): A function which returns a matrix given a matrix.
+            @Return:
+              (void): Initializes the layer weights.
         """
         ms = []
         for i, w in enumerate(self.layers):
@@ -142,7 +149,7 @@ class BasicDecoder(nn.Module):
         self.lout.weight = nn.Parameter(m)
 
 def orthonormal(weight):
-    """Initialize the layer as a random orthonormal matrix.
+    """ Initialize the layer as a random orthonormal matrix.
 
     Args:
         weight (torch.FloatTensor): Matrix of shape [M, N]. Only used for the shape.
@@ -156,7 +163,7 @@ def orthonormal(weight):
     return torch.from_numpy(m).float()
 
 def svd(weight):
-    """Initialize the layer with the U,V of SVD.
+    """ Initialize the layer with the U,V of SVD.
 
     Args:
         weight (torch.FloatTensor): Matrix of shape [M, N].
@@ -168,7 +175,7 @@ def svd(weight):
     return torch.matmul(U, V.T)
 
 def spectral_normalization(weight):
-    """Initialize the layer with spectral normalization.
+    """ Initialize the layer with spectral normalization.
 
     Args:
         weight (torch.FloatTensor): Matrix of shape [M, N].
@@ -180,7 +187,7 @@ def spectral_normalization(weight):
     return weight / S.max()
 
 def identity(weight):
-    """Initialize the layer with identity matrix.
+    """ Initialize the layer with identity matrix.
 
     Args:
         weight (torch.FloatTensor): Matrix of shape [M, N].
@@ -191,7 +198,7 @@ def identity(weight):
     return torch.diag(torch.ones(weight.shape[0]))
 
 def average(weight):
-    """Initialize the layer by normalizing the weights.
+    """ Initialize the layer by normalizing the weights.
 
     Args:
         weight (torch.FloatTensor): Matrix of shape [M, N].
