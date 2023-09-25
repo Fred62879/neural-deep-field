@@ -15,12 +15,12 @@ from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
 class CodebookPretrainNerf(BaseNeuralField):
-    def __init__(self, _decode_redshift=False, pretrain_pixel_supervision=False, **kwargs):
+    def __init__(self, decode_redshift=False, pretrain_pixel_supervision=False, **kwargs):
         self.kwargs = kwargs
 
         super(CodebookPretrainNerf, self).__init__()
 
-        self.decode_redshift = _decode_redshift
+        self.decode_redshift = decode_redshift
         self.pixel_supervision = pretrain_pixel_supervision
         self.init_model()
 
@@ -53,13 +53,11 @@ class CodebookPretrainNerf(BaseNeuralField):
 
         assert self.kwargs["model_redshift"] and \
             (self.kwargs["apply_gt_redshift"] or self.decode_redshift)
-            #not self.kwargs["redshift_unsupervision"] and \
-            #not self.kwargs["redshift_semi_supervision"]
 
         self.spatial_decoder = SpatialDecoder(
             output_bias=False,
             output_scaler=False,
-            _apply_gt_redshift=not self.decode_redshift,
+            decode_redshift=self.decode_redshift,
             qtz_calculate_loss=False,
             **self.kwargs)
 

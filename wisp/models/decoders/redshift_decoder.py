@@ -15,20 +15,11 @@ from wisp.models.activations import get_activation_class
 class RedshiftDecoder(nn.Module):
     """ Decoder input latent variables to redshift values.
     """
-    def __init__(self, _apply_gt_redshift, **kwargs):
+    def __init__(self, **kwargs):
         super(RedshiftDecoder, self).__init__()
 
         self.kwargs = kwargs
-
-        # at most one can be true
-        assert sum([kwargs["apply_gt_redshift"],
-                    kwargs["redshift_unsupervision"],
-                    kwargs["redshift_semi_supervision"]]) <= 1
-
-        self.apply_gt_redshift = _apply_gt_redshift
-
-        if not self.apply_gt_redshift:
-            self.init_model()
+        self.init_model()
 
     def init_model(self):
         self.input_dim = get_input_latents_dim(**self.kwargs)
@@ -40,7 +31,7 @@ class RedshiftDecoder(nn.Module):
         elif self.redshift_model_method == "classification":
             self.init_redshift_bins()
             output_dim = self.num_redshift_bins
-        else: raise ValueError()
+        else: raise ValueError("Unsupported redshift modeling method!")
 
         self.redshift_decoder = BasicDecoder(
             self.input_dim, output_dim,
@@ -52,13 +43,12 @@ class RedshiftDecoder(nn.Module):
         )
         self.redshift_decoder.initialize_last_layer_equal()
         # for n,p in self.redshift_decoder.lout.named_parameters(): print(n, p)
-        # assert 0
 
     def init_redshift_bins(self):
-        self.redshift_bin_center = init_redshift_bins(**self.kwargs)
         if self.kwargs["use_gpu"]:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else: device = "cpu"
+        self.redshift_bin_center = init_redshift_bins(**self.kwargs)
         self.redshift_bin_center = self.redshift_bin_center.to(device)
         self.num_redshift_bins = len(self.redshift_bin_center)
 
@@ -72,19 +62,15 @@ class RedshiftDecoder(nn.Module):
                           show_memory=self.kwargs["show_memory"])
         timer.reset()
 
-        if self.apply_gt_redshift:
-            assert specz is not None
-            ret["redshift"] = specz
+        if self.redshift_model_method == "regression":
+            redshift = self.redshift_decoder(z[:,0])[...,0]
+            ret["redshift"] = self.redshift_adjust(redshift + 0.5)
+
+        elif self.redshift_model_method == "classification":
+            ret["redshift"]= self.redshift_bin_center # [num_bins]
+            ret["redshift_logits"] = F.softmax(
+                self.redshift_decoder(z[:,0]), dim=-1) # [num_bins]
         else:
-            if self.redshift_model_method == "regression":
-                redshift = self.redshift_decoder(z[:,0])[...,0]
-                ret["redshift"] = self.redshift_adjust(redshift + 0.5)
-                # ret["redshift"] = specz
-            elif self.redshift_model_method == "classification":
-                ret["redshift"]= self.redshift_bin_center # [num_bins]
-                ret["redshift_logits"] = F.softmax(
-                    self.redshift_decoder(z[:,0]), dim=-1) # [num_bins]
-            else:
-                raise ValueError("Unsupported redshift model method!")
+            raise ValueError("Unsupported redshift model method!")
 
         timer.check("spatial_decod::redshift done")

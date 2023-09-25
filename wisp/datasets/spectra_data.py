@@ -474,6 +474,7 @@ class SpectraData:
 
         test_ids = np.array(test_ids)
         validation_ids = np.array(validation_ids)
+
         # if len(test_ids) == 0 or len(validation_ids) == 0:
         #     raise ValueError("Please select patches properly to make sure the number of validation and test spectra is not zero.")
 
@@ -495,7 +496,7 @@ class SpectraData:
         ## ends here
 
         # log.info(f"test spectra ids: {test_ids}")
-        # log.info(f"validation spectra ids: {validation_ids}")
+        log.info(f"validation spectra ids: {validation_ids}")
         # log.info(f"supervision spectra ids: {supervision_ids}")
 
         self.num_test_spectra = len(test_ids)

@@ -6,15 +6,15 @@ global:
     activate_model_timer: False
     activate_trainer_timer: False
     dataloader_drop_last: False
-    exp_name: 'spectral-inpainting' #'pretrain-sanity-check-scale'
+    exp_name: 'pretrain-sanity-check-generalization' #'spectral-inpainting'
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
     tasks: ['codebook_pretrain_infer','save_redshift','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra','save_pixel_values','recon_codebook_spectra_individ','recon_img','integrate_gt_spectra']
-    #tasks: ['redshift_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
+    tasks: ['redshift_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
     #tasks: ['redshift_pretrain_infer','save_redshift','recon_gt_spectra','plot_redshift_logits'] #'recon_gt_spectra_all_bins'
 
-    tasks: ['main_infer','recon_img']
+    #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
     #tasks: ['main_infer','recon_gt_spectra']
     #tasks: ['main_infer','plot_latent_embed']
@@ -46,7 +46,7 @@ optimizer:
 
 net:
     nef_type: 'AstroHyperSpectralNerf' #'AstroNerf'
-    model_redshift: False
+    model_redshift: True
     redshift_model_method: 'classification' #'regression'
     redshift_classification_method: 'weighted_avg' #'argmax'
 
@@ -163,17 +163,17 @@ trainer:
     regu_redshift_logits: True
     redshift_logits_regu_method: 'l1_excl_largest'
 
-    num_epochs: 100
+    num_epochs: 4000
     batch_size: 5500
     pretrain_batch_size: 7 #1500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 20
+    log_cli_every: 200
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 20
+    save_model_every: 200
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -201,14 +201,14 @@ trainer:
     #### ******** Constantly modify ********
     train_spectra_pixels_only: False
 
-    pixel_supervision: True
-    spectra_supervision: False
+    pixel_supervision: False
+    spectra_supervision: True
 
     main_train_with_pretrained_latents: False
     redshift_pretrain_with_same_latents: False
     redshift_pretrain_num_spectra: 20
 
-    apply_gt_redshift: False         # -
+    apply_gt_redshift: True         # -
     redshift_unsupervision: False    #  |- these three conflict each other
     redshift_semi_supervision: False # -
 
@@ -222,12 +222,12 @@ trainer:
     pretrain_num_wave_samples: 100 #30
     spectra_supervision_num_wave_samples: 100
 
-    resume_train: False
-    resume_log_dir: '20230924-141135_6k_redshift_pretrain_20_spectra_4k_epochs_resumed'
+    resume_train: True
+    resume_log_dir: '20230925-153351'
     resume_model_fname: 'model-ep2000-it0.pth'
 
-    pretrain_codebook: False
-    pretrain_log_dir: '20230910-232020_codebook_pretrain_6k_spectra_60k_epochs'
+    pretrain_codebook: True
+    pretrain_log_dir: '20230910-232020_codebook_pretrain_32_codes_6k_spectra_60k_epochs'
     pretrained_model_name: 'model-ep60000-it0.pth'
     #### ***********************************
 
@@ -246,7 +246,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20230910-232020_codebook_pretrain_6k_spectra_60k_epochs'
+    # infer_log_dir: '20230910-225636_codebook_pretrain_8_codes_6k_spectra_60k_epochs'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
@@ -263,8 +263,8 @@ infer:
     recon_cutout_start_pos: [ [[256,256]], [[86,188]] ]
 
     # recon spectra
-    infer_selected: True
-    pretrain_num_infer_upper_bound: 20
+    infer_selected: False
+    pretrain_num_infer_upper_bound: 70
     test_num_infer_upper_bound: 10
 
     spectra_neighbour_size: 1
@@ -303,7 +303,7 @@ dataset:
 patch_data:
     tracts: ['9812']
     patches: ['1,5']
-    use_full_patch: False
+    use_full_patch: True
 
     #### *** test patches ****
     test_tracts: []
@@ -331,23 +331,23 @@ trans_data:
     # plot_colors: ['blue']
     # plot_styles: ['solid']
 
-    # num_bands: 3
-    # sensor_collection_name: '3_gri'
-    # filter_ids: [0,1,2]
-    # filters: [g,r,i]
-    # sensors_full_name: [HSC-G,HSC-R,HSC-I]
-    # plot_labels: ['g', 'r', 'i']
-    # plot_colors: ['green','red','blue']
-    # plot_styles: ['solid','solid','solid']
+    num_bands: 3
+    sensor_collection_name: '3_gri'
+    filter_ids: [0,1,2]
+    filters: [g,r,i]
+    sensors_full_name: [HSC-G,HSC-R,HSC-I]
+    plot_labels: ['g', 'r', 'i']
+    plot_colors: ['green','red','blue']
+    plot_styles: ['solid','solid','solid']
  
-    num_bands: 5
-    sensor_collection_name: '5_grizy'
-    filter_ids: [0,1,2,3,4]
-    filters: [g,r,i,z,y]
-    sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y]
-    plot_labels: ['g', 'r', 'i', 'z', 'y']
-    plot_colors: ['green','red','blue','gray','yellow']
-    plot_styles: ['solid','solid','solid','solid','solid']
+    # num_bands: 5
+    # sensor_collection_name: '5_grizy'
+    # filter_ids: [0,1,2,3,4]
+    # filters: [g,r,i,z,y]
+    # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y]
+    # plot_labels: ['g', 'r', 'i', 'z', 'y']
+    # plot_colors: ['green','red','blue','gray','yellow']
+    # plot_styles: ['solid','solid','solid','solid','solid']
 
     # num_bands: 10
     # sensor_collection_name: '10'
@@ -373,7 +373,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000  # #spectra to load
-    num_supervision_spectra_upper_bound: 100 #7000
+    num_supervision_spectra_upper_bound: 7000
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 

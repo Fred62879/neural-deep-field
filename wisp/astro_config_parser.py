@@ -22,18 +22,20 @@ def register_class(cls, name):
 def get_pretrain_pipelines(pipelines, tasks, args):
     if "codebook_pretrain" in tasks or "redshift_pretrain" in tasks:
         assert(args.quantize_latent or args.quantize_spectra)
-        decode_redshift = "redshift_pretrain" in tasks
+        # decode_redshift = "redshift_pretrain" in tasks
+        decode_redshift = args.model_redshift and not args.apply_gt_redshift
         pretrain_nef = CodebookPretrainNerf(
-            _decode_redshift=decode_redshift,
+            decode_redshift=decode_redshift,
             pretrain_pixel_supervision=args.codebook_pretrain_pixel_supervision,
             **vars(args)
         )
         pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
 
     if "codebook_pretrain_infer" in tasks or "redshift_pretrain_infer" in tasks:
-        decode_redshift = "redshift_pretrain_infer" in tasks
+        # decode_redshift = "redshift_pretrain_infer" in tasks
+        decode_redshift = args.model_redshift and not args.apply_gt_redshift
         pretrain_nef = CodebookPretrainNerf(
-            _decode_redshift=decode_redshift,
+            decode_redshift=decode_redshift,
             pretrain_pixel_supervision=args.codebook_pretrain_pixel_supervision,
             **vars(args)
         )
@@ -41,7 +43,7 @@ def get_pretrain_pipelines(pipelines, tasks, args):
 
         if "recon_gt_spectra" in tasks or "recon_gt_spectra_all_bins" in tasks:
             spectra_nef = CodebookPretrainNerf(
-                _decode_redshift=decode_redshift, **vars(args))
+                decode_redshift=decode_redshift, **vars(args))
             pipelines["spectra_infer"] = AstroPipeline(spectra_nef)
 
         if "recon_codebook_spectra" in tasks:
@@ -50,7 +52,7 @@ def get_pretrain_pipelines(pipelines, tasks, args):
 
         elif "recon_codebook_spectra_individ" in tasks:
             codebook_spectra_nef = CodebookPretrainNerf(
-                _decode_redshift=decode_redshift, **vars(args))
+                decode_redshift=decode_redshift, **vars(args))
             pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_spectra_nef)
 
     return pipelines

@@ -90,7 +90,7 @@ class CodebookTrainer(BaseTrainer):
         self.apply_gt_redshift = self.extra_args["model_redshift"] and self.extra_args["apply_gt_redshift"]
         if self.mode == "codebook_pretrain":
             assert self.apply_gt_redshift
-        else: assert not self.apply_gt_redshift
+        # else: assert not self.apply_gt_redshift
 
         self.sample_wave = not self.extra_args["pretrain_use_all_wave"] # True
         self.train_within_wave_range = not self.pixel_supervision and \
@@ -141,7 +141,6 @@ class CodebookTrainer(BaseTrainer):
         else: raise ValueError("Invalid mode!")
 
     def init_data(self):
-        self.total_steps = 0
         self.save_data = False
         self.shuffle_dataloader = True
         self.dataloader_drop_last = False
@@ -162,7 +161,8 @@ class CodebookTrainer(BaseTrainer):
                 # checkpoint comes from codebook pretrain (using sup spectra)
                 # redshift pretrain use val spectra which is a permute of sup spectra
                 self.latents = nn.Embedding.from_pretrained(
-                    checkpoint["latents"][self.dataset.get_redshift_pretrain_spectra_ids()]
+                    checkpoint["latents"][self.dataset.get_redshift_pretrain_spectra_ids()],
+                    freeze=True
                 )
                 freeze_layers(self.train_pipeline, ["redshift_decoder"])
             else:
@@ -243,9 +243,10 @@ class CodebookTrainer(BaseTrainer):
                 elif "spatial.decoder.decode" in name:
                     codebook_logit_params.append(self.params_dict[name])
 
-            params.append({"params": redshift_params,
-                           "lr": self.extra_args["codebook_pretrain_lr"]})
-            if self.extra_args["redshift_pretrain_with_same_latents"]:
+            if not self.extra_args["apply_gt_redshift"]:
+                params.append({"params": redshift_params,
+                               "lr": self.extra_args["codebook_pretrain_lr"]})
+            if not self.extra_args["redshift_pretrain_with_same_latents"]:
                 params.append({"params": latents,
                                "lr": self.extra_args["codebook_pretrain_lr"]})
                 params.append({"params": codebook_logit_params,
@@ -303,6 +304,8 @@ class CodebookTrainer(BaseTrainer):
     #############
 
     def begin_train(self):
+        self.total_steps = 0
+
         if self.plot_loss:
             self.losses = []
 
@@ -557,11 +560,16 @@ class CodebookTrainer(BaseTrainer):
             checkpoint = self.load_model(self.resume_train_model_fname)
             # a = checkpoint["optimizer_state_dict"]
             # b = a["state"];c = a["param_groups"];print(b[0])
-            self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-            log.info("resumed training")
+            self.latents = nn.Embedding.from_pretrained(checkpoint["latents"], freeze=False)
 
+            # re-init optimizer to upate trainable latents
+            self.init_optimizer()
+
+            self.total_steps = checkpoint["iterations"]
+            self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             if self.plot_loss:
                 self.losses = list(np.load(self.resume_loss_fname))
+            log.info("resumed training")
 
         except Exception as e:
             log.info(e)

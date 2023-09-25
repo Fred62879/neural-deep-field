@@ -244,7 +244,9 @@ class AstroInferrer(BaseInferrer):
         #   `recon_img_sup_spectra` during pretran infer &
         #   `recon_img_val_spectra` during main train infer
         self.save_pixel_values = "save_pixel_values" in tasks
-        self.plot_redshift_logits = "plot_redshift_logits" in tasks
+        self.plot_redshift_logits = "plot_redshift_logits" in tasks and \
+            not self.extra_args["apply_gt_redshift"] and \
+            self.extra_args["redshift_model_method"] == "classification"
 
         # iii) infer all coords using modified model (recon codebook spectra)
         #   either we have the codebook spectra for all coords

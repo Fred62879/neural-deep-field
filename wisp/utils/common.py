@@ -163,7 +163,9 @@ def get_input_latents_dim(**kwargs):
     """
     if kwargs["pretrain_codebook"] and \
        ("codebook_pretrain" in kwargs["tasks"] or \
-        "pretrain_infer" in kwargs["tasks"] or \
+        "codebook_pretrain_infer" in kwargs["tasks"] or \
+        "redshift_pretrain" in kwargs["tasks"] or \
+        "redshift_pretrain_infer" in kwargs["tasks"] or \
         kwargs["main_train_with_pretrained_latents"]):
         latents_dim = kwargs["codebook_pretrain_latent_dim"]
     elif kwargs["coords_encode_method"] == "positional_encoding":
