@@ -838,9 +838,11 @@ class AstroInferrer(BaseInferrer):
 
         if self.plot_redshift_logits:
             redshift_logits = torch.stack(self.redshift_logits).detach().cpu().numpy()
-            fname = join(self.redshift_dir, f"{model_id}_logits.png")
+            fname = join(self.redshift_dir, f"{model_id}_logits")
             bin_centers = init_redshift_bins(**self.extra_args)
-            batch_hist(bin_centers, redshift_logits, fname,
+            print(bin_centers.shape, redshift_logits.shape)
+            np.save(fname, np.concatenate((bin_centers[None,:], redshift_logits), axis=0))
+            batch_hist(bin_centers, redshift_logits, fname + ".png",
                        self.extra_args["num_spectrum_per_row"], is_counts=True)
 
         if self.save_qtz_weights:
@@ -1076,7 +1078,7 @@ class AstroInferrer(BaseInferrer):
                     self.recon_fluxes.extend(fluxes)
 
                 if self.recon_gt_spectra_all_bins:
-                    fluxes = ret["spectra_all_bins"]
+                    fluxes = ret["spectra_all_bins"].permute(1,0,2) # [bsz,num_bins,nsmpl]
                     self.recon_fluxes_all.extend(fluxes) # [num_bins,bsz,nsmpl]
 
                 if self.save_qtz_weights:
@@ -1308,29 +1310,42 @@ class AstroInferrer(BaseInferrer):
     def _recon_gt_spectra_all_bins(self, num_spectra, model_id):
         """ Plot spectrum under all redshift for each spectra
         """
-        n_figs = num_spectra
-        n_spectrum_per_fig = len(self.recon_fluxes_all)
+        self.recon_fluxes_all = self.recon_fluxes_all.transpose(1,0,2) # [num_bins,bsz,nsmpl]
+        assert num_spectra == self.recon_fluxes_all.shape[1]
+        num_bins = self.recon_fluxes_all.shape[0]
+        n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
+        n_figs_each = int(np.ceil(num_bins / n_spectrum_per_fig))
 
-        def change_shape(data):
-            return np.tile(data, n_spectrum_per_fig).reshape(n_spectrum_per_fig, -1)
+        redshift_bins = init_redshift_bins(**self.extra_args).numpy()
 
-        for i in range(n_figs):
-            fname = f"model{model_id}-plot{i}-all_bins"
-            lo = i * n_spectrum_per_fig
-            hi = min(lo + n_spectrum_per_fig, num_spectra)
+        def change_shape(data, m):
+            return np.tile(data, m).reshape(m, -1)
 
-            _ = self.dataset.plot_spectrum(
-                self.spectra_dir, fname,
-                self.extra_args["flux_norm_cho"],
-                change_shape(self.gt_wave[i]),
-                change_shape(self.gt_fluxes[i]),
-                change_shape(self.recon_wave[i]),
-                self.recon_fluxes_all[:,i],
-                # save_spectra_together=True,
-                clip=self.extra_args["plot_clipped_spectrum"],
-                gt_masks=change_shape(self.gt_masks[i]),
-                recon_masks=change_shape(self.recon_masks[i]),
-                calculate_metrics=False)
+        ids = np.array([7,17])
+        for i in ids:
+        # for i in range(num_spectra):
+            cur_dir = join(self.spectra_dir, f"{i}-all-bins")
+
+            for j in range(n_figs_each):
+                fname = f"model{model_id}-plot{j}-all_bins"
+                lo = j * n_spectrum_per_fig
+                hi = min(lo + n_spectrum_per_fig, num_bins)
+                m = hi - lo
+
+                _ = self.dataset.plot_spectrum(
+                    cur_dir, fname,
+                    self.extra_args["flux_norm_cho"],
+                    change_shape(self.gt_wave[i], m),
+                    change_shape(self.gt_fluxes[i], m),
+                    change_shape(self.recon_wave[i], m),
+                    self.recon_fluxes_all[lo:hi,i],
+                    #save_spectra_together=True,
+                    clip=self.extra_args["plot_clipped_spectrum"],
+                    gt_masks=change_shape(self.gt_masks[i], m),
+                    recon_masks=change_shape(self.recon_masks[i], m),
+                    calculate_metrics=False,
+                    titles=redshift_bins[lo:hi]
+                )
 
         log.info("all bin spectrum plotting done")
 

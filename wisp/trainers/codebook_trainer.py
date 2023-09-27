@@ -193,7 +193,7 @@ class CodebookTrainer(BaseTrainer):
         """
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
-        # sampler_cls = SequentialSampler
+        sampler_cls = SequentialSampler
         # sampler_cls = RandomSampler
 
         sampler = BatchSampler(
@@ -317,6 +317,8 @@ class CodebookTrainer(BaseTrainer):
     def train(self):
         self.begin_train()
 
+        logits = [] # debug
+
         # for epoch in tqdm(range(self.num_epochs + 1)):
         for epoch in range(self.num_epochs + 1):
             self.begin_epoch()
@@ -337,9 +339,14 @@ class CodebookTrainer(BaseTrainer):
 
                 self.timer.check("batch ended")
 
+                if batch == 1:
+                    logits.append(self.cur_logits[0,222]) # debug
+
             self.end_epoch()
             self.timer.check("epoch ended")
 
+        logits = torch.stack(logits).detach().cpu().numpy()
+        plt.plot(logits); plt.savefig('tmp.png'); plt.close()
         self.end_train()
 
     def end_train(self):
@@ -608,6 +615,8 @@ class CodebookTrainer(BaseTrainer):
                                   self.recon_codebook_spectra_individ
         )
         self.timer.check("forwarded")
+
+        self.cur_logits = ret["redshift_logits"]
 
         # i) spectra supervision loss
         spectra_loss = 0

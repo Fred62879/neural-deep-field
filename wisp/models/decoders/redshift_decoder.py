@@ -41,7 +41,7 @@ class RedshiftDecoder(nn.Module):
             hidden_dim=self.kwargs["redshift_decod_hidden_dim"],
             skip=self.kwargs["redshift_decod_skip_layers"]
         )
-        self.redshift_decoder.initialize_last_layer_equal()
+        # self.redshift_decoder.initialize_last_layer_equal()
         # for n,p in self.redshift_decoder.lout.named_parameters(): print(n, p)
 
     def init_redshift_bins(self):
