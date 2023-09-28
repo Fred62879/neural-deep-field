@@ -74,16 +74,28 @@ class CodebookPretrainNerf(BaseNeuralField):
             **self.kwargs)
 
     def pretrain(self, coords, wave, wave_range,
-                 trans=None, trans_mask=None, nsmpl=None, qtz_args=None, specz=None,
-                 init_redshift_prob=None
+                 trans=None, trans_mask=None, nsmpl=None,
+                 qtz_args=None,
+                 z_scaler=None,
+                 z_redshift=None, specz=None,
+                 init_redshift_prob=None # debug
     ):
         """ Pretrain codebook.
             @Param
               coords: trainable latent variable [num_supervision_spectra,1,latent_dim]
               wave:   lambda values [bsz,nsmpl,1]
               wave_range: range of lambda used for linear norm [2] (min/max)
+
               trans:  transmission values (padded with -1 at two ends)
               trans_mask: mask for trans (0 for padded region, 1 for actual trans region)
+              nsmpl:  number of lambda sample within each band
+
+              qtz_args: quantization arguments
+
+              z_scaler: trainable latents for scaler decoder
+
+              z_redshift: trainable latents for redshift decoder
+              specz: gt redshift
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
                           show_memory=self.kwargs["show_memory"])
@@ -95,8 +107,12 @@ class CodebookPretrainNerf(BaseNeuralField):
         coords = coords[:,None]
 
         # `latents` is either logits or qtz latents or latents dep on qtz method
-        latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz,
-                                       init_redshift_prob=init_redshift_prob)
+        latents = self.spatial_decoder(
+            coords, self.codebook, qtz_args, ret,
+            z_scaler=z_scaler,
+            z_redshfit=z_redshift, specz=specz,
+            init_redshift_prob=init_redshift_prob
+        )
         timer.check("spatial decoding done")
 
         self.hps_decoder(

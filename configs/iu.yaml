@@ -207,6 +207,7 @@ trainer:
     main_train_with_pretrained_latents: False
     redshift_pretrain_with_same_latents: True
     redshift_pretrain_num_spectra: 20
+    redshift_pretrain_optimize_separate_latents: True
 
     apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other

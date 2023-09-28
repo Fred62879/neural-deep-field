@@ -78,13 +78,21 @@ class SpatialDecoder(nn.Module):
             skip=self.kwargs["spatial_decod_skip_layers"]
         )
 
-    def forward(self, z, codebook, qtz_args, ret, specz=None, sup_id=None, init_redshift_prob=None):
+    def forward(self, z, codebook, qtz_args, ret,
+                z_scaler=None,
+                z_redshift=None, specz=None,
+                sup_id=None, # DELETE
+                init_redshift_prob=None
+    ):
         """ Decode latent variables to various spatial information we need.
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
               codebook: codebook used for quantization
               qtz_args: arguments for quantization operations
+
+              z_redshift: trainable latents for redshift decoder
               specz: spectroscopic (gt) redshift
+
               sup_id: id of pixels to supervise with gt redshift (OBSOLETE)
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
@@ -92,10 +100,18 @@ class SpatialDecoder(nn.Module):
         timer.reset()
 
         if self.output_scaler or self.output_bias:
-            self.scaler_decoder(z, ret)
+            if z_scaler is None:
+                self.scaler_decoder(z, ret)
+            else: self.scaler_decoder(z_scaler, ret)
+
         if self.model_redshift:
             if self.decode_redshift:
-                self.redshift_decoder(z, ret, specz, init_redshift_prob)
+                print(z_redshift.shape)
+                assert 0
+                if z_redshift is None:
+                    self.redshift_decoder(z, ret, specz, init_redshift_prob)
+                else:
+                    self.redshift_decoder(z_redshift, ret, specz, init_redshift_prob)
             else: # apply gt redshift
                 assert specz is not None
                 ret["redshift"] = specz

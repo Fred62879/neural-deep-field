@@ -153,7 +153,10 @@ class CodebookTrainer(BaseTrainer):
         self.train_pipeline = self.pipeline[0]
 
         if self.mode == "codebook_pretrain":
-            self.init_trainable_latents()
+            self.latents = nn.Embedding(
+                self.num_spectra,
+                self.extra_args["codebook_pretrain_latent_dim"])
+            )
         elif self.mode == "redshift_pretrain":
             checkpoint = self.load_model(self.pretrained_model_fname)
 
@@ -166,9 +169,18 @@ class CodebookTrainer(BaseTrainer):
                 )
                 freeze_layers(self.train_pipeline, ["redshift_decoder"])
             else:
-                self.init_trainable_latents()
+                self.latents = nn.Embedding(
+                    self.num_spectra,
+                    self.extra_args["codebook_pretrain_latent_dim"]
+                )
                 freeze_layers(
                     self.train_pipeline, ["redshift_decoder","spatial_decoder.decode"])
+
+            if self.kwargs["redshift_pretrain_optimize_separate_latents"]:
+                self.redshift_latents = nn.Embedding(
+                    self.num_spectra,
+                    self.extra_args["codebook_pretrain_latent_dim"]
+                )
         else:
             raise ValueError("Invalid pretrainer mode.")
 
@@ -212,9 +224,8 @@ class CodebookTrainer(BaseTrainer):
 
     def init_optimizer(self):
         # collect all parameters from network and trainable latents
-        self.params_dict = {
-            "spectra_latents": param for _, param in self.latents.named_parameters()
-        }
+        self.params_dict = {}
+        # "spectra_latents": param for _, param in self.latents.named_parameters()}
 
         for name, param in self.train_pipeline.named_parameters():
             self.params_dict[name] = param
@@ -223,12 +234,12 @@ class CodebookTrainer(BaseTrainer):
         if self.mode == "codebook_pretrain":
             net_params, latents = [], []
             for name in self.params_dict:
-                if "spectra_latents" in name:
-                    latents.append(self.params_dict[name])
-                else:
-                    net_params.append(self.params_dict[name])
+                #if "spectra_latents" in name:
+                #    latents.append(self.params_dict[name])
+                #else:
+                net_params.append(self.params_dict[name])
 
-            params.append({"params": latents,
+            params.append({"params": self.latents.weight,
                            "lr": self.extra_args["codebook_pretrain_lr"]})
             params.append({"params": net_params,
                            "lr": self.extra_args["codebook_pretrain_lr"]})
@@ -236,9 +247,9 @@ class CodebookTrainer(BaseTrainer):
         elif self.mode == "redshift_pretrain":
             latents, redshift_params, codebook_logit_params = [], [], []
             for name in self.params_dict:
-                if "spectra_latents" in name:
-                    latents.append(self.params_dict[name])
-                elif "redshift_decoder" in name:
+                #if "spectra_latents" in name:
+                #    latents.append(self.params_dict[name])
+                if "redshift_decoder" in name:
                     redshift_params.append(self.params_dict[name])
                 elif "spatial.decoder.decode" in name:
                     codebook_logit_params.append(self.params_dict[name])
@@ -247,9 +258,12 @@ class CodebookTrainer(BaseTrainer):
                 params.append({"params": redshift_params,
                                "lr": self.extra_args["codebook_pretrain_lr"]})
             if not self.extra_args["redshift_pretrain_with_same_latents"]:
-                params.append({"params": latents,
+                params.append({"params": self.latents.weight,
                                "lr": self.extra_args["codebook_pretrain_lr"]})
                 params.append({"params": codebook_logit_params,
+                               "lr": self.extra_args["codebook_pretrain_lr"]})
+            if self.kwargs["redshift_pretrain_optimize_separate_latents"]:
+                params.append({"params": self.redshift_latents.weight,
                                "lr": self.extra_args["codebook_pretrain_lr"]})
 
         else: raise ValueError()
@@ -278,8 +292,13 @@ class CodebookTrainer(BaseTrainer):
         else: self.dataset.set_spectra_source("sup")
 
         # set input latents for codebook net
+        coords_source = ["spectra_latents"]
         self.dataset.set_coords_source("spectra_latents")
         self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
+
+        if self.mode == "redshift_pretrain" and \
+           self.kwargs["redshift_pretrain_optimize_separate_latents"]:
+            self.dataset.set_hardcode_data("redshift_latents", self.redshift_latents.weight)
 
         self.dataset.toggle_wave_sampling(self.sample_wave)
         if self.sample_wave:
@@ -567,10 +586,8 @@ class CodebookTrainer(BaseTrainer):
         else:
             self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))
 
-    def init_trainable_latents(self):
-        self.latents = nn.Embedding(
-            self.num_spectra,
-            self.extra_args["codebook_pretrain_latent_dim"])
+    def init_trainable_latents(self, n, m):
+        return nn.Embedding(n, m)
 
     def load_model(self, model_fname):
         assert(exists(model_fname))
@@ -616,9 +633,11 @@ class CodebookTrainer(BaseTrainer):
                 data["spectra_masks"], data["spectra_source_data"]
             )
 
-        init_redshift_prob = data["init_redshift_prob"]
+        ## debug
+        init_redshift_prob = None #data["init_redshift_prob"]
         #if self.epoch != 0:
         #    init_redshift_prob = torch.zeros(init_redshift_prob.shape, dtype=init_redshift_prob.dtype).to(init_redshift_prob.device)
+        ## ends here
 
         ret = forward(
             data,
