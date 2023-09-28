@@ -6,7 +6,7 @@ from os.path import exists
 
 from typing import Callable
 from torch.utils.data import Dataset
-from wisp.utils.common import print_shape
+from wisp.utils.common import print_shape, get_bin_id
 from wisp.datasets.fits_data import FitsData
 from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
@@ -437,6 +437,21 @@ class AstroDataset(Dataset):
 
         for field in batched_fields:
             out[field] = self.get_batched_data(field, idx)
+
+        ## debug
+        bsz = out["spectra_redshift"].shape[0]
+        n_bins = int(np.rint((
+            self.kwargs["redshift_hi"] - self.kwargs["redshift_lo"]) / self.kwargs["redshift_bin_width"]))
+        ids = np.array(
+            [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
+             for val in out["spectra_redshift"]])
+        ids = np.rint(ids).astype(int)
+        init_probs = np.zeros((bsz, n_bins)).astype(np.float32)
+        pos = np.arange(bsz)
+        ids = np.concatenate((pos[None,:],ids[None,:]),axis=0)
+        init_probs[ ids[0,:], ids[1:,] ] = 0.0001
+        out["init_redshift_prob"] = init_probs
+        ## ends here
 
         if "wave_data" in self.requested_fields:
             self.get_wave_data(len(idx), out)

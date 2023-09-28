@@ -74,7 +74,8 @@ class CodebookPretrainNerf(BaseNeuralField):
             **self.kwargs)
 
     def pretrain(self, coords, wave, wave_range,
-                 trans=None, trans_mask=None, nsmpl=None, qtz_args=None, specz=None
+                 trans=None, trans_mask=None, nsmpl=None, qtz_args=None, specz=None,
+                 init_redshift_prob=None
     ):
         """ Pretrain codebook.
             @Param
@@ -94,7 +95,8 @@ class CodebookPretrainNerf(BaseNeuralField):
         coords = coords[:,None]
 
         # `latents` is either logits or qtz latents or latents dep on qtz method
-        latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz)
+        latents = self.spatial_decoder(coords, self.codebook, qtz_args, ret, specz=specz,
+                                       init_redshift_prob=init_redshift_prob)
         timer.check("spatial decoding done")
 
         self.hps_decoder(

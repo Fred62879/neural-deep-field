@@ -78,7 +78,7 @@ class SpatialDecoder(nn.Module):
             skip=self.kwargs["spatial_decod_skip_layers"]
         )
 
-    def forward(self, z, codebook, qtz_args, ret, specz=None, sup_id=None):
+    def forward(self, z, codebook, qtz_args, ret, specz=None, sup_id=None, init_redshift_prob=None):
         """ Decode latent variables to various spatial information we need.
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
@@ -95,7 +95,7 @@ class SpatialDecoder(nn.Module):
             self.scaler_decoder(z, ret)
         if self.model_redshift:
             if self.decode_redshift:
-                self.redshift_decoder(z, ret, specz)
+                self.redshift_decoder(z, ret, specz, init_redshift_prob)
             else: # apply gt redshift
                 assert specz is not None
                 ret["redshift"] = specz

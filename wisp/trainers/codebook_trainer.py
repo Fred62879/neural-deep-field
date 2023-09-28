@@ -320,9 +320,11 @@ class CodebookTrainer(BaseTrainer):
         logits = [] # debug
 
         # for epoch in tqdm(range(self.num_epochs + 1)):
-        for epoch in range(self.num_epochs + 1):
+        for self.epoch in range(self.num_epochs + 1):
             self.begin_epoch()
             self.timer.check("begun epoch")
+
+            cur_logits = [] # debug
 
             for batch in range(self.num_iterations_cur_epoch):
                 iter_start_time = time.time()
@@ -339,14 +341,31 @@ class CodebookTrainer(BaseTrainer):
 
                 self.timer.check("batch ended")
 
-                if batch == 1:
-                    logits.append(self.cur_logits[0,222]) # debug
+                ## debug
+                if batch == 0:
+                    ids = np.array([[4,0],[192,1],[47,2],[43,3],[23,4],[49,5],[51,6]])
+                elif batch == 1:
+                    ids = np.array([[222,0],[42,1],[77,2],[22,3],[76,4],[67,5],[75,6]])
+                elif batch == 2:
+                    ids = np.array([[57,0],[38,1],[63,2],[54,3],[37,4],[38,5]])
+                cur_logits.extend(self.cur_logits[ids[:,1],ids[:,0]].detach().cpu().numpy())
+                ## ends here
+
+            logits.append(cur_logits) # debug
 
             self.end_epoch()
             self.timer.check("epoch ended")
 
-        logits = torch.stack(logits).detach().cpu().numpy()
-        plt.plot(logits); plt.savefig('tmp.png'); plt.close()
+        ## debug
+        logits = np.array(logits) # [nepochs,nspectra]
+        nrows, ncols = 4, 5
+        fig, axs = plt.subplots(nrows,ncols,figsize=(5*ncols,5*nrows))
+        for i in range(min(20,logits.shape[1])):
+            axis = axs[i//ncols,i%ncols]
+            axis.plot(logits[:,i])
+        fig.tight_layout(); plt.savefig('tmp.png'); plt.close()
+        ## ends here
+
         self.end_train()
 
     def end_train(self):
@@ -597,6 +616,10 @@ class CodebookTrainer(BaseTrainer):
                 data["spectra_masks"], data["spectra_source_data"]
             )
 
+        init_redshift_prob = data["init_redshift_prob"]
+        #if self.epoch != 0:
+        #    init_redshift_prob = torch.zeros(init_redshift_prob.shape, dtype=init_redshift_prob.dtype).to(init_redshift_prob.device)
+
         ret = forward(
             data,
             self.train_pipeline,
@@ -612,11 +635,14 @@ class CodebookTrainer(BaseTrainer):
             save_redshift=self.save_data and self.save_redshift,
             save_qtz_weights=self.save_data and self.save_qtz_weights,
             save_codebook_spectra=self.save_data and \
-                                  self.recon_codebook_spectra_individ
+                                  self.recon_codebook_spectra_individ,
+            save_spectra_all_bins=True, # debug
+            init_redshift_prob=init_redshift_prob
         )
         self.timer.check("forwarded")
 
-        self.cur_logits = ret["redshift_logits"]
+        self.cur_logits = ret["redshift_logits"] # debug
+        # self.cur_red_spectra = ret["spectra_all_bins"] # debug
 
         # i) spectra supervision loss
         spectra_loss = 0

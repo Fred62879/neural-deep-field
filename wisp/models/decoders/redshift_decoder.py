@@ -41,7 +41,7 @@ class RedshiftDecoder(nn.Module):
             hidden_dim=self.kwargs["redshift_decod_hidden_dim"],
             skip=self.kwargs["redshift_decod_skip_layers"]
         )
-        # self.redshift_decoder.initialize_last_layer_equal()
+        self.redshift_decoder.initialize_last_layer_equal()
         # for n,p in self.redshift_decoder.lout.named_parameters(): print(n, p)
 
     def init_redshift_bins(self):
@@ -52,7 +52,7 @@ class RedshiftDecoder(nn.Module):
         self.redshift_bin_center = self.redshift_bin_center.to(device)
         self.num_redshift_bins = len(self.redshift_bin_center)
 
-    def forward(self, z, ret, specz=None):
+    def forward(self, z, ret, specz=None, init_redshift_prob=None):
         """ Decode latent variables to various spatial information we need.
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
@@ -69,7 +69,7 @@ class RedshiftDecoder(nn.Module):
         elif self.redshift_model_method == "classification":
             ret["redshift"]= self.redshift_bin_center # [num_bins]
             ret["redshift_logits"] = F.softmax(
-                self.redshift_decoder(z[:,0]), dim=-1) # [num_bins]
+                self.redshift_decoder(z[:,0]) + init_redshift_prob, dim=-1) # [num_bins]
         else:
             raise ValueError("Unsupported redshift model method!")
 

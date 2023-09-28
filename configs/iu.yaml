@@ -134,8 +134,8 @@ spatial_decod:
     scaler_decod_activation_type: 'relu'
     scaler_decod_skip_layers: []
 
-    redshift_decod_hidden_dim: 64
-    redshift_decod_num_hidden_layers: 1
+    redshift_decod_hidden_dim: 128
+    redshift_decod_num_hidden_layers: 3
     redshift_decod_layer_type: 'none'
     redshift_decod_activation_type: 'relu'
     redshift_decod_skip_layers: []
@@ -163,21 +163,21 @@ trainer:
     regu_redshift_logits: False
     redshift_logits_regu_method: 'l1_excl_largest'
 
-    num_epochs: 100
+    num_epochs: 1000
     batch_size: 5500
     pretrain_batch_size: 7 #1500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 100
+    log_cli_every: 200
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 100
+    save_model_every: 200
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_source_data','spectra_masks','spectra_pixels','spectra_redshift','spectra_wave','spectra_redshift','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift','sup_spectra_wave','sup_spectra_masks','sup_spectra_data']
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_source_data','spectra_masks','spectra_pixels','spectra_redshift','spectra_wave','spectra_redshift','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift','sup_spectra_wave','sup_spectra_masks','sup_spectra_data','init_redshift_prob']
 
     learn_spectra_within_wave_range: True
     codebook_pretrain_pixel_supervision: False
@@ -216,7 +216,7 @@ trainer:
     pretrain_use_all_wave: False
     spectra_supervision_use_all_wave: False
 
-    pretrain_wave_sample_method: 'uniform' #_non_random'
+    pretrain_wave_sample_method: 'uniform_non_random'
 
     train_num_wave_samples: 50
     pretrain_num_wave_samples: 100 #30
@@ -246,7 +246,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20230926-192947_100_redshift_pretrain_0-7_spectra'
+    # infer_log_dir: '20230927-130628_0-10'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500

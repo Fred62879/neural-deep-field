@@ -1063,7 +1063,8 @@ class AstroInferrer(BaseInferrer):
                         save_spectra=self.recon_gt_spectra,
                         save_redshift=self.save_redshift,
                         save_qtz_weights=self.save_qtz_weights,
-                        save_spectra_all_bins=self.recon_gt_spectra_all_bins
+                        save_spectra_all_bins=self.recon_gt_spectra_all_bins,
+                        init_redshift_prob=data["init_redshift_prob"] # debug
                     )
 
                 if self.pretrain_infer:
@@ -1321,7 +1322,7 @@ class AstroInferrer(BaseInferrer):
         def change_shape(data, m):
             return np.tile(data, m).reshape(m, -1)
 
-        ids = np.array([7,17])
+        ids = np.array([7])
         for i in ids:
         # for i in range(num_spectra):
             cur_dir = join(self.spectra_dir, f"{i}-all-bins")

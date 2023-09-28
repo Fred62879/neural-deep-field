@@ -26,6 +26,11 @@ def get_bool_classify_redshift(**kwargs):
     return kwargs["model_redshift"] and not kwargs["apply_gt_redshift"] \
         and kwargs["redshift_model_method"] == "classification"
 
+def get_bin_id(lo, bin_width, val):
+    val = val - bin_width / 2
+    n = (val - lo) / bin_width
+    return n
+
 def get_loss(cho, cuda):
     if cho == "l1_mean":
         loss = nn.L1Loss()
@@ -300,10 +305,13 @@ def forward(
         save_qtz_weights=False,
         save_codebook_loss=False,
         save_codebook_spectra=False,
-        save_spectra_all_bins=False
+        save_spectra_all_bins=False,
+        init_redshift_prob=None, # debug
 ):
     requested_channels = []
     net_args = {"coords": data["coords"] }
+
+    net_args["init_redshift_prob"] = init_redshift_prob # debug
 
     if space_dim == 2:
         requested_channels = ["intensity"]
