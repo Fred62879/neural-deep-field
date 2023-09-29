@@ -111,6 +111,7 @@ class SpatialDecoder(nn.Module):
                 ret["redshift"] = specz
 
         # decode/quantize
+        # print('*', z[0])
         if self.quantize_spectra:
             logits = self.decode(z)
         elif self.quantize_z:

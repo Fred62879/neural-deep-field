@@ -362,7 +362,9 @@ def calculate_bayesian_redshift_logits(loss, mask, gt_spectra, recon_fluxes, red
     # n_spectrum_per_row = 7
     # nrow, ncol = int(n_spectrum_per_fig / n_spectrum_per_row), n_spectrum_per_row
     # n_figs = int(np.ceil(n / n_spectrum_per_fig))
-    # redshift_bins = init_redshift_bins(**kwargs).numpy()
+    # redshift_bins = init_redshift_bins(
+    #     kwargs["redshift_lo"], kwargs["redshift_hi"], kwargs["redshift_bin_width"]
+    # ).numpy()
 
     # for i in range(n_figs):
     #     fig, axs = plt.subplots(nrow, ncol, figsize=(5*ncol,5*nrow))

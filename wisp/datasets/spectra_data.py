@@ -10,8 +10,7 @@ import logging as log
 import matplotlib.pyplot as plt
 
 from wisp.datasets.patch_data import PatchData
-from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array, \
-    init_redshift_bins
+from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
@@ -494,12 +493,11 @@ class SpectraData:
         self.redshift_pretrain_ids = np.array([
             26,86,2,55,75,93,16, 73,54,95,53, 92,78,13,7, 30,22,24,33,8
         ])
-        # print(self.redshift_pretrain_ids)
         validation_ids = supervision_ids[self.redshift_pretrain_ids] #[10:]
         ## ends here
 
         # log.info(f"test spectra ids: {test_ids}")
-        log.info(f"validation spectra ids: {validation_ids}")
+        # log.info(f"validation spectra ids: {validation_ids}")
         # log.info(f"supervision spectra ids: {supervision_ids}")
 
         self.num_test_spectra = len(test_ids)

@@ -9,7 +9,7 @@ import scipy.interpolate as interpolate
 from pathlib import Path
 from os.path import join
 from astropy.visualization import ZScaleInterval
-from wisp.utils.numerical import calculate_sam_spectrum
+from wisp.utils.numerical import calculate_sam_spectrum, calculate_precision_recall
 
 
 def plot_grad_flow(named_parameters, gradFileName=None):
@@ -18,7 +18,7 @@ def plot_grad_flow(named_parameters, gradFileName=None):
         if "grid" not in n and (p.requires_grad) and ("bias" not in n):
             layers.append(n[-32:])
             # grad = p.grad.detach().cpu()
-            # print(grad[0])
+            # print(n, grad.shape, grad[0])
             ave_grads.append(p.grad.detach().cpu().abs().mean())
 
     plt.plot(ave_grads, alpha=0.3, color="b")
@@ -38,6 +38,22 @@ def plot_save(fname, x, y):
     plt.plot(x, y)
     plt.savefig(fname)
     plt.close()
+
+def plot_precision_recall_all(logits, gt_redshift, lo, hi, bin_width, n_per_row, fname):
+    n = len(logits)
+    ncols = min(n, n_per_row)
+    nrows = int(np.ceil(n / ncols))
+    fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
+    for i, (cur_logits, cur_gt_redshift) in enumerate(zip(logits, gt_redshift)):
+        precision, recall = calculate_precision_recall(
+            cur_logits, cur_gt_redshift, lo, hi, bin_width
+        )
+        axis = axs[i//ncols,i%ncols]
+        axis.plot(recall, precision)
+        axis.set_xlim(xmin=0,xmax=1.2); axis.set_ylim(ymin=-0.05,ymax=1)
+        axis.set_xlabel("recall");axis.set_ylabel("precision")
+
+    fig.tight_layout(); plt.savefig(fname); plt.close()
 
 def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):
     """ Plot latent variable distributions and each codebook embedding.

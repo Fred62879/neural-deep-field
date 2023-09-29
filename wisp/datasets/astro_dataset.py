@@ -486,6 +486,7 @@ class AstroDataset(Dataset):
         ## ends here
 
         # print_shape(out)
+        # print(out["redshift_latents"].requires_grad)
         if self.transform is not None:
             out = self.transform(out)
         return out

@@ -29,7 +29,7 @@ def get_bool_classify_redshift(**kwargs):
 def get_bin_id(lo, bin_width, val):
     val = val - bin_width / 2
     n = (val - lo) / bin_width
-    return n
+    return int(np.rint(n))
 
 def get_loss(cho, cuda):
     if cho == "l1_mean":
@@ -59,12 +59,9 @@ def freeze_layers(model, excls=[]):
         if not to_exclude:
             p.requires_grad = False
 
-def init_redshift_bins(**kwargs):
-    redshift_bin_center = torch.arange(
-        kwargs["redshift_lo"],
-        kwargs["redshift_hi"],
-        kwargs["redshift_bin_width"])
-    offset = kwargs["redshift_bin_width"] / 2
+def init_redshift_bins(lo, hi, bin_width):
+    redshift_bin_center = torch.arange(lo, hi, bin_width)
+    offset = bin_width / 2
     redshift_bin_center += offset
     return redshift_bin_center
 

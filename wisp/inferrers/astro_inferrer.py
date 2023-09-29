@@ -15,7 +15,8 @@ from wisp.datasets.data_utils import get_bound_id
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
 from wisp.utils.plot import plot_horizontally, plot_embed_map, \
-    plot_latent_embed, annotated_heat, plot_simple, batch_hist
+    plot_latent_embed, annotated_heat, plot_simple, batch_hist, \
+    plot_precision_recall_all
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
     sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, \
     load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, get_loss
@@ -386,6 +387,8 @@ class AstroInferrer(BaseInferrer):
 
             self.requested_fields.extend([
                 "spectra_source_data","spectra_masks","spectra_redshift"])
+            if self.split_latent:
+                self.requested_fields.append("redshift_latents")
 
             if self.infer_selected:
                 self.dataset_length = min(
@@ -740,9 +743,9 @@ class AstroInferrer(BaseInferrer):
             if self.recon_gt_spectra_all_bins:
                 self.recon_fluxes_all = []
 
-        if self.save_qtz_weights: self.qtz_weights = []
-        if self.save_pixel_values: self.spectra_trans = []
-        if self.plot_redshift_logits: self.redshift_logits = []
+        if self.plot_redshift_logits:
+            self.gt_redshift_l = []
+            self.redshift_logits = []
 
         if self.save_redshift:
             if self.classify_redshift:
@@ -751,10 +754,16 @@ class AstroInferrer(BaseInferrer):
             else: self.redshift = []
             self.gt_redshift = []
 
+        if self.save_qtz_weights: self.qtz_weights = []
+        if self.save_pixel_values: self.spectra_trans = []
+
     def run_checkpoint_selected_coords_partial_model(self, model_id, checkpoint):
         if self.pretrain_infer:
-            # self._set_dataset_coords_pretrain(checkpoint)
             self._set_coords_from_checkpoint(checkpoint)
+            if self.split_latent:
+                self.dataset.set_hardcode_data(
+                    "redshift_latents", checkpoint["redshift_latents"])
+
         self.infer_spectra(model_id, checkpoint)
 
     def post_checkpoint_selected_coords_partial_model(self, model_id):
@@ -837,13 +846,24 @@ class AstroInferrer(BaseInferrer):
                 self._log_data("redshift", gt_field="gt_redshift")
 
         if self.plot_redshift_logits:
+            gt_redshift = torch.stack(self.gt_redshift_l).detach().cpu().numpy()
             redshift_logits = torch.stack(self.redshift_logits).detach().cpu().numpy()
+            bin_centers = init_redshift_bins(
+                self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
+                self.extra_args["redshift_bin_width"])
+
             fname = join(self.redshift_dir, f"{model_id}_logits")
-            bin_centers = init_redshift_bins(**self.extra_args)
-            print(bin_centers.shape, redshift_logits.shape)
             np.save(fname, np.concatenate((bin_centers[None,:], redshift_logits), axis=0))
-            batch_hist(bin_centers, redshift_logits, fname + ".png",
-                       self.extra_args["num_spectrum_per_row"], is_counts=True)
+
+            batch_hist(
+                bin_centers, redshift_logits, fname + ".png",
+                self.extra_args["num_spectrum_per_row"], is_counts=True
+            )
+            plot_precision_recall_all(
+                redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
+                self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
+                self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png"
+            )
 
         if self.save_qtz_weights:
             fname = join(self.qtz_weights_dir, str(model_id))
@@ -1058,13 +1078,14 @@ class AstroInferrer(BaseInferrer):
                         self.space_dim,
                         qtz=self.qtz,
                         qtz_strategy=self.qtz_strategy,
+                        split_latent=self.split_latent,
                         apply_gt_redshift=self.apply_gt_redshift,
                         classify_redshift=self.classify_redshift,
                         save_spectra=self.recon_gt_spectra,
                         save_redshift=self.save_redshift,
                         save_qtz_weights=self.save_qtz_weights,
                         save_spectra_all_bins=self.recon_gt_spectra_all_bins,
-                        init_redshift_prob=data["init_redshift_prob"] # debug
+                        # init_redshift_prob=data["init_redshift_prob"] # debug
                     )
 
                 if self.pretrain_infer:
@@ -1110,6 +1131,7 @@ class AstroInferrer(BaseInferrer):
                         self.redshift.extend(ret["redshift"])
 
                 if self.plot_redshift_logits:
+                    self.gt_redshift_l.extend(data["spectra_redshift"])
                     self.redshift_logits.extend(ret["redshift_logits"])
 
             except StopIteration:
@@ -1317,10 +1339,19 @@ class AstroInferrer(BaseInferrer):
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
         n_figs_each = int(np.ceil(num_bins / n_spectrum_per_fig))
 
-        redshift_bins = init_redshift_bins(**self.extra_args).numpy()
+        redshift_bins = init_redshift_bins(
+            self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
+            self.extra_args["redshift_bin_width"]
+        ).numpy()
 
         def change_shape(data, m):
             return np.tile(data, m).reshape(m, -1)
+
+        # print(self.recon_fluxes_all.shape)
+        # np.save('tmp_gt.npy', self.gt_fluxes)
+        # np.save('tmp.npy', self.recon_fluxes_all)
+        # np.save('tmp_masks.npy', self.recon_masks)
+        # assert 0
 
         ids = np.array([7])
         for i in ids:
@@ -1340,7 +1371,7 @@ class AstroInferrer(BaseInferrer):
                     change_shape(self.gt_fluxes[i], m),
                     change_shape(self.recon_wave[i], m),
                     self.recon_fluxes_all[lo:hi,i],
-                    #save_spectra_together=True,
+                    # save_spectra_together=True,
                     clip=self.extra_args["plot_clipped_spectrum"],
                     gt_masks=change_shape(self.gt_masks[i], m),
                     recon_masks=change_shape(self.recon_masks[i], m),

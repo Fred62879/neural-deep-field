@@ -174,13 +174,10 @@ class CodebookTrainer(BaseTrainer):
                 # redshift pretrain use val spectra which is a permutation of sup spectra
                 permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
                 self.latents = nn.Embedding.from_pretrained(
-                    checkpoint["latents"][permute_ids], freeze=True)
+                    checkpoint["latents"][permute_ids], freeze=False)
 
                 if self.split_latent:
-                    #self.redshift_latents = nn.Embedding(self.num_spectra, red_z_dim)
-                    self.redshift_latents = Variable(
-                        torch.rand(self.num_spectra, red_z_dim), requires_grad=True
-                    )
+                    self.redshift_latents = nn.Embedding(self.num_spectra, red_z_dim)
                 freeze_layers(self.train_pipeline, excls=["redshift_decoder"])
 
             else:
@@ -193,7 +190,7 @@ class CodebookTrainer(BaseTrainer):
         # collect all parameters from network and trainable latents
         self.params_dict = { "latents": self.latents.weight }
         if self.split_latent:
-            self.params_dict["redshift_latents"] = self.redshift_latents #.weight
+            self.params_dict["redshift_latents"] = self.redshift_latents.weight
         for name, param in self.train_pipeline.named_parameters():
             self.params_dict[name] = param
 
@@ -255,9 +252,9 @@ class CodebookTrainer(BaseTrainer):
             spectra_logit_params, redshift_logit_params = [], []
 
             for name in self.params_dict:
-                if "latents" in name:
+                if name == "latents":
                     latents.append(self.params_dict[name])
-                elif "redshift_latents" in name:
+                elif name == "redshift_latents":
                     redshift_latents.append(self.params_dict[name])
                 elif "redshift_decoder" in name:
                     redshift_logit_params.append(self.params_dict[name])
@@ -306,7 +303,7 @@ class CodebookTrainer(BaseTrainer):
 
         if self.split_latent:
             fields.append("redshift_latents")
-            self.dataset.set_hardcode_data("redshift_latents", self.redshift_latents) #.weight)
+            self.dataset.set_hardcode_data("redshift_latents", self.redshift_latents.weight)
 
         self.dataset.toggle_wave_sampling(self.sample_wave)
         if self.sample_wave:
@@ -371,9 +368,6 @@ class CodebookTrainer(BaseTrainer):
                 self.timer.check("batch ended")
 
                 ## debug
-                if batch == 0:
-                    print(self.params_dict["redshift_latents"][0])
-                    # print(self.redshift_latents.weight[0])
                 # if batch == 0:
                 #     ids = np.array([[4,0],[192,1],[47,2],[43,3],[23,4],[49,5],[51,6]])
                 # elif batch == 1:
@@ -713,6 +707,7 @@ class CodebookTrainer(BaseTrainer):
                 largest, _ = torch.max(logits, dim=-1)
                 redshift_logits_regu = torch.mean(torch.sum(logits, dim=-1) - largest)
             elif self.redshift_logits_regu_method == "laplace":
+                raise NotImplementedError()
                 a = -torch.log(
                         torch.exp(-logits) + torch.exp( -(1-logits) )
                     )
@@ -767,7 +762,7 @@ class CodebookTrainer(BaseTrainer):
         }
         checkpoint["latents"] = self.latents.weight
         if self.split_latent:
-            checkpoint["redshift_latents"] = self.redshift_latents #.weight
+            checkpoint["redshift_latents"] = self.redshift_latents.weight
 
         torch.save(checkpoint, model_fname)
         return checkpoint

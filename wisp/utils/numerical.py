@@ -4,10 +4,10 @@ import numpy as np
 import logging as log
 
 from collections import defaultdict
-from wisp.utils.common import to_numpy
 from scipy.interpolate import interp1d
 from astropy.visualization import ZScaleInterval
 from skimage.metrics import structural_similarity
+from wisp.utils.common import to_numpy, init_redshift_bins, get_bin_id
 
 
 def calculate_emd(distrib1, distrib2, norm="l2", mask=None, weight=None, precision=None):
@@ -103,6 +103,34 @@ def normalize_data(data, norm_cho):
         data = (data - lo) / (hi - lo)
     else: raise ValueError()
     return data
+
+def calculate_one_precision_recall(thresh, logits, gt_id, ids):
+    """ Calculate precision and recall value under given threshold.
+    """
+    p = logits > thresh
+    # n = logits <= thresh
+    tp = ids[p] == gt_id
+    # fp = ids[p] != gt_id
+    # fn = ids[n] == gt_id
+    # precision = sum(tp) / (sum(tp) + sum(fp))
+    # recall = sum(tp) / (sum(tp) + sum(fn))
+    precision = sum(tp) / sum(p)
+    recall = sum(tp)
+    return precision, recall
+
+def calculate_precision_recall(logits, gt_redshift, lo, hi, bin_width):
+    """ Calculate precision and recall for current redshift classification result.
+    """
+    bins = init_redshift_bins(lo, hi, bin_width)
+    gt_id = get_bin_id(lo, bin_width, gt_redshift)
+    ids = np.arange(len(bins))
+    s_logits = np.sort(logits)
+    precision, recall = [], []
+    for thresh in s_logits[:-1]:
+        cur_precision, cur_recall = calculate_one_precision_recall(thresh, logits, gt_id, ids)
+        recall.append(cur_recall)
+        precision.append(cur_precision)
+    return np.array(precision), np.array(recall)
 
 def calculate_zscale_ranges(pixels):
     """ Calculate zscale ranges based on given pixels for each bands separately.

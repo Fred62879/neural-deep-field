@@ -44,14 +44,17 @@ class RedshiftDecoder(nn.Module):
             hidden_dim=self.kwargs["redshift_decod_hidden_dim"],
             skip=self.kwargs["redshift_decod_skip_layers"]
         )
-        self.redshift_decoder.initialize_last_layer_equal()
+        # self.redshift_decoder.initialize_last_layer_equal()
         # for n,p in self.redshift_decoder.lout.named_parameters(): print(n, p)
 
     def init_redshift_bins(self):
         if self.kwargs["use_gpu"]:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else: device = "cpu"
-        self.redshift_bin_center = init_redshift_bins(**self.kwargs)
+        self.redshift_bin_center = init_redshift_bins(
+            self.kwargs["redshift_lo"], self.kwargs["redshift_hi"],
+            self.kwargs["redshift_bin_width"]
+        )
         self.redshift_bin_center = self.redshift_bin_center.to(device)
         self.num_redshift_bins = len(self.redshift_bin_center)
 
