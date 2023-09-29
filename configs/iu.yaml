@@ -104,10 +104,9 @@ pretrain:
 
     split_latent: True
 
-    pretrain_latent_dim: 50
-    scaler_latent_dim: 0         # |
-    spectra_logit_latent_dim: 32  # |-sum up to latent dim
-    redshift_logit_latent_dim: 18 # |
+    spatial_latent_dim: 32
+    scaler_latent_dim: 0
+    redshift_logit_latent_dim: 16
 
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 100 #30
@@ -187,20 +186,20 @@ trainer:
     regu_redshift_logits: False
     redshift_logits_regu_method: 'l1_excl_largest'
 
-    num_epochs: 10
+    num_epochs: 4
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
     log_cli_every: 2
     log_gpu_every: -1
-    plot_grad_every: 1
+    plot_grad_every: -1
     save_data_every: -1
     save_model_every: 2
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_source_data','spectra_masks','spectra_pixels','spectra_redshift','spectra_wave','spectra_redshift','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift','sup_spectra_wave','sup_spectra_masks','sup_spectra_data','init_redshift_prob','scaler_latent_mask','spatial_latend_mask','redshift_latent_mask']
+    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_source_data','spectra_masks','spectra_pixels','spectra_redshift','spectra_wave','spectra_redshift','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift','sup_spectra_wave','sup_spectra_masks','sup_spectra_data','init_redshift_prob','scaler_latents','redshift_latents']
 
     learn_spectra_within_wave_range: True
 

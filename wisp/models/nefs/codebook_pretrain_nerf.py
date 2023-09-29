@@ -78,9 +78,8 @@ class CodebookPretrainNerf(BaseNeuralField):
     def pretrain(self, coords, wave, wave_range,
                  trans=None, trans_mask=None, nsmpl=None,
                  qtz_args=None, specz=None,
-                 scaler_latent_mask=None,
-                 spatial_latent_mask=None,
-                 redshift_latent_mask=None,
+                 scaler_latents=None,
+                 redshift_latents=None,
                  init_redshift_prob=None # debug
     ):
         """ Pretrain codebook.
@@ -113,9 +112,8 @@ class CodebookPretrainNerf(BaseNeuralField):
         latents = self.spatial_decoder(
             coords, self.codebook, qtz_args, ret,
             specz=specz,
-            scaler_latent_mask=scaler_latent_mask,
-            spatial_latent_mask=spatial_latent_mask,
-            redshift_latent_mask=redshift_latent_mask,
+            scaler_latents=scaler_latents,
+            redshift_latents=redshift_latents,
             init_redshift_prob=init_redshift_prob
         )
         timer.check("spatial decoding done")

@@ -178,7 +178,7 @@ def get_input_latent_dim(**kwargs):
         "redshift_pretrain_infer" in kwargs["tasks"] or \
         kwargs["main_train_with_pretrained_latents"]
        ):
-        latents_dim = kwargs["pretrain_latent_dim"]
+        latents_dim = kwargs["spatial_latent_dim"]
     elif kwargs["coords_encode_method"] == "positional_encoding":
         latents_dim = kwargs["coords_embed_dim"]
     elif kwargs["coords_encode_method"] == "grid":
@@ -341,10 +341,10 @@ def forward(
         net_args["wave_range"] = data["wave_range"] # linear normalization
 
         if split_latent:
-            if "spatial_latent_mask" in data:
-                net_args["spatial_latent_mask"] = data["spatial_latent_mask"]
-            if "redshift_latent_mask" in data:
-                net_args["redshift_latent_mask"] = data["redshift_latent_mask"]
+            if "scaler_latents" in data:
+                net_args["scaler_latents"] = data["scaler_latents"]
+            if "redshift_latents" in data:
+                net_args["redshift_latents"] = data["redshift_latents"]
         if apply_gt_redshift:
             net_args["specz"] = data["spectra_redshift"]
         if perform_integration:

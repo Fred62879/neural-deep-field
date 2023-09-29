@@ -40,12 +40,6 @@ class SpatialDecoder(nn.Module):
 
     def init_model(self):
         self.input_dim = get_input_latent_dim(**self.kwargs)
-        if self.kwargs["split_latent"]:
-            assert self.input_dim == self.kwargs["spectra_logit_latent_dim"] + \
-                self.kwargs["redshift_logit_latent_dim"] + self.kwargs["scaler_latent_dim"]
-
-            # spatial decoder latent dim
-            self.input_dim = self.kwargs["spectra_logit_latent_dim"]
 
         if self.decode_spatial_embedding or self.qtz:
             self.init_decoder()
@@ -86,9 +80,8 @@ class SpatialDecoder(nn.Module):
 
     def forward(self, z, codebook, qtz_args, ret,
                 specz=None,
-                scaler_latent_mask=None,
-                spatial_latent_mask=None,
-                redshift_latent_mask=None,
+                scaler_latents=None,
+                redshift_latents=None,
                 sup_id=None, # DELETE
                 init_redshift_prob=None # debug
     ):
@@ -107,24 +100,21 @@ class SpatialDecoder(nn.Module):
         timer.reset()
 
         if self.output_scaler or self.output_bias:
-            self.scaler_decoder(latent, ret, scaler_latent_mask)
+            self.scaler_decoder(latent, ret, scaler_latents)
 
         if self.model_redshift:
             if self.decode_redshift:
                 self.redshift_decoder(
-                    z, ret, specz, redshift_latent_mask, init_redshift_prob)
+                    z, ret, specz, redshift_latents, init_redshift_prob)
             else: # apply gt redshift
                 assert specz is not None
                 ret["redshift"] = specz
 
         # decode/quantize
-        if spatial_latent_mask is not None:
-            latents = z[...,spatial_latent_mask.bool()]
-
         if self.quantize_spectra:
-            logits = self.decode(latents)
+            logits = self.decode(z)
         elif self.quantize_z:
-            z, q_z = self.qtz(latents, codebook.weight, ret, qtz_args)
+            z, q_z = self.qtz(z, codebook.weight, ret, qtz_args)
         elif self.decode_spatial_embedding:
             z = self.decode(z)
         timer.check("spatial_decod::qtz done")

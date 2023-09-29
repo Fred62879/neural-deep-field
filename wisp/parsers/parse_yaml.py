@@ -284,7 +284,7 @@ def define_cmd_line_args():
                                 help="performe pretraining with 2d coords instead of \
                                 optimizing latent variables")
 
-    pretrain_group.add_argument("--pretrain-latent-dim", type=int)
+    # pretrain_group.add_argument("--pretrain-latent-dim", type=int)
 
     pretrain_group.add_argument("--redshift-pretrain-with-same-latents", action="store_true",
                                 help="use same latents as codebook pretrain during \
@@ -531,7 +531,7 @@ def define_cmd_line_args():
     train_group.add_argument("--split-latent", action="store_true",
                              help="use different latents for each decoder.")
     train_group.add_argument("--scaler-latent-dim", type=int)
-    train_group.add_argument("--spectra-logit-latent-dim", type=int)
+    train_group.add_argument("--spatial-latent-dim", type=int)
     train_group.add_argument("--redshift-logit-latent-dim", type=int)
 
     train_group.add_argument("--train-with-all-pixels", action="store_true")

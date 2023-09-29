@@ -291,6 +291,8 @@ class AstroDataset(Dataset):
 
         elif field == "masks":
             data = self.mask_dataset.get_mask(idx)
+        elif field in self.data:
+            data = self.data[field]
         else:
             raise ValueError(f"Unrecognized data field: {field}.")
 
@@ -422,10 +424,10 @@ class AstroDataset(Dataset):
         del out["spectra_id_map"]
 
     def get_model_data(self, out):
-        if "spatial_latent_mask" in self.data:
-            out["spatial_latent_mask"] = self.data["spatial_latent_mask"]
-        if "redshift_latent_mask" in self.data:
-            out["redshift_latent_mask"] = self.data["redshift_latent_mask"]
+        if "scaler_latents" in self.data:
+            out["scaler_latents"] = self.data["scaler_latents"]
+        if "redshift_latents" in self.data:
+            out["redshift_latents"] = self.data["redshift_latents"]
 
     def __len__(self):
         """ Length of the dataset in number of coords.
