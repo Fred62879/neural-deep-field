@@ -259,7 +259,39 @@ def define_cmd_line_args():
     qtz_group.add_argument("--qtz-seed", type=int)
     qtz_group.add_argument("--qtz-soft-temperature", type=int)
     qtz_group.add_argument("--qtz-temperature-scale", type=int)
-    qtz_group.add_argument("--codebook-pretrain-latent-dim", type=int)
+
+    ###################
+    # Pretrain arguments
+    ###################
+    pretrain_group = parser.add_argument_group("pretrain")
+
+    pretrain_group.add_argument("--pretrain-codebook", action="store_true")
+
+    pretrain_group.add_argument("--pretrain-batch-size", type=int, default=512)
+    pretrain_group.add_argument("--pretrain-pixel-beta", type=float)
+    pretrain_group.add_argument("--pretrain-redshift-beta", type=float)
+
+    pretrain_group.add_argument("--pretrain-log-dir", type=str)
+    pretrain_group.add_argument("--pretrained-model-name", type=str)
+
+    pretrain_group.add_argument("--pretrain-use-all-wave", action="store_true")
+    pretrain_group.add_argument("--pretrain-wave-sample-method", type=str, default="uniform")
+    pretrain_group.add_argument("--pretrain-num-wave-samples", type=int, default=1000,
+                                help="# wave to sample at each pretrain iteration.")
+
+    pretrain_group.add_argument("--pretrain-pixel-supervision", action="store_true")
+    pretrain_group.add_argument("--pretrain-with-coords", action="store_true",
+                                help="performe pretraining with 2d coords instead of \
+                                optimizing latent variables")
+
+    pretrain_group.add_argument("--pretrain-latent-dim", type=int)
+
+    pretrain_group.add_argument("--redshift-pretrain-with-same-latents", action="store_true",
+                                help="use same latents as codebook pretrain during \
+                                redshift pretrain")
+    pretrain_group.add_argument("--redshift-pretrain-num-spectra", type=float, default=1,
+                                help="num of spectra used for redshift pretrain, used to \
+                                sample a subset of spectra from codebook pretrain spectra.")
 
     ###################
     # Spatial Decoder arguments
@@ -469,17 +501,6 @@ def define_cmd_line_args():
                              help="Number of epochs to run the training.")
     train_group.add_argument("--batch-size", type=int, default=512,
                              help="Batch size for the training.")
-    train_group.add_argument("--pretrain-batch-size", type=int, default=512)
-    # train_group.add_argument("--resample", action="store_true",
-    #                          help="Resample the dataset after every epoch.")
-    # train_group.add_argument("--only-last", action="store_true",
-    #                          help="Train only last LOD.")
-    # train_group.add_argument("--resample-every", type=int, default=1,
-    #                          help="Resample every N epochs")
-    # train_group.add_argument("--model-format", type=str, default="full",
-    #                          choices=["full", "state_dict"],
-    #                          help="Format in which to save models.")
-
     train_group.add_argument("--render-tb-every", type=int, default=100,
                                 help="Render every N iterations")
     train_group.add_argument("--log-tb-every", type=int, default=100,
@@ -507,15 +528,22 @@ def define_cmd_line_args():
     train_group.add_argument("--redshift-logits-regu-method",type=str,
                              choices=["l1","l1_excl_largest","laplace"])
 
+    train_group.add_argument("--split-latent", action="store_true",
+                             help="use different latents for each decoder.")
+    train_group.add_argument("--scaler-latent-dim", type=int)
+    train_group.add_argument("--spectra-logit-latent-dim", type=int)
+    train_group.add_argument("--redshift-logit-latent-dim", type=int)
+
     train_group.add_argument("--train-with-all-pixels", action="store_true")
     train_group.add_argument("--train-pixel-ratio", type=float, default=1,
                              help="ratio of (unmasked) pixels used for training per epoch")
 
-    train_group.add_argument("--pretrain-codebook", action="store_true")
+    train_group.add_argument("--main-train-with-pretrained-latents", action="store_true",
+                             help="use trainable latent variable of autodecoder from \
+                             pretrain for main train as spatial embedding instead of \
+                             encoding coordinates. ")
+
     train_group.add_argument("--learn-spectra-within-wave-range", action="store_true")
-    train_group.add_argument("--codebook-pretrain-pixel-supervision", action="store_true")
-    train_group.add_argument("--pretrain-with-coords", action="store_true",
-                             help="performe pretraining with 2d coords instead of optimizing latent variables")
     train_group.add_argument("--weight-train", action="store_true")
     train_group.add_argument("--weight-by-wave-coverage", action="store_true",
                              help="spectra loss weighted by emitted lambda coverage or not.")
@@ -527,19 +555,6 @@ def define_cmd_line_args():
     train_group.add_argument("--spectra-supervision", action="store_true",
                              help="whether main training supervised by spectra.")
 
-    train_group.add_argument("--redshift-pretrain-with-same-latents", action="store_true",
-                             help="use same latents as codebook pretrain during redshift pretrain")
-    train_group.add_argument("--redshift-pretrain-optimize-separate-latents",
-                             action="store_true", help="optimize a separate latent variable \
-                             for the redshift decoder")
-    train_group.add_argument("--redshift-pretrain-num-spectra", type=float, default=1,
-                             help="num of spectra used for redshift pretrain, used to sample \
-                             a subset of spectra from codebook pretrain spectra.")
-    train_group.add_argument("--main-train-with-pretrained-latents", action="store_true",
-                             help="use trainable latent variable of autodecoder from \
-                             pretrain for main train as spatial embedding instead of \
-                             encoding coordinates. ")
-
     train_group.add_argument("--apply-gt-redshift", action="store_true",
                              help="apply gt redshift instead of generating redshift.")
     train_group.add_argument("--redshift-unsupervision", action="store_true",
@@ -549,8 +564,6 @@ def define_cmd_line_args():
 
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")
     train_group.add_argument("--redshift-beta", type=float, help="redshift loss weight scaler.")
-    train_group.add_argument("--pretrain-pixel-beta", type=float)
-    train_group.add_argument("--pretrain-redshift-beta", type=float)
 
     train_group.add_argument("--quantize-latent", action="store_true")
     train_group.add_argument("--quantize-spectra", action="store_true")
@@ -559,8 +572,6 @@ def define_cmd_line_args():
     train_group.add_argument("--resume-train", action="store_true")
     train_group.add_argument("--resume-log-dir", type=str)
     train_group.add_argument("--resume-model-fname", type=str)
-    train_group.add_argument("--pretrain-log-dir", type=str)
-    train_group.add_argument("--pretrained-model-name", type=str)
 
     train_group.add_argument("--uniform-sample-wave", action="store_true",
                              help="whether uniformly sample source wave or not.")
@@ -569,15 +580,11 @@ def define_cmd_line_args():
                             with number of samples falling within each band")
 
     train_group.add_argument("--train-use-all-wave", action="store_true")
-    train_group.add_argument("--pretrain-use-all-wave", action="store_true")
     train_group.add_argument("--spectra-supervision-use-all-wave", action="store_true")
 
-    train_group.add_argument("--pretrain-wave-sample-method", type=str, default="uniform")
 
     train_group.add_argument("--train-num-wave-samples", type=int, default=40,
                              help="# wave to sample at each training iteration.")
-    train_group.add_argument("--pretrain-num-wave-samples", type=int, default=1000,
-                             help="# wave to sample at each pretrain iteration.")
     train_group.add_argument("--spectra-supervision-num-wave-samples", type=int, default=1000,
                              help="# wave to sample at each training iteration \
                              for spectra supervision.")

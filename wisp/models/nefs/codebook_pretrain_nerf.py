@@ -15,13 +15,15 @@ from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
 class CodebookPretrainNerf(BaseNeuralField):
-    def __init__(self, decode_redshift=False, pretrain_pixel_supervision=False, **kwargs):
+    def __init__(self, decode_redshift=False,
+                 codebook_pretrain_pixel_supervision=False, **kwargs
+    ):
         self.kwargs = kwargs
 
         super(CodebookPretrainNerf, self).__init__()
 
         self.decode_redshift = decode_redshift
-        self.pixel_supervision = pretrain_pixel_supervision
+        self.pixel_supervision = codebook_pretrain_pixel_supervision
         self.init_model()
 
     def get_nef_type(self):
@@ -75,9 +77,10 @@ class CodebookPretrainNerf(BaseNeuralField):
 
     def pretrain(self, coords, wave, wave_range,
                  trans=None, trans_mask=None, nsmpl=None,
-                 qtz_args=None,
-                 z_scaler=None,
-                 z_redshift=None, specz=None,
+                 qtz_args=None, specz=None,
+                 scaler_latent_mask=None,
+                 spatial_latent_mask=None,
+                 redshift_latent_mask=None,
                  init_redshift_prob=None # debug
     ):
         """ Pretrain codebook.
@@ -100,7 +103,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
                           show_memory=self.kwargs["show_memory"])
         timer.check("forward starts")
-        # print(coords.shape, coords)
+        # print(coords.shape)
 
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]
@@ -109,8 +112,10 @@ class CodebookPretrainNerf(BaseNeuralField):
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(
             coords, self.codebook, qtz_args, ret,
-            z_scaler=z_scaler,
-            z_redshfit=z_redshift, specz=specz,
+            specz=specz,
+            scaler_latent_mask=scaler_latent_mask,
+            spatial_latent_mask=spatial_latent_mask,
+            redshift_latent_mask=redshift_latent_mask,
             init_redshift_prob=init_redshift_prob
         )
         timer.check("spatial decoding done")

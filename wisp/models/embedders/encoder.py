@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from wisp.utils import PerfTimer
 from wisp.models.grids import *
-from wisp.utils.common import get_input_latents_dim
+from wisp.utils.common import get_input_latent_dim
 
 import sys
 sys.path.insert(0, './wisp/models/embedders')
@@ -56,7 +56,7 @@ class Encoder(nn.Module):
             self.kwargs["max_grid_res"],
             self.kwargs["grid_num_lods"]
         )
-        self.effective_feature_dim = get_input_latents_dim(**self.kwargs)
+        self.effective_feature_dim = get_input_latent_dim(**self.kwargs)
 
     def forward(self, coords, lod_idx=None):
         """ Encode given coords

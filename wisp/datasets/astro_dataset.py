@@ -40,7 +40,7 @@ class AstroDataset(Dataset):
 
         if self.space_dim == 3:
             self.unbatched_fields = {
-                "wave_data","spectra_data","redshift_data"
+                "wave_data","spectra_data","redshift_data","model_data"
             }
         else:
             self.unbatched_fields = set()
@@ -421,6 +421,12 @@ class AstroDataset(Dataset):
         out["spectra_semi_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
         del out["spectra_id_map"]
 
+    def get_model_data(self, out):
+        if "spatial_latent_mask" in self.data:
+            out["spatial_latent_mask"] = self.data["spatial_latent_mask"]
+        if "redshift_latent_mask" in self.data:
+            out["redshift_latent_mask"] = self.data["redshift_latent_mask"]
+
     def __len__(self):
         """ Length of the dataset in number of coords.
         """
@@ -439,18 +445,18 @@ class AstroDataset(Dataset):
             out[field] = self.get_batched_data(field, idx)
 
         ## debug
-        bsz = out["spectra_redshift"].shape[0]
-        n_bins = int(np.rint((
-            self.kwargs["redshift_hi"] - self.kwargs["redshift_lo"]) / self.kwargs["redshift_bin_width"]))
-        ids = np.array(
-            [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
-             for val in out["spectra_redshift"]])
-        ids = np.rint(ids).astype(int)
-        init_probs = np.zeros((bsz, n_bins)).astype(np.float32)
-        pos = np.arange(bsz)
-        ids = np.concatenate((pos[None,:],ids[None,:]),axis=0)
-        init_probs[ ids[0,:], ids[1:,] ] = 0.0001
-        out["init_redshift_prob"] = init_probs
+        # bsz = out["spectra_redshift"].shape[0]
+        # n_bins = int(np.rint((
+        #     self.kwargs["redshift_hi"] - self.kwargs["redshift_lo"]) / self.kwargs["redshift_bin_width"]))
+        # ids = np.array(
+        #     [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
+        #      for val in out["spectra_redshift"]])
+        # ids = np.rint(ids).astype(int)
+        # init_probs = np.zeros((bsz, n_bins)).astype(np.float32)
+        # pos = np.arange(bsz)
+        # ids = np.concatenate((pos[None,:],ids[None,:]),axis=0)
+        # init_probs[ ids[0,:], ids[1:,] ] = 0.0001
+        # out["init_redshift_prob"] = init_probs
         ## ends here
 
         if "wave_data" in self.requested_fields:
@@ -461,6 +467,9 @@ class AstroDataset(Dataset):
 
         if "redshift_data" in self.requested_fields:
            self.get_redshift_data(out)
+
+        if "model_data" in self.requested_fields:
+            self.get_model_data(out)
 
         ## debug
         # import matplotlib.pyplot as plt

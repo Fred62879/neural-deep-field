@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from functools import partial
 from wisp.utils import PerfTimer
 from wisp.utils.common import print_shape, \
-    get_input_latents_dim, get_bool_classify_redshift
+    get_input_latent_dim, get_bool_classify_redshift
 
 from wisp.models.decoders import Decoder, BasicDecoder
 from wisp.models.activations import get_activation_class
@@ -58,21 +58,20 @@ class HyperSpectralDecoderB(nn.Module):
             if self.kwargs["coords_encode_method"] == "positional_encoding":
                 assert(self.kwargs["decoder_activation_type"] == "relu")
                 input_dim = self.kwargs["coords_embed_dim"]
-
             elif self.kwargs["coords_encode_method"] == "grid":
                 assert(self.kwargs["decoder_activation_type"] == "relu")
-                input_dim = get_input_latents_dim(**self.kwargs)
+                input_dim = get_input_latent_dim(**self.kwargs)
             else:
                 assert(self.kwargs["decoder_activation_type"] == "sin")
                 input_dim = self.kwargs["space_dim"]
-
-        else: #if kwargs["space_dim"] == 3:
+        else:
+            assert self.kwargs["space_dim"] == 3
             if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
                 latents_dim = self.kwargs["qtz_latent_dim"]
             elif self.kwargs["decode_spatial_embedding"]:
                 latents_dim = self.kwargs["spatial_decod_output_dim"]
             else:
-                latents_dim = get_input_latents_dim(**self.kwargs)
+                latents_dim = get_input_latent_dim(**self.kwargs)
 
             if self.kwargs["encode_wave"]:
                 if self.kwargs["hps_combine_method"] == "add":
@@ -80,9 +79,12 @@ class HyperSpectralDecoderB(nn.Module):
                     input_dim = self.kwargs["wave_embed_dim"]
                 elif self.kwargs["hps_combine_method"] == "concat":
                     input_dim = self.kwargs["wave_embed_dim"] + latents_dim
-
-            else: # coords and wave are not encoded
+                else:
+                    raise ValueError()
+            else:
+                # coords and wave are not encoded
                 input_dim = 3
+
         return input_dim
 
     def get_output_dim(self):

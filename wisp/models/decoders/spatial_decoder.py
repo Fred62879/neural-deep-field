@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 from wisp.utils import PerfTimer
 from wisp.models.decoders import BasicDecoder, MLP
-from wisp.utils.common import get_input_latents_dim
+from wisp.utils.common import get_input_latent_dim
 from wisp.models.activations import get_activation_class
 from wisp.models.layers import get_layer_class, Quantization
 from wisp.models.decoders.scaler_decoder import ScalerDecoder
@@ -39,7 +39,13 @@ class SpatialDecoder(nn.Module):
         self.init_model()
 
     def init_model(self):
-        self.input_dim = get_input_latents_dim(**self.kwargs)
+        self.input_dim = get_input_latent_dim(**self.kwargs)
+        if self.kwargs["split_latent"]:
+            assert self.input_dim == self.kwargs["spectra_logit_latent_dim"] + \
+                self.kwargs["redshift_logit_latent_dim"] + self.kwargs["scaler_latent_dim"]
+
+            # spatial decoder latent dim
+            self.input_dim = self.kwargs["spectra_logit_latent_dim"]
 
         if self.decode_spatial_embedding or self.qtz:
             self.init_decoder()
@@ -79,10 +85,12 @@ class SpatialDecoder(nn.Module):
         )
 
     def forward(self, z, codebook, qtz_args, ret,
-                z_scaler=None,
-                z_redshift=None, specz=None,
+                specz=None,
+                scaler_latent_mask=None,
+                spatial_latent_mask=None,
+                redshift_latent_mask=None,
                 sup_id=None, # DELETE
-                init_redshift_prob=None
+                init_redshift_prob=None # debug
     ):
         """ Decode latent variables to various spatial information we need.
             @Param
@@ -90,7 +98,6 @@ class SpatialDecoder(nn.Module):
               codebook: codebook used for quantization
               qtz_args: arguments for quantization operations
 
-              z_redshift: trainable latents for redshift decoder
               specz: spectroscopic (gt) redshift
 
               sup_id: id of pixels to supervise with gt redshift (OBSOLETE)
@@ -100,32 +107,29 @@ class SpatialDecoder(nn.Module):
         timer.reset()
 
         if self.output_scaler or self.output_bias:
-            if z_scaler is None:
-                self.scaler_decoder(z, ret)
-            else: self.scaler_decoder(z_scaler, ret)
+            self.scaler_decoder(latent, ret, scaler_latent_mask)
 
         if self.model_redshift:
             if self.decode_redshift:
-                print(z_redshift.shape)
-                assert 0
-                if z_redshift is None:
-                    self.redshift_decoder(z, ret, specz, init_redshift_prob)
-                else:
-                    self.redshift_decoder(z_redshift, ret, specz, init_redshift_prob)
+                self.redshift_decoder(
+                    z, ret, specz, redshift_latent_mask, init_redshift_prob)
             else: # apply gt redshift
                 assert specz is not None
                 ret["redshift"] = specz
 
         # decode/quantize
+        if spatial_latent_mask is not None:
+            latents = z[...,spatial_latent_mask.bool()]
+
         if self.quantize_spectra:
-            logits = self.decode(z)
+            logits = self.decode(latents)
         elif self.quantize_z:
-            z, z_q = self.qtz(z, codebook.weight, ret, qtz_args)
+            z, q_z = self.qtz(latents, codebook.weight, ret, qtz_args)
         elif self.decode_spatial_embedding:
             z = self.decode(z)
         timer.check("spatial_decod::qtz done")
 
         ret["latents"] = z
         if self.quantize_spectra: return logits
-        if self.quantize_z:       return z_q
+        if self.quantize_z:       return q_z
         return z

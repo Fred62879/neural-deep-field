@@ -330,7 +330,7 @@ class SpectraData:
         self.data["supervision_spectra"] = self.data["gt_spectra"][sup_ids]
         self.data["supervision_masks"] = self.data["gt_spectra_plot_mask"][sup_ids]
         self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][sup_ids]
-        if self.kwargs["codebook_pretrain_pixel_supervision"]:
+        if self.kwargs["pretrain_pixel_supervision"]:
             self.data["supervision_pixels"] = self.data["gt_spectra_pixels"][sup_ids]
 
         ## debug

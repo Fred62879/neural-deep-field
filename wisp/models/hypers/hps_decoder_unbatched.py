@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import print_shape, get_input_latents_dim
+from wisp.utils.common import print_shape, get_input_latent_dim
 
 from wisp.models.decoders import Decoder, BasicDecoder
 from wisp.models.activations import get_activation_class
@@ -49,7 +49,7 @@ class HyperSpectralDecoder(nn.Module):
 
             elif self.kwargs["coords_encode_method"] == "grid":
                 assert(self.kwargs["decoder_activation_type"] == "relu")
-                input_dim = get_input_latents_dim(**self.kwargs)
+                input_dim = get_input_latent_dim(**self.kwargs)
             else:
                 assert(self.kwargs["decoder_activation_type"] == "sin")
                 input_dim = self.kwargs["space_dim"]
@@ -60,7 +60,7 @@ class HyperSpectralDecoder(nn.Module):
             elif self.kwargs["decode_spatial_embedding"]:
                 latents_dim = self.kwargs["spatial_decod_output_dim"]
             else:
-                latents_dim = get_input_latents_dim(**self.kwargs)
+                latents_dim = get_input_latent_dim(**self.kwargs)
 
             if self.kwargs["encode_wave"]:
                 if self.kwargs["hps_combine_method"] == "add":

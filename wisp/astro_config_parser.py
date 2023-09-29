@@ -26,7 +26,7 @@ def get_pretrain_pipelines(pipelines, tasks, args):
         decode_redshift = args.model_redshift and not args.apply_gt_redshift
         pretrain_nef = CodebookPretrainNerf(
             decode_redshift=decode_redshift,
-            pretrain_pixel_supervision=args.codebook_pretrain_pixel_supervision,
+            codebook_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
             **vars(args)
         )
         pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
@@ -36,7 +36,7 @@ def get_pretrain_pipelines(pipelines, tasks, args):
         decode_redshift = args.model_redshift and not args.apply_gt_redshift
         pretrain_nef = CodebookPretrainNerf(
             decode_redshift=decode_redshift,
-            pretrain_pixel_supervision=args.codebook_pretrain_pixel_supervision,
+            codebook_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
             **vars(args)
         )
         pipelines["full"] = AstroPipeline(pretrain_nef)

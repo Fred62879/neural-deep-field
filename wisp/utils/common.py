@@ -49,7 +49,7 @@ def get_loss(cho, cuda):
     if cuda: loss = loss.cuda()
     return loss
 
-def freeze_layers(model, excls):
+def freeze_layers(model, excls=[]):
     """ Freeze layers in model (excluding those in `excls`).
     """
     for n, p in model.named_parameters():
@@ -67,6 +67,11 @@ def init_redshift_bins(**kwargs):
     offset = kwargs["redshift_bin_width"] / 2
     redshift_bin_center += offset
     return redshift_bin_center
+
+def create_latent_mask(lo, hi, ndim):
+    mask = torch.zeros(ndim)
+    mask[lo:hi] = 1
+    return mask.long()
 
 def segment_bool_array(arr):
     """ Get segments of True from a boolean array.
@@ -163,7 +168,7 @@ def print_shape(data):
             print(n, p)
         else: print(n, p.shape, p.dtype)
 
-def get_input_latents_dim(**kwargs):
+def get_input_latent_dim(**kwargs):
     """ Get the dimension of the input RA/DEC coordinate for MLP.
     """
     if kwargs["pretrain_codebook"] and \
@@ -171,8 +176,9 @@ def get_input_latents_dim(**kwargs):
         "codebook_pretrain_infer" in kwargs["tasks"] or \
         "redshift_pretrain" in kwargs["tasks"] or \
         "redshift_pretrain_infer" in kwargs["tasks"] or \
-        kwargs["main_train_with_pretrained_latents"]):
-        latents_dim = kwargs["codebook_pretrain_latent_dim"]
+        kwargs["main_train_with_pretrained_latents"]
+       ):
+        latents_dim = kwargs["pretrain_latent_dim"]
     elif kwargs["coords_encode_method"] == "positional_encoding":
         latents_dim = kwargs["coords_embed_dim"]
     elif kwargs["coords_encode_method"] == "grid":
@@ -289,6 +295,7 @@ def forward(
         space_dim,
         qtz=False,
         qtz_strategy="none",
+        split_latent=False,
         apply_gt_redshift=False,
         codebook_pretrain=False,
         classify_redshift=False,
@@ -333,6 +340,11 @@ def forward(
         net_args["wave"] = data["wave"]
         net_args["wave_range"] = data["wave_range"] # linear normalization
 
+        if split_latent:
+            if "spatial_latent_mask" in data:
+                net_args["spatial_latent_mask"] = data["spatial_latent_mask"]
+            if "redshift_latent_mask" in data:
+                net_args["redshift_latent_mask"] = data["redshift_latent_mask"]
         if apply_gt_redshift:
             net_args["specz"] = data["spectra_redshift"]
         if perform_integration:

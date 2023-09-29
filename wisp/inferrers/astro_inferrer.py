@@ -207,7 +207,7 @@ class AstroInferrer(BaseInferrer):
         if "recon_img" in tasks:
             if self.pretrain_infer:
                 self.recon_img_sup_spectra = \
-                    self.extra_args["codebook_pretrain_pixel_supervision"]
+                    self.extra_args["pretrain_pixel_supervision"]
             elif self.main_infer:
                 if self.recon_spectra_pixels_only:
                     self.recon_img_val_spectra = True

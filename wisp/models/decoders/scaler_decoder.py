@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import get_input_latents_dim
+from wisp.utils.common import get_input_latent_dim
 
 from wisp.models.decoders import BasicDecoder, MLP
 from wisp.models.layers import get_layer_class
@@ -26,7 +26,9 @@ class ScalerDecoder(nn.Module):
             self.init_model()
 
     def init_model(self):
-        self.input_dim = get_input_latents_dim(**self.kwargs)
+        if self.kwargs["split_latent"]:
+            self.input_dim = self.kwargs["scaler_latent_dim"]
+        else: self.input_dim = get_input_latent_dim(**self.kwargs)
 
         output_dim = 0
         if self.output_bias: output_dim += 1
@@ -41,7 +43,7 @@ class ScalerDecoder(nn.Module):
             skip=self.kwargs["scaler_decod_skip_layers"]
         )
 
-    def forward(self, z, ret):
+    def forward(self, z, ret, scaler_latent_mask=None):
         """ Decode latent variables to various spatial information we need.
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
@@ -54,8 +56,12 @@ class ScalerDecoder(nn.Module):
                           show_memory=self.kwargs["show_memory"])
         timer.reset()
 
+        if scaler_latent_mask is not None:
+            latent = z[:,0] * scaler_latent_mask
+        else: latent = z[:,0]
+
         if self.output_scaler or self.output_bias:
-            out = self.scaler_decoder(z[:,0])
+            out = self.scaler_decoder(latent)
             if self.output_scaler:
                 ret["scaler"] = out[...,0]
                 if self.output_bias:

@@ -16,10 +16,13 @@ def plot_grad_flow(named_parameters, gradFileName=None):
     layers, ave_grads = [], []
     for n, p in named_parameters:
         if "grid" not in n and (p.requires_grad) and ("bias" not in n):
-            # print('*', n)
-            # if "redshift" in n: print(p.grad)
+            print(n)
             layers.append(n[-32:])
+            grad = p.grad.detach().cpu()
+            print(grad[0])
+            #assert 0
             ave_grads.append(p.grad.detach().cpu().abs().mean())
+    assert 0
 
     plt.plot(ave_grads, alpha=0.3, color="b")
     plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k")

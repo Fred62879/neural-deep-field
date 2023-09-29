@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import get_input_latents_dim, init_redshift_bins
+from wisp.utils.common import get_input_latent_dim, init_redshift_bins
 
 from wisp.models.layers import get_layer_class
 from wisp.models.decoders import BasicDecoder
@@ -22,7 +22,10 @@ class RedshiftDecoder(nn.Module):
         self.init_model()
 
     def init_model(self):
-        self.input_dim = get_input_latents_dim(**self.kwargs)
+        if self.kwargs["split_latent"]:
+            self.input_dim = self.kwargs["redshift_logit_latent_dim"]
+        else: self.input_dim = get_input_latent_dim(**self.kwargs)
+
         self.redshift_model_method = self.kwargs["redshift_model_method"]
 
         if self.redshift_model_method == "regression":
@@ -52,7 +55,7 @@ class RedshiftDecoder(nn.Module):
         self.redshift_bin_center = self.redshift_bin_center.to(device)
         self.num_redshift_bins = len(self.redshift_bin_center)
 
-    def forward(self, z, ret, specz=None, init_redshift_prob=None):
+    def forward(self, z, ret, specz=None, redshift_latent_mask=None, init_redshift_prob=None):
         """ Decode latent variables to various spatial information we need.
             @Param
               z: raw 2D coordinate or embedding of 2D coordinate [batch_size,1,dim]
@@ -62,14 +65,27 @@ class RedshiftDecoder(nn.Module):
                           show_memory=self.kwargs["show_memory"])
         timer.reset()
 
+        if redshift_latent_mask is not None:
+            assert self.kwargs["split_latent"]
+            # latents = torch.zeros(z.shape, dtype=torch.float32).to('cuda:0')
+            latents = z # * (1 - redshift_latent_mask)
+            print(latents[0])
+            latents = latents[:,0,redshift_latent_mask.bool()]
+            assert latents.shape[-1] == self.kwargs["redshift_logit_latent_dim"]
+        else: latents = z[:,0]
+
         if self.redshift_model_method == "regression":
-            redshift = self.redshift_decoder(z[:,0])[...,0]
+            redshift = self.redshift_decoder(latent)[...,0]
             ret["redshift"] = self.redshift_adjust(redshift + 0.5)
 
         elif self.redshift_model_method == "classification":
             ret["redshift"]= self.redshift_bin_center # [num_bins]
-            ret["redshift_logits"] = F.softmax(
-                self.redshift_decoder(z[:,0]) + init_redshift_prob, dim=-1) # [num_bins]
+
+            logits = self.redshift_decoder(latents)
+            if init_redshift_prob is not None:
+                logits = logits + init_redshift_prob
+
+            ret["redshift_logits"] = F.softmax(logits, dim=-1) # [num_bins]
         else:
             raise ValueError("Unsupported redshift model method!")
 
