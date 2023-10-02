@@ -1,6 +1,7 @@
 
 import os
 import torch
+import pickle
 import numpy as np
 import logging as log
 import matplotlib.pyplot as plt
@@ -834,8 +835,10 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_redshift_pre:
             if self.classify_redshift:
-                self._log_data("argmax_redshift", gt_field="gt_redshift")
-                self._log_data("weighted_redshift")
+                fname = join(self.redshift_dir, f"{model_id}_max_redshift.txt")
+                self._log_data("argmax_redshift", gt_field="gt_redshift", fname=fname)
+                fname = join(self.redshift_dir, f"{model_id}_avg_redshift.txt")
+                self._log_data("weighted_redshift", fname=fname)
             else:
                 self._log_data("redshift", gt_field="gt_redshift")
 
@@ -1274,12 +1277,19 @@ class AstroInferrer(BaseInferrer):
 
         if gt_field is not None:
             gt = torch.stack(getattr(self, gt_field)).detach().cpu().numpy()
-
         recon = torch.stack(getattr(self, field)).detach().cpu().numpy()
         if mask is not None:
             recon = recon[mask]
+
         if fname is not None:
-            np.save(fname, recon)
+            if gt_field is not None:
+                to_save = np.concatenate((gt[None,:], recon[None,:]), axis=0)
+            else: to_save = recon
+            if fname[-3:] == "npy":
+                np.save(fname, to_save)
+            elif fname[-3:] == "txt":
+                with open(fname, "w") as f:
+                    f.write(f"{to_save}")
 
         if gt_field is None:
             log.info(f"{field}: {recon}")
@@ -1354,24 +1364,22 @@ class AstroInferrer(BaseInferrer):
 
         redshift_bins = init_redshift_bins(
             self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
-            self.extra_args["redshift_bin_width"]
-        ).numpy()
+            self.extra_args["redshift_bin_width"]).numpy()
 
         def change_shape(data, m):
             return np.tile(data, m).reshape(m, -1)
 
+        ## debug
         #np.save('tmp_masks.npy', self.recon_masks)
         #np.save('tmp_gt_fluxes.npy', self.gt_fluxes)
         #np.save('tmp_recon_fluxes.npy', self.recon_fluxes_all)
-
-        ## debug
         # calculate bin wise spectra loss
-        def calculate(gt_fluxes, recon_fluxes, masks, id):
-            mask = torch.FloatTensor(masks[id]).to('cuda:0')
-            gt_fluxes = torch.FloatTensor(gt_fluxes[id]).to('cuda:0')
-            recon_fluxes = torch.FloatTensor(recon_fluxes[:,id]).to('cuda:0')
-            losses = [F.mse_loss(recon*mask, gt_fluxes*mask).item() for recon in recon_fluxes]
-            return np.array(losses)
+        # def calculate(gt_fluxes, recon_fluxes, masks, id):
+        #     mask = torch.FloatTensor(masks[id]).to('cuda:0')
+        #     gt_fluxes = torch.FloatTensor(gt_fluxes[id]).to('cuda:0')
+        #     recon_fluxes = torch.FloatTensor(recon_fluxes[:,id]).to('cuda:0')
+        #     losses = [F.mse_loss(recon*mask, gt_fluxes*mask).item() for recon in recon_fluxes]
+        #     return np.array(losses)
         #losses = calculate(self.gt_fluxes, self.recon_fluxes_all, self.recon_masks, 9)
         #np.save('tmp_loss.npy',losses)
         ## ends here

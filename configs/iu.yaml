@@ -257,7 +257,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20231002-130326_18_spectra_gt_bin_add_bias'
+    infer_log_dir: '20231001-145317_17_spectra_4k_epochs'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
