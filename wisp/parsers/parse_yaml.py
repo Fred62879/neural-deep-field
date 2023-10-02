@@ -124,6 +124,15 @@ def define_cmd_line_args():
                                        "plot_redshift","plot_save_scaler"])
 
     ###################
+    # Debug options
+    ###################
+    debug_group = parser.add_argument_group("debug")
+
+    debug_group.add_argument("--add-redshift-logit-bias", action="store_true")
+    debug_group.add_argument("--plot-logits-for-gt-bin", action="store_true")
+    debug_group.add_argument("--plot-individ-spectra-loss", action="store_true")
+
+    ###################
     # General global network things
     ###################
     net_group = parser.add_argument_group("net")

@@ -429,6 +429,12 @@ class AstroDataset(Dataset):
         if "redshift_latents" in self.data:
             out["redshift_latents"] = self.data["redshift_latents"]
 
+    def get_debug_data(self, out):
+        if self.kwargs["plot_logits_for_gt_bin"]:
+            self.get_gt_redshift_bin_ids(out)
+        if self.kwargs["add_redshift_logit_bias"]:
+            self.get_init_redshift_logit_bias(out)
+
     def __len__(self):
         """ Length of the dataset in number of coords.
         """
@@ -446,21 +452,6 @@ class AstroDataset(Dataset):
         for field in batched_fields:
             out[field] = self.get_batched_data(field, idx)
 
-        ## debug
-        # bsz = out["spectra_redshift"].shape[0]
-        # n_bins = int(np.rint((
-        #     self.kwargs["redshift_hi"] - self.kwargs["redshift_lo"]) / self.kwargs["redshift_bin_width"]))
-        # ids = np.array(
-        #     [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
-        #      for val in out["spectra_redshift"]])
-        # ids = np.rint(ids).astype(int)
-        # init_probs = np.zeros((bsz, n_bins)).astype(np.float32)
-        # pos = np.arange(bsz)
-        # ids = np.concatenate((pos[None,:],ids[None,:]),axis=0)
-        # init_probs[ ids[0,:], ids[1:,] ] = 0.0001
-        # out["init_redshift_prob"] = init_probs
-        ## ends here
-
         if "wave_data" in self.requested_fields:
             self.get_wave_data(len(idx), out)
 
@@ -472,6 +463,8 @@ class AstroDataset(Dataset):
 
         if "model_data" in self.requested_fields:
             self.get_model_data(out)
+
+        self.get_debug_data(out)
 
         ## debug
         # import matplotlib.pyplot as plt
@@ -533,3 +526,26 @@ class AstroDataset(Dataset):
             clip=clip, spectra_clipped=spectra_clipped,
             calculate_metrics=True, titles=titles
         )
+
+    ############
+    # Debug data
+    ############
+
+    def get_gt_redshift_bin_ids(self, out):
+        out["gt_redshift_bin_ids"] = np.array(
+            [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
+             for val in out["spectra_redshift"]])
+
+    def get_init_redshift_logit_bias(self, out):
+        bsz = out["spectra_redshift"].shape[0]
+        n_bins = int(np.rint((
+            self.kwargs["redshift_hi"] - self.kwargs["redshift_lo"]) / self.kwargs["redshift_bin_width"]))
+        ids = np.array(
+            [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
+             for val in out["spectra_redshift"]])
+        ids = np.rint(ids).astype(int)
+        init_probs = np.zeros((bsz, n_bins)).astype(np.float32)
+        pos = np.arange(bsz)
+        ids = np.concatenate((pos[None,:],ids[None,:]),axis=0)
+        init_probs[ ids[0,:], ids[1:,] ] = 1
+        out["init_redshift_prob"] = init_probs

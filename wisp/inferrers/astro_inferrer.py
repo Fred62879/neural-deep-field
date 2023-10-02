@@ -17,7 +17,7 @@ from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
 from wisp.utils.plot import plot_horizontally, plot_embed_map, \
     plot_latent_embed, annotated_heat, plot_simple, batch_hist, \
-    plot_precision_recall_all
+    plot_precision_recall_all, plot_precision_recall_single
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
     sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, \
     load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, get_loss
@@ -869,11 +869,15 @@ class AstroInferrer(BaseInferrer):
                 bin_centers, redshift_logits, fname + ".png",
                 self.extra_args["num_spectrum_per_row"], is_counts=True
             )
-            plot_precision_recall_all(
+            # plot_precision_recall_all(
+            #     redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
+            #     self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
+            #     self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png"
+            # )
+            plot_precision_recall_single(
                 redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
                 self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
-                self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png"
-            )
+                f"{fname}_precision_recall.png")
 
         if self.save_qtz_weights:
             fname = join(self.qtz_weights_dir, str(model_id))
@@ -1095,9 +1099,8 @@ class AstroInferrer(BaseInferrer):
                         save_redshift=self.save_redshift,
                         save_qtz_weights=self.save_qtz_weights,
                         save_spectra_all_bins=self.recon_gt_spectra_all_bins,
-                        # init_redshift_prob=data["init_redshift_prob"] # debug
-                    )
-
+                        init_redshift_prob= None if "init_redshift_prob" not in data else \
+                                                data["init_redshift_prob"])
                 if self.pretrain_infer:
                     self.gt_fluxes.extend(data["spectra_source_data"][:,1])
                     self.spectra_wave.extend(data["spectra_source_data"][:,0])
@@ -1369,7 +1372,6 @@ class AstroInferrer(BaseInferrer):
             recon_fluxes = torch.FloatTensor(recon_fluxes[:,id]).to('cuda:0')
             losses = [F.mse_loss(recon*mask, gt_fluxes*mask).item() for recon in recon_fluxes]
             return np.array(losses)
-
         #losses = calculate(self.gt_fluxes, self.recon_fluxes_all, self.recon_masks, 9)
         #np.save('tmp_loss.npy',losses)
         ## ends here

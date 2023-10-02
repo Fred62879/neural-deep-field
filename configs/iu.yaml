@@ -33,6 +33,11 @@ global:
     #tasks: ['main_infer','recon_gt_spectra','save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
     #tasks: ['test','recon_gt_spectra','save_redshift','recon_codebook_spectra_individ','save_qtz_weights','recon_img']
 
+debug:
+    add_redshift_logit_bias: False
+    plot_logits_for_gt_bin: True
+    plot_individ_spectra_loss: True
+
 optimizer:
     optimizer_type: 'adam'
     b1: 0.5
@@ -115,7 +120,7 @@ pretrain:
     pretrain_pixel_supervision: False
     main_train_with_pretrained_latents: False
     redshift_pretrain_with_same_latents: True
-    redshift_pretrain_num_spectra: 18
+    redshift_pretrain_num_spectra: 17
 
 decoder:
     decoder_num_hidden_layers: 1
@@ -232,8 +237,8 @@ trainer:
     train_num_wave_samples: 50
     spectra_supervision_num_wave_samples: 100
 
-    resume_train: True
-    resume_log_dir: '20231001-182024'
+    resume_train: False
+    resume_log_dir: '20231002-120821'
     resume_model_fname: 'model-ep2000-it0.pth'
     #### ***********************************
 
@@ -252,7 +257,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20230930-212607_15_spectra_4k_epochs_resumed'
+    # infer_log_dir: '20231002-130326_18_spectra_gt_bin_add_bias'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500

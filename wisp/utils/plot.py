@@ -9,7 +9,8 @@ import scipy.interpolate as interpolate
 from pathlib import Path
 from os.path import join
 from astropy.visualization import ZScaleInterval
-from wisp.utils.numerical import calculate_sam_spectrum, calculate_precision_recall
+from wisp.utils.numerical import calculate_sam_spectrum, \
+    calculate_precision_recall, calculate_precision_recall_single
 
 
 def plot_grad_flow(named_parameters, gradFileName=None):
@@ -53,8 +54,17 @@ def plot_precision_recall_all(logits, gt_redshift, lo, hi, bin_width, n_per_row,
         axis.plot(recall, precision)
         axis.set_xlim(xmin=0,xmax=1.2); axis.set_ylim(ymin=-0.05,ymax=1)
         axis.set_xlabel("recall");axis.set_ylabel("precision")
-
     fig.tight_layout(); plt.savefig(fname); plt.close()
+
+def plot_precision_recall_single(logits, gt_redshifts, lo, hi, bin_width, fname):
+    n = len(logits)
+    precision, recall = calculate_precision_recall_single(
+        logits, gt_redshifts, lo, hi, bin_width)
+    plt.plot(recall, precision)
+    # plt.xlim(xmin=0,xmax=1.2);plt.ylim(ymin=-0.05,ymax=1)
+    plt.xlim(xmin=0,xmax=1);plt.ylim(ymin=0,ymax=1)
+    plt.xlabel("recall");plt.ylabel("precision")
+    plt.tight_layout(); plt.savefig(fname); plt.close()
 
 def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):
     """ Plot latent variable distributions and each codebook embedding.

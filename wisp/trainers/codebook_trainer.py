@@ -134,6 +134,9 @@ class CodebookTrainer(BaseTrainer):
                 self.extra_args["resume_log_dir"],
                 self.extra_args["resume_model_fname"])
 
+        if self.extra_args["plot_logits_for_gt_bin"]:
+            self.gt_bin_logits_fname = join(self.log_dir, "gt_bin_logits.png")
+
     def set_num_spectra(self):
         if self.mode == "redshift_pretrain":
             if self.extra_args["redshift_pretrain_with_same_latents"]:
@@ -334,8 +337,10 @@ class CodebookTrainer(BaseTrainer):
 
         if self.plot_loss:
             self.losses = []
-            self.spectra_individ_losses = [] # debug
-
+        if self.extra_args["plot_individ_spectra_loss"]:
+            self.spectra_individ_losses = []
+        if self.extra_args["plot_logits_for_gt_bin"]:
+            self.gt_bin_logits = []
         if self.extra_args["resume_train"]:
             self.resume_train()
 
@@ -344,15 +349,10 @@ class CodebookTrainer(BaseTrainer):
     def train(self):
         self.begin_train()
 
-        # logits = [] # debug
-
         # for epoch in tqdm(range(self.num_epochs + 1)):
         for self.epoch in range(self.num_epochs + 1):
             self.begin_epoch()
             self.timer.check("begun epoch")
-
-            # cur_logits = [] # debug
-            self.cur_spectra_individ_losses = []
 
             for batch in range(self.num_iterations_cur_epoch):
                 iter_start_time = time.time()
@@ -360,44 +360,20 @@ class CodebookTrainer(BaseTrainer):
                 data = self.next_batch()
                 self.timer.check("got data")
 
-                if batch == 1:
-                    self.get_9 = True
-                else: self.get_9 = False
-
                 self.pre_step()
-                self.step(data)
-                self.post_step()
+                ret = self.step(data)
+                self.post_step(data, ret)
 
                 self.iteration += 1
                 self.total_steps += 1
 
                 self.timer.check("batch ended")
 
-                ## debug
-                # if batch == 0:
-                #     ids = np.array([[4,0],[192,1],[47,2],[43,3],[23,4],[49,5],[51,6]])
-                # elif batch == 1:
-                #     ids = np.array([[222,0],[42,1],[77,2],[22,3],[76,4],[67,5],[75,6]])
-                # elif batch == 2:
-                #     ids = np.array([[57,0],[38,1],[63,2],[54,3],[37,4],[38,5]])
-                # cur_logits.extend(self.cur_logits[ids[:,1],ids[:,0]].detach().cpu().numpy())
-                ## ends here
-
-            # logits.append(cur_logits) # debug
-            self.spectra_individ_losses.append(self.cur_spectra_individ_losses)
-
             self.end_epoch()
             self.timer.check("epoch ended")
 
-        ## debug
-        # logits = np.array(logits) # [nepochs,nspectra]
-        # nrows, ncols = 4, 5
-        # fig, axs = plt.subplots(nrows,ncols,figsize=(5*ncols,5*nrows))
-        # for i in range(min(20,logits.shape[1])):
-        #     axis = axs[i//ncols,i%ncols]
-        #     axis.plot(logits[:,i])
-        # fig.tight_layout(); plt.savefig('tmp.png'); plt.close()
-        ## ends here
+        if self.extra_args["plot_logits_for_gt_bin"]:
+            self._plot_logits_for_gt_bin()
 
         self.end_train()
 
@@ -416,27 +392,8 @@ class CodebookTrainer(BaseTrainer):
             plt.savefig(self.loss_fname + "_log10.png")
             plt.close()
 
-            ## debug
-            losses = np.array(self.spectra_individ_losses)
-            np.save(self.loss_fname + "_individ.npy", losses)
-            m, n = losses.shape
-            x = np.arange(m)
-            ncols = min(n, self.extra_args["num_spectrum_per_row"])
-            nrows = int(np.ceil(n / ncols))
-            fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
-            for i, loss in enumerate(losses.T):
-                if nrows == 1: axis = axs if ncols == 1 else axs[i%ncols]
-                else:          axis = axs[i//ncols, i%ncols]
-                axis.plot(x, loss); axis.title(i)
-            fig.tight_layout(); plt.savefig(self.loss_fname + "_individ.png"); plt.close()
-
-            fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
-            for i, loss in enumerate(losses.T):
-                if nrows == 1: axis = axs if ncols == 1 else axs[i%ncols]
-                else:          axis = axs[i//ncols, i%ncols]
-                axis.plot(x, np.log10(np.array(loss))); axis.title(i)
-            fig.tight_layout(); plt.savefig(self.loss_fname + "_individ_log10.png"); plt.close()
-            ## ends here
+            if self.extra_args["plot_individ_spectra_loss"]:
+                self._plot_individ_spectra_loss()
 
         if self.extra_args["log_gpu_every"] != -1:
             nvidia_smi.nvmlShutdown()
@@ -451,6 +408,11 @@ class CodebookTrainer(BaseTrainer):
         self.pre_epoch()
         self.init_log_dict()
 
+        if self.extra_args["plot_logits_for_gt_bin"]:
+            self.cur_gt_bin_logits = []
+        if self.extra_args["plot_individ_spectra_loss"]:
+            self.cur_spectra_individ_losses = []
+
     def end_epoch(self):
         self.post_epoch()
 
@@ -459,6 +421,11 @@ class CodebookTrainer(BaseTrainer):
             self.epoch += 1
         else:
             self.scene_state.optimization.running = False
+
+        if self.extra_args["plot_logits_for_gt_bin"]:
+            self.gt_bin_logits.append(self.cur_gt_bin_logits)
+        if self.extra_args["plot_individ_spectra_loss"]:
+            self.spectra_individ_losses.append(self.cur_spectra_individ_losses)
 
     def reset_data_iterator(self):
         """ Rewind the iterator for the new epoch.
@@ -581,6 +548,15 @@ class CodebookTrainer(BaseTrainer):
 
         self.optimizer.step()
         self.timer.check("stepped")
+        return ret
+
+    def post_step(self, data, ret):
+        if self.extra_args["plot_logits_for_gt_bin"]:
+            gt_bin_ids = data["gt_redshift_bin_ids"][:,None]
+            batch_ids = np.arange(len(gt_bin_ids))[:,None]
+            ids = np.concatenate((batch_ids, gt_bin_ids), axis=-1)
+            self.cur_gt_bin_logits.extend(
+                ret["redshift_logits"][ids[:,0],ids[:,1]].detach().cpu().numpy())
 
         if self.save_data:
             if self.save_redshift:
@@ -601,9 +577,6 @@ class CodebookTrainer(BaseTrainer):
                 self.codebook_spectra.extend(ret["codebook_spectra"])
                 self.spectra_wave_c.extend(data["spectra_source_data"][:,0])
                 self.spectra_masks_c.extend(data["spectra_masks"])
-
-    def post_step(self):
-        pass
 
     #############
     # Helper methods
@@ -663,18 +636,20 @@ class CodebookTrainer(BaseTrainer):
         add_to_device(data, self.gpu_fields, self.device)
         self.timer.check("added to gpu")
 
-        # if self.classify_redshift and \
-        #    self.extra_args["redshift_classification_method"] == "bayesian_weighted_avg":
-        #     self.train_pipeline.set_bayesian_redshift_logits_calculation(
-        #         get_loss(self.extra_args["spectra_loss_cho"], self.cuda),
-        #         data["spectra_masks"], data["spectra_source_data"]
-        #     )
+        if self.classify_redshift and \
+           self.extra_args["redshift_classification_method"] == "bayesian_weighted_avg":
+            self.train_pipeline.set_bayesian_redshift_logits_calculation(
+                get_loss(self.extra_args["spectra_loss_cho"], self.cuda),
+                data["spectra_masks"], data["spectra_source_data"]
+            )
 
-        ## debug
-        init_redshift_prob = None #data["init_redshift_prob"]
-        #if self.epoch != 0:
-        #    init_redshift_prob = torch.zeros(init_redshift_prob.shape, dtype=init_redshift_prob.dtype).to(init_redshift_prob.device)
-        ## ends here
+        if self.extra_args["add_redshift_logit_bias"]:
+            init_redshift_prob = data["init_redshift_prob"]
+            # if self.epoch != 0:
+            #     init_redshift_prob = torch.zeros(
+            #         init_redshift_prob.shape, dtype=init_redshift_prob.dtype
+            #     ).to(init_redshift_prob.device)
+        else: init_redshift_prob = None
 
         ret = forward(
             data,
@@ -698,8 +673,8 @@ class CodebookTrainer(BaseTrainer):
         )
         self.timer.check("forwarded")
 
-        # self.cur_logits = ret["redshift_logits"] # debug
-        # self.cur_red_spectra = ret["spectra_all_bins"] # debug
+        #if self.extra_args["plot_individ_spectra_loss"]:
+        #    self.cur_red_spectra = ret["spectra_all_bins"]
 
         # i) spectra supervision loss
         spectra_loss = 0
@@ -714,21 +689,10 @@ class CodebookTrainer(BaseTrainer):
                 spectra_masks, gt_spectra, recon_fluxes,
                 weight_by_wave_coverage=self.extra_args["weight_by_wave_coverage"]
             )
-            ## debug
-            self.cur_spectra_individ_losses.extend(spectra_loss.detach().cpu().numpy())
+            if self.extra_args["plot_individ_spectra_loss"]:
+                self.cur_spectra_individ_losses.extend(spectra_loss.detach().cpu().numpy())
             spectra_loss = torch.mean(spectra_loss, dim=-1)
-            ## ends here
             self.log_dict["spectra_loss"] += spectra_loss.item()
-
-        ## debug
-        # calcualte loss for spectra 9
-        # if self.get_9:
-        #     gt = gt_spectra[:1]
-        #     recon = recon_fluxes[:1]
-        #     masks = spectra_masks[:1]
-        #     spectra_9_loss = self.spectra_loss(masks, gt, recon, False)
-        #     self.spectra_9_loss.append(spectra_9_loss.item())
-        ## ends here
 
         # ii) pixel supervision loss
         recon_loss = 0
@@ -936,3 +900,34 @@ class CodebookTrainer(BaseTrainer):
 
     def validate(self):
         pass
+
+    def _plot_logits_for_gt_bin(self):
+        logits = np.array(self.gt_bin_logits) # [nepochs,nspectra]
+        nrows, ncols = 4, 5
+        fig, axs = plt.subplots(nrows,ncols,figsize=(5*ncols,5*nrows))
+        for i in range(min(20,logits.shape[1])):
+            axis = axs[i//ncols,i%ncols]
+            axis.plot(logits[:,i])
+        fig.tight_layout(); plt.savefig(self.gt_bin_logits_fname); plt.close()
+
+    def _plot_individ_spectra_loss(self):
+        losses = np.array(self.spectra_individ_losses)
+        np.save(self.loss_fname + "_individ.npy", losses)
+        m, n = losses.shape
+        x = np.arange(m)
+        ncols = min(n, self.extra_args["num_spectrum_per_row"])
+        nrows = int(np.ceil(n / ncols))
+
+        fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
+        for i, loss in enumerate(losses.T):
+            if nrows == 1: axis = axs if ncols == 1 else axs[i%ncols]
+            else:          axis = axs[i//ncols, i%ncols]
+            axis.plot(x, loss); axis.set_title(i)
+        fig.tight_layout(); plt.savefig(self.loss_fname + "_individ.png"); plt.close()
+
+        fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
+        for i, loss in enumerate(losses.T):
+            if nrows == 1: axis = axs if ncols == 1 else axs[i%ncols]
+            else:          axis = axs[i//ncols, i%ncols]
+            axis.plot(x, np.log10(np.array(loss))); axis.set_title(i)
+        fig.tight_layout(); plt.savefig(self.loss_fname + "_individ_log10.png"); plt.close()
