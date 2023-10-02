@@ -48,7 +48,8 @@ def plot_precision_recall_all(logits, gt_redshift, lo, hi, bin_width, n_per_row,
         precision, recall = calculate_precision_recall(
             cur_logits, cur_gt_redshift, lo, hi, bin_width
         )
-        axis = axs[i//ncols,i%ncols]
+        if nrows == 1: axis = axs if ncols == 1 else axs[i%ncols]
+        else:          axis = axs[i//ncols,i%ncols]
         axis.plot(recall, precision)
         axis.set_xlim(xmin=0,xmax=1.2); axis.set_ylim(ymin=-0.05,ymax=1)
         axis.set_xlabel("recall");axis.set_ylabel("precision")

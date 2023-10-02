@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import logging as log
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 from tqdm import tqdm
 from pathlib import Path
@@ -855,6 +856,15 @@ class AstroInferrer(BaseInferrer):
             fname = join(self.redshift_dir, f"{model_id}_logits")
             np.save(fname, np.concatenate((bin_centers[None,:], redshift_logits), axis=0))
 
+            ## debug
+            # print(self.recon_fluxes_all.shape, redshift_logits.shape, self.gt_fluxes.shape, self.recon_masks.shape)
+            # recon_fluxes = redshift_logits[9]@self.recon_fluxes_all[:,9]
+            # loss = F.mse_loss(torch.FloatTensor(recon_fluxes*self.recon_masks[9]),
+            #                   torch.FloatTensor(self.gt_fluxes[9]*self.recon_masks[9])).item()
+            # print(loss)
+            # assert 0
+            ## ends here
+
             batch_hist(
                 bin_centers, redshift_logits, fname + ".png",
                 self.extra_args["num_spectrum_per_row"], is_counts=True
@@ -1347,13 +1357,24 @@ class AstroInferrer(BaseInferrer):
         def change_shape(data, m):
             return np.tile(data, m).reshape(m, -1)
 
-        # print(self.recon_fluxes_all.shape)
-        # np.save('tmp_gt.npy', self.gt_fluxes)
-        # np.save('tmp.npy', self.recon_fluxes_all)
-        # np.save('tmp_masks.npy', self.recon_masks)
-        # assert 0
+        #np.save('tmp_masks.npy', self.recon_masks)
+        #np.save('tmp_gt_fluxes.npy', self.gt_fluxes)
+        #np.save('tmp_recon_fluxes.npy', self.recon_fluxes_all)
 
-        ids = np.array([7])
+        ## debug
+        # calculate bin wise spectra loss
+        def calculate(gt_fluxes, recon_fluxes, masks, id):
+            mask = torch.FloatTensor(masks[id]).to('cuda:0')
+            gt_fluxes = torch.FloatTensor(gt_fluxes[id]).to('cuda:0')
+            recon_fluxes = torch.FloatTensor(recon_fluxes[:,id]).to('cuda:0')
+            losses = [F.mse_loss(recon*mask, gt_fluxes*mask).item() for recon in recon_fluxes]
+            return np.array(losses)
+
+        #losses = calculate(self.gt_fluxes, self.recon_fluxes_all, self.recon_masks, 9)
+        #np.save('tmp_loss.npy',losses)
+        ## ends here
+
+        ids = np.array([])
         for i in ids:
         # for i in range(num_spectra):
             cur_dir = join(self.spectra_dir, f"{i}-all-bins")

@@ -126,6 +126,9 @@ class BasicDecoder(nn.Module):
         """
         w = self.lout.weight
         w_sp = list(w.shape)
+        nsmpl = w.shape[0]
+        w_ = torch.mean(w, dim=0)
+        w_new = w_[None:,].tile(nsmpl,1)
         self.lout.weight = nn.Parameter( torch.full(w_sp, torch.mean(w).item()) )
         if self.bias:
             bias = self.lout.bias

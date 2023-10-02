@@ -43,7 +43,8 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_fluxes, weight_by_wav
         ret = loss(gt_spectra[:,1]*mask*weight, recon_fluxes*mask*weight)
     else:
         ret = loss(gt_spectra[:,1]*mask, recon_fluxes*mask)
-    ret = torch.mean(torch.sum(ret, dim=-1), dim=-1)
+    # ret = torch.mean(torch.sum(ret, dim=-1), dim=-1)
+    ret = torch.sum(ret, dim=-1) # debug
     return ret
 
 def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):

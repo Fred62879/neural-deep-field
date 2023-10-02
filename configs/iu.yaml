@@ -115,7 +115,7 @@ pretrain:
     pretrain_pixel_supervision: False
     main_train_with_pretrained_latents: False
     redshift_pretrain_with_same_latents: True
-    redshift_pretrain_num_spectra: 20
+    redshift_pretrain_num_spectra: 18
 
 decoder:
     decoder_num_hidden_layers: 1
@@ -183,18 +183,18 @@ trainer:
     redshift_loss_cho: l2_mean
 
     regu_redshift_logits: False
-    redshift_logits_regu_method: 'l1_excl_largest'
+    redshift_logits_regu_method: 'laplace' #'l1_excl_largest'
 
-    num_epochs: 1000
+    num_epochs: 2000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 200
+    log_cli_every: 400
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 200
+    save_model_every: 400
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -233,8 +233,8 @@ trainer:
     spectra_supervision_num_wave_samples: 100
 
     resume_train: True
-    resume_log_dir: '20230929-163546'
-    resume_model_fname: 'model-ep1000-it0.pth'
+    resume_log_dir: '20231001-182024'
+    resume_model_fname: 'model-ep2000-it0.pth'
     #### ***********************************
 
 infer:
@@ -252,7 +252,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: ''
+    # infer_log_dir: '20230930-212607_15_spectra_4k_epochs_resumed'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
