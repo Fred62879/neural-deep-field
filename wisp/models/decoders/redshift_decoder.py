@@ -36,16 +36,17 @@ class RedshiftDecoder(nn.Module):
             output_dim = self.num_redshift_bins
         else: raise ValueError("Unsupported redshift modeling method!")
 
-        self.redshift_decoder = BasicDecoder(
-            self.input_dim, output_dim,
-            get_activation_class(self.kwargs["redshift_decod_activation_type"]),
-            bias=True, layer=get_layer_class(self.kwargs["redshift_decod_layer_type"]),
-            num_layers=self.kwargs["redshift_decod_num_hidden_layers"] + 1,
-            hidden_dim=self.kwargs["redshift_decod_hidden_dim"],
-            skip=self.kwargs["redshift_decod_skip_layers"]
-        )
-        self.redshift_decoder.initialize_last_layer_equal()
-        # for n,p in self.redshift_decoder.lout.named_parameters(): print(n, p)
+        if not self.kwargs["direct_optimize_latents_for_redshift"]:
+            self.redshift_decoder = BasicDecoder(
+                self.input_dim, output_dim,
+                get_activation_class(self.kwargs["redshift_decod_activation_type"]),
+                bias=True, layer=get_layer_class(self.kwargs["redshift_decod_layer_type"]),
+                num_layers=self.kwargs["redshift_decod_num_hidden_layers"] + 1,
+                hidden_dim=self.kwargs["redshift_decod_hidden_dim"],
+                skip=self.kwargs["redshift_decod_skip_layers"]
+            )
+            self.redshift_decoder.initialize_last_layer_equal()
+            # for n,p in self.redshift_decoder.lout.named_parameters(): print(n, p)
 
     def init_redshift_bins(self):
         if self.kwargs["use_gpu"]:
@@ -80,10 +81,14 @@ class RedshiftDecoder(nn.Module):
 
         elif self.redshift_model_method == "classification":
             ret["redshift"]= self.redshift_bin_center # [num_bins]
-            logits = self.redshift_decoder(latents)
-            if init_redshift_prob is not None:
-                logits = logits + init_redshift_prob
-            ret["redshift_logits"] = F.softmax(logits, dim=-1) # [num_bins]
+
+            if self.kwargs["direct_optimize_latents_for_redshift"]:
+                ret["redshift_logits"] = F.softmax(redshift_latents, dim=-1)
+            else:
+                logits = self.redshift_decoder(latents)
+                if init_redshift_prob is not None:
+                    logits = logits + init_redshift_prob
+                ret["redshift_logits"] = F.softmax(logits, dim=-1) # [bsz,num_bins]
         else:
             raise ValueError("Unsupported redshift model method!")
 

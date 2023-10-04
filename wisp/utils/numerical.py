@@ -153,6 +153,7 @@ def calculate_precision_recall_single(logits, gt_redshifts, lo, hi, bin_width):
     precision, recall = [], []
     for thresh in threshes:
         ps = logits > thresh
+        if np.sum(ps) == 0: break
         n_tps_each = [sum(ids[p] == gt_id) for p, gt_id in zip(ps, gt_ids)]
         n_tps = sum(n_tps_each)
         cur_precision = n_tps / np.sum(ps)

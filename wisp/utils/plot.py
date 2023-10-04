@@ -61,9 +61,11 @@ def plot_precision_recall_single(logits, gt_redshifts, lo, hi, bin_width, fname)
     precision, recall = calculate_precision_recall_single(
         logits, gt_redshifts, lo, hi, bin_width)
     plt.plot(recall, precision)
-    # plt.xlim(xmin=0,xmax=1.2);plt.ylim(ymin=-0.05,ymax=1)
-    plt.xlim(xmin=0,xmax=1);plt.ylim(ymin=0,ymax=1)
+    # plt.xlim(xmin=0,xmax=1.0);plt.ylim(ymin=-0.05,ymax=1)
+    # plt.xlim(xmin=0,xmax=1);plt.ylim(ymin=0,ymax=1)
+    plt.xlim(xmin=0,xmax=1.2);plt.ylim(ymin=0,ymax=1.2)
     plt.xlabel("recall");plt.ylabel("precision")
+    plt.title(f"Precision Recall over {n} spectra")
     plt.tight_layout(); plt.savefig(fname); plt.close()
 
 def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):

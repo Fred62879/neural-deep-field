@@ -181,7 +181,10 @@ class CodebookTrainer(BaseTrainer):
 
                 if self.split_latent:
                     self.redshift_latents = nn.Embedding(self.num_spectra, red_z_dim)
-                freeze_layers(self.train_pipeline, excls=["redshift_decoder"])
+                excls = []
+                if not self.extra_args["direct_optimize_latents_for_redshift"]:
+                    excls.append("redshift_decoder")
+                freeze_layers(self.train_pipeline, excls=excls)
 
             else:
                 self.latents = nn.Embedding(self.num_spectra, z_dim)
@@ -266,13 +269,13 @@ class CodebookTrainer(BaseTrainer):
 
             if self.split_latent:
                 params.append({"params": redshift_latents,
-                               "lr": self.extra_args["codebook_pretrain_lr"]})
+                               "lr": self.extra_args["latents_lr"]})
             if not self.extra_args["apply_gt_redshift"]:
                 params.append({"params": redshift_logit_params,
                                "lr": self.extra_args["codebook_pretrain_lr"]})
             if not self.extra_args["redshift_pretrain_with_same_latents"]:
                 params.append({"params": latents,
-                               "lr": self.extra_args["codebook_pretrain_lr"]})
+                               "lr": self.extra_args["latents_lr"]})
                 params.append({"params": spectra_logit_params,
                                "lr": self.extra_args["codebook_pretrain_lr"]})
         else:
@@ -613,6 +616,10 @@ class CodebookTrainer(BaseTrainer):
             # a = checkpoint["optimizer_state_dict"]
             # b = a["state"];c = a["param_groups"];print(b[0])
             self.latents = nn.Embedding.from_pretrained(checkpoint["latents"], freeze=False)
+
+            if self.split_latent:
+                self.redshift_latents = nn.Embedding.from_pretrained(
+                    checkpoint["redshift_latents"], freeze=False)
 
             # re-init optimizer to upate trainable latents
             self.init_optimizer()

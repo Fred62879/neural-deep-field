@@ -146,7 +146,7 @@ def select_inferrence_ids(n, m):
     ids = np.arange(n)
     np.random.shuffle(ids)
     ids = ids[:m]
-    # ids = np.array([26 ,86  ,2 ,55 ,75 ,93 ,16 ,73 ,54 ,95 ,53 ,92, 78 ,13  ,7 ,30 ,22 ,24 ,33  ,8])
+    # ids = np.array([26,86,2,55,75, 93,16,73,54,95, 53,92,78,13,7, 30,22,24,33,8])
     return ids
 
 def create_patch_uid(tract, patch):

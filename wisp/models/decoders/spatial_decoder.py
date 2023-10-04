@@ -23,8 +23,9 @@ class SpatialDecoder(nn.Module):
 
         self.output_bias = output_bias
         self.output_scaler = output_scaler
-        self.model_redshift = kwargs["model_redshift"]
         self.decode_redshift = decode_redshift
+        self.model_redshift = kwargs["model_redshift"]
+        self.apply_gt_redshift = kwargs["apply_gt_redshift"]
 
         # we either quantize latents or spectra or none
         self.quantize_z = kwargs["quantize_latent"]
@@ -106,7 +107,7 @@ class SpatialDecoder(nn.Module):
             if self.decode_redshift:
                 self.redshift_decoder(
                     z, ret, specz, redshift_latents, init_redshift_prob)
-            else: # apply gt redshift
+            elif self.apply_gt_redshift:
                 assert specz is not None
                 ret["redshift"] = specz
 

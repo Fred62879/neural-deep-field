@@ -131,6 +131,7 @@ def define_cmd_line_args():
     debug_group.add_argument("--add-redshift-logit-bias", action="store_true")
     debug_group.add_argument("--plot-logits-for-gt-bin", action="store_true")
     debug_group.add_argument("--plot-individ-spectra-loss", action="store_true")
+    debug_group.add_argument("--direct-optimize-latents-for-redshift", action="store_true")
 
     ###################
     # General global network things
@@ -485,6 +486,7 @@ def define_cmd_line_args():
 
     optim_group.add_argument("--lr", type=float, default=0.0001)
     optim_group.add_argument("--grid_lr", type=float, default=0.001)
+    optim_group.add_argument("--latents_lr", type=float, default=0.001)
     optim_group.add_argument("--codebook-lr", type=float, default=0.0001)
     optim_group.add_argument("--codebook-pretrain-lr", type=float, default=0.0001)
 
