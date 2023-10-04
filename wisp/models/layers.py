@@ -211,7 +211,7 @@ class Quantization(nn.Module):
         return z_q
 
     def soft_quantize(self, z, codebook, ret, qtz_args):
-        """ Hard quantization can be applied at both quantize latent and spectra.
+        """ Soft quantization can be applied at both quantize latent and spectra.
             @Param
               z: logits [bsz,1,num_embed]
               codebook: codebook spectra [...,num_embed,bsz,embed_dim]

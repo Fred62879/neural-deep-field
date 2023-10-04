@@ -1366,25 +1366,25 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
             self.extra_args["redshift_bin_width"]).numpy()
 
+        if self.extra_args["calculate_bin_wise_spectra_loss"]:
+            # np.save('tmp_masks.npy', self.recon_masks)
+            # np.save('tmp_gt_fluxes.npy', self.gt_fluxes)
+            # np.save('tmp_recon_fluxes.npy', self.recon_fluxes_all)
+            # calculate bin wise spectra loss
+            def calculate(gt_fluxes, recon_fluxes, masks, id):
+                mask = torch.FloatTensor(masks[id]).to('cuda:0')
+                gt_fluxes = torch.FloatTensor(gt_fluxes[id]).to('cuda:0')
+                recon_fluxes = torch.FloatTensor(recon_fluxes[:,id]).to('cuda:0')
+                losses = [F.mse_loss(recon*mask, gt_fluxes*mask).item()
+                          for recon in recon_fluxes]
+                return np.array(losses)
+            losses = calculate(self.gt_fluxes, self.recon_fluxes_all, self.recon_masks, 0)
+            np.save('tmp_loss.npy',losses)
+
         def change_shape(data, m):
             return np.tile(data, m).reshape(m, -1)
 
-        ## debug
-        #np.save('tmp_masks.npy', self.recon_masks)
-        #np.save('tmp_gt_fluxes.npy', self.gt_fluxes)
-        #np.save('tmp_recon_fluxes.npy', self.recon_fluxes_all)
-        # calculate bin wise spectra loss
-        # def calculate(gt_fluxes, recon_fluxes, masks, id):
-        #     mask = torch.FloatTensor(masks[id]).to('cuda:0')
-        #     gt_fluxes = torch.FloatTensor(gt_fluxes[id]).to('cuda:0')
-        #     recon_fluxes = torch.FloatTensor(recon_fluxes[:,id]).to('cuda:0')
-        #     losses = [F.mse_loss(recon*mask, gt_fluxes*mask).item() for recon in recon_fluxes]
-        #     return np.array(losses)
-        #losses = calculate(self.gt_fluxes, self.recon_fluxes_all, self.recon_masks, 9)
-        #np.save('tmp_loss.npy',losses)
-        ## ends here
-
-        ids = np.array([])
+        ids = np.array([0])
         for i in ids:
         # for i in range(num_spectra):
             cur_dir = join(self.spectra_dir, f"{i}-all-bins")

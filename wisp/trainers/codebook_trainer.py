@@ -56,6 +56,8 @@ class CodebookTrainer(BaseTrainer):
 
         self.set_num_spectra()
         self.init_net()
+        self.collect_model_params()
+
         self.init_data()
         self.init_loss()
         self.init_optimizer()
@@ -137,24 +139,6 @@ class CodebookTrainer(BaseTrainer):
         if self.extra_args["plot_logits_for_gt_bin"]:
             self.gt_bin_logits_fname = join(self.log_dir, "gt_bin_logits.png")
 
-    def set_num_spectra(self):
-        if self.mode == "redshift_pretrain":
-            if self.extra_args["redshift_pretrain_with_same_latents"]:
-                self.num_spectra = self.extra_args["redshift_pretrain_num_spectra"]
-            else: self.num_spectra = self.dataset.get_num_validation_spectra()
-        elif self.mode == "codebook_pretrain":
-            self.num_spectra = self.dataset.get_num_supervision_spectra()
-        else: raise ValueError("Invalid mode!")
-
-    def init_data(self):
-        self.save_data = False
-        self.shuffle_dataloader = True
-        self.dataloader_drop_last = False
-
-        self.configure_dataset()
-        self.set_num_batches()
-        self.init_dataloader()
-
     def init_net(self):
         self.train_pipeline = self.pipeline[0]
 
@@ -177,10 +161,15 @@ class CodebookTrainer(BaseTrainer):
                 # redshift pretrain use val spectra which is a permutation of sup spectra
                 permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
                 self.latents = nn.Embedding.from_pretrained(
-                    checkpoint["latents"][permute_ids], freeze=False)
+                    checkpoint["latents"][permute_ids], freeze=True)
 
                 if self.split_latent:
-                    self.redshift_latents = nn.Embedding(self.num_spectra, red_z_dim)
+                    if self.extra_args["zero_init_redshift_latents"]:
+                        zero_latents = torch.zeros(self.num_spectra, red_z_dim)
+                        self.redshift_latents = nn.Embedding.from_pretrained(
+                            zero_latents, freeze=False)
+                    else: self.redshift_latents = nn.Embedding(self.num_spectra, red_z_dim)
+
                 excls = []
                 if not self.extra_args["direct_optimize_latents_for_redshift"]:
                     excls.append("redshift_decoder")
@@ -193,6 +182,7 @@ class CodebookTrainer(BaseTrainer):
         else:
             raise ValueError("Invalid pretrainer mode.")
 
+    def collect_model_params(self):
         # collect all parameters from network and trainable latents
         self.params_dict = { "latents": self.latents.weight }
         if self.split_latent:
@@ -204,6 +194,24 @@ class CodebookTrainer(BaseTrainer):
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.train_pipeline.parameters()))
         )
+
+    def set_num_spectra(self):
+        if self.mode == "redshift_pretrain":
+            if self.extra_args["redshift_pretrain_with_same_latents"]:
+                self.num_spectra = self.extra_args["redshift_pretrain_num_spectra"]
+            else: self.num_spectra = self.dataset.get_num_validation_spectra()
+        elif self.mode == "codebook_pretrain":
+            self.num_spectra = self.dataset.get_num_supervision_spectra()
+        else: raise ValueError("Invalid mode!")
+
+    def init_data(self):
+        self.save_data = False
+        self.shuffle_dataloader = True
+        self.dataloader_drop_last = False
+
+        self.configure_dataset()
+        self.set_num_batches()
+        self.init_dataloader()
 
     def init_loss(self):
         if self.extra_args["spectra_loss_cho"] == "emd":
@@ -243,7 +251,7 @@ class CodebookTrainer(BaseTrainer):
         if self.mode == "codebook_pretrain":
             net_params, latents = [], []
             for name in self.params_dict:
-                if "latents" in name:
+                if name == "latents":
                     latents.append(self.params_dict[name])
                 else:
                     net_params.append(self.params_dict[name])
@@ -607,6 +615,8 @@ class CodebookTrainer(BaseTrainer):
         checkpoint = torch.load(model_fname)
         load_pretrained_model_weights(
             self.train_pipeline, checkpoint["model_state_dict"])
+        if self.mode == "redshift_pretrain":
+            self.codebook_pretrain_total_steps = checkpoint["iterations"]
         self.train_pipeline.train()
         return checkpoint
 
@@ -615,12 +625,17 @@ class CodebookTrainer(BaseTrainer):
             checkpoint = self.load_model(self.resume_train_model_fname)
             # a = checkpoint["optimizer_state_dict"]
             # b = a["state"];c = a["param_groups"];print(b[0])
-            self.latents = nn.Embedding.from_pretrained(checkpoint["latents"], freeze=False)
+            self.latents = nn.Embedding.from_pretrained(
+                checkpoint["latents"], freeze=self.mode=="redshift_pretrain")
             if self.split_latent:
                 self.redshift_latents = nn.Embedding.from_pretrained(
                     checkpoint["redshift_latents"], freeze=False)
+                print(self.redshift_latents.weight[0])
 
-            # re-init optimizer to upate trainable latents
+            # re-init
+            self.collect_model_params()
+            self.init_data() # |_ these two can be
+            self.init_loss() # |  ommitted
             self.init_optimizer()
 
             self.total_steps = checkpoint["iterations"]
@@ -635,9 +650,6 @@ class CodebookTrainer(BaseTrainer):
         except Exception as e:
             log.info(e)
             log.info("start training from begining")
-
-        # update coords (since we use latents from checkpoint as coords)
-        self.configure_dataset()
 
     def calculate_loss(self, data):
         total_loss = 0
@@ -659,10 +671,13 @@ class CodebookTrainer(BaseTrainer):
             #     ).to(init_redshift_prob.device)
         else: init_redshift_prob = None
 
+        steps = self.codebook_pretrain_total_steps \
+            if self.mode == "redshift_pretrain" else self.total_steps
+
         ret = forward(
             data,
             self.train_pipeline,
-            self.total_steps,
+            steps,
             self.space_dim,
             qtz=self.qtz,
             qtz_strategy=self.qtz_strategy,

@@ -6,12 +6,12 @@ global:
     activate_model_timer: False
     activate_trainer_timer: False
     dataloader_drop_last: False
-    exp_name: 'codebook-pretrain' #'pretrain-sanity-check-scale'
+    exp_name: 'pretrain-sanity-check-scale' #convexity'
     use_gpu: True
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
     #tasks: ['codebook_pretrain_infer','save_redshift','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra','save_pixel_values','recon_codebook_spectra_individ','recon_img','integrate_gt_spectra']
-    #tasks: ['redshift_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
+    tasks: ['redshift_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
     #tasks: ['redshift_pretrain_infer','plot_redshift_logits','save_redshift','recon_gt_spectra'] #'recon_gt_spectra_all_bins'
 
     #tasks: ['main_infer','recon_img']
@@ -35,9 +35,12 @@ global:
 
 debug:
     add_redshift_logit_bias: False
-    plot_logits_for_gt_bin: False
-    plot_individ_spectra_loss: False
+    plot_logits_for_gt_bin: True
+    plot_individ_spectra_loss: True
+    calculate_bin_wise_spectra_loss: False
     direct_optimize_latents_for_redshift: False
+    use_debug_spectra_data: True
+    zero_init_redshift_latents: True
 
 optimizer:
     optimizer_type: 'adam'
@@ -45,9 +48,9 @@ optimizer:
     b2: 0.999
     lr: 1e-4
     grid_lr: 1e-3
-    latents_lr: 1e-1
+    latents_lr: 1e-4
     codebook_lr: 1e-6
-    codebook_pretrain_lr: 1e-5
+    codebook_pretrain_lr: 1e-4
     weight_decay: 1e-5
     grid_lr_weight: 100
 
@@ -102,12 +105,12 @@ grid:
 pretrain:
     pretrain_codebook: True
 
-    pretrain_batch_size: 1500 #8 #1500
+    pretrain_batch_size: 8 #1500
     pretrain_pixel_beta: 1
     pretrain_redshift_beta: 0.1
 
-    pretrain_log_dir: '20230910-232020_codebook_pretrain_6k_spectra_60k_epochs'
-    pretrained_model_name: 'model-ep60000-it0.pth'
+    pretrain_log_dir: '20230919-185032_codebook_pretrain_100_spectra_10k_epochs' #20230910-232020_codebook_pretrain_6k_spectra_60k_epochs'
+    pretrained_model_name: 'model-ep10000-it0.pth'
 
     split_latent: True
 
@@ -117,7 +120,7 @@ pretrain:
 
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 100 #30
-    pretrain_wave_sample_method: 'uniform' #_non_random'
+    pretrain_wave_sample_method: 'uniform_non_random'
 
     pretrain_pixel_supervision: False
     main_train_with_pretrained_latents: False
@@ -163,7 +166,7 @@ spatial_decod:
     scaler_decod_activation_type: 'relu'
     scaler_decod_skip_layers: []
 
-    redshift_decod_hidden_dim: 512
+    redshift_decod_hidden_dim: 1024
     redshift_decod_num_hidden_layers: 1
     redshift_decod_layer_type: 'none'
     redshift_decod_activation_type: 'relu'
@@ -192,16 +195,16 @@ trainer:
     regu_redshift_logits: False
     redshift_logits_regu_method: 'laplace' #'l1_excl_largest'
 
-    num_epochs: 200
+    num_epochs: 2000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 20
+    log_cli_every: 200
     log_gpu_every: -1
-    plot_grad_every: -1
+    plot_grad_every: 10
     save_data_every: -1
-    save_model_every: 20
+    save_model_every: 200
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -229,7 +232,7 @@ trainer:
     pixel_supervision: False
     spectra_supervision: True
 
-    apply_gt_redshift: True         # -
+    apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
     redshift_semi_supervision: False # -
 
@@ -239,9 +242,9 @@ trainer:
     train_num_wave_samples: 50
     spectra_supervision_num_wave_samples: 100
 
-    resume_train: True
-    resume_log_dir: '20230910-232020_pretrain_32_codes_conv'
-    resume_model_fname: 'model-ep60000-it0.pth'
+    resume_train: False
+    resume_log_dir: '20231004-142645_6k_redshift_pretrain_same_lr_1024_1_hidden_fix_qtz_steps_lr_1e-4'
+    resume_model_fname: 'model-ep1000-it0.pth'
     #### ***********************************
 
 infer:
