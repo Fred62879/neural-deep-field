@@ -475,7 +475,9 @@ class SpectraData:
         validation_ids = np.array(validation_ids)
 
         # if len(test_ids) == 0 or len(validation_ids) == 0:
-        #     raise ValueError("Please select patches properly to make sure the number of validation and test spectra is not zero.")
+        #     raise ValueError(
+        #         "Please select patches properly to make sure the number \
+        #         of validation and test spectra is not zero.")
 
         # use the rest spectra for pretrain (spectra supervision)
         supervision_ids = np.array(list(set(ids)-set(validation_ids)-set(test_ids))).astype(int)
@@ -483,18 +485,18 @@ class SpectraData:
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
 
         ## debug, pretrain sanity check (overfit and scale)
-        a = supervision_ids
-        b = validation_ids
-        supervision_ids = a #[:10]
-        c = np.arange(len(supervision_ids))
-        np.random.seed(0)
-        np.random.shuffle(c)
-        self.redshift_pretrain_ids = c[:self.kwargs["redshift_pretrain_num_spectra"]]
-        self.redshift_pretrain_ids = np.array([
-            26,86,2,55,75, 93,16,73,54,95, 53,92,78,13,7, 30,22,24,33,8
-        ])
+        # a = supervision_ids
+        # b = validation_ids
+        # supervision_ids = a #[:10]
+        # c = np.arange(len(supervision_ids))
+        # np.random.seed(0)
+        # np.random.shuffle(c)
+        # self.redshift_pretrain_ids = c[:self.kwargs["redshift_pretrain_num_spectra"]]
+        # self.redshift_pretrain_ids = np.array([
+        #     26,86,2,55,75, 93,16,73,54,95, 53,92,78,13,7, 30,22,24,33,8
+        # ])
         # self.redshift_pretrain_ids = np.array([26,86,2,55,75, 93,16,73,54,95])
-        validation_ids = supervision_ids[self.redshift_pretrain_ids] #[10:]
+        # validation_ids = supervision_ids[self.redshift_pretrain_ids] #[10:]
         ## ends here
 
         # log.info(f"test spectra ids: {test_ids}")

@@ -616,7 +616,6 @@ class CodebookTrainer(BaseTrainer):
             # a = checkpoint["optimizer_state_dict"]
             # b = a["state"];c = a["param_groups"];print(b[0])
             self.latents = nn.Embedding.from_pretrained(checkpoint["latents"], freeze=False)
-
             if self.split_latent:
                 self.redshift_latents = nn.Embedding.from_pretrained(
                     checkpoint["redshift_latents"], freeze=False)
@@ -628,7 +627,9 @@ class CodebookTrainer(BaseTrainer):
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             if self.plot_loss:
                 self.losses = list(np.load(self.resume_loss_fname))
-                self.spectra_individ_losses = list(np.load(self.resume_loss_fname[:-4] + "_individ.npy")) # debug
+                if self.extra_args["plot_individ_spectra_loss"]:
+                    self.spectra_individ_losses = list(np.load(
+                        self.resume_loss_fname[:-4] + "_individ.npy")) # debug
             log.info("resumed training")
 
         except Exception as e:
