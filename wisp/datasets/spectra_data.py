@@ -484,19 +484,15 @@ class SpectraData:
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
 
+        # select validation spectra from supervision spectra
         if self.kwargs["use_debug_spectra_data"]:
-            ## debug, pretrain sanity check (overfit and scale)
-            a = supervision_ids
-            b = validation_ids
-            supervision_ids = a #[:10]
-            c = np.arange(len(supervision_ids))
-            np.random.seed(0)
-            np.random.shuffle(c)
+            # c = np.arange(len(supervision_ids))
+            # np.random.seed(0)
+            # np.random.shuffle(c)
             # self.redshift_pretrain_ids = c[:self.kwargs["redshift_pretrain_num_spectra"]]
             self.redshift_pretrain_ids = np.array([
                 26,86,2,55,75, 93,16,73,54,95, 53,92,78,13,7, 30,22,24,33,8
             ])
-            # self.redshift_pretrain_ids = np.array([26,86,2,55,75, 93,16,73,54,95])
             validation_ids = supervision_ids[self.redshift_pretrain_ids]
 
         # log.info(f"test spectra ids: {test_ids}")

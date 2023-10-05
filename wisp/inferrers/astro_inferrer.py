@@ -783,9 +783,6 @@ class AstroInferrer(BaseInferrer):
             if self.recon_gt_spectra:
                 self.recon_fluxes = torch.stack(self.recon_fluxes).view(
                     self.dataset_length, 1, -1).detach().cpu().numpy()
-            if self.recon_gt_spectra_all_bins:
-                self.recon_fluxes_all = torch.stack(
-                    self.recon_fluxes_all).detach().cpu().numpy()
         else:
             if self.main_infer:
                 if self.recon_spectra_pixels_only:
@@ -824,14 +821,8 @@ class AstroInferrer(BaseInferrer):
         if self.recon_gt_spectra_all_bins:
             self._recon_gt_spectra_all_bins(num_spectra, model_id)
 
-        # if self.save_pixel_values:
-        #     self.recon_pixels = self.trans_obj.integrate(recon_fluxes)
-        #     if self.pretrain_infer:
-        #         self.gt_pixels = self.dataset.get_supervision_spectra_pixels().numpy()
-        #     else: self.gt_pixels = self.dataset.get_supervision_validation_pixels().numpy()
-        #     self.gt_pixels = self.gt_pixels[:,0]
-        #     self._log_data(
-        #         "recon_pixels", gt_field="gt_pixels", log_ratio=self.log_pixel_ratio)
+        if self.plot_redshift_logits:
+            self._plot_redshift_logtis()
 
         if self.save_redshift_pre:
             if self.classify_redshift:
@@ -849,42 +840,18 @@ class AstroInferrer(BaseInferrer):
             else:
                 self._log_data("redshift", gt_field="gt_redshift")
 
-        if self.plot_redshift_logits:
-            gt_redshift = torch.stack(self.gt_redshift_l).detach().cpu().numpy()
-            redshift_logits = torch.stack(self.redshift_logits).detach().cpu().numpy()
-            bin_centers = init_redshift_bins(
-                self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
-                self.extra_args["redshift_bin_width"])
-
-            fname = join(self.redshift_dir, f"{model_id}_logits")
-            np.save(fname, np.concatenate((bin_centers[None,:], redshift_logits), axis=0))
-
-            ## debug
-            # print(self.recon_fluxes_all.shape, redshift_logits.shape, self.gt_fluxes.shape, self.recon_masks.shape)
-            # recon_fluxes = redshift_logits[9]@self.recon_fluxes_all[:,9]
-            # loss = F.mse_loss(torch.FloatTensor(recon_fluxes*self.recon_masks[9]),
-            #                   torch.FloatTensor(self.gt_fluxes[9]*self.recon_masks[9])).item()
-            # print(loss)
-            # assert 0
-            ## ends here
-
-            batch_hist(
-                bin_centers, redshift_logits, fname + ".png",
-                self.extra_args["num_spectrum_per_row"], is_counts=True
-            )
-            # plot_precision_recall_all(
-            #     redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
-            #     self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
-            #     self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png"
-            # )
-            plot_precision_recall_single(
-                redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
-                self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
-                f"{fname}_precision_recall.png")
-
         if self.save_qtz_weights:
             fname = join(self.qtz_weights_dir, str(model_id))
             self._log_data("qtz_weights", fname=fname)
+
+        # if self.save_pixel_values:
+        #     self.recon_pixels = self.trans_obj.integrate(recon_fluxes)
+        #     if self.pretrain_infer:
+        #         self.gt_pixels = self.dataset.get_supervision_spectra_pixels().numpy()
+        #     else: self.gt_pixels = self.dataset.get_supervision_validation_pixels().numpy()
+        #     self.gt_pixels = self.gt_pixels[:,0]
+        #     self._log_data(
+        #         "recon_pixels", gt_field="gt_pixels", log_ratio=self.log_pixel_ratio)
 
         log.info("== Spectral coords inferrence done for current checkpoint.")
 
@@ -1356,38 +1323,47 @@ class AstroInferrer(BaseInferrer):
     def _recon_gt_spectra_all_bins(self, num_spectra, model_id):
         """ Plot spectrum under all redshift for each spectra
         """
-        self.recon_fluxes_all = self.recon_fluxes_all.transpose(1,0,2) # [num_bins,bsz,nsmpl]
-        assert num_spectra == self.recon_fluxes_all.shape[1]
-        num_bins = self.recon_fluxes_all.shape[0]
+        recon_fluxes_all = torch.stack(
+            self.recon_fluxes_all).permute(1,0,2).detach().cpu().numpy() # [num_bins,bsz,nsmpl]
+        assert num_spectra == recon_fluxes_all.shape[1]
+
+        num_bins = recon_fluxes_all.shape[0]
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
         n_figs_each = int(np.ceil(num_bins / n_spectrum_per_fig))
-
         redshift_bins = init_redshift_bins(
             self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
             self.extra_args["redshift_bin_width"]).numpy()
 
-        if self.extra_args["calculate_bin_wise_spectra_loss"]:
-            # np.save('tmp_masks.npy', self.recon_masks)
-            # np.save('tmp_gt_fluxes.npy', self.gt_fluxes)
-            # np.save('tmp_recon_fluxes.npy', self.recon_fluxes_all)
-            # calculate bin wise spectra loss
-            def calculate(gt_fluxes, recon_fluxes, masks, id):
-                mask = torch.FloatTensor(masks[id]).to('cuda:0')
-                gt_fluxes = torch.FloatTensor(gt_fluxes[id]).to('cuda:0')
-                recon_fluxes = torch.FloatTensor(recon_fluxes[:,id]).to('cuda:0')
-                losses = [F.mse_loss(recon*mask, gt_fluxes*mask).item()
-                          for recon in recon_fluxes]
-                return np.array(losses)
-            losses = calculate(self.gt_fluxes, self.recon_fluxes_all, self.recon_masks, 0)
-            np.save('tmp_loss.npy',losses)
+        def calculate_bin_wise_loss(gt_fluxes, recon_fluxes, masks, i):
+            mask = torch.FloatTensor(masks[i]).to('cuda:0')
+            gt_fluxes = torch.FloatTensor(gt_fluxes[i]).to('cuda:0')
+            recon_fluxes = torch.FloatTensor(recon_fluxes[:,id]).to('cuda:0')
+            losses = [F.mse_loss(recon*mask, gt_fluxes*mask).item()
+                      for recon in recon_fluxes]
+            return np.array(losses)
+
+        # def calculate_loss(i):
+        #     redshift_logits = torch.stack(self.redshift_logits).detach().cpu().numpy()[i]
+        #     plt.plot(redshift_logits);plt.savefig('tmp.png');plt.close()
+        #     recon_fluxes = redshift_logits @ recon_fluxes_all[:,i]
+        #     loss = F.mse_loss(torch.FloatTensor(recon_fluxes*self.recon_masks[i]),
+        #                       torch.FloatTensor(self.gt_fluxes[i]*self.recon_masks[i]))
+        #     return loss.item()
 
         def change_shape(data, m):
             return np.tile(data, m).reshape(m, -1)
 
-        ids = np.array([0])
-        for i in ids:
-        # for i in range(num_spectra):
+        spectra_ids = np.array([0])
+        for i in spectra_ids:
             cur_dir = join(self.spectra_dir, f"{i}-all-bins")
+
+            # calculate spectra loss under each redshift bin
+            if self.extra_args["calculate_bin_wise_spectra_loss"]:
+                # loss = calculate_loss(i); print(loss); assert 0
+                losses = calculate_bin_wise_loss(
+                    self.gt_fluxes, recon_fluxes_all, self.recon_masks, i)
+                fname = join(cur_dir, f"bin_wise_spectra_loss-model{model_id}-spectra{i}")
+                np.save(fname, losses)
 
             for j in range(n_figs_each):
                 fname = f"model{model_id}-plot{j}-all_bins"
@@ -1401,7 +1377,7 @@ class AstroInferrer(BaseInferrer):
                     change_shape(self.gt_wave[i], m),
                     change_shape(self.gt_fluxes[i], m),
                     change_shape(self.recon_wave[i], m),
-                    self.recon_fluxes_all[lo:hi,i],
+                    recon_fluxes_all[lo:hi,i],
                     # save_spectra_together=True,
                     clip=self.extra_args["plot_clipped_spectrum"],
                     gt_masks=change_shape(self.gt_masks[i], m),
@@ -1411,6 +1387,39 @@ class AstroInferrer(BaseInferrer):
                 )
 
         log.info("all bin spectrum plotting done")
+
+    def _plot_redshift_logtis(self):
+        gt_redshift = torch.stack(self.gt_redshift_l).detach().cpu().numpy()
+        redshift_logits = torch.stack(self.redshift_logits).detach().cpu().numpy()
+        bin_centers = init_redshift_bins(
+            self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
+            self.extra_args["redshift_bin_width"])
+
+        fname = join(self.redshift_dir, f"{model_id}_logits")
+        np.save(fname, np.concatenate((bin_centers[None,:], redshift_logits), axis=0))
+
+        ## debug
+        # print(self.recon_fluxes_all.shape, redshift_logits.shape, self.gt_fluxes.shape, self.recon_masks.shape)
+        # recon_fluxes = redshift_logits[9]@self.recon_fluxes_all[:,9]
+        # loss = F.mse_loss(torch.FloatTensor(recon_fluxes*self.recon_masks[9]),
+        #                   torch.FloatTensor(self.gt_fluxes[9]*self.recon_masks[9])).item()
+        # print(loss)
+        # assert 0
+        ## ends here
+
+        batch_hist(
+            bin_centers, redshift_logits, fname + ".png",
+            self.extra_args["num_spectrum_per_row"], is_counts=True
+        )
+        # plot_precision_recall_all(
+        #     redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
+        #     self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
+        #     self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png"
+        # )
+        plot_precision_recall_single(
+            redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
+            self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
+            f"{fname}_precision_recall.png")
 
     def configure_img_metrics(self):
         self.metric_options = self.extra_args["metric_options"]
