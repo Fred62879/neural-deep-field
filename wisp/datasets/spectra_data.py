@@ -494,6 +494,7 @@ class SpectraData:
                 26,86,2,55,75, 93,16,73,54,95, 53,92,78,13,7, 30,22,24,33,8
             ])
             validation_ids = supervision_ids[self.redshift_pretrain_ids]
+            # print(self.redshift_pretrain_ids)
 
         # log.info(f"test spectra ids: {test_ids}")
         # log.info(f"validation spectra ids: {validation_ids}")

@@ -822,7 +822,7 @@ class AstroInferrer(BaseInferrer):
             self._recon_gt_spectra_all_bins(num_spectra, model_id)
 
         if self.plot_redshift_logits:
-            self._plot_redshift_logtis()
+            self._plot_redshift_logtis(model_id)
 
         if self.save_redshift_pre:
             if self.classify_redshift:
@@ -1337,18 +1337,22 @@ class AstroInferrer(BaseInferrer):
         def calculate_bin_wise_loss(gt_fluxes, recon_fluxes, masks, i):
             mask = torch.FloatTensor(masks[i]).to('cuda:0')
             gt_fluxes = torch.FloatTensor(gt_fluxes[i]).to('cuda:0')
-            recon_fluxes = torch.FloatTensor(recon_fluxes[:,id]).to('cuda:0')
-            losses = [F.mse_loss(recon*mask, gt_fluxes*mask).item()
+            recon_fluxes = torch.FloatTensor(recon_fluxes[:,i]).to('cuda:0')
+            losses = [F.mse_loss(recon*mask, gt_fluxes*mask, reduction="sum").item()
                       for recon in recon_fluxes]
             return np.array(losses)
 
-        # def calculate_loss(i):
-        #     redshift_logits = torch.stack(self.redshift_logits).detach().cpu().numpy()[i]
-        #     plt.plot(redshift_logits);plt.savefig('tmp.png');plt.close()
-        #     recon_fluxes = redshift_logits @ recon_fluxes_all[:,i]
-        #     loss = F.mse_loss(torch.FloatTensor(recon_fluxes*self.recon_masks[i]),
-        #                       torch.FloatTensor(self.gt_fluxes[i]*self.recon_masks[i]))
-        #     return loss.item()
+        def calculate_loss(i):
+            redshift_logits = torch.stack(self.redshift_logits).detach().cpu().numpy()[i]
+            # plt.plot(redshift_logits);plt.savefig('tmp.png');plt.close()
+            recon_fluxes = redshift_logits @ recon_fluxes_all[:,i]
+            # plt.plot(recon_fluxes*self.recon_masks[i]);
+            # plt.plot(self.gt_fluxes[i]*self.recon_masks[i]);
+            # plt.savefig('tmp_.png'); plt.close()
+            loss = F.mse_loss(torch.FloatTensor(recon_fluxes*self.recon_masks[i]),
+                              torch.FloatTensor(self.gt_fluxes[i]*self.recon_masks[i]),
+                              reduction="sum")
+            return loss.item()
 
         def change_shape(data, m):
             return np.tile(data, m).reshape(m, -1)
@@ -1359,7 +1363,7 @@ class AstroInferrer(BaseInferrer):
 
             # calculate spectra loss under each redshift bin
             if self.extra_args["calculate_bin_wise_spectra_loss"]:
-                # loss = calculate_loss(i); print(loss); assert 0
+                loss = calculate_loss(i); print(loss) #;assert 0
                 losses = calculate_bin_wise_loss(
                     self.gt_fluxes, recon_fluxes_all, self.recon_masks, i)
                 fname = join(cur_dir, f"bin_wise_spectra_loss-model{model_id}-spectra{i}")
@@ -1388,7 +1392,7 @@ class AstroInferrer(BaseInferrer):
 
         log.info("all bin spectrum plotting done")
 
-    def _plot_redshift_logtis(self):
+    def _plot_redshift_logtis(self, model_id):
         gt_redshift = torch.stack(self.gt_redshift_l).detach().cpu().numpy()
         redshift_logits = torch.stack(self.redshift_logits).detach().cpu().numpy()
         bin_centers = init_redshift_bins(

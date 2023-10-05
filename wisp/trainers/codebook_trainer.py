@@ -702,9 +702,6 @@ class CodebookTrainer(BaseTrainer):
         )
         self.timer.check("forwarded")
 
-        #if self.extra_args["plot_individ_spectra_loss"]:
-        #    self.cur_red_spectra = ret["spectra_all_bins"]
-
         # i) spectra supervision loss
         spectra_loss = 0
         recon_fluxes = ret["intensity"]
