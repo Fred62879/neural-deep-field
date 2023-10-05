@@ -26,7 +26,7 @@ from wisp.loss import spectra_supervision_loss, \
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     select_inferrence_ids, load_embed, load_model_weights, forward, \
     load_pretrained_model_weights, get_pretrained_model_fname, \
-    get_bool_classify_redshift, freeze_layers, get_loss, create_latent_mask
+    get_bool_classify_redshift, freeze_layers, get_loss, create_latent_mask, set_seed
 
 
 class CodebookTrainer(BaseTrainer):
@@ -145,6 +145,7 @@ class CodebookTrainer(BaseTrainer):
         if self.mode == "codebook_pretrain":
             assert not self.split_latent
 
+            set_seed(self.extra_args["seed"] + 1)
             self.latents = nn.Embedding(
                 self.num_spectra,
                 self.extra_args["spatial_latent_dim"])
@@ -165,10 +166,15 @@ class CodebookTrainer(BaseTrainer):
 
                 if self.split_latent:
                     if self.extra_args["zero_init_redshift_latents"]:
-                        zero_latents = torch.zeros(self.num_spectra, red_z_dim)
+                        one_latents = 0.01 * torch.ones(self.num_spectra, red_z_dim)
                         self.redshift_latents = nn.Embedding.from_pretrained(
-                            zero_latents, freeze=False)
-                    else: self.redshift_latents = nn.Embedding(self.num_spectra, red_z_dim)
+                            one_latents, freeze=False)
+                    else:
+                        set_seed(self.extra_args["seed"] + 2)
+                        self.redshift_latents = nn.Embedding(self.num_spectra, red_z_dim)
+                        # a = self.redshift_latents.weight[0:1].tile(self.num_spectra, 1)
+                        # self.redshift_latents = nn.Embedding.from_pretrained(
+                        #     a, freeze=False)
 
                 excls = []
                 if not self.extra_args["direct_optimize_latents_for_redshift"]:

@@ -19,7 +19,7 @@ class MLP(nn.Module):
         super(MLP, self).__init__()
 
         def block(dim_in, dim_out, seed=0, activate=True):
-            set_seed()
+            # set_seed()
             block = [ nn.Linear(dim_in, dim_out) ]
             if activate:
                 block.append(nn.ReLU(inplace=True))

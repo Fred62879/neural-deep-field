@@ -168,7 +168,7 @@ class PE_Rand(nn.Module):
         return mapping
 
     def randmz_weights(self, seed):
-        # set_seed()
+        # # set_seed()
         weight = torch.randn(self.pe_dim) # ~N(0,1)
         weight = 2 * torch.pi * self.omega * weight
         return weight.reshape((self.pe_dim, 1)).type(self.float_tensor)
@@ -214,7 +214,7 @@ class IntePERand(nn.Module):
         return torch.exp(-.5*torch.sum(covar_lifted, dim=0))
 
     def randmz_weights(self, seed=0):
-        set_seed()
+        # set_seed()
         weight = torch.randn(self.pe_dim)
         weight = 2 * torch.pi * self.omega * weight
         return weight.type(self.float_tensor)
@@ -253,7 +253,7 @@ class RandGaus(nn.Module):
         return mapping
 
     def randmz_weights(self, seed):
-        set_seed()
+        # set_seed()
         weight = torch.empty((self.pe_dim,1), dtype=torch.float).normal_(mean=0.,std=self.sigma**2)
         weight = 2 * torch.pi * self.omega * weight
         return weight
@@ -299,7 +299,7 @@ class InteRandGaus(nn.Module):
         return torch.exp(-.5*torch.sum(covar_lifted, dim=0)).type(self.float_tensor)
 
     def randmz_weights(self, seed):
-        set_seed()
+        # set_seed()
         weight = torch.empty(self.pe_dim).normal_(mean=0.,std=self.sigma**2)
         return 2 * torch.pi * weight.type(self.float_tensor)
 
@@ -388,7 +388,7 @@ class RandIGausLinr(nn.Module): # pe9
                   .format(pe_dim, sigma, omega))
 
     def randmz_weights(self, seed):
-        set_seed()
+        # set_seed()
         weight = torch.empty(self.pe_dim).normal_(mean=0.,std=self.sigma**2)
         #print('pre', weight)
         weight = 2 * torch.pi * weight * self.scale

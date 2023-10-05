@@ -114,7 +114,7 @@ def get_layer_class(layer_type):
         assert(False and "layer type does not exist")
 
 def init_codebook(seed, num_embed, latent_dim):
-    set_seed()
+    # set_seed()
     qtz_codebook = nn.Embedding(num_embed, latent_dim)
     qtz_codebook.weight.data.uniform_(
         -1.0 / latent_dim, 1.0 / latent_dim)

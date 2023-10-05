@@ -61,7 +61,7 @@ class Sine_Layer(nn.Module):
 
     def init_weights(self, seed):
         std = 1/self.dim_in if self.is_first else np.sqrt(6 / self.dim_in) / self.w0
-        set_seed()
+        # set_seed()
         w = torch.empty((self.dim_out, self.dim_in), dtype=torch.float).uniform_(-std, std)
         self.linear.weight = nn.Parameter(w)
 
@@ -75,7 +75,7 @@ class Linr_Layer(nn.Module):
 
         self.layer = nn.Linear(dim_hidden, dim_out)
         std = np.sqrt(6 / dim_hidden) / hidden_w0
-        set_seed()
+        # set_seed()
         w = torch.empty((dim_out, dim_hidden), dtype=torch.float).uniform_(-std, std)
         self.layer.weight = nn.Parameter(w)
 
