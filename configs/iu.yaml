@@ -13,7 +13,7 @@ global:
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
     tasks: ['codebook_pretrain_infer','save_redshift','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra','save_pixel_values','recon_codebook_spectra_individ','recon_img','integrate_gt_spectra']
     tasks: ['redshift_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    #tasks: ['redshift_pretrain_infer','plot_redshift_logits','save_redshift','recon_gt_spectra'] #'recon_gt_spectra_all_bins'
+    tasks: ['redshift_pretrain_infer','plot_redshift_logits','save_redshift','recon_gt_spectra'] #'recon_gt_spectra_all_bins'
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -126,7 +126,7 @@ pretrain:
     pretrain_pixel_supervision: False
     main_train_with_pretrained_latents: False
     redshift_pretrain_with_same_latents: True
-    redshift_pretrain_num_spectra: 20
+    redshift_pretrain_num_spectra: 40
 
 decoder:
     decoder_num_hidden_layers: 1
@@ -167,7 +167,7 @@ spatial_decod:
     scaler_decod_activation_type: 'relu'
     scaler_decod_skip_layers: []
 
-    redshift_decod_hidden_dim: 1024
+    redshift_decod_hidden_dim: 2048
     redshift_decod_num_hidden_layers: 1
     redshift_decod_layer_type: 'none'
     redshift_decod_activation_type: 'relu'
@@ -196,14 +196,14 @@ trainer:
     regu_redshift_logits: False
     redshift_logits_regu_method: 'laplace' #'l1_excl_largest'
 
-    num_epochs: 1000
+    num_epochs: 1 #500
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
     log_cli_every: 100
     log_gpu_every: -1
-    plot_grad_every: 1
+    plot_grad_every: -1
     save_data_every: -1
     save_model_every: 100
 
@@ -243,9 +243,9 @@ trainer:
     train_num_wave_samples: 50
     spectra_supervision_num_wave_samples: 100
 
-    resume_train: False
-    resume_log_dir: '20231005-141208'
-    resume_model_fname: 'model-ep1000-it0.pth'
+    resume_train: True
+    resume_log_dir: '20231005-173456_6k_to_40_2048_dim_500_epochs'
+    resume_model_fname: 'model-ep500-it0.pth'
     #### ***********************************
 
 infer:
@@ -300,7 +300,7 @@ infer:
     average_neighbour_spectra: True
     infer_spectra_individually: False
 
-    num_spectrum_per_fig: 35
+    num_spectrum_per_fig: 20
     num_spectrum_per_row: 5
 
 dataset:

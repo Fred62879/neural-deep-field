@@ -20,7 +20,7 @@ from torch.utils.data import BatchSampler, \
 
 from wisp.utils import PerfTimer
 from wisp.trainers import BaseTrainer
-from wisp.utils.plot import plot_grad_flow
+from wisp.utils.plot import plot_grad_flow, plot_multiple
 from wisp.loss import spectra_supervision_loss, \
     spectra_supervision_emd_loss, pretrain_pixel_loss
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
@@ -137,7 +137,7 @@ class CodebookTrainer(BaseTrainer):
                 self.extra_args["resume_model_fname"])
 
         if self.extra_args["plot_logits_for_gt_bin"]:
-            self.gt_bin_logits_fname = join(self.log_dir, "gt_bin_logits.png")
+            self.gt_bin_logits_fname = join(self.log_dir, "gt_bin_logits")
 
     def init_net(self):
         self.train_pipeline = self.pipeline[0]
@@ -650,7 +650,7 @@ class CodebookTrainer(BaseTrainer):
                 self.losses = list(np.load(self.resume_loss_fname))
                 if self.extra_args["plot_individ_spectra_loss"]:
                     self.spectra_individ_losses = list(np.load(
-                        self.resume_loss_fname[:-4] + "_individ.npy")) # debug
+                        self.resume_loss_fname[:-4] + "_individ.npy").T)
             log.info("resumed training")
 
         except Exception as e:
@@ -840,25 +840,12 @@ class CodebookTrainer(BaseTrainer):
         w = weights[self.selected_ids,0]
         log.info(f"Qtz weights {w}")
 
-    def plotspectra(self,spectra):
-        import matplotlib.pyplot as plt
-        n,m = spectra.shape
-        x = np.arange(m)
-        fig, axs = plt.subplots(2,10,figsize=(50,10))
-        for i in range(n):
-            axis = axs[i//10,i%10]
-            axis.plot(x,spectra[i])
-        fig.tight_layout()
-        plt.savefig('tmp.png')
-        plt.close()
-
     def _recon_gt_spectra(self):
         log.info("reconstructing gt spectrum")
 
         self.gt_fluxes = torch.stack(self.gt_fluxes).view(
             self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
         # [n_spectra,nsmpl]
-        # self.plotspectra(self.gt_fluxes)
 
         self.recon_fluxes = torch.stack(self.recon_fluxes).view(
             self.num_spectra, self.extra_args["spectra_neighbour_size"]**2, -1
@@ -929,31 +916,21 @@ class CodebookTrainer(BaseTrainer):
 
     def _plot_logits_for_gt_bin(self):
         logits = np.array(self.gt_bin_logits) # [nepochs,nspectra]
-        nrows, ncols = 4, 5
-        fig, axs = plt.subplots(nrows,ncols,figsize=(5*ncols,5*nrows))
-        for i in range(min(20,logits.shape[1])):
-            axis = axs[i//ncols,i%ncols]
-            axis.plot(logits[:,i])
-        fig.tight_layout(); plt.savefig(self.gt_bin_logits_fname); plt.close()
+        plot_multiple(
+            self.extra_args["num_spectrum_per_fig"],
+            self.extra_args["num_spectrum_per_row"],
+            logits.T, self.gt_bin_logits_fname)
 
     def _plot_individ_spectra_loss(self):
-        losses = np.array(self.spectra_individ_losses)
+        losses = np.array(self.spectra_individ_losses).T
         np.save(self.loss_fname + "_individ.npy", losses)
-        m, n = losses.shape
-        x = np.arange(m)
-        ncols = min(n, self.extra_args["num_spectrum_per_row"])
-        nrows = int(np.ceil(n / ncols))
-
-        fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
-        for i, loss in enumerate(losses.T):
-            if nrows == 1: axis = axs if ncols == 1 else axs[i%ncols]
-            else:          axis = axs[i//ncols, i%ncols]
-            axis.plot(x, loss); axis.set_title(i)
-        fig.tight_layout(); plt.savefig(self.loss_fname + "_individ.png"); plt.close()
-
-        fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
-        for i, loss in enumerate(losses.T):
-            if nrows == 1: axis = axs if ncols == 1 else axs[i%ncols]
-            else:          axis = axs[i//ncols, i%ncols]
-            axis.plot(x, np.log10(np.array(loss))); axis.set_title(i)
-        fig.tight_layout(); plt.savefig(self.loss_fname + "_individ_log10.png"); plt.close()
+        plot_multiple(
+            self.extra_args["num_spectrum_per_fig"],
+            self.extra_args["num_spectrum_per_row"],
+            losses, self.loss_fname + "_individ"
+        )
+        plot_multiple(
+            self.extra_args["num_spectrum_per_fig"],
+            self.extra_args["num_spectrum_per_row"],
+            np.log10(losses), self.loss_fname + "_individ_log10"
+        )
