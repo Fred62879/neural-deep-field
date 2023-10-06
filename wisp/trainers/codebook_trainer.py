@@ -112,8 +112,8 @@ class CodebookTrainer(BaseTrainer):
         log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
-                ["model_dir","spectra_dir","codebook_spectra_dir","qtz_weight_dir"],
-                ["models","train_spectra","train_codebook_spectra","qtz_weights"]):
+                ["loss_dir","model_dir","spectra_dir","codebook_spectra_dir","qtz_weight_dir"],
+                ["losses","models","train_spectra","train_codebook_spectra","qtz_weights"]):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -121,7 +121,7 @@ class CodebookTrainer(BaseTrainer):
         self.grad_fname = join(self.log_dir, "grad.png")
 
         if self.plot_loss:
-            self.loss_fname = join(self.log_dir, "loss")
+            self.loss_fname = join(self.loss_dir, "loss")
 
         if self.mode == "redshift_pretrain":
             # redshift pretrain use pretrained model from codebook pretrain
@@ -636,7 +636,6 @@ class CodebookTrainer(BaseTrainer):
             if self.split_latent:
                 self.redshift_latents = nn.Embedding.from_pretrained(
                     checkpoint["redshift_latents"], freeze=False)
-                print(self.redshift_latents.weight[0])
 
             # re-init
             self.collect_model_params()
@@ -651,6 +650,7 @@ class CodebookTrainer(BaseTrainer):
                 if self.extra_args["plot_individ_spectra_loss"]:
                     self.spectra_individ_losses = list(np.load(
                         self.resume_loss_fname[:-4] + "_individ.npy").T)
+
             log.info("resumed training")
 
         except Exception as e:

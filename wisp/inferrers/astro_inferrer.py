@@ -17,10 +17,10 @@ from wisp.datasets.data_utils import get_bound_id
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
 from wisp.utils.plot import plot_horizontally, plot_embed_map, \
-    plot_latent_embed, annotated_heat, plot_simple, batch_hist, \
-    plot_precision_recall_all, plot_precision_recall_single, plot_multiple
+    plot_latent_embed, annotated_heat, plot_simple, plot_multiple, \
+    plot_precision_recall_all, plot_precision_recall_single
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
-    sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, \
+    sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, to_numpy, \
     load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, get_loss
 
 
@@ -506,8 +506,8 @@ class AstroInferrer(BaseInferrer):
             gt_fname = self.cur_patch.get_gt_img_fname() + ".npy"
             # `model_id` requires manual setup
             model_id = 0
-            recon_fname = join(self.recon_dir, f"{self.cur_patch_uid}_{model_id}.npy")
-            out_fname = join(self.recon_dir, f"{self.cur_patch_uid}_{model_id}_residual.png")
+            recon_fname = join(self.recon_dir, f"{self.cur_patch_uid}_model-{model_id}.npy")
+            out_fname = join(self.recon_dir, f"{self.cur_patch_uid}_model-{model_id}_residual.png")
             gt = np.load(gt_fname)
             recon = np.load(recon_fname)
             residual = gt - recon
@@ -609,7 +609,7 @@ class AstroInferrer(BaseInferrer):
                     self.metrics_zscale = np.concatenate((
                         self.metrics_zscale, cur_metrics_zscale[:,None]), axis=1)
             else:
-                fname = join(self.recon_dir, f"{model_id}.pth")
+                fname = join(self.recon_dir, f"model-{model_id}.pth")
                 self._log_data("recon_pixels", fname=fname, gt_field="gt_pixels")
 
         if self.recon_synthetic_band:
@@ -693,7 +693,7 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_scaler:
             re_args = {
-                "fname": f'infer_{model_id}',
+                "fname": f'infer_model-{model_id}',
                 "dir": self.scaler_dir,
                 "verbose": self.verbose,
                 "num_bands": 1,
@@ -715,7 +715,7 @@ class AstroInferrer(BaseInferrer):
 
         elif self.save_qtz_w_main:
             re_args = {
-                "fname": f'{model_id}',
+                "fname": f'model-{model_id}',
                 "dir": self.qtz_weights_dir,
                 "verbose": self.verbose,
                 "num_bands": self.qtz_n_embd,
@@ -826,10 +826,12 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_redshift_pre:
             if self.classify_redshift:
-                fname = join(self.redshift_dir, f"{model_id}_max_redshift.txt")
-                self._log_data("argmax_redshift", gt_field="gt_redshift", fname=fname)
-                fname = join(self.redshift_dir, f"{model_id}_avg_redshift.txt")
-                self._log_data("weighted_redshift", fname=fname)
+                self._log_redshift_residual_outlier(model_id)
+                fname = join(self.redshift_dir, f"model-{model_id}_max_redshift.txt")
+                self._log_data("argmax_redshift", gt_field="gt_redshift",
+                               fname=fname, log_to_console=False)
+                # fname = join(self.redshift_dir, f"model-{model_id}_avg_redshift.txt")
+                # self._log_data("weighted_redshift", fname=fname)
             else:
                 self._log_data("redshift", gt_field="gt_redshift")
 
@@ -841,7 +843,7 @@ class AstroInferrer(BaseInferrer):
                 self._log_data("redshift", gt_field="gt_redshift")
 
         if self.save_qtz_weights:
-            fname = join(self.qtz_weights_dir, str(model_id))
+            fname = join(self.qtz_weights_dir, f"model-{model_id}")
             self._log_data("qtz_weights", fname=fname)
 
         # if self.save_pixel_values:
@@ -889,7 +891,7 @@ class AstroInferrer(BaseInferrer):
             # if spectra is 2d, add dummy 1st dim to simplify code
             enum = zip([spectra_wave], [self.codebook_spectra], [spectra_masks])
             dir = self.codebook_spectra_dir
-            fname = str(model_id) + "_" + \
+            fname = f"model-{model_id}_" + \
                 str(self.extra_args["codebook_spectra_plot_wave_lo"]) + "_" + \
                 str(self.extra_args["codebook_spectra_plot_wave_hi"])
 
@@ -901,7 +903,7 @@ class AstroInferrer(BaseInferrer):
 
             enum = zip(spectra_wave, self.codebook_spectra, spectra_masks)
             dir = self.codebook_spectra_individ_dir
-            fname = f"{model_id}"
+            fname = f"model-{model_id}"
 
         else:
             self.codebook_spectra = self.codebook_spectra.reshape(
@@ -917,7 +919,7 @@ class AstroInferrer(BaseInferrer):
 
             enum = zip(spectra_wave, self.codebook_spectra, spectra_masks)
             dir = self.codebook_spectra_individ_dir
-            fname = f"{model_id}"
+            fname = f"model-{model_id}"
 
         for i, obj in enumerate(enum):
             (wave, codebook_spectra, masks) = obj
@@ -1232,7 +1234,9 @@ class AstroInferrer(BaseInferrer):
         self.dataset.set_hardcode_data(self.coords_source, coords)
         self.dataset_length = len(coords)
 
-    def _log_data(self, field, fname=None, gt_field=None, mask=None, log_ratio=False):
+    def _log_data(self, field, fname=None, gt_field=None, mask=None,
+                  log_ratio=False, log_to_console=True
+    ):
         """ Log estimated and gt data is specified.
             If `fname` is not None, we save recon data locally.
             If `mask` is not None, we apply mask before logging.
@@ -1243,8 +1247,8 @@ class AstroInferrer(BaseInferrer):
         log_ratio = log_ratio and gt_field is not None
 
         if gt_field is not None:
-            gt = torch.stack(getattr(self, gt_field)).detach().cpu().numpy()
-        recon = torch.stack(getattr(self, field)).detach().cpu().numpy()
+            gt = to_numpy(getattr(self, gt_field))
+        recon = to_numpy(getattr(self, field))
         if mask is not None:
             recon = recon[mask]
 
@@ -1258,6 +1262,8 @@ class AstroInferrer(BaseInferrer):
                 with open(fname, "w") as f:
                     f.write(f"{to_save}")
 
+        if not log_to_console: return
+
         if gt_field is None:
             log.info(f"{field}: {recon}")
         elif log_ratio:
@@ -1266,6 +1272,24 @@ class AstroInferrer(BaseInferrer):
         else:
             log.info(f"{gt_field}: {gt}")
             log.info(f"recon {field}: {recon}")
+
+    def _log_redshift_residual_outlier(self, model_id):
+        gt_redshift = torch.stack(self.gt_redshift).detach().cpu().numpy()
+        argmax_redshift = torch.stack(self.argmax_redshift).detach().cpu().numpy()
+        self.redshift_residual = argmax_redshift - gt_redshift
+        fname = join(self.redshift_dir, f"model-{model_id}_redshift_residual.txt")
+        self._log_data("redshift_residual", fname=fname, log_to_console=False)
+
+        ids = np.arange(len(self.redshift_residual))
+        outlier = ids[np.abs(self.redshift_residual) > self.extra_args["redshift_bin_width"]]
+        outlier_gt = gt_redshift[outlier]
+        outlier_est = argmax_redshift[outlier]
+        to_save = np.array(list(outlier) + list(outlier_gt) + list(outlier_est))
+        log.info(f"outlier spectra: {outlier}")
+        log.info(f"gt_redshift: {outlier_gt}")
+        log.info(f"argmax_redshift: {outlier_est}")
+        fname = join(self.redshift_dir, f"model-{model_id}_redshift_outlier.txt")
+        with open(fname, "w") as f: f.write(f"{to_save}")
 
     def _plot_redshift_map(self, model_id):
         if self.extra_args["mark_spectra"]:
@@ -1276,7 +1300,7 @@ class AstroInferrer(BaseInferrer):
         plot_annotated_heat_map = partial(annotated_heat, positions, markers)
 
         re_args = {
-            "fname": model_id,
+            "fname": f"model-{model_id}",
             "dir": self.redshift_dir,
             "verbose": self.verbose,
             "num_bands": 1,
@@ -1298,7 +1322,7 @@ class AstroInferrer(BaseInferrer):
 
         cur_checkpoint_metrics = []
         for i in range(n_figs):
-            fname = f"model{model_id}-plot{i}"
+            fname = f"model-{model_id}-plot{i}"
             lo = i * n_spectrum_per_fig
             hi = min(lo + n_spectrum_per_fig, num_spectra)
 
@@ -1315,10 +1339,10 @@ class AstroInferrer(BaseInferrer):
             if cur_metrics is not None:
                 cur_checkpoint_metrics.extend(cur_metrics)
 
-        log.info("spectrum plotting done")
-
         if len(cur_checkpoint_metrics) != 0:
             self.metrics.append(cur_checkpoint_metrics)
+
+        log.info("spectrum plotting done")
 
     def _recon_gt_spectra_all_bins(self, num_spectra, model_id):
         """ Plot spectrum under all redshift for each spectra
@@ -1366,11 +1390,11 @@ class AstroInferrer(BaseInferrer):
                 loss = calculate_loss(i); print(loss) #;assert 0
                 losses = calculate_bin_wise_loss(
                     self.gt_fluxes, recon_fluxes_all, self.recon_masks, i)
-                fname = join(cur_dir, f"bin_wise_spectra_loss-model{model_id}-spectra{i}")
+                fname = join(cur_dir, f"bin_wise_spectra_loss-model-{model_id}-spectra{i}")
                 np.save(fname, losses)
 
             for j in range(n_figs_each):
-                fname = f"model{model_id}-plot{j}-all_bins"
+                fname = f"model-{model_id}-plot{j}-all_bins"
                 lo = j * n_spectrum_per_fig
                 hi = min(lo + n_spectrum_per_fig, num_bins)
                 m = hi - lo
@@ -1406,15 +1430,19 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["num_spectrum_per_row"],
             redshift_logits, fname, x=bin_centers)
 
-        # plot_precision_recall_all(
-        #     redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
-        #     self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
-        #     self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png"
-        # )
-        plot_precision_recall_single(
-            redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
-            self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
-            f"{fname}_precision_recall.png")
+        if self.extra_args["plot_redshift_precision_recall"]:
+            plot_precision_recall_all(
+                redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
+                self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
+                self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png")
+
+        if self.extra_args["plot_redshift_precision_recall_together"]:
+            plot_precision_recall_single(
+                redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
+                self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
+                f"{fname}_precision_recall.png")
+
+        log.info("redshift logits plotting done")
 
     def configure_img_metrics(self):
         self.metric_options = self.extra_args["metric_options"]

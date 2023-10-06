@@ -88,7 +88,8 @@ class RedshiftDecoder(nn.Module):
                 logits = self.redshift_decoder(latents)
                 if init_redshift_prob is not None:
                     logits = logits + init_redshift_prob
-                ret["redshift_logits"] = F.softmax(logits, dim=-1) # [bsz,num_bins]
+                # ret["redshift_logits"] = F.softmax(logits, dim=-1) # [bsz,num_bins]
+                ret["redshift_logits"] = logits
         else:
             raise ValueError("Unsupported redshift model method!")
 

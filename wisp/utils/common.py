@@ -85,10 +85,23 @@ def segment_bool_array(arr):
     if lo != -1: segments.append([start, n])
     return segments
 
-def to_numpy(tensor):
+def tensor_to_numpy(tensor, detach=True):
+    if detach: tensor = tensor.detach()
+    if tensor.device != "cpu": tensor = tensor.cpu()
+    tensor = tensor.numpy()
+    return tensor
+
+def to_numpy(tensor, detach=True):
     class_name = tensor.__class__.__name__
-    if class_name == "Tensor":
-        tensor = tensor.numpy()
+    if class_name == "list":
+        sub_class_name = tensor[0].__class__.__name__
+        if sub_class_name == "Tensor":
+            tensor = tensor_to_numpy(torch.stack(tensor))
+        elif sub_class_name == "ndarray" or sub_class_name == "list":
+            tensor = np.array(tensor)
+        else: raise ValueError()
+    elif class_name == "Tensor":
+        tensor = tensor_to_numpy(torch.stack(tensor))
     assert tensor.__class__.__name__ == "ndarray"
     return tensor
 
@@ -104,7 +117,7 @@ def get_pretrained_model_fname(log_dir, dname, model_fname):
         dnames.sort()
         pretrained_model_dir = join(log_dir, "..", dnames[-2])
 
-    loss_fname = join(pretrained_model_dir, "loss.npy")
+    loss_fname = join(pretrained_model_dir, "losses", "loss.npy")
 
     pretrained_model_dir = join(pretrained_model_dir, "models")
 

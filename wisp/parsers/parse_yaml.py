@@ -695,6 +695,9 @@ def define_cmd_line_args():
     infer_group.add_argument("--infer-spectra-individually", action="store_true")
     infer_group.add_argument("--codebook-spectra-clip-range", nargs="+")
 
+    infer_group.add_argument("--plot-redshift-precision-recall", action="store_true")
+    infer_group.add_argument("--plot-redshift-precision-recall-together", action="store_true")
+
     infer_group.add_argument("--num-spectrum-per-fig", type=int,
                              help="number of spectrum in each figure.")
     infer_group.add_argument("--num-spectrum-per-row", type=int,
