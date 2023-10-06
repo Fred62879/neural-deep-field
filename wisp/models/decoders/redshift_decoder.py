@@ -47,6 +47,7 @@ class RedshiftDecoder(nn.Module):
             )
             # self.redshift_decoder.initialize_last_layer_equal()
             # for n,p in self.redshift_decoder.lout.named_parameters(): print(n, p)
+        else: assert self.num_redshift_bins == self.kwargs["redshift_logit_latent_dim"]
 
     def init_redshift_bins(self):
         if self.kwargs["use_gpu"]:
