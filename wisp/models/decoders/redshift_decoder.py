@@ -88,8 +88,10 @@ class RedshiftDecoder(nn.Module):
                 logits = self.redshift_decoder(latents)
                 if init_redshift_prob is not None:
                     logits = logits + init_redshift_prob
-                # ret["redshift_logits"] = F.softmax(logits, dim=-1) # [bsz,num_bins]
-                ret["redshift_logits"] = logits
+                ret["redshift_logits"] = F.softmax(logits, dim=-1) # [bsz,num_bins]
+                # regu = torch.pow(torch.sum(logits**2, dim=-1, keepdim=True), 0.5)
+                # ret["redshift_logits"] = logits / (regu + 1e-10)
+                # print(torch.sum( ret["redshift_logits"]**2, dim=-1))
         else:
             raise ValueError("Unsupported redshift model method!")
 
