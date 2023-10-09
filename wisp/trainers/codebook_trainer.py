@@ -167,11 +167,16 @@ class CodebookTrainer(BaseTrainer):
                 if self.split_latent:
                     if self.extra_args["zero_init_redshift_latents"]:
                         one_latents = 0.01 * torch.ones(self.num_spectra, red_z_dim)
+                        # zero_latents = torch.zeros(self.num_spectra, red_z_dim)
                         self.redshift_latents = nn.Embedding.from_pretrained(
-                            one_latents, freeze=False)
+                            one_latents, freeze=not self.extra_args["optimize_redshift_latents_for_autodecoder"])
                     else:
                         set_seed(self.extra_args["seed"] + 2)
-                        self.redshift_latents = nn.Embedding(self.num_spectra, red_z_dim)
+                        self.redshift_latents = nn.Embedding(
+                            self.num_spectra, red_z_dim
+                        ).requires_grad_(
+                            self.extra_args["optimize_redshift_latents_for_autodecoder"]
+                        )
                         # a = self.redshift_latents.weight[0:1].tile(self.num_spectra, 1)
                         # self.redshift_latents = nn.Embedding.from_pretrained(
                         #     a, freeze=False)
@@ -281,7 +286,8 @@ class CodebookTrainer(BaseTrainer):
                 elif "spatial.decoder.decode" in name:
                     spectra_logit_params.append(self.params_dict[name])
 
-            if self.split_latent:
+            if self.split_latent and \
+               self.extra_args["optimize_redshift_latents_for_autodecoder"]:
                 params.append({"params": redshift_latents,
                                "lr": self.extra_args["latents_lr"]})
             if not self.extra_args["apply_gt_redshift"]:
@@ -635,7 +641,9 @@ class CodebookTrainer(BaseTrainer):
                 checkpoint["latents"], freeze=self.mode=="redshift_pretrain")
             if self.split_latent:
                 self.redshift_latents = nn.Embedding.from_pretrained(
-                    checkpoint["redshift_latents"], freeze=False)
+                    checkpoint["redshift_latents"],
+                    freeze=self.extra_args["optimize_redshift_latents_for_autodecoder"]
+                )
 
             # re-init
             self.collect_model_params()

@@ -13,7 +13,7 @@ global:
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
     tasks: ['codebook_pretrain_infer','save_redshift','recon_gt_spectra'] #,'save_qtz_weights','recon_codebook_spectra','save_pixel_values','recon_codebook_spectra_individ','recon_img','integrate_gt_spectra']
     tasks: ['redshift_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    tasks: ['redshift_pretrain_infer','plot_redshift_logits','save_redshift','recon_gt_spectra'] #'recon_gt_spectra_all_bins'
+    #tasks: ['redshift_pretrain_infer','plot_redshift_logits','save_redshift','recon_gt_spectra'] #'recon_gt_spectra_all_bins'
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -37,11 +37,12 @@ global:
 debug:
     add_redshift_logit_bias: False
     plot_logits_for_gt_bin: False
-    plot_individ_spectra_loss: False
+    plot_individ_spectra_loss: True
     calculate_bin_wise_spectra_loss: False
-    direct_optimize_latents_for_redshift: True
     use_debug_spectra_data: True
     zero_init_redshift_latents: False
+    direct_optimize_latents_for_redshift: False
+    optimize_redshift_latents_for_autodecoder: True
 
 optimizer:
     optimizer_type: 'adam'
@@ -49,9 +50,9 @@ optimizer:
     b2: 0.999
     lr: 1e-4
     grid_lr: 1e-3
-    latents_lr: 1e-1
+    latents_lr: 1e-4
     codebook_lr: 1e-6
-    codebook_pretrain_lr: 1e-1
+    codebook_pretrain_lr: 1e-4
     weight_decay: 1e-5
     grid_lr_weight: 100
 
@@ -106,21 +107,21 @@ grid:
 pretrain:
     pretrain_codebook: True
 
-    pretrain_batch_size: 20 #8 #1500
+    pretrain_batch_size: 10 #20 #1500
     pretrain_pixel_beta: 1
     pretrain_redshift_beta: 0.1
 
-    pretrain_log_dir: '20230919-185032_codebook_pretrain_100_spectra_10k_epochs' #'20230910-232020_codebook_pretrain_6k_spectra_60k_epochs'
+    pretrain_log_dir: '20230919-185032_codebook_pretrain_100_spectra_10k_epochs'
     pretrained_model_name: 'model-ep10000-it0.pth'
 
     split_latent: True
 
     spatial_latent_dim: 32
     scaler_latent_dim: 0
-    redshift_logit_latent_dim: 330
+    redshift_logit_latent_dim: 16 #330
 
     pretrain_use_all_wave: False
-    pretrain_num_wave_samples: 50 #100 #30
+    pretrain_num_wave_samples: 100 #30
     pretrain_wave_sample_method: 'uniform' #_non_random'
 
     pretrain_pixel_supervision: False
@@ -167,7 +168,7 @@ spatial_decod:
     scaler_decod_activation_type: 'relu'
     scaler_decod_skip_layers: []
 
-    redshift_decod_hidden_dim: 1024
+    redshift_decod_hidden_dim: 2048
     redshift_decod_num_hidden_layers: 1
     redshift_decod_layer_type: 'none'
     redshift_decod_activation_type: 'relu'
@@ -196,16 +197,16 @@ trainer:
     regu_redshift_logits: False
     redshift_logits_regu_method: 'laplace' #'l1_excl_largest'
 
-    num_epochs: 1000
+    num_epochs: 600
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 100
+    log_cli_every: 200
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 100
+    save_model_every: 200
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -243,9 +244,9 @@ trainer:
     train_num_wave_samples: 50
     spectra_supervision_num_wave_samples: 100
 
-    resume_train: False
-    resume_log_dir: '20231005-184020_100_to_100_1024_dim_2k_epochs_resumed'
-    resume_model_fname: 'model-ep1000-it0.pth'
+    resume_train: True
+    resume_log_dir: '20231009-124112_2048_dim_100_samples_1.4k_epochs_resumed'
+    resume_model_fname: 'model-ep400-it0.pth'
     #### ***********************************
 
 infer:
@@ -263,7 +264,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20231004-203706'
+    # infer_log_dir: '20231008-214522_2048_dim_rand_1k_epochs_same_lr_150_samples'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
@@ -301,7 +302,7 @@ infer:
     infer_spectra_individually: False
 
     plot_redshift_precision_recall: False
-    plot_redshift_precision_recall_together: False
+    plot_redshift_precision_recall_together: True
 
     num_spectrum_per_fig: 20
     num_spectrum_per_row: 5

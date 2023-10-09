@@ -815,8 +815,8 @@ class AstroInferrer(BaseInferrer):
             self.recon_fluxes = torch.stack(self.recon_fluxes).view(
                 num_spectra, self.neighbour_size**2, -1).detach().cpu().numpy()
 
-        if self.recon_gt_spectra:
-            self._recon_gt_spectra(num_spectra, model_id)
+        #if self.recon_gt_spectra:
+        #    self._recon_gt_spectra(num_spectra, model_id)
 
         if self.recon_gt_spectra_all_bins:
             self._recon_gt_spectra_all_bins(num_spectra, model_id)
@@ -1284,7 +1284,7 @@ class AstroInferrer(BaseInferrer):
         outlier = ids[np.abs(self.redshift_residual) > self.extra_args["redshift_bin_width"]]
         outlier_gt = gt_redshift[outlier]
         outlier_est = argmax_redshift[outlier]
-        to_save = np.array(list(outlier) + list(outlier_gt) + list(outlier_est))
+        to_save = np.array(list(outlier) + list(outlier_gt) + list(outlier_est)).reshape(3,-1)
         log.info(f"outlier spectra: {outlier}")
         log.info(f"gt_redshift: {outlier_gt}")
         log.info(f"argmax_redshift: {outlier_est}")

@@ -132,9 +132,10 @@ def define_cmd_line_args():
     debug_group.add_argument("--plot-logits-for-gt-bin", action="store_true")
     debug_group.add_argument("--plot-individ-spectra-loss", action="store_true")
     debug_group.add_argument("--calculate-bin-wise-spectra-loss", action="store_true")
-    debug_group.add_argument("--direct-optimize-latents-for-redshift", action="store_true")
     debug_group.add_argument("--use-debug-spectra-data", action="store_true")
     debug_group.add_argument("--zero-init-redshift-latents", action="store_true")
+    debug_group.add_argument("--direct-optimize-latents-for-redshift", action="store_true")
+    debug_group.add_argument("--optimize-redshift-latents-for-autodecoder", action="store_true")
 
     ###################
     # General global network things
