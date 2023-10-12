@@ -188,7 +188,7 @@ def get_input_latent_dim(**kwargs):
         "redshift_pretrain_infer" in kwargs["tasks"] or \
         kwargs["main_train_with_pretrained_latents"]
        ):
-        latents_dim = kwargs["spatial_latent_dim"]
+        latents_dim = kwargs["spectra_latent_dim"]
     elif kwargs["coords_encode_method"] == "positional_encoding":
         latents_dim = kwargs["coords_embed_dim"]
     elif kwargs["coords_encode_method"] == "grid":
@@ -394,16 +394,21 @@ def includes_layer(target_layers, source_layer):
         if target_layer in source_layer: return True
     return False
 
-def load_pretrained_model_weights(model, pretrained_state, shared_layer_names=None):
+def load_pretrained_model_weights(model, pretrained_state, shared_layer_names=None, excls=[]):
     """ Load weights from saved model.
         Loading is performed for only layers in both the given model and
           the pretrained state and in `shared_layer_names` if not None.
+        Also, we don't load layers included in excls.
     """
     pretrained_dict = {}
     cur_state = model.state_dict()
     for n in cur_state.keys():
-        if n in pretrained_state and (
-                shared_layer_names is None or includes_layer(shared_layer_names, n)
+        to_exclude = False
+        for excl in excls:
+            if excl in n: to_exclude = True
+
+        if not to_exclude and (n in pretrained_state and (
+                shared_layer_names is None or includes_layer(shared_layer_names, n))
         ):
             pretrained_dict[n] = pretrained_state[n]
         else: pretrained_dict[n] = cur_state[n]

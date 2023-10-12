@@ -93,7 +93,7 @@ class AstroInferrer(BaseInferrer):
 
             if self.mode == "redshift_pretrain_infer":
                 self.dataset.set_spectra_source("val")
-                if self.extra_args["redshift_pretrain_with_same_latents"]:
+                if self.extra_args["sample_from_codebook_pretrain_spectra"]:
                     self.num_spectra = self.extra_args["redshift_pretrain_num_spectra"]
                 else: self.num_spectra = self.dataset.get_num_validation_spectra()
             else:
@@ -196,7 +196,6 @@ class AstroInferrer(BaseInferrer):
         self.redshift_semi_supervision = self.model_redshift and \
             self.extra_args["redshift_semi_supervision"]
         if self.codebook_pretrain_infer: assert self.apply_gt_redshift
-        # if self.redshift_pretrain_infer: assert not self.apply_gt_redshift
         self.classify_redshift = get_bool_classify_redshift(**self.extra_args)
 
         # i) infer all coords using original model
@@ -266,14 +265,14 @@ class AstroInferrer(BaseInferrer):
         # keep only tasks required to perform
         self.group_tasks = []
 
-        if self.recon_img or \
-           self.save_qtz_weights or self.save_scaler or \
-           self.plot_embed_map or self.plot_latent_embed:
+        if self.recon_img: # or \
+           # self.save_qtz_weights or self.save_scaler or \
+           # self.plot_embed_map or self.plot_latent_embed:
             self.group_tasks.append("infer_all_coords_full_model")
 
-        if self.recon_gt_spectra or self.recon_gt_spectra_all_bins or \
-           self.save_qtz_weights or self.save_redshift:
-            self.group_tasks.append("infer_selected_coords_partial_model")
+        if self.recon_gt_spectra or self.recon_gt_spectra_all_bins: # or \
+           # self.save_qtz_weights or self.save_redshift:
+           self.group_tasks.append("infer_selected_coords_partial_model")
 
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
             self.group_tasks.append("infer_hardcode_coords_modified_model")
@@ -307,7 +306,9 @@ class AstroInferrer(BaseInferrer):
             self.wave_source = "spectra"
             self.coords_source = "spectra_latents"
             self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
-            self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
+            if not self.use_all_wave:
+                self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
+                self.wave_sample_method = self.extra_args["pretrain_infer_wave_sample_method"]
 
             self.requested_fields.append("spectra_source_data")
             if self.recon_img: # _sup_spectra
@@ -389,7 +390,7 @@ class AstroInferrer(BaseInferrer):
 
             self.requested_fields.extend([
                 "spectra_source_data","spectra_masks","spectra_redshift"])
-            if self.split_latent:
+            if not self.apply_gt_redshift and self.split_latent:
                 self.requested_fields.append("redshift_latents")
 
             if self.infer_selected:
@@ -762,7 +763,7 @@ class AstroInferrer(BaseInferrer):
     def run_checkpoint_selected_coords_partial_model(self, model_id, checkpoint):
         if self.pretrain_infer:
             self._set_coords_from_checkpoint(checkpoint)
-            if self.split_latent:
+            if not self.apply_gt_redshift and self.split_latent:
                 self.dataset.set_hardcode_data(
                     "redshift_latents", checkpoint["redshift_latents"])
 
@@ -815,8 +816,8 @@ class AstroInferrer(BaseInferrer):
             self.recon_fluxes = torch.stack(self.recon_fluxes).view(
                 num_spectra, self.neighbour_size**2, -1).detach().cpu().numpy()
 
-        #if self.recon_gt_spectra:
-        #    self._recon_gt_spectra(num_spectra, model_id)
+        if self.recon_gt_spectra:
+            self._recon_gt_spectra(num_spectra, model_id)
 
         if self.recon_gt_spectra_all_bins:
             self._recon_gt_spectra_all_bins(num_spectra, model_id)
@@ -843,8 +844,8 @@ class AstroInferrer(BaseInferrer):
                 self._log_data("redshift", gt_field="gt_redshift")
 
         if self.save_qtz_weights:
-            fname = join(self.qtz_weights_dir, f"model-{model_id}")
-            self._log_data("qtz_weights", fname=fname)
+            fname = join(self.qtz_weights_dir, f"model-{model_id}.npy")
+            self._log_data("qtz_weights", fname=fname, log_to_console=False)
 
         # if self.save_pixel_values:
         #     self.recon_pixels = self.trans_obj.integrate(recon_fluxes)

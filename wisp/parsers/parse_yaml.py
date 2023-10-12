@@ -111,6 +111,7 @@ def define_cmd_line_args():
     global_group.add_argument("--seed", type=int, default=42, help="global random seed.")
     global_group.add_argument("--exp-name", type=str, default="unnamed_experiment",
                               help="Experiment name.")
+    global_group.add_argument("--log-fname", type=str, help="Log dir name")
     global_group.add_argument("--tasks", nargs="+", type=str,
                               choices=["train",
                                        "plot_embed_map_during_train","save_codebook",
@@ -132,10 +133,20 @@ def define_cmd_line_args():
     debug_group.add_argument("--plot-logits-for-gt-bin", action="store_true")
     debug_group.add_argument("--plot-individ-spectra-loss", action="store_true")
     debug_group.add_argument("--calculate-bin-wise-spectra-loss", action="store_true")
-    debug_group.add_argument("--use-debug-spectra-data", action="store_true")
+
+    debug_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
+    debug_group.add_argument("--optimize-spectra-latents", action="store_true")
+
+    debug_group.add_argument("--sample-from-codebook-pretrain-spectra", action="store_true",
+                             help="sample spectra for redshift pretrain from spectra \
+                             used for codebook pretrain.")
+    debug_group.add_argument("--load-pretrained-latents-and-freeze", action="store_true",
+                             help="use same latents as codebook pretrain during \
+                             redshift pretrain.")
+
     debug_group.add_argument("--zero-init-redshift-latents", action="store_true")
-    debug_group.add_argument("--direct-optimize-latents-for-redshift", action="store_true")
-    debug_group.add_argument("--optimize-redshift-latents-for-autodecoder", action="store_true")
+    debug_group.add_argument("--optimize-redshift-latents", action="store_true")
+    debug_group.add_argument("--optimize-redshift-latents-as-logits", action="store_true")
 
     ###################
     # General global network things
@@ -298,11 +309,6 @@ def define_cmd_line_args():
                                 help="performe pretraining with 2d coords instead of \
                                 optimizing latent variables")
 
-    # pretrain_group.add_argument("--pretrain-latent-dim", type=int)
-
-    pretrain_group.add_argument("--redshift-pretrain-with-same-latents", action="store_true",
-                                help="use same latents as codebook pretrain during \
-                                redshift pretrain")
     pretrain_group.add_argument("--redshift-pretrain-num-spectra", type=float, default=1,
                                 help="num of spectra used for redshift pretrain, used to \
                                 sample a subset of spectra from codebook pretrain spectra.")
@@ -489,9 +495,10 @@ def define_cmd_line_args():
                              choices=list(str2optim.keys()), help="Optimizer to be used.")
 
     optim_group.add_argument("--lr", type=float, default=0.0001)
-    optim_group.add_argument("--grid_lr", type=float, default=0.001)
-    optim_group.add_argument("--latents_lr", type=float, default=0.001)
+    optim_group.add_argument("--grid-lr", type=float, default=0.001)
     optim_group.add_argument("--codebook-lr", type=float, default=0.0001)
+    optim_group.add_argument("--spectra-latents-lr", type=float, default=0.001)
+    optim_group.add_argument("--redshift-latents-lr", type=float, default=0.001)
     optim_group.add_argument("--codebook-pretrain-lr", type=float, default=0.0001)
 
     optim_group.add_argument("--weight-decay", type=float, default=0, help="Weight decay.")
@@ -546,7 +553,7 @@ def define_cmd_line_args():
     train_group.add_argument("--split-latent", action="store_true",
                              help="use different latents for each decoder.")
     train_group.add_argument("--scaler-latent-dim", type=int)
-    train_group.add_argument("--spatial-latent-dim", type=int)
+    train_group.add_argument("--spectra-latent-dim", type=int)
     train_group.add_argument("--redshift-logit-latent-dim", type=int)
 
     train_group.add_argument("--train-with-all-pixels", action="store_true")

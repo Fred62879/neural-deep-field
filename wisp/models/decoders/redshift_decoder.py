@@ -36,7 +36,7 @@ class RedshiftDecoder(nn.Module):
             output_dim = self.num_redshift_bins
         else: raise ValueError("Unsupported redshift modeling method!")
 
-        if not self.kwargs["direct_optimize_latents_for_redshift"]:
+        if not self.kwargs["optimize_redshift_latents_as_logits"]:
             self.redshift_decoder = BasicDecoder(
                 self.input_dim, output_dim,
                 get_activation_class(self.kwargs["redshift_decod_activation_type"]),
@@ -83,7 +83,7 @@ class RedshiftDecoder(nn.Module):
         elif self.redshift_model_method == "classification":
             ret["redshift"]= self.redshift_bin_center # [num_bins]
 
-            if self.kwargs["direct_optimize_latents_for_redshift"]:
+            if self.kwargs["optimize_redshift_latents_as_logits"]:
                 ret["redshift_logits"] = F.softmax(redshift_latents, dim=-1)
             else:
                 logits = self.redshift_decoder(latents)

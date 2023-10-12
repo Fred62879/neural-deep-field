@@ -111,6 +111,8 @@ class BaseTrainer(ABC):
         self.log_dict = {}
 
         self.log_fname = f'{datetime.now().strftime("%Y%m%d-%H%M%S")}'
+        if self.extra_args["log_fname"] is not None:
+            self.log_fname += "-" + self.extra_args["log_fname"]
         self.log_dir = os.path.join(extra_args["log_dir"], self.exp_name, self.log_fname)
 
         # Default TensorBoard Logging
