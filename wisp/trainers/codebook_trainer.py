@@ -195,8 +195,10 @@ class CodebookTrainer(BaseTrainer):
                 self.latents = nn.Embedding(self.num_spectra, sp_z_dim)
 
             # model params
-            if self.extra_args["optimize_codebook_logits_mlp"]:
+            if not self.extra_args["load_pretrained_codebook_logits_mlp"]:
                 load_excls.append("spatial_decoder.decode")
+
+            if self.extra_args["optimize_codebook_logits_mlp"]:
                 freeze_excls.append("spatial_decoder.decode")
 
             if not self.extra_args["optimize_redshift_latents_as_logits"]:
@@ -297,7 +299,7 @@ class CodebookTrainer(BaseTrainer):
                     redshift_latents.append(self.params_dict[name])
                 elif "redshift_decoder" in name:
                     redshift_logit_params.append(self.params_dict[name])
-                elif "spatial.decoder.decode" in name:
+                elif "spatial_decoder.decode" in name:
                     spectra_logit_params.append(self.params_dict[name])
 
             # redshift parameters
@@ -432,6 +434,10 @@ class CodebookTrainer(BaseTrainer):
 
     def end_train(self):
         self.writer.close()
+
+        if self.plot_grad_every != -1:
+            plt.savefig(self.grad_fname)
+            plt.close()
 
         if self.plot_loss:
             x = np.arange(len(self.losses))
@@ -595,8 +601,8 @@ class CodebookTrainer(BaseTrainer):
         total_loss.backward()
         self.timer.check("backward done")
 
-        if self.plot_grad_every != -1 and (self.epoch == 0 or \
-           (self.plot_grad_every % self.epoch == 0)):
+        if self.plot_grad_every != -1 and \
+           (self.epoch == 0 or (self.epoch % self.plot_grad_every == 0)):
             plot_grad_flow(self.params_dict.items(), self.grad_fname)
 
         self.optimizer.step()
@@ -788,7 +794,8 @@ class CodebookTrainer(BaseTrainer):
 
             self.log_dict["redshift_logits_regu"] += redshift_logits_regu
 
-        total_loss = spectra_loss + recon_loss*self.recon_beta + redshift_logits_regu
+        total_loss = spectra_loss + recon_loss*self.recon_beta + \
+            redshift_logits_regu*self.extra_args["redshift_logits_regu_beta"]
 
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss calculated")

@@ -457,15 +457,19 @@ class AstroInferrer(BaseInferrer):
 
         if self.recon_codebook_spectra:
             self.wave_source = "full_spectra"
-        elif self.pretrain_infer:
-            self.wave_source = "spectra"
-            self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
-            self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
-        else: self.wave_source = "trans"
+        elif self.recon_codebook_spectra_individ:
+            if self.pretrain_infer:
+                self.wave_source = "spectra"
+                self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
+                self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
+            else: self.wave_source = "trans"
+        else: raise ValueError()
 
         if self.recon_codebook_spectra:
             self.coords_source = "codebook_latents"
             self.dataset_length = self.qtz_n_embd
+            if self.extra_args["plot_clipped_spectrum"]:
+                self.requested_fields.append("spectra_masks")
 
         elif self.recon_codebook_spectra_individ:
             if self.pretrain_infer:
@@ -886,6 +890,7 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             spectra_wave = torch.stack(self.spectra_wave_c).view(
                 self.dataset_length, -1).detach().cpu().numpy()
+            spectra_masks = None
             spectra_masks = torch.stack(self.spectra_masks_c).bool().view(
                 self.dataset_length, -1).detach().cpu().numpy()
 
@@ -931,6 +936,7 @@ class AstroInferrer(BaseInferrer):
 
             cur_dir = join(dir, f"spectra-{i}")
             Path(cur_dir).mkdir(parents=True, exist_ok=True)
+
             self.dataset.plot_spectrum(
                 cur_dir, fname, self.extra_args["flux_norm_cho"],
                 None, None, wave, codebook_spectra,
@@ -1157,16 +1163,20 @@ class AstroInferrer(BaseInferrer):
                     spectra = ret["spectra"]
                 elif self.recon_codebook_spectra_individ:
                     spectra = ret["codebook_spectra"]
+                else: raise ValueError()
                 self.codebook_spectra.extend(spectra)
 
                 if self.recon_codebook_spectra:
                     self.spectra_wave_c.extend(data["wave"])
-                    self.spectra_masks_c.extend(data["spectra_masks"])
-                else: # if self.recon_codebook_spectra_individ:
+                    # self.spectra_masks_c.extend(data["spectra_masks"])
+
+                elif self.recon_codebook_spectra_individ:
                     if self.pretrain_infer:
                         self.spectra_wave_ci.extend(data["wave"])
                         self.spectra_masks_ci.extend(data["spectra_masks"])
                         self.redshift.extend(data["spectra_redshift"])
+
+                else: raise ValueError()
 
             except StopIteration:
                 log.info("codebook spectra forward done")

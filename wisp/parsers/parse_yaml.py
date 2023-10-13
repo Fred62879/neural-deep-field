@@ -136,6 +136,7 @@ def define_cmd_line_args():
 
     debug_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
     debug_group.add_argument("--optimize-spectra-latents", action="store_true")
+    debug_group.add_argument("--load-pretrained-codebook-logits-mlp", action="store_true")
 
     debug_group.add_argument("--sample-from-codebook-pretrain-spectra", action="store_true",
                              help="sample spectra for redshift pretrain from spectra \
@@ -295,6 +296,11 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--pretrain-batch-size", type=int, default=512)
     pretrain_group.add_argument("--pretrain-pixel-beta", type=float)
     pretrain_group.add_argument("--pretrain-redshift-beta", type=float)
+
+    pretrain_group.add_argument("--regu-redshift-logits", action="store_true")
+    pretrain_group.add_argument("--redshift-logits-regu-beta", type=float)
+    pretrain_group.add_argument("--redshift-logits-regu-method",type=str,
+                             choices=["l1","l1_excl_largest","laplace"])
 
     pretrain_group.add_argument("--pretrain-log-dir", type=str)
     pretrain_group.add_argument("--pretrained-model-name", type=str)
@@ -545,10 +551,6 @@ def define_cmd_line_args():
     train_group.add_argument("--pixel-loss-cho",type=str, choices=["l1","l2"])
     train_group.add_argument("--spectra-loss-cho",type=str, choices=["l1","l2"])
     train_group.add_argument("--redshift-loss-cho",type=str, choices=["l1","l2"])
-
-    train_group.add_argument("--regu-redshift-logits", action="store_true")
-    train_group.add_argument("--redshift-logits-regu-method",type=str,
-                             choices=["l1","l1_excl_largest","laplace"])
 
     train_group.add_argument("--split-latent", action="store_true",
                              help="use different latents for each decoder.")
