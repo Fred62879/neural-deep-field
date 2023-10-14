@@ -5,8 +5,7 @@ import torch.nn.functional as F
 
 from functools import partial
 from wisp.utils import PerfTimer
-from wisp.utils.common import print_shape, \
-    get_input_latent_dim, get_bool_classify_redshift
+from wisp.utils.common import get_input_latent_dim, get_bool_classify_redshift
 
 from wisp.models.decoders import Decoder, BasicDecoder
 from wisp.models.activations import get_activation_class
@@ -46,11 +45,9 @@ class HyperSpectralDecoderB(nn.Module):
             self.intensifier = Intensifier(kwargs["intensification_method"])
         self.inte = HyperSpectralIntegrator(integrate=integrate, **kwargs)
 
-    def set_bayesian_redshift_logits_calculation(self, loss, mask, gt_spectra):
-        """ Set function to calculate bayesian logits for redshift classification.
-        """
-        self.calculate_bayesian_redshift_logits = partial(
-            calculate_bayesian_redshift_logits, loss, mask, gt_spectra)
+    ##################
+    # Initialization
+    ##################
 
     def get_input_dim(self):
         if self.kwargs["space_dim"] == 2:
@@ -106,8 +103,91 @@ class HyperSpectralDecoderB(nn.Module):
         )
 
     ##################
-    # model forwarding
+    # Setters
     ##################
+
+    def set_batch_reduction_order(self, order="qtz_first"):
+        """ When we do spectra quantization over multiple redshift bins,
+            our forwared spectra has two batch dim.
+            If we want to save spectra under each bin, we need to perform qtz first.
+            If we want to plot codebook spectra, we need to average over all redshift bins first.
+            @Param
+              spectra: [num_redshift_bins,num_embed,bsz,num_smpl]
+              order: `qtz_first` or `bin_avg_first`
+        """
+        self.reduction_order = order
+
+    def set_bayesian_redshift_logits_calculation(self, loss, mask, gt_spectra):
+        """ Set function to calculate bayesian logits for redshift classification.
+        """
+        self.calculate_bayesian_redshift_logits = partial(
+            calculate_bayesian_redshift_logits, loss, mask, gt_spectra)
+
+    ##################
+    # Model forwarding
+    ##################
+
+    def classify_redshift4D(self, spectra, ret):
+        """ @Param
+              spectra [num_redshift_bins,num_embed,bsz,nsmpl]
+              ret["redshift_logits"] [bsz,num_redshift_bins]
+            @Return
+              spectra [num_embed,bsz,nsmpl]
+        """
+        assert self.kwargs["redshift_classification_method"] == "weighted_avg"
+        num_embed = spectra.shape[1]
+        spectra = torch.einsum("ij,jkim->kim", ret["redshift_logits"], spectra)
+        # spectra = torch.matmul(
+        #     ret["redshift_logits"][:,None,:,None].tile(1,num_embed,1,1), # [bsz,n_embed,1,.]
+        #     spectra.permute(2,1,0,3) # [bsz,n_embed,n_bins,nsmpl]
+        # )[:,:,0]
+        return spectra
+
+    def classify_redshift3D(self, spectra, ret):
+        """ @Param
+              spectra [num_redshift_bins,bsz,nsmpl]
+              ret["redshift_logits"] [bsz,num_redshift_bins]
+            @Return
+              spectra [bsz,nsmpl]
+        """
+        assert self.kwargs["redshift_classification_method"] == "weighted_avg"
+        spectra = torch.matmul(
+            ret["redshift_logits"][:,None], spectra.permute(1,0,2))[:,0]
+        # elif self.kwargs["redshift_classification_method"] == "argmax":
+        #     # spectra = ArgMax.apply(ret["redshift_logits"], spectra)
+        #     ids = ArgMax.apply(ret["redshift_logits"])
+        #     spectra = torch.matmul(ids[:,None], spectra.permute(1,0,2))[:,0]
+        # elif self.kwargs["redshift_classification_method"] == "bayesian_weighted_avg":
+        #     logits = self.calculate_bayesian_redshift_logits(
+        #         spectra, ret["redshift_logits"], **self.kwargs) # [bsz,num_bins]
+        #     spectra = torch.matmul(logits, spectra.permute(1,0,2))[:,0]
+        # else: raise ValueError()
+        return spectra
+
+    def quantize_spectra(self, logits, codebook_spectra, ret, qtz_args):
+        _, spectra = self.qtz(logits, codebook_spectra, ret, qtz_args)
+        spectra = torch.squeeze(spectra, dim=-2) # [...,bsz,nsmpl]
+        return spectra
+
+    def spectra_dim_reduction(self, input, spectra, ret, qtz_args):
+        if self.qtz_spectra:
+            if self.reduction_order == "qtz_first":
+                spectra = self.quantize_spectra(input, spectra, ret, qtz_args)
+                if self.classify_redshift:
+                    ret["spectra_all_bins"] = spectra
+                    spectra = self.classify_redshift3D(spectra, ret)
+
+            elif self.reduction_order == "bin_avg_first":
+                if self.classify_redshift:
+                    spectra = self.classify_redshift4D(spectra, ret)
+                ret["codebook_spectra"] = spectra.permute(1,0,2)
+                spectra = self.quantize_spectra(input, spectra, ret, qtz_args)
+            else:
+                raise ValueError()
+        else:
+            if self.classify_redshift:
+                spectra = self.classify_redshift3D(spectra, ret)
+        return spectra
 
     def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
                             wave_bound, ret, codebook, qtz_args
@@ -126,38 +206,17 @@ class HyperSpectralDecoderB(nn.Module):
                spectra: reconstructed emitted spectra [bsz,num_nsmpl]
         """
         bsz = wave.shape[0]
+
         if self.qtz_spectra:
             codes = codebook.weight[:,None,None].tile(1,bsz,1,1)
-            latents = self.convert(
-                wave, codes, redshift, wave_bound) # [...,num_embed,bsz,nsmpl,dim]
-            codebook_spectra = self.spectra_decoder(latents)[...,0] # [...,num_embed,bsz,nsmpl]
-
-            # input here is logits
-            _, spectra = self.qtz(input, codebook_spectra, ret, qtz_args)
-            spectra = torch.squeeze(spectra, dim=-2) # [...,bsz,nsmpl]
+            latents = self.convert(wave, codes, redshift, wave_bound)
+                                                           # [...,num_embed,bsz,nsmpl,dim]
+            spectra = self.spectra_decoder(latents)[...,0] # [...,num_embed,bsz,nsmpl]
         else:
             latents = self.convert(wave, input, redshift, wave_bound) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
 
-        if self.classify_redshift:
-            # spectra [num_redshift_bins,bsz,nsmpl]; logits [bsz,num_redshift_bins]
-            ret["spectra_all_bins"] = spectra
-
-            if self.kwargs["redshift_classification_method"] == "weighted_avg":
-                spectra = torch.matmul(
-                    ret["redshift_logits"][:,None], spectra.permute(1,0,2))[:,0]
-
-            elif self.kwargs["redshift_classification_method"] == "argmax":
-                # spectra = ArgMax.apply(ret["redshift_logits"], spectra)
-                ids = ArgMax.apply(ret["redshift_logits"])
-                spectra = torch.matmul(ids[:,None], spectra.permute(1,0,2))[:,0]
-
-            elif self.kwargs["redshift_classification_method"] == "bayesian_weighted_avg":
-                logits = self.calculate_bayesian_redshift_logits(
-                    spectra, ret["redshift_logits"], **self.kwargs) # [bsz,num_bins]
-                spectra = torch.matmul(logits, spectra.permute(1,0,2))[:,0]
-
-            else: raise ValueError()
+        spectra = self.spectra_dim_reduction(input, spectra, ret, qtz_args) # [bsz,nsmpl]
 
         if self.scale:
             assert scaler is not None
@@ -229,8 +288,6 @@ class HyperSpectralDecoderB(nn.Module):
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
                           show_memory=self.kwargs["show_memory"])
         timer.reset()
-
-        # print(latents.shape, wave.shape)
 
         perform_spectra_supervision = num_sup_spectra > 0
 

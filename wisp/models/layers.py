@@ -214,7 +214,7 @@ class Quantization(nn.Module):
         """ Soft quantization can be applied at both quantize latent and spectra.
             @Param
               z: logits [bsz,1,num_embed]
-              codebook: codebook spectra [...,num_embed,bsz,embed_dim]
+              codebook: codebook spectra [...,num_embed,bsz,nsmpl]
         """
         if qtz_args["find_embed_id"]:
             min_embed_ids = torch.argmax(z, dim=-1)
@@ -249,8 +249,8 @@ class Quantization(nn.Module):
             if self.classify_redshift:
                 ret["qtz_weights"] = weights[0]
             else: ret["qtz_weights"] = weights
-        if qtz_args["save_codebook_spectra"]:
-            ret["codebook_spectra"] = codebook # [bsz,num_embeds,full_nsmpl]
+        # if qtz_args["save_codebook_spectra"]:
+        #     ret["codebook_spectra"] = codebook # [bsz,num_embeds,full_nsmpl]
         return z_q
 
     def forward(self, z, codebook, ret, qtz_args):

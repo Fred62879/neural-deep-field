@@ -29,6 +29,9 @@ class CodebookPretrainNerf(BaseNeuralField):
     def get_nef_type(self):
         return "codebook_pretrain"
 
+    def set_batch_reduction_order(self, order="qtz_first"):
+        self.hps_decoder.set_batch_reduction_order(order=order)
+
     def set_bayesian_redshift_logits_calculation(self, loss, mask, gt_spectra):
         self.hps_decoder.set_bayesian_redshift_logits_calculation(loss, mask, gt_spectra)
 
