@@ -47,6 +47,7 @@ def plot_multiple(n_per_fig, n_per_row, data, fname, x=None):
             else:          axis = axs[j//ncols, j%ncols]
             if x is None: axis.plot(data[lo+j])
             else:         axis.plot(x, data[lo+j])
+            axis.set_title(i*n_per_fig + j)
 
         fig.tight_layout(); plt.savefig(f"{fname}-{i}"); plt.close()
 

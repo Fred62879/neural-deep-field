@@ -155,7 +155,6 @@ class CodebookTrainer(BaseTrainer):
                 self.extra_args["spectra_latent_dim"])
 
         elif self.mode == "redshift_pretrain":
-            sp_z_dim = self.extra_args["spectra_latent_dim"]
             red_z_dim = self.extra_args["redshift_logit_latent_dim"]
 
             load_excls, freeze_excls = [], []
@@ -179,27 +178,31 @@ class CodebookTrainer(BaseTrainer):
                         self.extra_args["optimize_redshift_latents"])
 
             # spectra latents
-            if self.extra_args["sample_from_codebook_pretrain_spectra"]:
-                if self.extra_args["load_pretrained_latents_and_freeze"]:
-                    # checkpoint comes from codebook pretrain (use sup spectra)
-                    checkpoint = torch.load(self.pretrained_model_fname)
-                    assert checkpoint["latents"].shape[1] == sp_z_dim
+            if self.extra_args["direct_optimize_codebook_logits"]:
+                self.latents = nn.Embedding(self.num_spectra, self.extra_args["qtz_num_embed"])
+            else:
+                sp_z_dim = self.extra_args["spectra_latent_dim"]
+                if self.extra_args["sample_from_codebook_pretrain_spectra"]:
+                    if self.extra_args["load_pretrained_latents_and_freeze"]:
+                        # checkpoint comes from codebook pretrain (use sup spectra)
+                        checkpoint = torch.load(self.pretrained_model_fname)
+                        assert checkpoint["latents"].shape[1] == sp_z_dim
 
-                    # redshift pretrain use val spectra which is a permutation of sup spectra
-                    permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
-                    self.latents = nn.Embedding.from_pretrained(
-                        checkpoint["latents"][permute_ids], freeze=True)
+                        # redshift pretrain use val spectra which is a permutation of sup spectra
+                        permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
+                        self.latents = nn.Embedding.from_pretrained(
+                            checkpoint["latents"][permute_ids], freeze=True)
+                    else:
+                        self.latents = nn.Embedding(self.num_spectra, sp_z_dim)
                 else:
                     self.latents = nn.Embedding(self.num_spectra, sp_z_dim)
-            else:
-                self.latents = nn.Embedding(self.num_spectra, sp_z_dim)
 
             # model params
-            if not self.extra_args["load_pretrained_codebook_logits_mlp"]:
-                load_excls.append("spatial_decoder.decode")
-
-            if self.extra_args["optimize_codebook_logits_mlp"]:
-                freeze_excls.append("spatial_decoder.decode")
+            if not self.extra_args["direct_optimize_codebook_logits"]:
+                if not self.extra_args["load_pretrained_codebook_logits_mlp"]:
+                    load_excls.append("spatial_decoder.decode")
+                if self.extra_args["optimize_codebook_logits_mlp"]:
+                    freeze_excls.append("spatial_decoder.decode")
 
             if not self.extra_args["optimize_redshift_latents_as_logits"]:
                 freeze_excls.append("redshift_decoder")
@@ -325,10 +328,13 @@ class CodebookTrainer(BaseTrainer):
                                "lr": self.extra_args["spectra_latents_lr"]})
 
             # spectra decoder parameters
-            if self.extra_args["optimize_codebook_logits_mlp"] or \
-               not self.extra_args["load_pretrained_latents_and_freeze"]:
-                params.append({"params": spectra_logit_params,
-                               "lr": self.extra_args["codebook_pretrain_lr"]})
+            if self.extra_args["direct_optimize_codebook_logits"]:
+                pass
+            else:
+                if self.extra_args["optimize_codebook_logits_mlp"] or \
+                   not self.extra_args["load_pretrained_latents_and_freeze"]:
+                    params.append({"params": spectra_logit_params,
+                                   "lr": self.extra_args["codebook_pretrain_lr"]})
         else:
             raise ValueError()
 
@@ -578,6 +584,7 @@ class CodebookTrainer(BaseTrainer):
         super().init_log_dict()
         self.log_dict["pixel_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
+        self.log_dict["spectra_latents_regu"] = 0.0
         self.log_dict["redshift_logits_regu"] = 0.0
 
     def pre_step(self):
@@ -770,11 +777,18 @@ class CodebookTrainer(BaseTrainer):
         if self.pixel_supervision:
             gt_pixels = data["spectra_pixels"]
             recon_pixels = ret["intensity"]
-
             recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
+            recon_loss *= self.recon_beta
             self.log_dict["pixel_loss"] += recon_loss.item()
 
         # iii)
+        spectra_latents_regu = 0
+        if self.extra_args["regularize_pretrain_spectra_latents"]:
+            spectra_latents_regu = torch.abs(torch.mean(torch.sum(data["coords"],dim=-1)))
+            spectra_latents_regu *= self.extra_args["spectra_latents_regu_beta"]
+            self.log_dict["spectra_latents_regu"] += spectra_latents_regu.item()
+
+        # iv)
         redshift_logits_regu = 0
         if self.classify_redshift and self.extra_args["regu_redshift_logits"] and \
            self.extra_args["redshift_classification_method"] == "weighted_avg":
@@ -788,14 +802,15 @@ class CodebookTrainer(BaseTrainer):
             elif self.redshift_logits_regu_method == "laplace":
                 redshift_logits_regu = torch.mean(
                     -torch.log( torch.exp(-logits) + torch.exp(-(1-logits)) ) + \
-                    torch.log( torch.FloatTensor(1 + 1/torch.exp(torch.tensor(1))).to(self.device)))
+                    torch.log( torch.FloatTensor(1 + 1/torch.exp(torch.tensor(1))
+                    ).to(self.device)))
             else:
                 raise ValueError("Invalid redshift logit regularization method!")
 
-            self.log_dict["redshift_logits_regu"] += redshift_logits_regu
+            redshift_logits_regu *= self.extra_args["redshift_logits_regu_beta"]
+            self.log_dict["redshift_logits_regu"] += redshift_logits_regu.item()
 
-        total_loss = spectra_loss + recon_loss*self.recon_beta + \
-            redshift_logits_regu*self.extra_args["redshift_logits_regu_beta"]
+        total_loss = spectra_loss + recon_loss + spectra_latents_regu + redshift_logits_regu
 
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss calculated")
@@ -814,6 +829,9 @@ class CodebookTrainer(BaseTrainer):
         log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
         if self.pixel_supervision:
             log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / n)
+        if self.extra_args["regularize_pretrain_spectra_latents"]:
+            log_text += " | spectra latents regu: {:>.3E}".format(
+                self.log_dict["spectra_latents_regu"] / n)
         if self.classify_redshift and \
            self.extra_args["redshift_classification_method"] == "weighted_avg":
             log_text += " | redshift logits regu: {:>.3E}".format(

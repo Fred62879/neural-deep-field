@@ -837,9 +837,10 @@ class AstroInferrer(BaseInferrer):
                 self._log_redshift_residual_outlier(model_id)
                 fname = join(self.redshift_dir, f"model-{model_id}_max_redshift.txt")
                 self._log_data("argmax_redshift", gt_field="gt_redshift",
-                               fname=fname, log_to_console=False)
-                # fname = join(self.redshift_dir, f"model-{model_id}_avg_redshift.txt")
-                # self._log_data("weighted_redshift", fname=fname)
+                               fname=fname)
+                               #fname=fname, log_to_console=False)
+                fname = join(self.redshift_dir, f"model-{model_id}_avg_redshift.txt")
+                self._log_data("weighted_redshift", fname=fname)
             else:
                 self._log_data("redshift", gt_field="gt_redshift")
 
@@ -852,8 +853,8 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_qtz_weights:
             fname = join(self.qtz_weights_dir, f"model-{model_id}.npy")
-            # self._log_data("qtz_weights", fname=fname, log_to_console=False)
-            self._log_data("qtz_weights")
+            self._log_data("qtz_weights", fname=fname, log_to_console=False)
+            # self._log_data("qtz_weights")
 
         # if self.save_pixel_values:
         #     self.recon_pixels = self.trans_obj.integrate(recon_fluxes)

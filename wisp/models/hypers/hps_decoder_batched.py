@@ -32,6 +32,7 @@ class HyperSpectralDecoderB(nn.Module):
         self.intensify = intensify
         self.qtz_spectra = qtz_spectra
 
+        self.reduction_order = "qtz_first"
         self.classify_redshift = _model_redshift and get_bool_classify_redshift(**kwargs)
 
         self.convert = HyperSpectralConverter(

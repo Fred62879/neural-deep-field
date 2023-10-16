@@ -36,6 +36,7 @@ class SpatialDecoder(nn.Module):
         self.qtz_calculate_loss = qtz_calculate_loss
         self.quantization_strategy = kwargs["quantization_strategy"]
         self.decode_spatial_embedding = kwargs["decode_spatial_embedding"]
+        self.direct_optimize_codebook_logits = kwargs["direct_optimize_codebook_logits"]
 
         self.init_model()
 
@@ -112,9 +113,10 @@ class SpatialDecoder(nn.Module):
                 ret["redshift"] = specz
 
         # decode/quantize
-        # print('*', z[0])
         if self.quantize_spectra:
-            logits = self.decode(z)
+            if self.kwargs["direct_optimize_codebook_logits"]:
+                logits = z
+            else: logits = self.decode(z)
         elif self.quantize_z:
             z, q_z = self.qtz(z, codebook.weight, ret, qtz_args)
         elif self.decode_spatial_embedding:

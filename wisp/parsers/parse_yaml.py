@@ -137,6 +137,8 @@ def define_cmd_line_args():
     debug_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
     debug_group.add_argument("--optimize-spectra-latents", action="store_true")
     debug_group.add_argument("--load-pretrained-codebook-logits-mlp", action="store_true")
+    debug_group.add_argument("--direct-optimize-codebook-logits", action="store_true",
+                             help="optimize latents directly as logits without autodecoder.")
 
     debug_group.add_argument("--sample-from-codebook-pretrain-spectra", action="store_true",
                              help="sample spectra for redshift pretrain from spectra \
@@ -148,6 +150,10 @@ def define_cmd_line_args():
     debug_group.add_argument("--zero-init-redshift-latents", action="store_true")
     debug_group.add_argument("--optimize-redshift-latents", action="store_true")
     debug_group.add_argument("--optimize-redshift-latents-as-logits", action="store_true")
+
+    debug_group.add_argument("--regularize-pretrain-spectra-latents", action="store_true",
+                             help="L2 regularize latents for autodecoder during pretrain.")
+    debug_group.add_argument("--spectra-latents-regu-beta", type=float)
 
     ###################
     # General global network things
