@@ -43,7 +43,9 @@ class SpatialDecoder(nn.Module):
     def init_model(self):
         self.input_dim = get_input_latent_dim(**self.kwargs)
 
-        if self.decode_spatial_embedding or self.qtz:
+        if self.quantize_spectra and self.kwargs["direct_optimize_codebook_logits"]:
+            pass
+        elif self.decode_spatial_embedding or self.qtz:
             self.init_decoder()
 
         if self.quantize_z:
@@ -115,7 +117,7 @@ class SpatialDecoder(nn.Module):
         # decode/quantize
         if self.quantize_spectra:
             if self.kwargs["direct_optimize_codebook_logits"]:
-                logits = z
+                logits = F.softmax(z, dim=-1)
             else: logits = self.decode(z)
         elif self.quantize_z:
             z, q_z = self.qtz(z, codebook.weight, ret, qtz_args)

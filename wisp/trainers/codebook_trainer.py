@@ -85,6 +85,10 @@ class CodebookTrainer(BaseTrainer):
         self.split_latent = self.mode == "redshift_pretrain" and \
             self.extra_args["split_latent"]
 
+        self.optimize_spectra_latents = self.extra_args["direct_optimize_codebook_logits"] or \
+            (self.extra_args["optimize_spectra_latents"] and \
+             not self.extra_args["load_pretrained_latents_and_freeze"])
+
         # quantization setups
         self.qtz_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
         self.qtz_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
@@ -149,17 +153,20 @@ class CodebookTrainer(BaseTrainer):
         if self.mode == "codebook_pretrain":
             assert not self.split_latent
 
+            # spectra latents
             set_seed(self.extra_args["seed"] + 1)
-            self.latents = nn.Embedding(
-                self.num_spectra,
-                self.extra_args["spectra_latent_dim"])
+            if self.extra_args["direct_optimize_codebook_logits"]:
+                self.latents = nn.Embedding(
+                    self.num_spectra, self.extra_args["qtz_num_embed"])
+            else:
+                self.latents = nn.Embedding(
+                    self.num_spectra, self.extra_args["spectra_latent_dim"])
 
         elif self.mode == "redshift_pretrain":
-            red_z_dim = self.extra_args["redshift_logit_latent_dim"]
-
             load_excls, freeze_excls = [], []
 
             # redshift latents
+            red_z_dim = self.extra_args["redshift_logit_latent_dim"]
             if self.apply_gt_redshift:
                 pass
             elif self.split_latent:
@@ -178,6 +185,7 @@ class CodebookTrainer(BaseTrainer):
                         self.extra_args["optimize_redshift_latents"])
 
             # spectra latents
+            set_seed(self.extra_args["seed"] + 1)
             if self.extra_args["direct_optimize_codebook_logits"]:
                 self.latents = nn.Embedding(self.num_spectra, self.extra_args["qtz_num_embed"])
             else:
@@ -279,17 +287,23 @@ class CodebookTrainer(BaseTrainer):
     def init_optimizer(self):
         params = []
         if self.mode == "codebook_pretrain":
-            net_params, latents = [], []
+            spectra_latents = []
+            other_params, spectra_logit_params = [], []
             for name in self.params_dict:
                 if name == "latents":
-                    latents.append(self.params_dict[name])
+                    spectra_latents.append(self.params_dict[name])
+                elif "spatial_decoder.decode" in name:
+                    spectra_logit_params.append(self.params_dict[name])
                 else:
-                    net_params.append(self.params_dict[name])
+                    other_params.append(self.params_dict[name])
 
-            params.append({"params": self.latents.weight,
+            params.append({"params": spectra_latents,
                            "lr": self.extra_args["codebook_pretrain_lr"]})
-            params.append({"params": net_params,
+            params.append({"params": other_params,
                            "lr": self.extra_args["codebook_pretrain_lr"]})
+            if not self.extra_args["direct_optimize_codebook_logits"]:
+                params.append({"params": spectra_logit_params,
+                               "lr": self.extra_args["codebook_pretrain_lr"]})
 
         elif self.mode == "redshift_pretrain":
             latents, redshift_latents = [], []
@@ -322,8 +336,7 @@ class CodebookTrainer(BaseTrainer):
                 raise ValueError("Must split latents.")
 
             # spectra latents
-            if self.extra_args["optimize_spectra_latents"] and \
-               not self.extra_args["load_pretrained_latents_and_freeze"]:
+            if self.optimize_spectra_latents:
                 params.append({"params": latents,
                                "lr": self.extra_args["spectra_latents_lr"]})
 
@@ -682,7 +695,9 @@ class CodebookTrainer(BaseTrainer):
             # a = checkpoint["optimizer_state_dict"]
             # b = a["state"];c = a["param_groups"];print(b[0])
             self.latents = nn.Embedding.from_pretrained(
-                checkpoint["latents"], freeze=self.mode=="redshift_pretrain")
+                checkpoint["latents"],
+                freeze=not self.optimize_spectra_latents
+            )
             if not self.apply_gt_redshift and self.split_latent:
                 self.redshift_latents = nn.Embedding.from_pretrained(
                     checkpoint["redshift_latents"],
