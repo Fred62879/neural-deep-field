@@ -45,7 +45,7 @@ debug:
     load_pretrained_codebook_logits_mlp: True
     direct_optimize_codebook_logits: True
 
-    sample_from_codebook_pretrain_spectra: True
+    sample_from_codebook_pretrain_spectra: False
     load_pretrained_latents_and_freeze: False
 
     zero_init_redshift_latents: False
@@ -55,14 +55,16 @@ debug:
     regularize_pretrain_spectra_latents: False
     spectra_latents_regu_beta: 100
 
+    regu_codebook_spectra: True
+
 optimizer:
     optimizer_type: 'adam'
-    optimize_latents_use_lbfgs: True
+    optimize_latents_use_lbfgs: False
     b1: 0.5
     b2: 0.999
     lr: 1e-4
     grid_lr: 1e-3
-    spectra_latents_lr: 1e-2
+    spectra_latents_lr: 1e-1
     redshift_latents_lr: 1e-2
     codebook_lr: 1e-6
     codebook_pretrain_lr: 1e-3
@@ -210,16 +212,16 @@ trainer:
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
-    num_epochs: 100
+    num_epochs: 5000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 10
+    log_cli_every: 500
     log_gpu_every: -1
     plot_grad_every: 1
     save_data_every: -1
-    save_model_every: 10
+    save_model_every: 500
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -407,7 +409,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000  # #spectra to load
-    num_supervision_spectra_upper_bound: 20
+    num_supervision_spectra_upper_bound: 7000
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 
