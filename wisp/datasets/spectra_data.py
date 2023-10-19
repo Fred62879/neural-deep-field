@@ -1049,7 +1049,7 @@ class SpectraData:
         axis.set_title(title)
 
         if plot_gt_spectrum:
-            axis.plot(gt_wave, gt_flux, color="black", label="GT")
+            axis.plot(gt_wave, gt_flux, color="gray", label="GT")
         if plot_recon_spectrum:
             if above_threshold is not None: # plot recon flux according to zncc
                 axis.plot(recon_wave, recon_flux, color="blue", label="Recon.")

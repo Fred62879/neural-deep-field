@@ -505,6 +505,7 @@ def define_cmd_line_args():
 
     optim_group.add_argument("--optimizer-type", type=str, default="adam",
                              choices=list(str2optim.keys()), help="Optimizer to be used.")
+    optim_group.add_argument("--optimize-latents-use-lbfgs", action="store_true")
 
     optim_group.add_argument("--lr", type=float, default=0.0001)
     optim_group.add_argument("--grid-lr", type=float, default=0.001)

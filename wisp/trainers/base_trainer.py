@@ -76,10 +76,10 @@ class BaseTrainer(ABC):
 
         # Optimizer params
         self.optim_cls = optim_cls
+        self.optim_params = optim_params
         self.lr = extra_args["grid_lr"]
         self.weight_decay = extra_args["weight_decay"]
         self.grid_lr_weight = extra_args["grid_lr_weight"]
-        self.optim_params = optim_params
 
         # Training params
         self.exp_name = extra_args["exp_name"]
