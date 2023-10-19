@@ -21,7 +21,8 @@ from wisp.utils.plot import plot_horizontally, plot_embed_map, \
     plot_precision_recall_all, plot_precision_recall_single
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
     sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, to_numpy, \
-    load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, get_loss
+    load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, \
+    get_loss, get_bin_id
 
 
 class AstroInferrer(BaseInferrer):
@@ -1447,13 +1448,25 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
             self.extra_args["redshift_bin_width"])
 
+        # n, nbins = redshift_logits.shape
+        # gt_bin_ids = np.array([
+        #     get_bin_id(self.extra_args["redshift_lo"],
+        #                self.extra_args["redshift_bin_width"], val
+        #     ) for val in gt_redshift
+        # ])[None,:]
+        # indices = np.arange(n)[None,:]
+        # gt_bin_ids = np.concatenate((indices, gt_bin_ids), axis=0)
+        # gt_logits = np.zeros(redshift_logits.shape)
+        # gt_logits[gt_bin_ids[0,:], gt_bin_ids[1,:]] = 0.1
+
         fname = join(self.redshift_dir, f"model-{model_id}_logits")
         np.save(fname, np.concatenate((bin_centers[None,:], redshift_logits), axis=0))
 
         plot_multiple(
             self.extra_args["num_spectrum_per_fig"],
             self.extra_args["num_spectrum_per_row"],
-            redshift_logits, fname, x=bin_centers)
+            redshift_logits, fname, x=bin_centers,vertical_xs=gt_redshift)
+            # y2=gt_logits)
 
         if self.extra_args["plot_redshift_precision_recall"]:
             plot_precision_recall_all(

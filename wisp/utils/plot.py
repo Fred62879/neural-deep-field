@@ -29,7 +29,7 @@ def plot_grad_flow(named_parameters, gradFileName=None):
     plt.xlabel("Layers");plt.ylabel("average gradient")
     plt.title("Gradient flow");plt.grid(True)
 
-def plot_multiple(n_per_fig, n_per_row, data, fname, x=None):
+def plot_multiple(n_per_fig, n_per_row, data, fname, x=None, y2=None, vertical_xs=None):
     n = len(data)
     n_figs = int(np.ceil(n / n_per_fig))
 
@@ -47,6 +47,12 @@ def plot_multiple(n_per_fig, n_per_row, data, fname, x=None):
             else:          axis = axs[j//ncols, j%ncols]
             if x is None: axis.plot(data[lo+j])
             else:         axis.plot(x, data[lo+j])
+            if y2 is not None:
+                if x is None: axis.plot(y2[lo+j], color="orange")
+                else:         axis.plot(x, y2[lo+j], color="orange")
+            if vertical_xs is not None:
+                axis.axvline(x=vertical_xs[lo+j], color="green", linewidth=1, linestyle="--")
+
             axis.set_title(i*n_per_fig + j)
 
         fig.tight_layout(); plt.savefig(f"{fname}-{i}"); plt.close()
