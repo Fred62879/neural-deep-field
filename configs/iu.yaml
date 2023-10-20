@@ -125,7 +125,7 @@ grid:
 pretrain:
     pretrain_codebook: True
 
-    pretrain_batch_size: 3400
+    pretrain_batch_size: 5
     pretrain_pixel_beta: 1
     pretrain_redshift_beta: 0.1
 
@@ -137,6 +137,7 @@ pretrain:
     pretrained_model_name: 'model-ep5000-it0.pth'
 
     split_latent: True
+    use_latents_as_coords: True
 
     spectra_latent_dim: 32
     scaler_latent_dim: 0

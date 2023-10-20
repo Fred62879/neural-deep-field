@@ -40,7 +40,7 @@ class AstroDataset(Dataset):
 
         if self.space_dim == 3:
             self.unbatched_fields = {
-                "wave_data","spectra_data","redshift_data","model_data"
+                "idx","selected_ids","wave_data","spectra_data","redshift_data","model_data"
             }
         else:
             self.unbatched_fields = set()
@@ -252,24 +252,37 @@ class AstroDataset(Dataset):
         # return self.trans_dataset.get_full_wave_bound()
         return self.data["wave_range"]
 
-    def index_selected_data(self, data, idx):
-        """ Index data with both selected_ids and given idx
-              (for selective spectra inferrence only)
-            @Param
-               selected_ids: select from source data (filter index)
-               idx: dataset index (batch index)
+    def __len__(self):
+        """ Length of the dataset in number of coords.
         """
-        if self.mode == "codebook_pretrain_infer" and self.infer_selected:
-            assert "selected_ids" in self.data
-            data = data[self.data["selected_ids"]]
-        return data[idx]
+        return self.dataset_length
+
+    def __getitem__(self, idx: list):
+        """ Sample data from requried fields using given index.
+            Also get unbatched data (trans, spectra etc.).
+        """
+        out = {}
+        batch_size = len(idx)
+        batched_fields = self.requested_fields - self.unbatched_fields
+
+        for field in batched_fields:
+            out[field] = self.get_batched_data(field, idx)
+        self.get_unbatched_data(idx, out)
+
+        # print_shape(out)
+        if self.transform is not None:
+            out = self.transform(out)
+        return out
+
+    ############
+    # Helpers
+    ############
 
     def get_batched_data(self, field, idx):
         if field == "coords":
             if self.coords_source == "fits":
                 data = self.fits_dataset.get_coords()
-            else:
-                data = self.data[self.coords_source]
+            else: data = self.data[self.coords_source]
 
         elif field == "pixels":
             data = self.fits_dataset.get_pixels()
@@ -300,12 +313,54 @@ class AstroDataset(Dataset):
         data = self.index_selected_data(data, idx)
         return data
 
+    def get_unbatched_data(self, idx, out):
+        if "idx" in self.requested_fields:
+            out["idx"] = idx
+
+        self.get_debug_data(out)
+
+        if "model_data" in self.requested_fields:
+            self.get_model_data(out)
+
+        if "wave_data" in self.requested_fields:
+            self.get_wave_data(len(idx), out)
+
+        if "spectra_data" in self.requested_fields:
+            self.get_spectra_data(out)
+
+        if "redshift_data" in self.requested_fields:
+           self.get_redshift_data(out)
+
+    def index_selected_data(self, data, idx):
+        """ Index data with both selected_ids and given idx
+              (for selective spectra inferrence only)
+            @Param
+               selected_ids: select from source data (filter index)
+               idx: dataset index (batch index)
+        """
+        if self.mode == "codebook_pretrain_infer" and self.infer_selected:
+            assert "selected_ids" in self.data
+            data = data[self.data["selected_ids"]]
+        return data[idx]
+
     def get_full_emitted_wave(self):
         """ Get full range of emitted wave.
         """
         mask = self.get_full_spectra_wave_mask()
         full_wave = self.get_full_spectra_wave_coverage()
         return mask, full_wave
+
+    def get_debug_data(self, out):
+        if self.kwargs["plot_logits_for_gt_bin"]:
+            self.get_gt_redshift_bin_ids(out)
+        if self.kwargs["add_redshift_logit_bias"]:
+            self.get_init_redshift_logit_bias(out)
+
+    def get_model_data(self, out):
+        if "scaler_latents" in self.data:
+            out["scaler_latents"] = self.data["scaler_latents"]
+        if "redshift_latents" in self.data:
+            out["redshift_latents"] = self.data["redshift_latents"]
 
     def get_wave_data(self, batch_size, out):
         """ Get wave (lambda and transmission) data depending on data source.
@@ -348,7 +403,8 @@ class AstroDataset(Dataset):
             out["wave"] = out["spectra_source_data"][:,0][...,None] # [bsz,nsmpl,1]
 
             if self.kwargs["regu_codebook_spectra"]:
-                out["full_wave_masks"], out["full_wave"] = self.get_full_emitted_wave()
+                out["full_emitted_wave_masks"], out["full_emitted_wave"] = \
+                    self.get_full_emitted_wave()
 
         elif self.wave_source == "trans":
             # trans wave are not batched, we sample at every step
@@ -431,65 +487,28 @@ class AstroDataset(Dataset):
         out["spectra_semi_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
         del out["spectra_id_map"]
 
-    def get_model_data(self, out):
-        if "scaler_latents" in self.data:
-            out["scaler_latents"] = self.data["scaler_latents"]
-        if "redshift_latents" in self.data:
-            out["redshift_latents"] = self.data["redshift_latents"]
+    ############
+    # Debug data
+    ############
 
-    def get_debug_data(self, out):
-        if self.kwargs["plot_logits_for_gt_bin"]:
-            self.get_gt_redshift_bin_ids(out)
-        if self.kwargs["add_redshift_logit_bias"]:
-            self.get_init_redshift_logit_bias(out)
+    def get_gt_redshift_bin_ids(self, out):
+        out["gt_redshift_bin_ids"] = np.array(
+            [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
+             for val in out["spectra_redshift"]])
 
-    def __len__(self):
-        """ Length of the dataset in number of coords.
-        """
-        return self.dataset_length
-
-    def __getitem__(self, idx: list):
-        """ Sample data from requried fields using given index.
-            Also get unbatched data (trans, spectra etc.).
-        """
-        out = {}
-        batch_size = len(idx)
-        batched_fields = self.requested_fields - self.unbatched_fields
-        # print(batched_fields, self.requested_fields)
-
-        for field in batched_fields:
-            out[field] = self.get_batched_data(field, idx)
-
-        if "wave_data" in self.requested_fields:
-            self.get_wave_data(len(idx), out)
-
-        if "spectra_data" in self.requested_fields:
-            self.get_spectra_data(out)
-
-        if "redshift_data" in self.requested_fields:
-           self.get_redshift_data(out)
-
-        if "model_data" in self.requested_fields:
-            self.get_model_data(out)
-
-        self.get_debug_data(out)
-
-        ## debug
-        # import matplotlib.pyplot as plt
-        # a = out["spectra_source_data"]
-        # b = out["spectra_masks"]
-        # fig, axs = plt.subplots(4, 5, figsize=(5*5,5*4))
-        # for i in range(20):
-        #     axis = axs[i//5, i%5]
-        #     axis.plot(a[i][0][b[i]],a[i][1][b[i]])
-        # fig.tight_layout(); plt.savefig('tmp-val.png'); plt.close()
-        # assert 0
-        ## ends here
-
-        # print_shape(out)
-        if self.transform is not None:
-            out = self.transform(out)
-        return out
+    def get_init_redshift_logit_bias(self, out):
+        bsz = out["spectra_redshift"].shape[0]
+        n_bins = int(np.rint((
+            self.kwargs["redshift_hi"] - self.kwargs["redshift_lo"]) / self.kwargs["redshift_bin_width"]))
+        ids = np.array(
+            [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
+             for val in out["spectra_redshift"]])
+        ids = np.rint(ids).astype(int)
+        init_probs = np.zeros((bsz, n_bins)).astype(np.float32)
+        pos = np.arange(bsz)
+        ids = np.concatenate((pos[None,:],ids[None,:]),axis=0)
+        init_probs[ ids[0,:], ids[1:,] ] = 1
+        out["init_redshift_prob"] = init_probs
 
     ############
     # Utilities
@@ -532,28 +551,4 @@ class AstroDataset(Dataset):
             spectra_ids=spectra_ids,
             gt_masks=gt_masks, recon_masks=recon_masks,
             clip=clip, spectra_clipped=spectra_clipped,
-            calculate_metrics=True, titles=titles
-        )
-
-    ############
-    # Debug data
-    ############
-
-    def get_gt_redshift_bin_ids(self, out):
-        out["gt_redshift_bin_ids"] = np.array(
-            [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
-             for val in out["spectra_redshift"]])
-
-    def get_init_redshift_logit_bias(self, out):
-        bsz = out["spectra_redshift"].shape[0]
-        n_bins = int(np.rint((
-            self.kwargs["redshift_hi"] - self.kwargs["redshift_lo"]) / self.kwargs["redshift_bin_width"]))
-        ids = np.array(
-            [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
-             for val in out["spectra_redshift"]])
-        ids = np.rint(ids).astype(int)
-        init_probs = np.zeros((bsz, n_bins)).astype(np.float32)
-        pos = np.arange(bsz)
-        ids = np.concatenate((pos[None,:],ids[None,:]),axis=0)
-        init_probs[ ids[0,:], ids[1:,] ] = 1
-        out["init_redshift_prob"] = init_probs
+            calculate_metrics=True, titles=titles)

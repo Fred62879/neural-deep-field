@@ -174,7 +174,7 @@ def print_shape(data):
         if p is None:
             print(f"{n} is None")
         elif type(p) == tuple or type(p) == list:
-            print(n, len(p), p[0].dtype, p[0].device)
+            print(n, len(p), p[0].__class__.__name__)
         elif type(p) == torch.Tensor:
             print(n, p.shape, p.dtype, p.device)
         elif type(p) == int:
@@ -308,6 +308,7 @@ def forward(
         space_dim,
         qtz=False,
         qtz_strategy="none",
+        index_latent=False,
         split_latent=False,
         apply_gt_redshift=False,
         codebook_pretrain=False,
@@ -329,8 +330,11 @@ def forward(
         save_spectra_all_bins=False,
         init_redshift_prob=None, # debug
 ):
-    requested_channels = []
-    net_args = {"coords": data["coords"] }
+    net_args, requested_channels = {}, []
+
+    if "coords" in data:
+        net_args["coords"] = data["coords"]
+    else: net_args["coords"] = None
 
     net_args["init_redshift_prob"] = init_redshift_prob # debug
 
@@ -354,11 +358,18 @@ def forward(
         net_args["wave"] = data["wave"]
         net_args["wave_range"] = data["wave_range"] # linear normalization
 
+        if index_latent:
+            if "idx" in data:
+                net_args["idx"] = data["idx"]
+            if "selected_ids" in data:
+                net_args["selected_ids"] = data["selected_ids"]
+
         if split_latent:
             if "scaler_latents" in data:
                 net_args["scaler_latents"] = data["scaler_latents"]
             if "redshift_latents" in data:
                 net_args["redshift_latents"] = data["redshift_latents"]
+
         if apply_gt_redshift:
             net_args["specz"] = data["spectra_redshift"]
         if perform_integration:
@@ -379,8 +390,7 @@ def forward(
             qtz_args["save_codebook_spectra"] = save_codebook_spectra
             net_args["qtz_args"] = qtz_args
         if regu_codebook_spectra:
-            net_args["full_wave"] = data["full_wave"]
-            # net_args["full_wave_masks"] = data["full_wave_masks"]
+            net_args["full_emitted_wave"] = data["full_emitted_wave"]
             requested_channels.append("full_range_codebook_spectra")
     else:
         raise ValueError("Unsupported space dimension.")

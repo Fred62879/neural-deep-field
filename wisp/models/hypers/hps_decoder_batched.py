@@ -251,9 +251,8 @@ class HyperSpectralDecoderB(nn.Module):
     def forward(self, latents,
                 wave, trans, nsmpl, full_wave_bound,
                 trans_mask=None,
-                num_sup_spectra=0, sup_spectra_wave=None,
+                full_emitted_wave=None,
                 codebook=None, qtz_args=None, ret=None,
-                full_wave=None
     ):
         """ @Param
             latents:   (encoded or original) coords or logits for quantization.
@@ -266,11 +265,6 @@ class HyperSpectralDecoderB(nn.Module):
               nsmpl:     average number of lambda samples falling within each band. [num_bands]
               full_wave_bound: min and max value of lambda
                                used for linear normalization of lambda
-            - spectra supervision
-              num_spectra_coords: > 0 if spectra supervision.
-                                  The last #num_spectra_coords entries in latents are for sup.
-              sup_spectra_wave: not None if do spectra supervision.
-                                [num_spectra_coords,full_num_samples]
             - spectra qtz
               codebook    nn.Parameter [num_embed,embed_dim]
               qtz_args
@@ -290,15 +284,13 @@ class HyperSpectralDecoderB(nn.Module):
               intensity: reconstructed pixel values
               sup_spectra: reconstructed spectra used for spectra supervision
         """
-        assert num_sup_spectra >= 0
         bsz = latents.shape[0]
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
                           show_memory=self.kwargs["show_memory"])
         timer.reset()
 
-        # if self.kwargs["regu_codebook_spectra"]:
-        if full_wave is not None:
-            self.forward_codebook_spectra(codebook, full_wave, full_wave_bound, ret)
+        if full_emitted_wave is not None:
+            self.forward_codebook_spectra(codebook, full_emitted_wave, full_wave_bound, ret)
 
         redshift = None if ret["redshift"] is None else \
             ret["redshift"] if self.classify_redshift else ret["redshift"][:bsz]

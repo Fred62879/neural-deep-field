@@ -330,6 +330,9 @@ def define_cmd_line_args():
                                 help="num of spectra used for redshift pretrain, used to \
                                 sample a subset of spectra from codebook pretrain spectra.")
 
+    pretrain_group.add_argument("--use-latents-as-coords", action="store_true",
+                                help="pass latents as coords to model.")
+
     ###################
     # Spatial Decoder arguments
     ###################
@@ -566,6 +569,7 @@ def define_cmd_line_args():
 
     train_group.add_argument("--split-latent", action="store_true",
                              help="use different latents for each decoder.")
+
     train_group.add_argument("--scaler-latent-dim", type=int)
     train_group.add_argument("--spectra-latent-dim", type=int)
     train_group.add_argument("--redshift-logit-latent-dim", type=int)

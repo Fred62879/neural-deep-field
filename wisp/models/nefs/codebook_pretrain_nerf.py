@@ -16,7 +16,8 @@ from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 class CodebookPretrainNerf(BaseNeuralField):
     def __init__(self, decode_redshift=False,
-                 codebook_pretrain_pixel_supervision=False, **kwargs
+                 codebook_pretrain_pixel_supervision=False,
+                 **kwargs
     ):
         self.kwargs = kwargs
 
@@ -24,6 +25,7 @@ class CodebookPretrainNerf(BaseNeuralField):
 
         self.decode_redshift = decode_redshift
         self.pixel_supervision = codebook_pretrain_pixel_supervision
+        self.use_latents_as_coords = kwargs["use_latents_as_coords"]
         self.init_model()
 
     def get_nef_type(self):
@@ -49,15 +51,15 @@ class CodebookPretrainNerf(BaseNeuralField):
         self._register_forward_function(self.pretrain, channels)
 
     def init_model(self):
+        assert self.kwargs["model_redshift"] and \
+            (self.kwargs["apply_gt_redshift"] or self.decode_redshift)
+
         if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
             self.codebook = init_codebook(
                 self.kwargs["qtz_seed"],
                 self.kwargs["qtz_num_embed"],
                 self.kwargs["qtz_latent_dim"])
         else: self.codebook = None
-
-        assert self.kwargs["model_redshift"] and \
-            (self.kwargs["apply_gt_redshift"] or self.decode_redshift)
 
         self.spatial_decoder = SpatialDecoder(
             output_bias=False,
@@ -78,20 +80,31 @@ class CodebookPretrainNerf(BaseNeuralField):
             _model_redshift=self.kwargs["model_redshift"],
             **self.kwargs)
 
-        if self.kwargs["debug_lbfgs"]:
-            self.num_spectra = self.kwargs["redshift_pretrain_num_spectra"]
+        self.num_spectra = self.kwargs["redshift_pretrain_num_spectra"]
+
+        if self.use_latents_as_coords:
             self.latents = nn.Embedding(
                 self.num_spectra, self.kwargs["qtz_num_embed"])
+        if not self.kwargs["apply_gt_redshift"] and self.kwargs["split_latent"]:
             self.redshift_latents = nn.Embedding(
                 self.num_spectra, self.kwargs["redshift_logit_latent_dim"])
 
+    def index_latents(self, data, selected_ids, idx):
+        ret = data
+        if selected_ids is not None:
+            ret = ret[selected_ids]
+        if idx is not None:
+            ret = ret[idx]
+        return ret
+
     def pretrain(self, coords, wave, wave_range,
                  trans=None, trans_mask=None, nsmpl=None,
+                 full_emitted_wave=None,
                  qtz_args=None, specz=None,
-                 scaler_latents=None,
-                 redshift_latents=None,
-                 init_redshift_prob=None, # debug
-                 full_wave=None
+                 scaler_latents=None,    # DELETE
+                 redshift_latents=None,  # DELETE
+                 idx=None, selected_ids=None,
+                 init_redshift_prob=None # debug
     ):
         """ Pretrain codebook.
             @Param
@@ -103,25 +116,32 @@ class CodebookPretrainNerf(BaseNeuralField):
               trans_mask: mask for trans (0 for padded region, 1 for actual trans region)
               nsmpl:  number of lambda sample within each band
 
+              full_emitted_wave:
+
               qtz_args: quantization arguments
 
-              z_scaler: trainable latents for scaler decoder
-
-              z_redshift: trainable latents for redshift decoder
               specz: gt redshift
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
                           show_memory=self.kwargs["show_memory"])
         timer.check("forward starts")
-        # print(coords.shape)
 
         ret = defaultdict(lambda: None)
-        bsz = coords.shape[0]
-        coords = coords[:,None]
 
-        if self.kwargs["debug_lbfgs"]:
-            coords = self.latents.weight[:,None]
+        if self.use_latents_as_coords:
+            assert coords is None
+            coords = self.latents.weight
+            coords = self.index_latents(coords, selected_ids, idx)
+
+        coords = coords[:,None]
+        # print(coords.shape)
+
+        if not self.kwargs["apply_gt_redshift"] and self.kwargs["split_latent"]:
             redshift_latents = self.redshift_latents.weight
+            redshift_latents = self.index_latents(redshift_latents, selected_ids, idx)
+        else: redshift_latents = None
+
+        # print(redshift_latents.shape)
 
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(
@@ -138,7 +158,7 @@ class CodebookPretrainNerf(BaseNeuralField):
             trans_mask=trans_mask,
             codebook=self.codebook,
             qtz_args=qtz_args, ret=ret,
-            full_wave=full_wave
+            full_emitted_wave=full_emitted_wave
         )
         timer.check("hps decoding done")
         return ret
