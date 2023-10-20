@@ -58,17 +58,17 @@ debug:
     regu_codebook_spectra: True
     codebook_spectra_regu_beta: 1
 
-    debug_lbfgs: True
+    debug_lbfgs: False
 
 optimizer:
     optimizer_type: 'adam'
-    optimize_latents_use_lbfgs: False
+    optimize_latents_use_lbfgs: True
     b1: 0.5
     b2: 0.999
     lr: 1e-4
     grid_lr: 1e-3
     spectra_latents_lr: 1e-1
-    redshift_latents_lr: 1e-1
+    redshift_latents_lr: 1e0
     codebook_lr: 1e-6
     codebook_pretrain_lr: 1e-3
     weight_decay: 1e-5
@@ -229,7 +229,7 @@ trainer:
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
-    gpu_data: ['coords','pixels','weights','full_wave','wave','trans','nsmpl','spectra_source_data','spectra_masks','spectra_pixels','spectra_redshift','spectra_wave','spectra_redshift','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift','sup_spectra_wave','sup_spectra_masks','sup_spectra_data','init_redshift_prob','scaler_latents','redshift_latents']
+    gpu_data: ['coords','pixels','weights','full_wave','full_emitted_wave','wave','trans','nsmpl','spectra_source_data','spectra_masks','spectra_pixels','spectra_redshift','spectra_wave','spectra_redshift','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift','sup_spectra_wave','sup_spectra_masks','sup_spectra_data','init_redshift_prob','scaler_latents','redshift_latents']
 
     learn_spectra_within_wave_range: True
 

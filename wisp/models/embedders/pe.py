@@ -250,6 +250,7 @@ class RandGaus(nn.Module):
     def init_mapping(self, seed):
         mapping = nn.Linear(1, self.pe_dim, bias=self.bias)
         mapping.weight = nn.Parameter(self.randmz_weights(seed),requires_grad=False)
+        mapping.bias.requires_grad = False
         return mapping
 
     def randmz_weights(self, seed):

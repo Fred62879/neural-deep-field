@@ -31,6 +31,11 @@ class CodebookPretrainNerf(BaseNeuralField):
     def get_nef_type(self):
         return "codebook_pretrain"
 
+    def set_latents(self, **kwargs): #latents, redshift_latents):
+        self.latents = kwargs["latents"]
+        self.redshift_latents = kwargs["redshift_latents"]
+        print('**', self.latents.weight.requires_grad, self.redshift_latents.weight.requires_grad)
+
     def set_batch_reduction_order(self, order="qtz_first"):
         self.hps_decoder.set_batch_reduction_order(order=order)
 
@@ -80,14 +85,15 @@ class CodebookPretrainNerf(BaseNeuralField):
             _model_redshift=self.kwargs["model_redshift"],
             **self.kwargs)
 
-        self.num_spectra = self.kwargs["redshift_pretrain_num_spectra"]
-
-        if self.use_latents_as_coords:
-            self.latents = nn.Embedding(
-                self.num_spectra, self.kwargs["qtz_num_embed"])
-        if not self.kwargs["apply_gt_redshift"] and self.kwargs["split_latent"]:
-            self.redshift_latents = nn.Embedding(
-                self.num_spectra, self.kwargs["redshift_logit_latent_dim"])
+        # init latent variables
+        if self.kwargs["debug_lbfgs"]:
+            self.num_spectra = self.kwargs["redshift_pretrain_num_spectra"]
+            if self.use_latents_as_coords:
+                self.latents = nn.Embedding(
+                    self.num_spectra, self.kwargs["qtz_num_embed"])
+            if not self.kwargs["apply_gt_redshift"] and self.kwargs["split_latent"]:
+                self.redshift_latents = nn.Embedding(
+                    self.num_spectra, self.kwargs["redshift_logit_latent_dim"])
 
     def index_latents(self, data, selected_ids, idx):
         ret = data
@@ -134,14 +140,13 @@ class CodebookPretrainNerf(BaseNeuralField):
             coords = self.index_latents(coords, selected_ids, idx)
 
         coords = coords[:,None]
-        # print(coords.shape)
+        # print(coords.device)
 
         if not self.kwargs["apply_gt_redshift"] and self.kwargs["split_latent"]:
             redshift_latents = self.redshift_latents.weight
             redshift_latents = self.index_latents(redshift_latents, selected_ids, idx)
         else: redshift_latents = None
-
-        # print(redshift_latents.shape)
+        # print(redshift_latents.device)
 
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(

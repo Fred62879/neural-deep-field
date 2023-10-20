@@ -232,7 +232,7 @@ class HyperSpectralDecoderB(nn.Module):
 
         return spectra
 
-    def forward_codebook_spectra(self, codebook, full_wave, full_wave_bound, ret):
+    def forward_codebook_spectra(self, codebook, full_emitted_wave, full_wave_bound, ret):
         """
             @Params
               codebook: [num_embed,dim]
@@ -243,7 +243,7 @@ class HyperSpectralDecoderB(nn.Module):
         """
         n = codebook.weight.shape[0]
         latents = self.convert(
-            full_wave[None,:,None].tile(n,1,1),
+            full_emitted_wave[None,:,None].tile(n,1,1),
             codebook.weight[:,None], None, full_wave_bound
         ) # [num_embed,nsmpl,dim]
         ret["full_range_codebook_spectra"] = self.spectra_decoder(latents)[...,0]
