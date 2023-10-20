@@ -35,8 +35,8 @@ class HyperSpectralDecoderB(nn.Module):
         self.reduction_order = "qtz_first"
         self.classify_redshift = _model_redshift and get_bool_classify_redshift(**kwargs)
 
-        self.recon_codebook_spectra = kwargs["regu_codebook_spectra"] and \
-            self.kwargs["space_dim"] == 3 and self.kwargs["quantize_spectra"]
+        # self.recon_codebook_spectra = kwargs["regu_codebook_spectra"] and \
+        #     self.kwargs["space_dim"] == 3 and self.kwargs["quantize_spectra"]
 
         self.convert = HyperSpectralConverter(
             _model_redshift=_model_redshift, **kwargs
@@ -296,7 +296,8 @@ class HyperSpectralDecoderB(nn.Module):
                           show_memory=self.kwargs["show_memory"])
         timer.reset()
 
-        if self.kwargs["regu_codebook_spectra"]:
+        # if self.kwargs["regu_codebook_spectra"]:
+        if full_wave is not None:
             self.forward_codebook_spectra(codebook, full_wave, full_wave_bound, ret)
 
         redshift = None if ret["redshift"] is None else \

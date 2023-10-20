@@ -748,12 +748,12 @@ class CodebookTrainer(BaseTrainer):
             qtz_strategy=self.qtz_strategy,
             split_latent=self.split_latent,
             apply_gt_redshift=self.apply_gt_redshift,
-            classify_redshift=self.classify_redshift,
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
             regu_codebook_spectra=self.regu_codebook_spectra,
             save_spectra=not self.classify_redshift,
             save_redshift=self.save_data and self.save_redshift,
+            save_redshift_logits=self.classify_redshift,
             save_qtz_weights=self.save_data and self.save_qtz_weights,
             save_codebook_spectra=self.save_data and \
                                   self.recon_codebook_spectra_individ,

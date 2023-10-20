@@ -470,8 +470,8 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             self.coords_source = "codebook_latents"
             self.dataset_length = self.qtz_n_embd
-            if self.extra_args["plot_clipped_spectrum"]:
-                self.requested_fields.append("spectra_masks")
+            # if self.extra_args["plot_clipped_spectrum"]:
+            #     self.requested_fields.append("spectra_masks")
 
         elif self.recon_codebook_spectra_individ:
             if self.pretrain_infer:
@@ -897,7 +897,6 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             spectra_wave = torch.stack(self.spectra_wave_c).view(
                 self.dataset_length, -1).detach().cpu().numpy()
-            spectra_masks = None
             spectra_masks = torch.stack(self.spectra_masks_c).bool().view(
                 self.dataset_length, -1).detach().cpu().numpy()
 
@@ -989,14 +988,15 @@ class AstroInferrer(BaseInferrer):
                     qtz=self.qtz,
                     qtz_strategy=self.qtz_strategy,
                     apply_gt_redshift=self.apply_gt_redshift,
-                    classify_redshift=self.classify_redshift,
                     perform_integration=self.perform_integration,
                     trans_sample_method=self.trans_sample_method,
-                    save_qtz_weights=self.save_qtz_weights,
                     save_scaler=self.save_scaler,
+                    save_redshift=self.save_redshift,
                     save_embed_ids=self.plot_embed_map,
                     save_latents=self.plot_latent_embed,
-                    save_redshift=self.save_redshift)
+                    save_qtz_weights=self.save_qtz_weights,
+                    # save_redshift_logits=self.classify_redshift
+                )
 
             if self.recon_img:
                 # artifically generated transmission function (last channel)
@@ -1084,10 +1084,10 @@ class AstroInferrer(BaseInferrer):
                         qtz_strategy=self.qtz_strategy,
                         split_latent=self.split_latent,
                         apply_gt_redshift=self.apply_gt_redshift,
-                        classify_redshift=self.classify_redshift,
-                        save_spectra=self.recon_gt_spectra,
                         save_redshift=self.save_redshift,
+                        save_spectra=self.recon_gt_spectra,
                         save_qtz_weights=self.save_qtz_weights,
+                        save_redshift_logits=self.plot_redshift_logits,
                         save_spectra_all_bins=self.recon_gt_spectra_all_bins,
                         init_redshift_prob= None if "init_redshift_prob" not in data else \
                                                 data["init_redshift_prob"])
@@ -1169,7 +1169,6 @@ class AstroInferrer(BaseInferrer):
                         split_latent=self.split_latent,
                         apply_gt_redshift=self.recon_codebook_spectra_individ and \
                                           self.apply_gt_redshift,
-                        classify_redshift=self.classify_redshift,
                         save_spectra=self.recon_codebook_spectra,
                         save_codebook_spectra=self.recon_codebook_spectra_individ
                     )
@@ -1183,7 +1182,10 @@ class AstroInferrer(BaseInferrer):
 
                 if self.recon_codebook_spectra:
                     self.spectra_wave_c.extend(data["wave"])
-                    # self.spectra_masks_c.extend(data["spectra_masks"])
+                    print(min(data["wave"][0,:,0]), max(data["wave"][0,:,0]))
+                    print(min(data["wave"][1,:,0]), max(data["wave"][1,:,0]))
+                    assert 0
+                    self.spectra_masks_c.extend(data["spectra_masks"])
 
                 elif self.recon_codebook_spectra_individ:
                     if self.pretrain_infer:
