@@ -171,7 +171,16 @@ class CodebookTrainerDebug(BaseTrainer):
         # latents = [self.latents.weight, self.redshift_latents.weight]
         # self.optimizer = torch.optim.LBFGS(latents, **params)
         # self.optimizer = torch.optim.LBFGS([self.redshift_latents.weight], **params)
-        self.optimizer = torch.optim.LBFGS(self.train_pipeline.parameters(), **params)
+        # self.optimizer = torch.optim.LBFGS(self.train_pipeline.parameters(), **params)
+
+        net_params = []
+        for n,p in self.train_pipeline.named_parameters():
+            if n == "nef.latents.weight":
+                net_params.append(p)
+            elif n == "nef.redshift_latents.weight":
+                net_params.append(p)
+
+        self.optimizer = torch.optim.LBFGS(net_params, **params)
 
     def set_num_spectra(self):
         if self.mode == "redshift_pretrain":
@@ -205,8 +214,9 @@ class CodebookTrainerDebug(BaseTrainer):
     def init_dataloader(self):
         """ (Re-)Initialize dataloader.
         """
-        if self.shuffle_dataloader: sampler_cls = RandomSampler
-        else: sampler_cls = SequentialSampler
+        # if self.shuffle_dataloader: sampler_cls = RandomSampler
+        # else: sampler_cls = SequentialSampler
+        sampler_cls = SequentialSampler
 
         sampler = BatchSampler(
             sampler_cls(self.dataset),

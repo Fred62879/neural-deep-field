@@ -84,7 +84,7 @@ class RedshiftDecoder(nn.Module):
             ret["redshift"]= self.redshift_bin_center # [num_bins]
 
             if self.kwargs["optimize_redshift_latents_as_logits"]:
-                ret["redshift_logits"] = F.softmax(redshift_latents, dim=-1)
+                ret["redshift_logits"] = F.softmax(latents, dim=-1)
             else:
                 logits = self.redshift_decoder(latents)
                 if init_redshift_prob is not None:

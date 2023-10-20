@@ -78,6 +78,13 @@ class CodebookPretrainNerf(BaseNeuralField):
             _model_redshift=self.kwargs["model_redshift"],
             **self.kwargs)
 
+        if self.kwargs["debug_lbfgs"]:
+            self.num_spectra = self.kwargs["redshift_pretrain_num_spectra"]
+            self.latents = nn.Embedding(
+                self.num_spectra, self.kwargs["qtz_num_embed"])
+            self.redshift_latents = nn.Embedding(
+                self.num_spectra, self.kwargs["redshift_logit_latent_dim"])
+
     def pretrain(self, coords, wave, wave_range,
                  trans=None, trans_mask=None, nsmpl=None,
                  qtz_args=None, specz=None,
@@ -111,6 +118,10 @@ class CodebookPretrainNerf(BaseNeuralField):
         ret = defaultdict(lambda: None)
         bsz = coords.shape[0]
         coords = coords[:,None]
+
+        if self.kwargs["debug_lbfgs"]:
+            coords = self.latents.weight[:,None]
+            redshift_latents = self.redshift_latents.weight
 
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(
