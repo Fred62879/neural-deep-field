@@ -1182,9 +1182,6 @@ class AstroInferrer(BaseInferrer):
 
                 if self.recon_codebook_spectra:
                     self.spectra_wave_c.extend(data["wave"])
-                    print(min(data["wave"][0,:,0]), max(data["wave"][0,:,0]))
-                    print(min(data["wave"][1,:,0]), max(data["wave"][1,:,0]))
-                    assert 0
                     self.spectra_masks_c.extend(data["spectra_masks"])
 
                 elif self.recon_codebook_spectra_individ:

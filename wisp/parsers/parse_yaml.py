@@ -158,6 +158,8 @@ def define_cmd_line_args():
     debug_group.add_argument("--regu-codebook-spectra", action="store_true")
     debug_group.add_argument("--codebook-spectra-regu-beta", type=float)
 
+    debug_group.add_argument("--debug-lbfgs", action="store_true")
+
     ###################
     # General global network things
     ###################

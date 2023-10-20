@@ -317,8 +317,6 @@ class AstroDataset(Dataset):
             # doesn't consider effect of redshift on each spectra
             bsz = out["coords"].shape[0]
             masks, full_wave = self.get_full_emitted_wave()
-            print(min(full_wave), max(full_wave))
-            assert 0
             out["spectra_masks"] = masks[None,:].tile(bsz,1)
             out["wave"] = full_wave[None,:,None].tile(bsz,1,1)
 

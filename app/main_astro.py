@@ -29,8 +29,9 @@ if __name__ == "__main__":
 
     if "redshift_pretrain" in tasks and args.pretrain_codebook:
         optim_cls, optim_params = get_optimizer_from_config(args)
+        trainer_cls = CodebookTrainerDebug if args.debug_lbfgs else CodebookTrainer
         trainer = get_trainer_from_config(
-            CodebookTrainer,
+            trainer_cls,
             [ pipelines["codebook_net"] ],
             dataset, optim_cls, optim_params, device, args
         )

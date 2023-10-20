@@ -9,5 +9,6 @@
 from .base_trainer import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 #from .multiview_trainer import MultiviewTrainer
 from .codebook_trainer import CodebookTrainer
+from .codebook_trainer_debug import CodebookTrainerDebug
 from .astro_trainer import AstroTrainer
 #from .sdf_trainer import SDFTrainer

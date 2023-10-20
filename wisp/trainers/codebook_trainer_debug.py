@@ -29,7 +29,7 @@ from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     get_bool_classify_redshift, freeze_layers, get_loss, create_latent_mask, set_seed
 
 
-class CodebookTrainer(BaseTrainer):
+class CodebookTrainerDebug(BaseTrainer):
     """ Trainer class for codebook pretraining.
     """
     def __init__(self, pipeline, dataset, optim_cls, optim_params, device, **extra_args):
@@ -415,7 +415,7 @@ class CodebookTrainer(BaseTrainer):
             qtz_strategy=self.qtz_strategy,
             split_latent=self.split_latent,
             apply_gt_redshift=self.apply_gt_redshift,
-            classify_redshift=self.classify_redshift,
+            save_redshift_logits=self.classify_redshift,
             trans_sample_method=self.trans_sample_method)
 
         total_loss = self.spectra_loss(
