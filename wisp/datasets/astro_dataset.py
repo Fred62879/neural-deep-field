@@ -300,6 +300,13 @@ class AstroDataset(Dataset):
         data = self.index_selected_data(data, idx)
         return data
 
+    def get_full_emitted_wave(self):
+        """ Get full range of emitted wave.
+        """
+        mask = self.get_full_spectra_wave_mask()
+        full_wave = self.get_full_spectra_wave_coverage()
+        return mask, full_wave
+
     def get_wave_data(self, batch_size, out):
         """ Get wave (lambda and transmission) data depending on data source.
         """
@@ -308,12 +315,10 @@ class AstroDataset(Dataset):
         if self.wave_source == "full_spectra":
             # for codebook spectra recon (according to emitted wave)
             # doesn't consider effect of redshift on each spectra
-            mask = self.get_full_spectra_wave_mask()
-            full_wave = self.get_full_spectra_wave_coverage()
-
             bsz = out["coords"].shape[0]
-            out["wave"] = full_wave[None,:,None].tile(bsz,1,1)
+            masks, full_wave = self.get_full_emitted_wave()
             out["spectra_sup_masks"] = mask[None,:].tile(bsz,1)
+            out["wave"] = full_wave[None,:,None].tile(bsz,1,1)
 
         elif self.wave_source == "spectra":
             # spectra_sup_data: [bsz,4+2*nbands,nsmpl]
@@ -341,6 +346,9 @@ class AstroDataset(Dataset):
                 out["nsmpl"] = nsmpl
 
             out["wave"] = out["spectra_source_data"][:,0][...,None] # [bsz,nsmpl,1]
+
+            if self.kwargs["regu_codebook_spectra"]:
+                out["full_wave_masks"], out["full_wave"] = self.get_full_emitted_wave()
 
         elif self.wave_source == "trans":
             # trans wave are not batched, we sample at every step

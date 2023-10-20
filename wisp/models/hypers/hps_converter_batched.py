@@ -1,5 +1,6 @@
 
 import torch
+import warnings
 import torch.nn as nn
 
 from wisp.utils.common import get_bool_classify_redshift
@@ -158,7 +159,8 @@ class HyperSpectralConverter(nn.Module):
         embed_dim = latents.shape[-1]
 
         if redshift is None:
-            assert not self._model_redshift
+            if self._model_redshift:
+                warnings.warn("model redshift without providing redshift values!")
         else: wave = self.shift_wave(wave, redshift)
         wave = self.linear_norm_wave(wave, wave_bound)
 

@@ -82,14 +82,6 @@ class CodebookTrainer(BaseTrainer):
             self.mode = "redshift_pretrain"
         else: raise ValueError()
 
-        self.plot_loss = self.extra_args["plot_loss"]
-        self.split_latent = self.mode == "redshift_pretrain" and \
-            self.extra_args["split_latent"]
-
-        self.optimize_spectra_latents = self.extra_args["direct_optimize_codebook_logits"] or \
-            (self.extra_args["optimize_spectra_latents"] and \
-             not self.extra_args["load_pretrained_latents_and_freeze"])
-
         # quantization setups
         self.qtz_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
         self.qtz_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
@@ -115,6 +107,16 @@ class CodebookTrainer(BaseTrainer):
         self.save_pixel_values = "save_pixel_values_during_train" in tasks and self.pixel_supervision
         self.recon_gt_spectra = "recon_gt_spectra_during_train" in tasks
         self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ_during_train" in tasks
+
+        # all others
+        self.plot_loss = self.extra_args["plot_loss"]
+        self.split_latent = self.mode == "redshift_pretrain" and \
+            self.extra_args["split_latent"]
+        self.regu_codebook_spectra = self.extra_args["regu_codebook_spectra"] and \
+            self.qtz_spectra
+        self.optimize_spectra_latents = self.extra_args["direct_optimize_codebook_logits"] or \
+            (self.extra_args["optimize_spectra_latents"] and \
+             not self.extra_args["load_pretrained_latents_and_freeze"])
 
     def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
@@ -565,6 +567,7 @@ class CodebookTrainer(BaseTrainer):
         self.log_dict["spectra_loss"] = 0.0
         self.log_dict["spectra_latents_regu"] = 0.0
         self.log_dict["redshift_logits_regu"] = 0.0
+        self.log_dict["codebook_spectra_regu"] = 0.0
 
     def pre_step(self):
         # since we are optimizing latents which are inputs for the pipeline
@@ -748,6 +751,7 @@ class CodebookTrainer(BaseTrainer):
             classify_redshift=self.classify_redshift,
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
+            regu_codebook_spectra=self.regu_codebook_spectra,
             save_spectra=not self.classify_redshift,
             save_redshift=self.save_data and self.save_redshift,
             save_qtz_weights=self.save_data and self.save_qtz_weights,
@@ -814,7 +818,15 @@ class CodebookTrainer(BaseTrainer):
             redshift_logits_regu *= self.extra_args["redshift_logits_regu_beta"]
             self.log_dict["redshift_logits_regu"] += redshift_logits_regu.item()
 
-        total_loss = spectra_loss + recon_loss + spectra_latents_regu + redshift_logits_regu
+        # v)
+        codebook_regu = 0
+        if self.regu_codebook_spectra:
+            codebook_regu = torch.mean(torch.sum(ret["full_range_codebook_spectra"], dim=0))
+            codebook_regu *= self.extra_args["codebook_spectra_regu_beta"]
+            self.log_dict["codebook_spectra_regu"] += codebook_regu
+
+        total_loss = spectra_loss + recon_loss + \
+            spectra_latents_regu + redshift_logits_regu + codebook_regu
 
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss calculated")
@@ -840,6 +852,9 @@ class CodebookTrainer(BaseTrainer):
            self.extra_args["redshift_classification_method"] == "weighted_avg":
             log_text += " | redshift logits regu: {:>.3E}".format(
                 self.log_dict["redshift_logits_regu"] / n)
+        if self.regu_codebook_spectra:
+            log_text += " | codebook spectra regu: {:>.3E}".format(
+                self.log_dict["codebook_spectra_regu"] / n)
 
         log.info(log_text)
 

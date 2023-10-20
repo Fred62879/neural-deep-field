@@ -35,6 +35,9 @@ class HyperSpectralDecoderB(nn.Module):
         self.reduction_order = "qtz_first"
         self.classify_redshift = _model_redshift and get_bool_classify_redshift(**kwargs)
 
+        self.recon_codebook_spectra = kwargs["regu_codebook_spectra"] and \
+            self.kwargs["space_dim"] == 3 and self.kwargs["quantize_spectra"]
+
         self.convert = HyperSpectralConverter(
             _model_redshift=_model_redshift, **kwargs
         )
@@ -91,7 +94,6 @@ class HyperSpectralDecoderB(nn.Module):
         return 1
 
     def init_decoder(self):
-        # self.spectra_decoder = Decoder(**kwargs)
         input_dim = self.get_input_dim()
         output_dim = self.get_output_dim()
         self.spectra_decoder = BasicDecoder(
@@ -230,28 +232,29 @@ class HyperSpectralDecoderB(nn.Module):
 
         return spectra
 
-    def forward_sup_spectra(self, latents, wave, full_wave_bound,
-                            num_spectra_coords, ret, codebook, qtz_args):
-        """ During training, some latents will be decoded, combining with full wave.
-            Currently only supports spectra coords (incl. gt, dummy that requires
-              spectrum plotting during training time).
-            Latents that require full wave are placed at the end of the tensor.
+    def forward_codebook_spectra(self, codebook, full_wave, full_wave_bound, ret):
         """
-        latents = latents[-num_spectra_coords:]
-        bias = None if ret["bias"] is None else ret["bias"][-num_spectra_coords:]
-        scaler = None if ret["scaler"] is None else ret["scaler"][-num_spectra_coords:]
-        redshift = None if ret["redshift"] is None else ret["redshift"][-num_spectra_coords:]
-
-        ret["sup_spectra"] = self.reconstruct_spectra(
-            latents, wave, scaler, bias, redshift,
-            full_wave_bound, ret, codebook, qtz_args
-        )
+            @Params
+              codebook: [num_embed,dim]
+              full_wave: [nsmpl]
+              full_wave_masks: [nsmpl]
+            @Return
+              ret["codebook_spectra"]: [num_embed,nsmpl]
+        """
+        n = codebook.weight.shape[0]
+        latents = self.convert(
+            full_wave[None,:,None].tile(n,1,1),
+            codebook.weight[:,None], None, full_wave_bound
+        ) # [num_embed,nsmpl,dim]
+        ret["full_range_codebook_spectra"] = self.spectra_decoder(latents)[...,0]
 
     def forward(self, latents,
                 wave, trans, nsmpl, full_wave_bound,
                 trans_mask=None,
                 num_sup_spectra=0, sup_spectra_wave=None,
-                codebook=None, qtz_args=None, ret=None):
+                codebook=None, qtz_args=None, ret=None,
+                full_wave=None
+    ):
         """ @Param
             latents:   (encoded or original) coords or logits for quantization.
                          [bsz,1,space_dim or coords_encode_dim]
@@ -279,6 +282,9 @@ class HyperSpectralDecoderB(nn.Module):
                 "codebook_loss": loss for codebook optimization.
               }
 
+            - full_wave
+              full_wave_massk
+
             @Return (added to `ret`)
               spectra:   reconstructed spectra
               intensity: reconstructed pixel values
@@ -290,24 +296,16 @@ class HyperSpectralDecoderB(nn.Module):
                           show_memory=self.kwargs["show_memory"])
         timer.reset()
 
-        perform_spectra_supervision = num_sup_spectra > 0
+        if self.kwargs["regu_codebook_spectra"]:
+            self.forward_codebook_spectra(codebook, full_wave, full_wave_bound, ret)
 
-        if perform_spectra_supervision:
-            self.forward_sup_spectra(
-                latents, sup_spectra_wave, full_wave_bound,
-                num_sup_spectra, ret, codebook, qtz_args
-            )
-            latents = latents[:-num_sup_spectra]
-            if latents.shape[0] == 0: return
-
-        n = bsz if not perform_spectra_supervision else bsz-num_sup_spectra
         redshift = None if ret["redshift"] is None else \
-            ret["redshift"] if self.classify_redshift else ret["redshift"][:n]
+            ret["redshift"] if self.classify_redshift else ret["redshift"][:bsz]
 
         ret["spectra"] = self.reconstruct_spectra(
             latents, wave,
-            None if ret["scaler"] is None else ret["scaler"][:n],
-            None if ret["bias"] is None else ret["bias"][:n],
+            None if ret["scaler"] is None else ret["scaler"][:bsz],
+            None if ret["bias"] is None else ret["bias"][:bsz],
             redshift,
             full_wave_bound, ret, codebook, qtz_args
         )

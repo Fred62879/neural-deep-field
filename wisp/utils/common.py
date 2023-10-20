@@ -315,6 +315,7 @@ def forward(
         spectra_supervision=False,
         perform_integration=False,
         trans_sample_method="none",
+        regu_codebook_spectra=False,
         redshift_supervision_train=False,
         save_scaler=False,
         save_spectra=False,
@@ -377,6 +378,10 @@ def forward(
                     qtz_args["find_embed_id"] = save_embed_ids
             qtz_args["save_codebook_spectra"] = save_codebook_spectra
             net_args["qtz_args"] = qtz_args
+        if regu_codebook_spectra:
+            net_args["full_wave"] = data["full_wave"]
+            # net_args["full_wave_masks"] = data["full_wave_masks"]
+            requested_channels.append("full_range_codebook_spectra")
     else:
         raise ValueError("Unsupported space dimension.")
 

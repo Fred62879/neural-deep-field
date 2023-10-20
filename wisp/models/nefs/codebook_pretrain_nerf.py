@@ -39,7 +39,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         """ Register forward functions with the channels that they output.
         """
         channels = ["intensity","spectra","spectra_all_bins","qtz_weights",
-                    "codebook_spectra","min_embed_ids","latents"]
+                    "codebook_spectra","full_range_codebook_spectra","min_embed_ids","latents"]
 
         if self.kwargs["model_redshift"]:
             channels.append("redshift")
@@ -83,7 +83,8 @@ class CodebookPretrainNerf(BaseNeuralField):
                  qtz_args=None, specz=None,
                  scaler_latents=None,
                  redshift_latents=None,
-                 init_redshift_prob=None # debug
+                 init_redshift_prob=None, # debug
+                 full_wave=None
     ):
         """ Pretrain codebook.
             @Param
@@ -125,7 +126,8 @@ class CodebookPretrainNerf(BaseNeuralField):
             latents, wave, trans, nsmpl, wave_range,
             trans_mask=trans_mask,
             codebook=self.codebook,
-            qtz_args=qtz_args, ret=ret
+            qtz_args=qtz_args, ret=ret,
+            full_wave=full_wave
         )
         timer.check("hps decoding done")
         return ret
