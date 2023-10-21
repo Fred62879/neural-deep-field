@@ -165,7 +165,8 @@ class CodebookTrainer(BaseTrainer):
         self.train_pipeline.set_batch_reduction_order("bin_avg_first")
         latents, redshift_latents = self.init_latents()
         self.train_pipeline.set_latents(latents.weight)
-        self.train_pipeline.set_redshift_latents(redshift_latents.weight)
+        if redshift_latents is not None:
+            self.train_pipeline.set_redshift_latents(redshift_latents.weight)
         # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
         self.freeze_and_load()
         # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
@@ -207,7 +208,7 @@ class CodebookTrainer(BaseTrainer):
         """
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
-        # sampler_cls = SequentialSampler
+        sampler_cls = SequentialSampler
         # sampler_cls = RandomSampler
 
         sampler = BatchSampler(
@@ -428,7 +429,8 @@ class CodebookTrainer(BaseTrainer):
             self.save_data = True
 
             if self.save_redshift:
-                self.redshift = []
+                self.gt_redshift = []
+                self.est_redshift = []
             if self.save_qtz_weights:
                 self.qtz_weights = []
             if self.save_pixel_values:
@@ -447,7 +449,7 @@ class CodebookTrainer(BaseTrainer):
             # re-init dataloader to make sure pixels are in order
             self.use_all_pixels = True
             self.shuffle_dataloader = False
-            self.sample_wave = False # not self.extra_args["pretrain_use_all_wave"]
+            self.sample_wave = not self.extra_args["pretrain_use_all_wave"]
             self.dataset.toggle_wave_sampling(self.sample_wave)
             self.set_num_batches()
             self.init_dataloader()
@@ -556,7 +558,13 @@ class CodebookTrainer(BaseTrainer):
 
         if self.save_data:
             if self.save_redshift:
-                self.redshift.extend(data["spectra_redshift"])
+                self.gt_redshift.extend(data["spectra_redshift"])
+                if self.classify_redshift:
+                    ids = torch.argmax(ret["redshift_logits"], dim=-1)
+                    argmax_redshift = ret["redshift"][ids]
+                    self.est_redshift.extend(argmax_redshift)
+                else:
+                    self.redshift.extend(ret["redshift"])
             if self.save_pixel_values:
                 self.recon_pixel_vals.extend(ret["intensity"])
                 self.gt_pixel_vals.extend(data["spectra_pixels"])
@@ -602,6 +610,7 @@ class CodebookTrainer(BaseTrainer):
             # codebook logits
             if self.extra_args["direct_optimize_codebook_logits"]:
                 # directly optimize logits
+                load_excls.append("nef.latents")
                 freeze_excls.append("nef.latents")
             else:
                 # optimize an autodecoder
@@ -785,11 +794,15 @@ class CodebookTrainer(BaseTrainer):
             self._save_pixel_values()
 
     def _save_redshift(self):
-        if type(self.redshift) == list:
-            self.redshift = torch.stack(self.redshift)[self.selected_ids]
+        # if type(self.redshift) == list:
+        self.gt_redshift = torch.stack(
+            self.gt_redshift)[self.selected_ids].detach().cpu().numpy()
+        self.est_redshift = torch.stack(
+            self.est_redshift)[self.selected_ids].detach().cpu().numpy()
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
-        log.info(f"gt redshift values: {self.redshift}")
+        log.info(f"gt redshift values: {self.gt_redshift}")
+        log.info(f"est redshift values: {self.est_redshift}")
 
     def _save_pixel_values(self):
         gt_vals = torch.stack(self.gt_pixel_vals).detach().cpu().numpy()[self.selected_ids,0]
@@ -949,7 +962,7 @@ class CodebookTrainer(BaseTrainer):
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
             regu_codebook_spectra=self.regu_codebook_spectra,
-            save_spectra=not self.classify_redshift,
+            save_spectra=self.save_data and self.recon_gt_spectra,
             save_redshift=self.save_data and self.save_redshift,
             save_redshift_logits=self.classify_redshift,
             save_qtz_weights=self.save_data and self.save_qtz_weights,
@@ -1066,7 +1079,7 @@ class CodebookTrainer(BaseTrainer):
         spectra_latents = None
         other_params, spectra_logit_params = [], []
         for name in self.params_dict:
-            if name == "nef.latents.weight":
+            if name == "nef.latents":
                 spectra_latents = self.params_dict[name]
             elif "spatial_decoder.decode" in name:
                 spectra_logit_params.append(self.params_dict[name])

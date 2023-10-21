@@ -471,7 +471,7 @@ class AstroInferrer(BaseInferrer):
             raise ValueError()
 
         if self.recon_codebook_spectra:
-            self.requested_fields.append("coord")
+            self.requested_fields.append("coords")
             self.coords_source = "codebook_latents"
             self.dataset_length = self.qtz_n_embd
             # if self.extra_args["plot_clipped_spectrum"]:

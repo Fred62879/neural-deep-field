@@ -430,6 +430,7 @@ def load_pretrained_model_weights(model, pretrained_state, shared_layer_names=No
         ):
             pretrained_dict[n] = pretrained_state[n]
         else: pretrained_dict[n] = cur_state[n]
+
     model.load_state_dict(pretrained_dict)
 
 def load_model_weights(model, pretrained_state):
