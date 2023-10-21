@@ -31,10 +31,11 @@ class CodebookPretrainNerf(BaseNeuralField):
     def get_nef_type(self):
         return "codebook_pretrain"
 
-    def set_latents(self, **kwargs): #latents, redshift_latents):
-        self.latents = kwargs["latents"]
-        self.redshift_latents = kwargs["redshift_latents"]
-        print('**', self.latents.weight.requires_grad, self.redshift_latents.weight.requires_grad)
+    def set_latents(self, latents):
+        self.latents = latents
+
+    def set_redshift_latents(self, redshift_latents):
+        self.redshift_latents = redshift_latents
 
     def set_batch_reduction_order(self, order="qtz_first"):
         self.hps_decoder.set_batch_reduction_order(order=order)
@@ -85,7 +86,7 @@ class CodebookPretrainNerf(BaseNeuralField):
             _model_redshift=self.kwargs["model_redshift"],
             **self.kwargs)
 
-        # init latent variables
+        # init latent variables **** DELETE ****
         if self.kwargs["debug_lbfgs"]:
             self.num_spectra = self.kwargs["redshift_pretrain_num_spectra"]
             if self.use_latents_as_coords:
@@ -136,14 +137,14 @@ class CodebookPretrainNerf(BaseNeuralField):
 
         if self.use_latents_as_coords:
             assert coords is None
-            coords = self.latents.weight
+            coords = self.latents
             coords = self.index_latents(coords, selected_ids, idx)
 
         coords = coords[:,None]
         # print(coords.device)
 
         if not self.kwargs["apply_gt_redshift"] and self.kwargs["split_latent"]:
-            redshift_latents = self.redshift_latents.weight
+            redshift_latents = self.redshift_latents
             redshift_latents = self.index_latents(redshift_latents, selected_ids, idx)
         else: redshift_latents = None
         # print(redshift_latents.device)

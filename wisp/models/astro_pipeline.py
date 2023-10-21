@@ -36,8 +36,11 @@ class AstroPipeline(nn.Module):
 
         self.nef: BaseNeuralField = nef
 
-    def set_latents(self, **kwargs):
-        self.nef.set_latents(**kwargs)
+    def set_latents(self, latents):
+        self.nef.set_latents(latents)
+
+    def set_redshift_latents(self, redshift_latents):
+        self.nef.set_redshift_latents(redshift_latents)
 
     def set_batch_reduction_order(self, order="qtz_first"):
         self.nef.set_batch_reduction_order(order=order)

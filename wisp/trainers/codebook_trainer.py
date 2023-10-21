@@ -163,10 +163,12 @@ class CodebookTrainer(BaseTrainer):
     def init_net(self):
         self.train_pipeline = self.pipeline[0]
         self.train_pipeline.set_batch_reduction_order("bin_avg_first")
-        self.train_pipeline.set_latents(**self.init_latents())
-        # for n,p in self.train_pipeline.named_parameters():
-        #     print(n, p.requires_grad)
+        latents, redshift_latents = self.init_latents()
+        self.train_pipeline.set_latents(latents.weight)
+        self.train_pipeline.set_redshift_latents(redshift_latents.weight)
+        # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
         self.freeze_and_load()
+        # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
         log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.train_pipeline.parameters())))
@@ -529,13 +531,18 @@ class CodebookTrainer(BaseTrainer):
             if keep_ret: return loss, ret
             return loss
 
-        self.optimizer.step(partial(closure, False))
-        self.timer.check("stepped")
+        if self.extra_args["optimize_latents_use_lbfgs"]:
+            self.optimizer.step(closure)
+            self.timer.check("stepped")
 
-        loss, ret = closure(True)
+        loss, ret = closure(True) # forward backward without step
         if self.plot_grad_every != -1 and \
            (self.epoch == 0 or (self.epoch % self.plot_grad_every == 0)):
             plot_grad_flow(self.params_dict.items(), self.grad_fname)
+
+        if not self.extra_args["optimize_latents_use_lbfgs"]:
+            self.optimizer.step()
+            self.timer.check("stepped")
 
         return ret
 
@@ -579,10 +586,9 @@ class CodebookTrainer(BaseTrainer):
         elif self.mode == "redshift_pretrain":
             latents = self.init_redshift_pretrain_spectra_latents()
             redshift_latents = self.init_redshift_pretrain_redshift_latents()
-            print('*', latents.weight.requires_grad, redshift_latents.weight.requires_grad)
         else:
             raise ValueError("Invalid pretrainer mode.")
-        return {"latents": latents, "redshift_latents": redshift_latents}
+        return latents, redshift_latents
 
     def freeze_and_load(self):
         """ For redshift pretrain (sanity check), we load part of the pretrained
@@ -596,13 +602,13 @@ class CodebookTrainer(BaseTrainer):
             # codebook logits
             if self.extra_args["direct_optimize_codebook_logits"]:
                 # directly optimize logits
-                freeze_excls.append("nef.latents.weight")
+                freeze_excls.append("nef.latents")
             else:
                 # optimize an autodecoder
                 if not self.extra_args["load_pretrained_codebook_logits_mlp"]:
                     load_excls.append("spatial_decoder.decode")
                 if self.extra_args["optimize_codebook_logits_mlp"]:
-                    freeze_excls.append("nef.latents.weight")
+                    freeze_excls.append("nef.latents")
                 if self.extra_args["optimize_spectra_latents"]:
                     freeze_excls.append("spatial_decoder.decode")
 
@@ -610,11 +616,11 @@ class CodebookTrainer(BaseTrainer):
             if self.classify_redshift:
                 if self.extra_args["optimize_redshift_latents_as_logits"]:
                     # directly optimize logits
-                    freeze_excls.append("nef.redshift_latents.weight")
+                    freeze_excls.append("nef.redshift_latents")
                 else:
                     # optimize an autodecoder
                     freeze_excls.append("redshift_decoder")
-                    freeze_excls.append("nef.redshift_latents.weight")
+                    freeze_excls.append("nef.redshift_latents")
 
             freeze_layers(self.train_pipeline, excls=freeze_excls)
             self.load_model(self.pretrained_model_fname, excls=load_excls)
@@ -1087,9 +1093,9 @@ class CodebookTrainer(BaseTrainer):
         spectra_logit_params, redshift_logit_params = [], []
 
         for name in self.params_dict:
-            if name == "nef.latents.weight":
+            if name == "nef.latents":
                 spectra_latents = self.params_dict[name]
-            elif name == "nef.redshift_latents.weight":
+            elif name == "nef.redshift_latents":
                 redshift_latents = self.params_dict[name]
             elif "redshift_decoder" in name:
                 redshift_logit_params.append(self.params_dict[name])
