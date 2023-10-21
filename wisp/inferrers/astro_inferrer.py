@@ -301,12 +301,11 @@ class AstroInferrer(BaseInferrer):
         self.calculate_metrics = False
         self.perform_integration = True #self.recon_img
 
-        # self.requested_fields = ["coords"]
         self.requested_fields = []
 
         if self.pretrain_infer:
+            self.coords_source = None
             self.wave_source = "spectra"
-            self.coords_source = None #"spectra_latents"
             self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
             if not self.use_all_wave:
                 self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
@@ -380,22 +379,18 @@ class AstroInferrer(BaseInferrer):
         """
         self.use_all_wave = True
         self.perform_integration = False
+
         self.requested_fields = []
-        # self.requested_fields = ["coords"]
 
         if self.pretrain_infer:
+            self.coords_source = None
             self.wave_source = "spectra"
-            # pretrain coords set use checkpoint
-            self.coords_source = None #"spectra_latents"
             self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
             if not self.use_all_wave:
                 self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
                 self.wave_sample_method = self.extra_args["pretrain_infer_wave_sample_method"]
-
             self.requested_fields.extend([
                 "spectra_source_data","spectra_masks","spectra_redshift"])
-            # if not self.apply_gt_redshift and self.split_latent:
-            #    self.requested_fields.append("redshift_latents")
 
             if self.infer_selected:
                 self.dataset_length = min(
@@ -461,7 +456,6 @@ class AstroInferrer(BaseInferrer):
         self.perform_integration = False
 
         self.requested_fields = []
-        # self.requested_fields = ["coords"]
 
         if self.recon_codebook_spectra:
             self.wave_source = "full_spectra"
@@ -485,11 +479,9 @@ class AstroInferrer(BaseInferrer):
 
         elif self.recon_codebook_spectra_individ:
             if self.pretrain_infer:
-                self.coords_source = None #"spectra_latents"
+                self.coords_source = None
                 self.requested_fields.extend([
                     "spectra_source_data","spectra_masks","spectra_redshift"])
-                # if not self.apply_gt_redshift and self.split_latent:
-                #     self.requested_fields.append("redshift_latents")
 
                 if self.infer_selected:
                     self.dataset_length = min(
@@ -785,12 +777,6 @@ class AstroInferrer(BaseInferrer):
             if not self.apply_gt_redshift and self.split_latent:
                 self.spectra_infer_pipeline.set_redshift_latents(
                     checkpoint["model_state_dict"]["nef.redshift_latents"])
-
-            # self._set_coords_from_checkpoint(checkpoint)
-            # if not self.apply_gt_redshift and self.split_latent:
-            #     self.dataset.set_hardcode_data(
-            #         "redshift_latents", checkpoint["redshift_latents"])
-
         self.infer_spectra(model_id, checkpoint)
 
     def post_checkpoint_selected_coords_partial_model(self, model_id):
@@ -898,10 +884,6 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             self._set_coords_from_checkpoint(checkpoint)
         elif self.recon_codebook_spectra_individ and self.pretrain_infer:
-            # self._set_coords_from_checkpoint(checkpoint)
-            # if not self.apply_gt_redshift and self.split_latent:
-            #     self.dataset.set_hardcode_data(
-            #         "redshift_latents", checkpoint["redshift_latents"])
             self.codebook_spectra_infer_pipeline.set_latents(
                 checkpoint["model_state_dict"]["nef.latents"])
             if not self.apply_gt_redshift and self.split_latent:
@@ -1251,13 +1233,7 @@ class AstroInferrer(BaseInferrer):
     def _set_coords_from_checkpoint(self, checkpoint):
         """ Set dataset coords using saved model checkpoint.
         """
-        if self.coords_source == "spectra_latents":
-            assert 0
-            # trainable code for each spectra during pretrain
-            latents = checkpoint["latents"]
-            self.dataset.set_hardcode_data(self.coords_source, latents)
-
-        elif self.coords_source == "codebook_latents":
+        if self.coords_source == "codebook_latents":
             # latent code in codebook
             codebook_latents = load_layer_weights(
                 checkpoint["model_state_dict"], lambda n: "grid" not in n and "codebook" in n)
