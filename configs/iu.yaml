@@ -62,7 +62,7 @@ debug:
 
 optimizer:
     optimizer_type: 'adam'
-    optimize_latents_use_lbfgs: False
+    optimize_latents_use_lbfgs: True
     b1: 0.5
     b2: 0.999
     lr: 1e-4

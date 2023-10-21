@@ -266,9 +266,9 @@ class AstroInferrer(BaseInferrer):
         # keep only tasks required to perform
         self.group_tasks = []
 
-        if self.recon_img: # or \
-           # self.save_qtz_weights or self.save_scaler or \
-           # self.plot_embed_map or self.plot_latent_embed:
+        if self.recon_img or \
+           self.save_qtz_weights or self.save_scaler or \
+           self.plot_embed_map or self.plot_latent_embed:
             self.group_tasks.append("infer_all_coords_full_model")
 
         if self.recon_gt_spectra or self.recon_gt_spectra_all_bins: # or \
@@ -311,7 +311,7 @@ class AstroInferrer(BaseInferrer):
                 self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
                 self.wave_sample_method = self.extra_args["pretrain_infer_wave_sample_method"]
 
-            self.requested_fields.append("spectra_source_data")
+            self.requested_fields.extend(["spectra_source_data","spectra_masks"])
             if self.recon_img: # _sup_spectra
                 self.requested_fields.append("spectra_pixels")
             if self.apply_gt_redshift:
@@ -580,8 +580,12 @@ class AstroInferrer(BaseInferrer):
 
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
         if self.pretrain_infer:
-            # self._set_dataset_coords_pretrain(checkpoint)
-            self._set_coords_from_checkpoint(checkpoint)
+            # self._set_coords_from_checkpoint(checkpoint)
+            self.full_pipeline.set_latents(checkpoint["model_state_dict"]["nef.latents"])
+            if not self.apply_gt_redshift and self.split_latent:
+                self.full_pipeline.set_redshift_latents(
+                    checkpoint["model_state_dict"]["nef.redshift_latents"])
+
         self.infer_all_coords(model_id, checkpoint)
 
         if self.plot_latent_embed:
@@ -777,6 +781,7 @@ class AstroInferrer(BaseInferrer):
             if not self.apply_gt_redshift and self.split_latent:
                 self.spectra_infer_pipeline.set_redshift_latents(
                     checkpoint["model_state_dict"]["nef.redshift_latents"])
+
         self.infer_spectra(model_id, checkpoint)
 
     def post_checkpoint_selected_coords_partial_model(self, model_id):
