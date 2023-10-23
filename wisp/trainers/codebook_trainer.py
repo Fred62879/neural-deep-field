@@ -187,9 +187,6 @@ class CodebookTrainer(BaseTrainer):
     def collect_model_params(self):
         # collect all parameters from network and trainable latents
         self.params_dict = {}
-        # self.params_dict["latents"] = self.latents.weight
-        # if not self.apply_gt_redshift and self.split_latent:
-        #     self.params_dict["redshift_latents"] = self.redshift_latents.weight
         for name, param in self.train_pipeline.named_parameters():
             self.params_dict[name] = param
 
@@ -256,9 +253,6 @@ class CodebookTrainer(BaseTrainer):
                 "history_size": 10
             }
             self.optimizer = torch.optim.LBFGS(latents, **params)
-            # for n,p in self.train_pipeline.named_parameters():
-            #     print(n, p.requires_grad)
-            # self.optimizer = torch.optim.LBFGS(self.train_pipeline.parameters(), **params)
         else:
             net_params.extend(latents)
             optimizer = self.optim_cls(net_params, **self.optim_params)
@@ -288,14 +282,7 @@ class CodebookTrainer(BaseTrainer):
 
         # set input latents for codebook net
         fields.append("idx")
-        # self.dataset.set_coords_source("spectra_latents")
-        # self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
-        # if not self.apply_gt_redshift and self.split_latent:
-        #     fields.append("redshift_latents")
-        #     self.dataset.set_hardcode_data("redshift_latents", self.redshift_latents.weight)
-
         self.dataset.toggle_integration(self.pixel_supervision)
-
         self.dataset.toggle_wave_sampling(self.sample_wave)
         if self.sample_wave:
             self.dataset.set_num_wave_samples(self.extra_args["pretrain_num_wave_samples"])
@@ -725,10 +712,6 @@ class CodebookTrainer(BaseTrainer):
             "model_state_dict": self.train_pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
         }
-        # checkpoint["latents"] = self.latents.weight
-        # if not self.apply_gt_redshift and self.split_latent:
-        #     checkpoint["redshift_latents"] = self.redshift_latents.weight
-
         torch.save(checkpoint, model_fname)
         return checkpoint
 
@@ -790,16 +773,12 @@ class CodebookTrainer(BaseTrainer):
     def save_local(self):
         if self.recon_gt_spectra:
             self._recon_gt_spectra()
-
         if self.recon_codebook_spectra_individ:
             self._recon_codebook_spectra_individ()
-
         if self.save_redshift:
             self._save_redshift()
-
         if self.save_qtz_weights:
             self._save_qtz_weights()
-
         if self.save_pixel_values:
             self._save_pixel_values()
 
