@@ -155,7 +155,8 @@ def define_cmd_line_args():
                              help="L2 regularize latents for autodecoder during pretrain.")
     debug_group.add_argument("--spectra-latents-regu-beta", type=float)
 
-    debug_group.add_argument("--regu-codebook-spectra", action="store_true")
+    debug_group.add_argument("--regu-within-codebook-spectra", action="store_true")
+    debug_group.add_argument("--regu-across-codebook-spectra", action="store_true")
     debug_group.add_argument("--codebook-spectra-regu-beta", type=float)
 
     debug_group.add_argument("--debug-lbfgs", action="store_true")

@@ -8,6 +8,7 @@ import numpy as np
 import torch.nn as nn
 import logging as log
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 from tqdm import tqdm
 from pathlib import Path
@@ -113,8 +114,14 @@ class CodebookTrainer(BaseTrainer):
         self.index_latent = True # index latents as coords in model
         self.split_latent = self.mode == "redshift_pretrain" and \
             self.extra_args["split_latent"]
-        self.regu_codebook_spectra = self.extra_args["regu_codebook_spectra"] and \
-            self.qtz_spectra
+        self.regu_within_codebook_spectra = self.qtz_spectra and \
+            self.extra_args["regu_within_codebook_spectra"]
+        self.regu_across_codebook_spectra = self.qtz_spectra and \
+            self.extra_args["regu_across_codebook_spectra"]
+        self.regu_codebook_spectra = self.regu_within_codebook_spectra or \
+            self.regu_across_codebook_spectra
+        assert self.regu_within_codebook_spectra + \
+            self.regu_across_codebook_spectra <= 1
         self.optimize_spectra_latents = self.extra_args["direct_optimize_codebook_logits"] or \
             (self.extra_args["optimize_spectra_latents"] and \
              not self.extra_args["load_pretrained_latents_and_freeze"])
@@ -163,13 +170,16 @@ class CodebookTrainer(BaseTrainer):
     def init_net(self):
         self.train_pipeline = self.pipeline[0]
         self.train_pipeline.set_batch_reduction_order("bin_avg_first")
+
         latents, redshift_latents = self.init_latents()
         self.train_pipeline.set_latents(latents.weight)
         if redshift_latents is not None:
             self.train_pipeline.set_redshift_latents(redshift_latents.weight)
+
         # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
         self.freeze_and_load()
         # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
+
         log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(
             sum(p.numel() for p in self.train_pipeline.parameters())))
@@ -208,7 +218,7 @@ class CodebookTrainer(BaseTrainer):
         """
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
-        sampler_cls = SequentialSampler
+        # sampler_cls = SequentialSampler
         # sampler_cls = RandomSampler
 
         sampler = BatchSampler(
@@ -284,11 +294,12 @@ class CodebookTrainer(BaseTrainer):
         #     fields.append("redshift_latents")
         #     self.dataset.set_hardcode_data("redshift_latents", self.redshift_latents.weight)
 
+        self.dataset.toggle_integration(self.pixel_supervision)
+
         self.dataset.toggle_wave_sampling(self.sample_wave)
         if self.sample_wave:
             self.dataset.set_num_wave_samples(self.extra_args["pretrain_num_wave_samples"])
             self.dataset.set_wave_sample_method(self.extra_args["pretrain_wave_sample_method"])
-        self.dataset.toggle_integration(self.pixel_supervision)
         if self.train_within_wave_range:
             self.dataset.set_wave_range(
                 self.extra_args["spectra_supervision_wave_lo"],
@@ -298,10 +309,9 @@ class CodebookTrainer(BaseTrainer):
         if self.extra_args["infer_selected"]:
             self.selected_ids = select_inferrence_ids(
                 self.num_spectra,
-                self.extra_args["pretrain_num_infer_upper_bound"]
-            )
-        else: self.selected_ids = np.arange(self.num_spectra)
-        fields.append("selected_ids")
+                self.extra_args["pretrain_num_infer_upper_bound"])
+        else:
+            self.selected_ids = np.arange(self.num_spectra)
 
         self.dataset.set_fields(fields)
 
@@ -1031,10 +1041,16 @@ class CodebookTrainer(BaseTrainer):
 
         # v)
         codebook_regu = 0
-        if self.regu_codebook_spectra:
-            codebook_regu = torch.mean(torch.sum(ret["full_range_codebook_spectra"], dim=0))
-            codebook_regu *= self.extra_args["codebook_spectra_regu_beta"]
-            self.log_dict["codebook_spectra_regu"] += codebook_regu
+        if self.regu_within_codebook_spectra:
+            sp = ret["full_range_codebook_spectra"].shape # [num_embed,nsmpl]
+            dtp = ret["full_range_codebook_spectra"].device
+            codebook_regu = F.l1_loss(
+                ret["full_range_codebook_spectra"], torch.zeros(sp).to(dtp))
+        elif self.regu_across_codebook_spectra:
+            codebook_regu = torch.mean(
+                torch.sum(ret["full_range_codebook_spectra"], dim=0))
+        codebook_regu *= self.extra_args["codebook_spectra_regu_beta"]
+        self.log_dict["codebook_spectra_regu"] += codebook_regu
 
         total_loss = spectra_loss + recon_loss + \
             spectra_latents_regu + redshift_logits_regu + codebook_regu

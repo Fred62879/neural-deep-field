@@ -309,13 +309,16 @@ class AstroDataset(Dataset):
         else:
             raise ValueError(f"Unrecognized data field: {field}.")
 
-        # print(field, data.shape, idx)
+        # print('*', field, data.shape, idx)
         data = self.index_selected_data(data, idx)
         return data
 
     def get_unbatched_data(self, idx, out):
         if "idx" in self.requested_fields:
             out["idx"] = idx
+
+        if "selected_ids" in self.requested_fields:
+            out["selected_ids"] = self.data["selected_ids"]
 
         self.get_debug_data(out)
 
@@ -402,7 +405,8 @@ class AstroDataset(Dataset):
 
             out["wave"] = out["spectra_source_data"][:,0][...,None] # [bsz,nsmpl,1]
 
-            if self.kwargs["regu_codebook_spectra"]:
+            if self.kwargs["regu_within_codebook_spectra"] or \
+               self.kwargs["regu_across_codebook_spectra"]:
                 out["full_emitted_wave_masks"], out["full_emitted_wave"] = \
                     self.get_full_emitted_wave()
 

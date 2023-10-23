@@ -138,10 +138,10 @@ class CodebookPretrainNerf(BaseNeuralField):
         if self.use_latents_as_coords:
             assert coords is None
             coords = self.latents
+            # print(coords.shape, selected_ids, idx)
             coords = self.index_latents(coords, selected_ids, idx)
 
         coords = coords[:,None]
-        # print(coords.device)
 
         if not self.kwargs["apply_gt_redshift"] and self.kwargs["split_latent"]:
             redshift_latents = self.redshift_latents

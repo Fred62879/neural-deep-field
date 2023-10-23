@@ -304,6 +304,8 @@ class AstroInferrer(BaseInferrer):
         self.requested_fields = []
 
         if self.pretrain_infer:
+            self.infer_selected = self.extra_args["infer_selected"]
+
             self.coords_source = None
             self.wave_source = "spectra"
             self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
@@ -311,7 +313,7 @@ class AstroInferrer(BaseInferrer):
                 self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
                 self.wave_sample_method = self.extra_args["pretrain_infer_wave_sample_method"]
 
-            self.requested_fields.extend(["spectra_source_data","spectra_masks"])
+            self.requested_fields.extend(["idx","spectra_source_data","spectra_masks"])
             if self.recon_img: # _sup_spectra
                 self.requested_fields.append("spectra_pixels")
             if self.apply_gt_redshift:
@@ -320,6 +322,7 @@ class AstroInferrer(BaseInferrer):
             if self.infer_selected:
                 self.dataset_length = min(
                     self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
+                self.requested_fields.append("selected_ids")
             else: self.dataset_length = self.num_spectra
 
         elif self.main_infer:
@@ -383,6 +386,8 @@ class AstroInferrer(BaseInferrer):
         self.requested_fields = []
 
         if self.pretrain_infer:
+            self.infer_selected = self.extra_args["infer_selected"]
+
             self.coords_source = None
             self.wave_source = "spectra"
             self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
@@ -390,11 +395,12 @@ class AstroInferrer(BaseInferrer):
                 self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
                 self.wave_sample_method = self.extra_args["pretrain_infer_wave_sample_method"]
             self.requested_fields.extend([
-                "spectra_source_data","spectra_masks","spectra_redshift"])
+                "idx","spectra_source_data","spectra_masks","spectra_redshift"])
 
             if self.infer_selected:
                 self.dataset_length = min(
                     self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
+                self.requested_fields.append("selected_ids")
             else: self.dataset_length = self.num_spectra
 
         elif self.main_infer:
@@ -471,6 +477,7 @@ class AstroInferrer(BaseInferrer):
             raise ValueError()
 
         if self.recon_codebook_spectra:
+            self.infer_selected = False
             self.requested_fields.append("coords")
             self.coords_source = "codebook_latents"
             self.dataset_length = self.qtz_n_embd
@@ -479,11 +486,14 @@ class AstroInferrer(BaseInferrer):
 
         elif self.recon_codebook_spectra_individ:
             if self.pretrain_infer:
+                self.infer_selected = self.extra_args["infer_selected"]
+
                 self.coords_source = None
                 self.requested_fields.extend([
-                    "spectra_source_data","spectra_masks","spectra_redshift"])
+                    "idx","spectra_source_data","spectra_masks","spectra_redshift"])
 
                 if self.infer_selected:
+                    self.requested_fields.append("selected_ids")
                     self.dataset_length = min(
                         self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
                 else:
@@ -995,6 +1005,7 @@ class AstroInferrer(BaseInferrer):
                     self.space_dim,
                     qtz=self.qtz,
                     qtz_strategy=self.qtz_strategy,
+                    index_latent=self.index_latent,
                     apply_gt_redshift=self.apply_gt_redshift,
                     perform_integration=self.perform_integration,
                     trans_sample_method=self.trans_sample_method,
@@ -1090,6 +1101,7 @@ class AstroInferrer(BaseInferrer):
                         self.space_dim,
                         qtz=self.qtz,
                         qtz_strategy=self.qtz_strategy,
+                        index_latent=self.index_latent,
                         split_latent=self.split_latent,
                         apply_gt_redshift=self.apply_gt_redshift,
                         save_redshift=self.save_redshift,
@@ -1174,6 +1186,7 @@ class AstroInferrer(BaseInferrer):
                         self.space_dim,
                         qtz=self.qtz,
                         qtz_strategy=self.qtz_strategy,
+                        index_latent=self.index_latent,
                         split_latent=self.split_latent,
                         apply_gt_redshift=self.recon_codebook_spectra_individ and \
                                           self.apply_gt_redshift,

@@ -6,14 +6,14 @@ global:
     activate_model_timer: False
     activate_trainer_timer: False
     dataloader_drop_last: False
-    exp_name: 'pretrain-sanity-check-scale'
+    exp_name: 'codebook-pretrain' #pretrain-sanity-check-scale'
     use_gpu: True
     seed: 42
 
-    #tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    #tasks: ['codebook_pretrain_infer','save_redshift','recon_gt_spectra','save_qtz_weights','recon_codebook_spectra_individ'] #,'save_pixel_values','recon_img','integrate_gt_spectra']
-    tasks: ['redshift_pretrain'] #,'recon_gt_spectra_during_train','save_redshift_during_train'] #,'save_pixel_values_during_train','recon_codebook_spectra_individ_during_train'] #,_during_train']
-    tasks: ['redshift_pretrain_infer','recon_codebook_spectra','recon_gt_spectra','save_redshift','plot_redshift_logits'] #,'save_qtz_weights'] #,'recon_gt_spectra_all_bins']
+    tasks: ['codebook_pretrain','recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
+    tasks: ['codebook_pretrain_infer','recon_codebook_spectra'] #,'save_redshift','recon_gt_spectra'] #,'recon_codebook_spectra_individ'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
+    #tasks: ['redshift_pretrain'] #,'recon_gt_spectra_during_train','save_redshift_during_train'] #,'save_pixel_values_during_train','recon_codebook_spectra_individ_during_train'] #,_during_train']
+    #tasks: ['redshift_pretrain_infer','recon_codebook_spectra','recon_gt_spectra','save_redshift','plot_redshift_logits'] #,'save_qtz_weights'] #,'recon_gt_spectra_all_bins']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -55,19 +55,20 @@ debug:
     regularize_pretrain_spectra_latents: False
     spectra_latents_regu_beta: 100
 
-    regu_codebook_spectra: False
+    regu_within_codebook_spectra: False
+    regu_across_codebook_spectra: True
     codebook_spectra_regu_beta: 1
 
     debug_lbfgs: False
 
 optimizer:
     optimizer_type: 'adam'
-    optimize_latents_use_lbfgs: True
+    optimize_latents_use_lbfgs: False
     b1: 0.5
     b2: 0.999
     lr: 1e-4
     grid_lr: 1e-3
-    spectra_latents_lr: 1e-1
+    spectra_latents_lr: 1e-3
     redshift_latents_lr: 1e-1
     codebook_lr: 1e-6
     codebook_pretrain_lr: 1e-3
@@ -168,7 +169,7 @@ qtz:
     quantization_strategy: 'soft'
     quantization_calculate_loss: False # only if hard qtz
     qtz_latent_dim: 32
-    qtz_num_embed: 8
+    qtz_num_embed: 4
     qtz_beta: 1
     qtz_seed: 8
     qtz_temperature_scale: 0.01
@@ -216,16 +217,16 @@ trainer:
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
-    num_epochs: 1000
+    num_epochs: 5000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 100
+    log_cli_every: 500
     log_gpu_every: -1
-    plot_grad_every: -1
+    plot_grad_every: 1
     save_data_every: -1
-    save_model_every: 100
+    save_model_every: 500
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -253,7 +254,7 @@ trainer:
     pixel_supervision: False
     spectra_supervision: True
 
-    apply_gt_redshift: False         # -
+    apply_gt_redshift: True         # -
     redshift_unsupervision: False    #  |- these three conflict each other
     redshift_semi_supervision: False # -
 
@@ -265,7 +266,7 @@ trainer:
 
     resume_train: False
     resume_log_dir: ''
-    resume_model_fname: 'model-ep5000-it0.pth'
+    resume_model_fname: 'model-ep100-it0.pth'
     #### ***********************************
 
 infer:
@@ -273,7 +274,7 @@ infer:
     infer_last_model_only: True
 
     infer_batch_size: 500
-    pretrain_infer_batch_size: 20
+    pretrain_infer_batch_size: 10
 
     infer_use_all_wave: True
     # infer_num_wave: 
@@ -283,7 +284,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20231017-185349'
+    # infer_log_dir: ''
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
@@ -301,7 +302,7 @@ infer:
 
     # recon spectra
     infer_selected: False
-    pretrain_num_infer_upper_bound: 1
+    pretrain_num_infer_upper_bound: 20
     test_num_infer_upper_bound: 10
 
     spectra_neighbour_size: 1
@@ -309,7 +310,7 @@ infer:
     flux_norm_cho: "identity"
     spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]
     mark_spectra: True
-    plot_clipped_spectrum: True
+    plot_clipped_spectrum: False
     plot_spectrum_together: True
     plot_spectrum_with_gt: True
     plot_spectrum_with_recon: True
