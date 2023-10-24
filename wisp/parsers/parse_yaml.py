@@ -393,6 +393,9 @@ def define_cmd_line_args():
                            help="intensify pixel value with to capture high dynamic range.")
     hps_group.add_argument("--intensification-method", type=str,
                            choices=["identity","arcsinh","sinh"])
+    hps_group.add_argument("--spectra-batch-reduction-order", type=str,
+                           choices=["bin_avg_first","qtz_first"],
+                           help="refer to hps_decoder_batched.py")
 
     ###################
     # Arguments for dataset

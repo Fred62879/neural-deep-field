@@ -118,8 +118,8 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["regu_within_codebook_spectra"]
         self.regu_across_codebook_spectra = self.qtz_spectra and \
             self.extra_args["regu_across_codebook_spectra"]
-        self.regu_codebook_spectra = self.regu_within_codebook_spectra or \
-            self.regu_across_codebook_spectra
+        self.regu_codebook_spectra = self.mode == "codebook_pretrain" and \
+            (self.regu_within_codebook_spectra or self.regu_across_codebook_spectra)
         assert self.regu_within_codebook_spectra + \
             self.regu_across_codebook_spectra <= 1
         self.optimize_spectra_latents = self.extra_args["direct_optimize_codebook_logits"] or \
@@ -169,7 +169,8 @@ class CodebookTrainer(BaseTrainer):
 
     def init_net(self):
         self.train_pipeline = self.pipeline[0]
-        self.train_pipeline.set_batch_reduction_order("bin_avg_first")
+        self.train_pipeline.set_batch_reduction_order(
+            self.extra_args["spectra_batch_reduction_order"])
 
         latents, redshift_latents = self.init_latents()
         self.train_pipeline.set_latents(latents.weight)
@@ -1020,14 +1021,21 @@ class CodebookTrainer(BaseTrainer):
 
         # v)
         codebook_regu = 0
-        if self.regu_within_codebook_spectra:
+        if self.regu_codebook_spectra:
             sp = ret["full_range_codebook_spectra"].shape # [num_embed,nsmpl]
             dtp = ret["full_range_codebook_spectra"].device
-            codebook_regu = F.l1_loss(
-                ret["full_range_codebook_spectra"], torch.zeros(sp).to(dtp))
-        elif self.regu_across_codebook_spectra:
-            codebook_regu = torch.mean(
-                torch.sum(ret["full_range_codebook_spectra"], dim=0))
+            if self.regu_within_codebook_spectra:
+                codebook_regu = F.l1_loss(
+                    ret["full_range_codebook_spectra"],
+                    torch.zeros(sp).to(dtp))
+
+            elif self.regu_across_codebook_spectra:
+                codebook_regu = F.l1_loss(
+                    ret["full_range_codebook_spectra"],
+                    torch.zeros(sp).to(dtp),
+                    reduction='none')
+                codebook_regu = torch.mean(torch.sum(codebook_regu, dim=0))
+
         codebook_regu *= self.extra_args["codebook_spectra_regu_beta"]
         self.log_dict["codebook_spectra_regu"] += codebook_regu
 
