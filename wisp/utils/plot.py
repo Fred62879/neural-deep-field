@@ -51,7 +51,7 @@ def plot_multiple(n_per_fig, n_per_row, data, fname, x=None, y2=None, vertical_x
                 if x is None: axis.plot(y2[lo+j], color="orange")
                 else:         axis.plot(x, y2[lo+j], color="orange")
             if vertical_xs is not None:
-                axis.axvline(x=vertical_xs[lo+j], color="green", linewidth=1, linestyle="--")
+                axis.axvline(x=vertical_xs[lo+j], color="red", linewidth=2, linestyle="--")
 
             axis.set_title(i*n_per_fig + j)
 

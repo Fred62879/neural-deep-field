@@ -70,9 +70,6 @@ class CodebookTrainer(BaseTrainer):
 
     def check_configs(self):
         tasks = set(self.extra_args["tasks"])
-        if "redshift_pretrain" in tasks:
-            assert not self.extra_args["optimize_spectra_latents"] or \
-                not self.extra_args["load_pretrained_latents_and_freeze"]
 
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
@@ -122,9 +119,26 @@ class CodebookTrainer(BaseTrainer):
             (self.regu_within_codebook_spectra or self.regu_across_codebook_spectra)
         assert self.regu_within_codebook_spectra + \
             self.regu_across_codebook_spectra <= 1
-        self.optimize_spectra_latents = self.extra_args["direct_optimize_codebook_logits"] or \
-            (self.extra_args["optimize_spectra_latents"] and \
-             not self.extra_args["load_pretrained_latents_and_freeze"])
+
+        self.optimize_codebook_latents = self.extra_args["optimize_codebook_latents"]
+        self.optimize_redshift_latents = self.extra_args["optimize_redshift_latents"]
+        self.optimize_codebook_latents_as_logits = self.extra_args["optimize_codebook_latents_as_logits"]
+        self.optimize_redshift_latents_as_logits = self.extra_args["optimize_redshift_latents_as_logits"]
+        self.alternation_steps = self.extra_args["alternation_steps"]
+        self.alternation_starts_with = self.extra_args["alternation_starts_with"]
+        self.use_lbfgs = self.extra_args["optimize_latents_use_lbfgs"]
+        self.optimize_latents_alternately = self.extra_args["pretrain_optimize_latents_alternately"]
+
+        if self.use_lbfgs:
+            assert (self.optimize_codebook_latents_as_logits and \
+                    self.optimize_redshift_latents_as_logits), \
+                    "Doesn't support optimizing alternately autodceoder arch"
+
+        if self.optimize_latents_alternately:
+            # em optimization for codebook & redshift latents
+            assert (self.optimize_codebook_latents_as_logits and \
+                    self.optimize_redshift_latents_as_logits), \
+                    "Doesn't support optimizing alternately an autodecoder arch"
 
     def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
@@ -235,29 +249,50 @@ class CodebookTrainer(BaseTrainer):
 
     def init_optimizer(self):
         if self.mode == "codebook_pretrain":
-            latents, net_params = self.assign_codebook_pretrain_optimization_params()
+            latents, net_params = self._assign_codebook_pretrain_optimization_params()
         elif self.mode == "redshift_pretrain":
-            latents, net_params = self.assign_redshift_pretrain_optimization_params()
-        else: raise ValueError()
-
-        if self.extra_args["optimize_latents_use_lbfgs"]:
-            # latents_optimizer = torch.optim.LBFGS(latents, **params)
-            # if len(net_params) != 0:
-            #     net_optimizer = self.optim_cls(net_params, **self.optim_params)
-            #     self.optimizer = multi_optimizer(latents_optimizer, net_optimizer)
-            # else:
-            #     self.optimizer = multi_optimizer(latents_optimizer)
-
-            params = {
-                "lr": self.extra_args["redshift_latents_lr"],
-                "max_iter": 4,
-                "history_size": 10
-            }
-            self.optimizer = torch.optim.LBFGS(latents, **params)
+            if self.optimize_latents_alternately:
+                codebook_latents_group, redshift_latents_group, net_params = \
+                    self._assign_redshift_pretrain_optimization_params()
+            else:
+                latents, net_params = self._assign_redshift_pretrain_optimization_params()
         else:
-            net_params.extend(latents)
-            optimizer = self.optim_cls(net_params, **self.optim_params)
-            self.optimizer = multi_optimizer(optimizer)
+            raise ValueError()
+
+        if self.optimize_latents_alternately:
+            if self.use_lbfgs:
+                raise NotImplementedError()
+            else:
+                redshift_latents_optm = self.optim_cls(
+                    redshift_latents_group, **self.optim_params)
+                codebook_latents_optm = self.optim_cls(
+                    codebook_latents_group, **self.optim_params)
+                optms = {
+                    "redshift_latents": redshift_latents_optm,
+                    "codebook_latents": codebook_latents_optm
+                }
+                self.optimizer = multi_optimizer(**optms)
+        else:
+            if self.use_lbfgs:
+                # latents_optimizer = torch.optim.LBFGS(latents, **params)
+                # if len(net_params) != 0:
+                #     net_optimizer = self.optim_cls(net_params, **self.optim_params)
+                #     self.optimizer = multi_optimizer(latents_optimizer, net_optimizer)
+                # else:
+                #     self.optimizer = multi_optimizer(latents_optimizer)
+
+                params = {
+                    "lr": self.extra_args["redshift_latents_lr"],
+                    "max_iter": 4,
+                    "history_size": 10
+                }
+                self.optimizer = torch.optim.LBFGS(latents, **params)
+            else:
+                net_params.extend(latents)
+                optms = {
+                    "all_params": self.optim_cls(net_params, **self.optim_params)
+                }
+                self.optimizer = multi_optimizer(**optms)
 
         if self.verbose: log.info(self.optimizer)
 
@@ -328,6 +363,7 @@ class CodebookTrainer(BaseTrainer):
         # for epoch in tqdm(range(self.num_epochs + 1)):
         for self.epoch in range(self.num_epochs + 1):
             self.begin_epoch()
+            # print(self.cur_optm_target)
             self.timer.check("begun epoch")
 
             for batch in range(self.num_iterations_cur_epoch):
@@ -392,6 +428,10 @@ class CodebookTrainer(BaseTrainer):
             self.cur_gt_bin_logits = []
         if self.extra_args["plot_individ_spectra_loss"]:
             self.cur_spectra_individ_losses = []
+
+        if self.optimize_latents_alternately:
+            self.cur_optm_target = self._get_current_optm_target()
+        else: self.cur_optm_target = None
 
     def end_epoch(self):
         self.post_epoch()
@@ -517,7 +557,7 @@ class CodebookTrainer(BaseTrainer):
             @Param:
               data (dict): Dictionary of the input batch from the DataLoader.
         """
-        # if self.extra_args["optimize_latents_use_lbfgs"]:
+        # if self.use_lbfgs:
         #     # self.optimizer.set_loss_func(partial(self.calculate_loss, self))
         #     self.optimizer.set_loss_func(self.calculate_loss)
         #     self.optimizer.set_current_data(data)
@@ -531,17 +571,19 @@ class CodebookTrainer(BaseTrainer):
             if keep_ret: return loss, ret
             return loss
 
-        if self.extra_args["optimize_latents_use_lbfgs"]:
+        if self.use_lbfgs:
+            assert 0
+            # todo, use multi_optimizer (uncomment line below and debug)
+            # self.optimizer.step(target=self.cur_optm_target, closure=closure)
             self.optimizer.step(closure)
             self.timer.check("stepped")
 
         loss, ret = closure(True) # forward backward without step
-        if self.plot_grad_every != -1 and \
-           (self.epoch == 0 or (self.epoch % self.plot_grad_every == 0)):
+        if self._plot_grad_now():
             plot_grad_flow(self.params_dict.items(), self.grad_fname)
 
-        if not self.extra_args["optimize_latents_use_lbfgs"]:
-            self.optimizer.step()
+        if not self.use_lbfgs:
+            self.optimizer.step(target=self.cur_optm_target)
             self.timer.check("stepped")
 
         return ret
@@ -606,22 +648,24 @@ class CodebookTrainer(BaseTrainer):
             load_excls, freeze_excls = [], []
 
             # codebook logits
-            if self.extra_args["direct_optimize_codebook_logits"]:
-                # directly optimize logits
-                load_excls.append("nef.latents")
+            if self.optimize_codebook_latents:
                 freeze_excls.append("nef.latents")
+            if not self.extra_args["load_pretrained_codebook_latents"]:
+                load_excls.append("nef.latents")
+
+            if self.optimize_codebook_latents_as_logits:
+                # directly optimize logits
+                pass
             else:
                 # optimize an autodecoder
+                if self.extra_args["optimize_codebook_logits_mlp"]:
+                    freeze_excls.append("spatial_decoder.decode")
                 if not self.extra_args["load_pretrained_codebook_logits_mlp"]:
                     load_excls.append("spatial_decoder.decode")
-                if self.extra_args["optimize_codebook_logits_mlp"]:
-                    freeze_excls.append("nef.latents")
-                if self.extra_args["optimize_spectra_latents"]:
-                    freeze_excls.append("spatial_decoder.decode")
 
             # redshift bin logits
             if self.classify_redshift:
-                if self.extra_args["optimize_redshift_latents_as_logits"]:
+                if self.optimize_redshift_latents_as_logits:
                     # directly optimize logits
                     freeze_excls.append("nef.redshift_latents")
                 else:
@@ -637,7 +681,7 @@ class CodebookTrainer(BaseTrainer):
     def init_codebook_pretrain_spectra_latents(self):
         latents = None
         set_seed(self.extra_args["seed"] + 1)
-        if self.extra_args["direct_optimize_codebook_logits"]:
+        if self.optimize_codebook_latents_as_logits:
             dim = self.extra_args["qtz_num_embed"]
         else: dim = self.extra_args["spectra_latent_dim"]
         latents = nn.Embedding(self.num_spectra, dim, device=self.device)
@@ -656,26 +700,26 @@ class CodebookTrainer(BaseTrainer):
                 # zero_latents = torch.zeros(self.num_spectra, red_z_dim)
                 redshift_latents = nn.Embedding.from_pretrained(
                     one_latents, device=self.device,
-                    freeze=not self.extra_args["optimize_redshift_latents"])
+                    freeze=not self.optimize_redshift_latents)
             else:
                 redshift_latents = nn.Embedding(
                     self.num_spectra, red_z_dim, device=self.device
                 ).requires_grad_(
-                    self.extra_args["optimize_redshift_latents_as_logits"] or \
-                    self.extra_args["optimize_redshift_latents"])
+                    self.optimize_redshift_latents_as_logits or \
+                    self.optimize_redshift_latents)
 
         return redshift_latents
 
     def init_redshift_pretrain_spectra_latents(self):
         latents = None
         set_seed(self.extra_args["seed"] + 1)
-        if self.extra_args["direct_optimize_codebook_logits"]:
+        if self.optimize_codebook_latents_as_logits:
             latents = nn.Embedding(
                 self.num_spectra, self.extra_args["qtz_num_embed"], device=self.device)
         else:
             sp_z_dim = self.extra_args["spectra_latent_dim"]
             if self.extra_args["sample_from_codebook_pretrain_spectra"]:
-                if self.extra_args["load_pretrained_latents_and_freeze"]:
+                if self.extra_args["load_pretrained_codebook_latents"]:
                     # checkpoint comes from codebook pretrain (use sup spectra)
                     checkpoint = torch.load(self.pretrained_model_fname)
                     assert checkpoint["latents"].shape[1] == sp_z_dim
@@ -725,11 +769,11 @@ class CodebookTrainer(BaseTrainer):
             # TODO: can we load latents as part of the model
             # self.latents = nn.Embedding.from_pretrained(
             #     checkpoint["latents"],
-            #     freeze=not self.optimize_spectra_latents)
+            #     freeze=not self.optimize_codebook_latents)
             # if not self.apply_gt_redshift and self.split_latent:
             #     self.redshift_latents = nn.Embedding.from_pretrained(
             #         checkpoint["redshift_latents"],
-            #         freeze=self.extra_args["optimize_redshift_latents"])
+            #         freeze=self.optimize_redshift_latents)
 
             # re-init
             self.collect_model_params()
@@ -782,6 +826,10 @@ class CodebookTrainer(BaseTrainer):
             self._save_qtz_weights()
         if self.save_pixel_values:
             self._save_pixel_values()
+
+    def _plot_grad_now(self):
+        return self.plot_grad_every != -1 and \
+            (self.epoch == 0 or self.epoch % self.plot_grad_every == 0)
 
     def _save_redshift(self):
         # if type(self.redshift) == list:
@@ -1076,82 +1124,110 @@ class CodebookTrainer(BaseTrainer):
     # Optimizer Helpers
     ###################
 
-    def assign_codebook_pretrain_optimization_params(self):
-        latents, net_params = [], []
+    def _get_current_optm_target(self):
+        residu = self.epoch % (sum(self.alternation_steps))
+        if self.alternation_starts_with == "codebook_latents":
+            return "codebook_latents" if residu < self.alternation_steps[0] else "redshift_latents"
+        elif self.alternation_starts_with == "redshift_latents":
+            return "redshift_latents" if residu < self.alternation_steps[0] else "codebook_latents"
+        else: raise ValueError()
 
-        spectra_latents = None
-        other_params, spectra_logit_params = [], []
+    def _assign_codebook_pretrain_optimization_params(self):
+        codebook_latents = None
+        other_params, codebook_logit_params = [], []
         for name in self.params_dict:
             if name == "nef.latents":
-                spectra_latents = self.params_dict[name]
+                codebook_latents = self.params_dict[name]
             elif "spatial_decoder.decode" in name:
-                spectra_logit_params.append(self.params_dict[name])
+                codebook_logit_params.append(self.params_dict[name])
             else:
                 other_params.append(self.params_dict[name])
 
-        net_params.append({"params": other_params,
-                           "lr": self.extra_args["codebook_pretrain_lr"]})
+        latents_group, net_params_group = [], []
 
-        if self.extra_args["direct_optimize_codebook_logits"]:
-            latents.append({"params": spectra_latents,
-                            "lr": self.extra_args["spectra_latents_lr"]})
-        else:
-            latents.append({"params": spectra_latents,
-                            "lr": self.extra_args["codebook_pretrain_lr"]})
-            net_params.append({"params": spectra_logit_params,
-                               "lr": self.extra_args["codebook_pretrain_lr"]})
+        self._add_codebook_latents(codebook_latents, latents_group)
+        net_params_group.append({"params": other_params,
+                                 "lr": self.extra_args["codebook_pretrain_lr"]})
+        if not self.optimize_codebook_latents_as_logits:
+            net_params_group.append({"params": spectra_logit_params,
+                                     "lr": self.extra_args["codebook_pretrain_lr"]})
         return latents, net_params
 
-    def assign_redshift_pretrain_optimization_params(self):
-        latents, net_params = [], []
-
-        spectra_latents, redshift_latents = None, None
-        spectra_logit_params, redshift_logit_params = [], []
+    def _assign_redshift_pretrain_optimization_params(self):
+        codebook_latents, redshift_latents = None, None
+        codebook_logit_params, redshift_logit_params = [], []
 
         for name in self.params_dict:
             if name == "nef.latents":
-                spectra_latents = self.params_dict[name]
+                codebook_latents = self.params_dict[name]
             elif name == "nef.redshift_latents":
                 redshift_latents = self.params_dict[name]
             elif "redshift_decoder" in name:
                 redshift_logit_params.append(self.params_dict[name])
             elif "spatial_decoder.decode" in name:
-                spectra_logit_params.append(self.params_dict[name])
+                codebook_logit_params.append(self.params_dict[name])
+
+        if self.optimize_latents_alternately:
+            codebook_latents_group, redshift_latents_group = [], []
+        else: latents_group = []
+        net_params_group = []
 
         # redshift latents & parameters
-        if self.apply_gt_redshift:
-            pass
-        elif self.split_latent:
-            if self.extra_args["optimize_redshift_latents_as_logits"]:
-                if self.extra_args["optimize_latents_use_lbfgs"]:
-                    latents.append(redshift_latents)
-                else:
-                    latents.append({"params": redshift_latents,
-                                    "lr": self.extra_args["redshift_latents_lr"]})
-            elif self.extra_args["optimize_redshift_latents"]:
-                latents.append({"params": redshift_latents,
-                                "lr": self.extra_args["redshift_latents_lr"]})
-                net_params.append({"params": redshift_logit_params,
-                                   "lr": self.extra_args["codebook_pretrain_lr"]})
+        if not self.apply_gt_redshift:
+            assert self.split_latent
+            if self.optimize_latents_alternately:
+                self._add_redshift_latents(
+                    redshift_latents, redshift_logit_params,
+                    redshift_latents_group, net_params_group)
             else:
-                raise ValueError("Nothing to do.")
-        else:
-            raise ValueError("Must split latents.")
+                self._add_redshift_latents(
+                    redshift_latents, redshift_logit_params,
+                    latents_group, net_params_group)
 
-        # spectra latents
-        if self.optimize_spectra_latents:
-            if self.extra_args["optimize_latents_use_lbfgs"]:
-                latents.append(spectra_latents)
+        # codebook latents
+        if self.optimize_codebook_latents:
+            if self.optimize_latents_alternately:
+                self._add_codebook_latents(codebook_latents, codebook_latents_group)
             else:
-                latents.append({"params": spectra_latents,
-                                "lr": self.extra_args["spectra_latents_lr"]})
+                self._add_codebook_latents(codebook_latents, latents_group)
 
-        # spectra decoder parameters
-        if self.extra_args["direct_optimize_codebook_logits"]:
+        # codebook logits parameters
+        if self.optimize_codebook_latents_as_logits:
             pass
         else:
-            if self.extra_args["optimize_codebook_logits_mlp"] or \
-               not self.extra_args["load_pretrained_latents_and_freeze"]:
-                net_params.append({"params": spectra_logit_params,
-                                   "lr": self.extra_args["codebook_pretrain_lr"]})
-        return latents, net_params
+            if self.extra_args["optimize_codebook_logits_mlp"]:
+                net_params_group.append({"params": codebook_logit_params,
+                                         "lr": self.extra_args["codebook_pretrain_lr"]})
+
+        if self.optimize_latents_alternately:
+            return codebook_latents_group, redshift_latents_group, net_params_group
+        return latents_group, net_params_group
+
+    def _add_codebook_latents(self, codebook_latents, latents_group):
+        if self.optimize_codebook_latents_as_logits:
+            if self.use_lbfgs:
+                latents_group.append(codebook_latents)
+            else:
+                latents_group.append({"params": codebook_latents,
+                                      "lr": self.extra_args["spectra_latents_lr"]})
+        else:
+            latents_group.append({"params": codebook_latents,
+                                  "lr": self.extra_args["codebook_pretrain_lr"]})
+
+    def _add_redshift_latents(self, redshift_latents, redshift_logit_params,
+                              latents_group, net_params_group
+    ):
+        if self.optimize_redshift_latents_as_logits:
+            assert self.optimize_redshift_latents
+            if self.use_lbfgs:
+                latents_group.append(redshift_latents)
+            else:
+                latents_group.append({"params": redshift_latents,
+                                      "lr": self.extra_args["redshift_latents_lr"]})
+        else: # autodecoder arch
+            if self.optimize_redshift_latents:
+                latents_group.append({"params": redshift_latents,
+                                      "lr": self.extra_args["redshift_latents_lr"]})
+            if self.optimize_redshift_logits_mlp:
+                net_params_group.append({"params": redshift_logit_params,
+                                         "lr": self.extra_args["codebook_pretrain_lr"]})

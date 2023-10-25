@@ -40,17 +40,18 @@ debug:
     plot_individ_spectra_loss: False
     calculate_bin_wise_spectra_loss: False
 
-    optimize_spectra_latents: True
-    optimize_codebook_logits_mlp: False
-    load_pretrained_codebook_logits_mlp: True
-    direct_optimize_codebook_logits: True
-
     sample_from_codebook_pretrain_spectra: True
-    load_pretrained_latents_and_freeze: False
 
-    zero_init_redshift_latents: False
-    optimize_redshift_latents: False
+    optimize_codebook_latents_as_logits: True
+    optimize_codebook_latents: True
+    load_pretrained_codebook_latents: False
+    optimize_codebook_logits_mlp: False
+    load_pretrained_codebook_logits_mlp: False
+
     optimize_redshift_latents_as_logits: True
+    optimize_redshift_latents: True
+    zero_init_redshift_latents: False
+    optimize_redshift_logits_mlp: False
 
     regularize_pretrain_spectra_latents: False
     spectra_latents_regu_beta: 100
@@ -64,6 +65,7 @@ debug:
 optimizer:
     optimizer_type: 'adam'
     optimize_latents_use_lbfgs: False
+
     b1: 0.5
     b2: 0.999
     lr: 1e-4
@@ -125,6 +127,10 @@ grid:
 
 pretrain:
     pretrain_codebook: True
+
+    pretrain_optimize_latents_alternately: True
+    alternation_starts_with: "codebook_latents"
+    alternation_steps: [20,80]
 
     pretrain_batch_size: 20
     pretrain_pixel_beta: 1
@@ -218,7 +224,7 @@ trainer:
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
-    num_epochs: 500
+    num_epochs: 1000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
@@ -266,7 +272,7 @@ trainer:
     spectra_supervision_num_wave_samples: 100
 
     resume_train: False
-    resume_log_dir: ''
+    resume_log_dir: '20231024-193045_altnt_90_10_5k_epochs'
     resume_model_fname: 'model-ep5000-it0.pth'
     #### ***********************************
 

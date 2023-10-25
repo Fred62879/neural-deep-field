@@ -134,8 +134,7 @@ class BaseTrainer(ABC):
                 wandb.define_metric(f"LOD-{d}-360-Degree-Scene")
                 wandb.define_metric(
                     f"LOD-{d}-360-Degree-Scene",
-                    step_metric=f"LOD-{d}-360-Degree-Scene/step"
-                )
+                    step_metric=f"LOD-{d}-360-Degree-Scene/step")
 
         self.iteration = 1
 

@@ -134,22 +134,21 @@ def define_cmd_line_args():
     debug_group.add_argument("--plot-individ-spectra-loss", action="store_true")
     debug_group.add_argument("--calculate-bin-wise-spectra-loss", action="store_true")
 
-    debug_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
-    debug_group.add_argument("--optimize-spectra-latents", action="store_true")
-    debug_group.add_argument("--load-pretrained-codebook-logits-mlp", action="store_true")
-    debug_group.add_argument("--direct-optimize-codebook-logits", action="store_true",
-                             help="optimize latents directly as logits without autodecoder.")
-
     debug_group.add_argument("--sample-from-codebook-pretrain-spectra", action="store_true",
                              help="sample spectra for redshift pretrain from spectra \
                              used for codebook pretrain.")
-    debug_group.add_argument("--load-pretrained-latents-and-freeze", action="store_true",
-                             help="use same latents as codebook pretrain during \
-                             redshift pretrain.")
 
-    debug_group.add_argument("--zero-init-redshift-latents", action="store_true")
-    debug_group.add_argument("--optimize-redshift-latents", action="store_true")
+    debug_group.add_argument("--optimize-codebook-latents-as-logits", action="store_true",
+                             help="optimize latents directly as logits without autodecoder.")
+    debug_group.add_argument("--optimize-codebook-latents", action="store_true")
+    debug_group.add_argument("--load-pretrained-codebook-latents", action="store_true")
+    debug_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
+    debug_group.add_argument("--load-pretrained-codebook-logits-mlp", action="store_true")
+
     debug_group.add_argument("--optimize-redshift-latents-as-logits", action="store_true")
+    debug_group.add_argument("--optimize-redshift-latents", action="store_true")
+    debug_group.add_argument("--zero-init-redshift-latents", action="store_true")
+    debug_group.add_argument("--optimize-redshift-logits-mlp", action="store_true")
 
     debug_group.add_argument("--regularize-pretrain-spectra-latents", action="store_true",
                              help="L2 regularize latents for autodecoder during pretrain.")
@@ -304,6 +303,15 @@ def define_cmd_line_args():
     pretrain_group = parser.add_argument_group("pretrain")
 
     pretrain_group.add_argument("--pretrain-codebook", action="store_true")
+
+    pretrain_group.add_argument("--pretrain-optimize-latents-alternately", action="store_true",
+                                help="optimize codebook and redshift latents alternately \
+                                in redshfit pretrain (EM).")
+    pretrain_group.add_argument("--alternation-starts-with", type=str,
+                                choices=["codebook_latents","redshift_latents"],
+                                help="alternate optimization starts with.")
+    pretrain_group.add_argument("--alternation-steps", nargs="+", type=int,
+                                help="alternately optimize each for given steps.")
 
     pretrain_group.add_argument("--pretrain-batch-size", type=int, default=512)
     pretrain_group.add_argument("--pretrain-pixel-beta", type=float)

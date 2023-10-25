@@ -487,12 +487,11 @@ class SpectraData:
         # select spectra for redshift pretrain from spectra used for codebook pretrain
         if self.kwargs["sample_from_codebook_pretrain_spectra"]:
             indices = np.arange(len(supervision_ids))
-            # np.random.seed(20)
-            # np.random.shuffle(indices)
+            np.random.seed(self.kwargs["seed"])
+            np.random.shuffle(indices)
             self.redshift_pretrain_ids = indices[:self.kwargs["redshift_pretrain_num_spectra"]]
-            # self.redshift_pretrain_ids = np.array([7])
             validation_ids = supervision_ids[self.redshift_pretrain_ids]
-            # print(self.redshift_pretrain_ids)
+            print(self.redshift_pretrain_ids)
 
         # log.info(f"test spectra ids: {test_ids}")
         # log.info(f"validation spectra ids: {validation_ids}")
