@@ -324,7 +324,9 @@ def forward(
         save_embed_ids=False,
         save_qtz_weights=False,
         save_codebook_loss=False,
+        save_codebook_logits=False,
         save_redshift_logits=False,
+        save_codebook_latents=False,
         save_codebook_spectra=False,
         save_spectra_all_bins=False,
         init_redshift_prob=None, # debug
@@ -350,7 +352,9 @@ def forward(
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if save_qtz_weights: requested_channels.append("qtz_weights")
         if save_codebook_loss: requested_channels.append("codebook_loss")
+        if save_codebook_logits: requested_channels.append("codebook_logits")
         if save_redshift_logits: requested_channels.append("redshift_logits")
+        if save_codebook_latents: requested_channels.append("codebook_latents")
         if save_codebook_spectra: requested_channels.append("codebook_spectra")
         if save_spectra_all_bins: requested_channels.append("spectra_all_bins")
 

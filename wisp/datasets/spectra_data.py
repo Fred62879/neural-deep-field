@@ -488,7 +488,7 @@ class SpectraData:
         if self.kwargs["sample_from_codebook_pretrain_spectra"]:
             indices = np.arange(len(supervision_ids))
             np.random.seed(self.kwargs["seed"])
-            np.random.shuffle(indices)
+            # np.random.shuffle(indices)
             self.redshift_pretrain_ids = indices[:self.kwargs["redshift_pretrain_num_spectra"]]
             validation_ids = supervision_ids[self.redshift_pretrain_ids]
             print(self.redshift_pretrain_ids)

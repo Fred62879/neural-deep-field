@@ -76,13 +76,15 @@ class AstroInferrer(BaseInferrer):
 
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","recon_synthetic_dir","metric_dir",
-                 "spectra_dir","codebook_spectra_dir", "codebook_spectra_individ_dir",
-                 "embed_map_dir","latent_dir","redshift_dir","latent_embed_dir",
-                 "zoomed_recon_dir","scaler_dir","pixel_distrib_dir","qtz_weights_dir"],
-                ["models","recons","recon_synthetic","metrics",f"{prefix}_spectra",
-                 f"{prefix}_codebook_spectra",f"{prefix}_codebook_spectra_individ",
-                 "embed_map","latents","redshift","latent_embed","zoomed_recon",
-                 "scaler","pixel_distrib","qtz_weights"]
+                 "zoomed_recon_dir","scaler_dir","pixel_distrib_dir","qtz_weights_dir",
+                 "embed_map_dir","latent_dir","redshift_dir","latent_embed_dir","spectra_dir",
+                 "codebook_logits_dir","codebook_latents_dir",
+                 "codebook_spectra_dir", "codebook_spectra_individ_dir"],
+                ["models","recons","recon_synthetic","metrics",
+                 "zoomed_recon","scaler","pixel_distrib","qtz_weights",
+                 "embed_map","latents","redshift","latent_embed",f"{prefix}_spectra",
+                 f"{prefix}_codebook_logits",f"{prefix}_codebook_latents",
+                 f"{prefix}_codebook_spectra",f"{prefix}_codebook_spectra_individ"]
         ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
@@ -247,6 +249,8 @@ class AstroInferrer(BaseInferrer):
         #   `recon_img_sup_spectra` during pretran infer &
         #   `recon_img_val_spectra` during main train infer
         self.save_pixel_values = "save_pixel_values" in tasks
+        self.plot_codebook_logits = "plot_codebook_logits" in tasks and self.qtz_spectra
+        self.save_codebook_latents = "save_codebook_latents" in tasks and self.qtz_spectra
         self.plot_redshift_logits = "plot_redshift_logits" in tasks and \
             not self.extra_args["apply_gt_redshift"] and \
             self.extra_args["redshift_model_method"] == "classification"
@@ -770,6 +774,12 @@ class AstroInferrer(BaseInferrer):
             if self.recon_gt_spectra_all_bins:
                 self.recon_fluxes_all = []
 
+        if self.plot_codebook_logits:
+            self.codebook_logits = []
+
+        if self.save_codebook_latents:
+            self.codebook_latents = []
+
         if self.plot_redshift_logits:
             self.gt_redshift_l = []
             self.redshift_logits = []
@@ -846,6 +856,12 @@ class AstroInferrer(BaseInferrer):
 
         if self.recon_gt_spectra_all_bins:
             self._recon_gt_spectra_all_bins(num_spectra, model_id)
+
+        if self.plot_codebook_logits:
+            self._plot_codebook_logits(model_id)
+
+        if self.save_codebook_latents:
+            self._save_codebook_latents(model_id)
 
         if self.plot_redshift_logits:
             self._plot_redshift_logits(model_id)
@@ -1107,7 +1123,9 @@ class AstroInferrer(BaseInferrer):
                         save_redshift=self.save_redshift,
                         save_spectra=self.recon_gt_spectra,
                         save_qtz_weights=self.save_qtz_weights,
+                        save_codebook_logits=self.plot_codebook_logits,
                         save_redshift_logits=self.plot_redshift_logits,
+                        save_codebook_latents=self.save_codebook_latents,
                         save_spectra_all_bins=self.recon_gt_spectra_all_bins,
                         init_redshift_prob= None if "init_redshift_prob" not in data else \
                                                 data["init_redshift_prob"])
@@ -1152,6 +1170,12 @@ class AstroInferrer(BaseInferrer):
                         self.weighted_redshift.extend(weighted_redshift)
                     else:
                         self.redshift.extend(ret["redshift"])
+
+                if self.plot_codebook_logits:
+                    self.codebook_logits.extend(ret["codebook_logits"])
+
+                if self.save_codebook_latents:
+                    self.codebook_latents.extend(ret["codebook_latents"])
 
                 if self.plot_redshift_logits:
                     self.gt_redshift_l.extend(data["spectra_redshift"])
@@ -1456,6 +1480,21 @@ class AstroInferrer(BaseInferrer):
                     titles=redshift_bins[lo:hi])
 
         log.info("all bin spectrum plotting done")
+
+    def _plot_codebook_logits(self, model_id):
+        codebook_logits = torch.stack(self.codebook_logits).detach().cpu().numpy()
+        fname = join(self.codebook_logits_dir, f"model-{model_id}_logits")
+        np.save(fname, codebook_logits)
+
+        plot_multiple(
+            self.extra_args["num_spectrum_per_fig"],
+            self.extra_args["num_spectrum_per_row"],
+            codebook_logits, fname)
+
+    def _save_codebook_latents(self, model_id):
+        codebook_latents = torch.stack(self.codebook_latents).detach().cpu().numpy()
+        fname = join(self.codebook_latents_dir, f"model-{model_id}_logits")
+        np.save(fname, codebook_latents)
 
     def _plot_redshift_logits(self, model_id):
         gt_redshift = torch.stack(self.gt_redshift_l).detach().cpu().numpy()

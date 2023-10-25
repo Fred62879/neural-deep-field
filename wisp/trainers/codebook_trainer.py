@@ -230,7 +230,7 @@ class CodebookTrainer(BaseTrainer):
         """
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
-        # sampler_cls = SequentialSampler
+        sampler_cls = SequentialSampler
         # sampler_cls = RandomSampler
 
         sampler = BatchSampler(
@@ -702,6 +702,7 @@ class CodebookTrainer(BaseTrainer):
                     one_latents, device=self.device,
                     freeze=not self.optimize_redshift_latents)
             else:
+                torch.manual_seed(self.extra_args["seed"])
                 redshift_latents = nn.Embedding(
                     self.num_spectra, red_z_dim, device=self.device
                 ).requires_grad_(

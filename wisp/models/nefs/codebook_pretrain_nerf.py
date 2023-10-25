@@ -47,7 +47,8 @@ class CodebookPretrainNerf(BaseNeuralField):
         """ Register forward functions with the channels that they output.
         """
         channels = ["intensity","spectra","spectra_all_bins","qtz_weights",
-                    "codebook_spectra","full_range_codebook_spectra","min_embed_ids","latents"]
+                    "codebook_spectra","codebook_logits","codebook_latents",
+                    "full_range_codebook_spectra","min_embed_ids","latents"]
 
         if self.kwargs["model_redshift"]:
             channels.append("redshift")
@@ -147,7 +148,6 @@ class CodebookPretrainNerf(BaseNeuralField):
             redshift_latents = self.redshift_latents
             redshift_latents = self.index_latents(redshift_latents, selected_ids, idx)
         else: redshift_latents = None
-        # print(redshift_latents.device)
 
         # `latents` is either logits or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(
