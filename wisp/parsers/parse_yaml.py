@@ -138,6 +138,7 @@ def define_cmd_line_args():
                              help="sample spectra for redshift pretrain from spectra \
                              used for codebook pretrain.")
 
+    debug_group.add_argument("--zero-init-codebook-latents", action="store_true")
     debug_group.add_argument("--optimize-codebook-latents-as-logits", action="store_true",
                              help="optimize latents directly as logits without autodecoder.")
     debug_group.add_argument("--optimize-codebook-latents", action="store_true")
@@ -145,9 +146,9 @@ def define_cmd_line_args():
     debug_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
     debug_group.add_argument("--load-pretrained-codebook-logits-mlp", action="store_true")
 
+    debug_group.add_argument("--zero-init-redshift-latents", action="store_true")
     debug_group.add_argument("--optimize-redshift-latents-as-logits", action="store_true")
     debug_group.add_argument("--optimize-redshift-latents", action="store_true")
-    debug_group.add_argument("--zero-init-redshift-latents", action="store_true")
     debug_group.add_argument("--optimize-redshift-logits-mlp", action="store_true")
 
     debug_group.add_argument("--regularize-pretrain-spectra-latents", action="store_true",
@@ -294,8 +295,10 @@ def define_cmd_line_args():
     qtz_group.add_argument("--qtz-num-embed", type=int)
     qtz_group.add_argument("--qtz-beta", type=float, help="codebook loss weight")
     qtz_group.add_argument("--qtz-seed", type=int)
-    qtz_group.add_argument("--qtz-soft-temperature", type=int)
-    qtz_group.add_argument("--qtz-temperature-scale", type=int)
+
+
+    qtz_group.add_argument("--temped-qtz", action="store_true")
+    qtz_group.add_argument("--qtz-temperature-scale", type=float)
 
     ###################
     # Pretrain arguments

@@ -481,7 +481,8 @@ class SpectraData:
 
         # use the rest spectra for pretrain (spectra supervision)
         supervision_ids = np.array(list(set(ids)-set(validation_ids)-set(test_ids))).astype(int)
-        np.random.shuffle(supervision_ids)
+        np.random.seed(self.kwargs["seed"])
+        # np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
 
         # select spectra for redshift pretrain from spectra used for codebook pretrain

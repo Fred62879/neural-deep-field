@@ -1489,7 +1489,7 @@ class AstroInferrer(BaseInferrer):
         plot_multiple(
             self.extra_args["num_spectrum_per_fig"],
             self.extra_args["num_spectrum_per_row"],
-            codebook_logits, fname)
+            codebook_logits, fname, hist=True)
 
     def _save_codebook_latents(self, model_id):
         codebook_latents = torch.stack(self.codebook_latents).detach().cpu().numpy()

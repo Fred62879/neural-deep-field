@@ -124,11 +124,14 @@ class CodebookTrainer(BaseTrainer):
         self.optimize_redshift_latents = self.extra_args["optimize_redshift_latents"]
         self.optimize_codebook_latents_as_logits = self.extra_args["optimize_codebook_latents_as_logits"]
         self.optimize_redshift_latents_as_logits = self.extra_args["optimize_redshift_latents_as_logits"]
+        if self.optimize_redshift_latents_as_logits:
+            # no pretrained latents to load
+            assert self.mode == "redshift_pretrain" and self.optimize_redshift_latents
+
         self.alternation_steps = self.extra_args["alternation_steps"]
         self.alternation_starts_with = self.extra_args["alternation_starts_with"]
         self.use_lbfgs = self.extra_args["optimize_latents_use_lbfgs"]
         self.optimize_latents_alternately = self.extra_args["pretrain_optimize_latents_alternately"]
-
         if self.use_lbfgs:
             assert (self.optimize_codebook_latents_as_logits and \
                     self.optimize_redshift_latents_as_logits), \
@@ -191,9 +194,16 @@ class CodebookTrainer(BaseTrainer):
         if redshift_latents is not None:
             self.train_pipeline.set_redshift_latents(redshift_latents.weight)
 
-        # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
+        print(latents.weight)
+        for n,p in self.train_pipeline.named_parameters():
+            # print(n, p.requires_grad)
+            if n == 'nef.latents': print(p)
+
         self.freeze_and_load()
-        # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
+        for n,p in self.train_pipeline.named_parameters():
+            # print(n, p.requires_grad)
+            if n == 'nef.latents': print(p)
+        assert 0
 
         log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(
@@ -230,7 +240,7 @@ class CodebookTrainer(BaseTrainer):
         """
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
-        sampler_cls = SequentialSampler
+        # sampler_cls = SequentialSampler
         # sampler_cls = RandomSampler
 
         sampler = BatchSampler(
@@ -269,31 +279,21 @@ class CodebookTrainer(BaseTrainer):
                     codebook_latents_group, **self.optim_params)
                 optms = {
                     "redshift_latents": redshift_latents_optm,
-                    "codebook_latents": codebook_latents_optm
-                }
-                self.optimizer = multi_optimizer(**optms)
+                    "codebook_latents": codebook_latents_optm }
         else:
             if self.use_lbfgs:
-                # latents_optimizer = torch.optim.LBFGS(latents, **params)
-                # if len(net_params) != 0:
-                #     net_optimizer = self.optim_cls(net_params, **self.optim_params)
-                #     self.optimizer = multi_optimizer(latents_optimizer, net_optimizer)
-                # else:
-                #     self.optimizer = multi_optimizer(latents_optimizer)
-
+                assert len(net_params) == 0
                 params = {
                     "lr": self.extra_args["redshift_latents_lr"],
                     "max_iter": 4,
                     "history_size": 10
                 }
-                self.optimizer = torch.optim.LBFGS(latents, **params)
+                optms = { "latents_optimizer": torch.optim.LBFGS(latents, **params) }
             else:
                 net_params.extend(latents)
-                optms = {
-                    "all_params": self.optim_cls(net_params, **self.optim_params)
-                }
-                self.optimizer = multi_optimizer(**optms)
+                optms = { "all_params": self.optim_cls(net_params, **self.optim_params) }
 
+        self.optimizer = multi_optimizer(**optms)
         if self.verbose: log.info(self.optimizer)
 
     def configure_dataset(self):
@@ -572,10 +572,9 @@ class CodebookTrainer(BaseTrainer):
             return loss
 
         if self.use_lbfgs:
-            assert 0
-            # todo, use multi_optimizer (uncomment line below and debug)
+            # todo, use lbfgs in em (uncomment line below and debug)
             # self.optimizer.step(target=self.cur_optm_target, closure=closure)
-            self.optimizer.step(closure)
+            self.optimizer.step(closure=closure)
             self.timer.check("stepped")
 
         loss, ret = closure(True) # forward backward without step
@@ -629,14 +628,14 @@ class CodebookTrainer(BaseTrainer):
     def init_latents(self):
         if self.mode == "codebook_pretrain":
             assert not self.split_latent
-            latents = self.init_codebook_pretrain_spectra_latents()
+            codebook_latents = self.init_codebook_pretrain_codebook_latents()
             redshift_latents = None
         elif self.mode == "redshift_pretrain":
-            latents = self.init_redshift_pretrain_spectra_latents()
+            codebook_latents = self.init_redshift_pretrain_codebook_latents()
             redshift_latents = self.init_redshift_pretrain_redshift_latents()
         else:
             raise ValueError("Invalid pretrainer mode.")
-        return latents, redshift_latents
+        return codebook_latents, redshift_latents
 
     def freeze_and_load(self):
         """ For redshift pretrain (sanity check), we load part of the pretrained
@@ -678,61 +677,67 @@ class CodebookTrainer(BaseTrainer):
         else:
             raise ValueError()
 
-    def init_codebook_pretrain_spectra_latents(self):
-        latents = None
-        set_seed(self.extra_args["seed"] + 1)
+    def init_codebook_pretrain_codebook_latents(self):
         if self.optimize_codebook_latents_as_logits:
             dim = self.extra_args["qtz_num_embed"]
-        else: dim = self.extra_args["spectra_latent_dim"]
-        latents = nn.Embedding(self.num_spectra, dim, device=self.device)
+        else:
+            dim = self.extra_args["spectra_latent_dim"]
+        latents = self.create_latents(
+            self.num_spectra, dim,
+            zero_init=self.extra_args["zero_init_codebook_latents"],
+            freeze=not self.optimize_codebook_latents,
+            seed=self.extra_args["seed"] + 1
+        )
         return latents
 
     def init_redshift_pretrain_redshift_latents(self):
-        redshift_latents = None
-        set_seed(self.extra_args["seed"] + 2)
-        red_z_dim = self.extra_args["redshift_logit_latent_dim"]
-
-        if self.apply_gt_redshift:
-            pass
-        elif self.split_latent:
-            if self.extra_args["zero_init_redshift_latents"]:
-                one_latents = 0.01 * torch.ones(self.num_spectra, red_z_dim)
-                # zero_latents = torch.zeros(self.num_spectra, red_z_dim)
-                redshift_latents = nn.Embedding.from_pretrained(
-                    one_latents, device=self.device,
-                    freeze=not self.optimize_redshift_latents)
-            else:
-                torch.manual_seed(self.extra_args["seed"])
-                redshift_latents = nn.Embedding(
-                    self.num_spectra, red_z_dim, device=self.device
-                ).requires_grad_(
-                    self.optimize_redshift_latents_as_logits or \
-                    self.optimize_redshift_latents)
-
-        return redshift_latents
-
-    def init_redshift_pretrain_spectra_latents(self):
-        latents = None
-        set_seed(self.extra_args["seed"] + 1)
-        if self.optimize_codebook_latents_as_logits:
-            latents = nn.Embedding(
-                self.num_spectra, self.extra_args["qtz_num_embed"], device=self.device)
+        if not self.apply_gt_redshift and self.split_latent:
+            latents = self.create_latents(
+                self.num_spectra, self.extra_args["redshift_logit_latent_dim"],
+                zero_init=self.extra_args["zero_init_redshift_latents"],
+                freeze=not self.optimize_redshift_latents,
+                seed=self.extra_args["seed"] + 2)
         else:
-            sp_z_dim = self.extra_args["spectra_latent_dim"]
-            if self.extra_args["sample_from_codebook_pretrain_spectra"]:
-                if self.extra_args["load_pretrained_codebook_latents"]:
-                    # checkpoint comes from codebook pretrain (use sup spectra)
-                    checkpoint = torch.load(self.pretrained_model_fname)
-                    assert checkpoint["latents"].shape[1] == sp_z_dim
+            latents = None
+        return latents
 
-                    # redshift pretrain use val spectra which is a permutation of sup spectra
-                    permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
-                    latents = nn.Embedding.from_pretrained(
-                        checkpoint["latents"][permute_ids], freeze=True, device=self.device)
-                else:
-                    latents = nn.Embedding(self.num_spectra, sp_z_dim, device=self.device)
-            else:
-                latents = nn.Embedding(self.num_spectra, sp_z_dim, device=self.device)
+    def init_redshift_pretrain_codebook_latents(self):
+        latents = None
+        if self.optimize_codebook_latents_as_logits:
+            sp_z_dim = self.extra_args["qtz_num_embed"]
+        else: sp_z_dim = self.extra_args["spectra_latent_dim"]
+
+        if self.extra_args["load_pretrained_codebook_latents"]:
+            assert self.extra_args["sample_from_codebook_pretrain_spectra"]
+            # checkpoint comes from codebook pretrain (use sup spectra)
+            checkpoint = torch.load(self.pretrained_model_fname)
+            assert checkpoint["latents"].shape[1] == sp_z_dim
+
+            # redshift pretrain use val spectra which is a permutation of sup spectra
+            permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
+            latents = self.create_latent_mask(
+                self.num_spectra, sp_z_dim,
+                pretrained=checkpoint["latents"][permute_ids],
+                freeze=not self.extra_args["optimize_codebook_latents"])
+        else:
+            set_seed(self.extra_args["seed"] + 1)
+            latents = self.create_latents(
+                self.num_spectra, sp_z_dim,
+                zero_init=self.extra_args["zero_init_codebook_latents"],
+                freeze=not self.extra_args["optimize_codebook_latents"])
+        return latents
+
+    def create_latents(self, n, m, pretrained=None, zero_init=False, freeze=False, seed=0):
+        if pretrained is not None:
+            latents = nn.Embedding.from_pretrained(pretrained, device=self.device)
+        elif zero_init:
+            zero_latents = torch.zeros(n, m)
+            latents = nn.Embedding.from_pretrained(zero_latents).to(self.device)
+        else:
+            torch.manual_seed(seed)
+            latents = nn.Embedding(n, m, device=self.device)
+
+        latents = latents.requires_grad_(not freeze)
         return latents
 
     def load_model(self, model_fname, excls=[]):
@@ -1152,7 +1157,7 @@ class CodebookTrainer(BaseTrainer):
         if not self.optimize_codebook_latents_as_logits:
             net_params_group.append({"params": spectra_logit_params,
                                      "lr": self.extra_args["codebook_pretrain_lr"]})
-        return latents, net_params
+        return latents_group, net_params_group
 
     def _assign_redshift_pretrain_optimization_params(self):
         codebook_latents, redshift_latents = None, None

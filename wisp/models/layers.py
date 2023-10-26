@@ -169,7 +169,6 @@ class Quantization(nn.Module):
 
         self.calculate_loss = calculate_loss
         self.quantization_strategy = kwargs["quantization_strategy"]
-        self.temperature = kwargs["qtz_soft_temperature"]
 
         self.beta = kwargs["qtz_beta"]
         self.num_embed = kwargs["qtz_num_embed"]
@@ -220,12 +219,17 @@ class Quantization(nn.Module):
             min_embed_ids = torch.argmax(z, dim=-1)
         else: min_embed_ids = None
 
-        weights = z * qtz_args["temperature"] * self.kwargs["qtz_temperature_scale"]
+        weights = z
+        if self.kwargs["temped_qtz"]:
+            weights = weights * qtz_args["temperature"] * self.kwargs["qtz_temperature_scale"]
+        # print(z.shape, torch.sum(z, dim=-1)[:,0])
+        # print(qtz_args["temperature"], self.kwargs["qtz_temperature_scale"])
+
         # choice 1: use softmax
         # weights = nn.functional.softmax(weights, dim=-1) # [bsz,1,num_embeds]
         # choice 2: regularize s.t. l2 norm of weights sum to 1
-        regu = torch.pow(torch.sum(weights**2, dim=-1, keepdim=True), 0.5)
-        weights = weights / (regu + 1e-10)
+        # regu = torch.pow(torch.sum(weights**2, dim=-1, keepdim=True), 0.5)
+        # weights = weights / (regu + 1e-10)
 
         # codebook here is codebook spectra
         if self.kwargs["quantize_spectra"]:
