@@ -11,9 +11,9 @@ global:
     seed: 60
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra_during_train'] #,'save_pixel_values_during_train','save_redshift_during_train'] #,'recon_codebook_spectra_individ_during_train'] #,'save_qtz_weights_during_train']
-    tasks: ['codebook_pretrain_infer','plot_codebook_logits','recon_gt_spectra'] #'recon_codebook_spectra_individ''recon_codebook_spectra','save_redshift'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
-    tasks: ['redshift_pretrain'] #,'recon_gt_spectra_during_train','save_redshift_during_train'] #,'save_pixel_values_during_train','recon_codebook_spectra_individ_during_train'] #,_during_train']
-    #tasks: ['redshift_pretrain_infer','recon_gt_spectra','save_redshift','plot_redshift_logits','plot_codebook_logits'] #'save_codebook_latents',] #,'save_qtz_weights'] #,'recon_codebook_spectra','recon_gt_spectra_all_bins']
+    tasks: ['codebook_pretrain_infer','recon_codebook_spectra'] #'plot_codebook_logits','recon_gt_spectra'] #'recon_codebook_spectra','save_redshift'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
+    #tasks: ['redshift_pretrain'] #,'recon_gt_spectra_during_train','save_redshift_during_train'] #,'save_pixel_values_during_train','recon_codebook_spectra_individ_during_train'] #,_during_train']
+    tasks: ['redshift_pretrain_infer','recon_codebook_spectra_individ'] #'recon_gt_spectra','save_redshift','plot_redshift_logits','plot_codebook_logits'] #'save_codebook_latents',] #,'save_qtz_weights'] #'recon_gt_spectra_all_bins']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -42,25 +42,6 @@ debug:
 
     sample_from_codebook_pretrain_spectra: True
 
-    zero_init_codebook_latents: True
-    optimize_codebook_latents_as_logits: True
-    optimize_codebook_latents: True
-    load_pretrained_codebook_latents: False
-    optimize_codebook_logits_mlp: False
-    load_pretrained_codebook_logits_mlp: False
-
-    zero_init_redshift_latents: False
-    optimize_redshift_latents_as_logits: True
-    optimize_redshift_latents: True
-    optimize_redshift_logits_mlp: False
-
-    regularize_pretrain_spectra_latents: False
-    spectra_latents_regu_beta: 100
-
-    regu_within_codebook_spectra: False
-    regu_across_codebook_spectra: False
-    codebook_spectra_regu_beta: 1
-
     debug_lbfgs: False
 
 optimizer:
@@ -71,7 +52,7 @@ optimizer:
     b2: 0.999
     lr: 1e-4
     grid_lr: 1e-3
-    spectra_latents_lr: 1e-3
+    codebook_latents_lr: 1e-3
     redshift_latents_lr: 1e-1
     codebook_lr: 1e-6
     codebook_pretrain_lr: 1e-3
@@ -129,25 +110,47 @@ grid:
 pretrain:
     pretrain_codebook: True
 
-    pretrain_optimize_latents_alternately: False
-    alternation_starts_with: "codebook_latents"
-    alternation_steps: [20,80]
-
     pretrain_batch_size: 20
     pretrain_pixel_beta: 1
     pretrain_redshift_beta: 0.1
 
-    regu_redshift_logits: False
+    pretrain_optimize_latents_alternately: False
+    alternation_starts_with: "codebook_latents"
+    alternation_steps: [10,20]
+
+    zero_init_codebook_latents: True
+    optimize_codebook_latents_as_logits: True
+    optimize_codebook_latents: True
+    load_pretrained_codebook_latents: False
+    optimize_codebook_logits_mlp: False
+    load_pretrained_codebook_logits_mlp: False
+
+    zero_init_redshift_latents: True
+    optimize_redshift_latents_as_logits: True
+    optimize_redshift_latents: True
+    optimize_redshift_logits_mlp: False
+
+    regularize_redshift_logits: False
     redshift_logits_regu_beta: 100
     redshift_logits_regu_method: 'laplace' #'l1' 'l1_excl_largest'
 
-    pretrain_log_dir: '20231025-184024_4_codes_20_spectra_zero_init'
-    pretrained_model_name: 'model-ep5000-it0.pth'
+    regularize_codebook_logits: False
+    codebook_logits_regu_beta: 1
+
+    regularize_codebook_latents: False
+    codebook_latents_regu_beta: 100
+
+    regularize_within_codebook_spectra: False
+    regularize_across_codebook_spectra: False
+    codebook_spectra_regu_beta: 1
+
+    pretrain_log_dir: '20231026-160003_4_codes_5_spectra_zero_init'
+    pretrained_model_name: 'model-ep2000-it0.pth'
 
     split_latent: True
     use_latents_as_coords: True
 
-    spectra_latent_dim: 32
+    codebook_latent_dim: 32
     scaler_latent_dim: 0
     redshift_logit_latent_dim: 330
 
@@ -157,7 +160,7 @@ pretrain:
 
     pretrain_pixel_supervision: False
     main_train_with_pretrained_latents: False
-    redshift_pretrain_num_spectra: 20
+    redshift_pretrain_num_spectra: 5
 
 decoder:
     decoder_num_hidden_layers: 1
@@ -227,16 +230,16 @@ trainer:
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
-    num_epochs: 100
+    num_epochs: 2000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 10
+    log_cli_every: 200
     log_gpu_every: -1
-    plot_grad_every: 1
+    plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 10
+    save_model_every: 1000
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -275,8 +278,8 @@ trainer:
     spectra_supervision_num_wave_samples: 100
 
     resume_train: False
-    resume_log_dir: '20231025-170444'
-    resume_model_fname: 'model-ep5000-it0.pth'
+    resume_log_dir: '20231026-113046'
+    resume_model_fname: 'model-ep3000-it0.pth'
     #### ***********************************
 
 infer:
@@ -294,7 +297,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20231025-175527_4_codes_20_spectra_seed_60'
+    infer_log_dir: '20231026-160155_4_codes_5_spectra_zero_all_1e-1_1e-3'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
@@ -424,7 +427,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000  # #spectra to load
-    num_supervision_spectra_upper_bound: 20
+    num_supervision_spectra_upper_bound: 5
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 

@@ -190,7 +190,7 @@ def get_input_latent_dim(**kwargs):
         "redshift_pretrain_infer" in kwargs["tasks"] or \
         kwargs["main_train_with_pretrained_latents"]
        ):
-        latents_dim = kwargs["spectra_latent_dim"]
+        latents_dim = kwargs["codebook_latent_dim"]
     elif kwargs["coords_encode_method"] == "positional_encoding":
         latents_dim = kwargs["coords_embed_dim"]
     elif kwargs["coords_encode_method"] == "grid":
@@ -314,8 +314,8 @@ def forward(
         spectra_supervision=False,
         perform_integration=False,
         trans_sample_method="none",
-        regu_codebook_spectra=False,
         redshift_supervision_train=False,
+        regularize_codebook_spectra=False,
         save_scaler=False,
         save_spectra=False,
         save_latents=False,
@@ -392,7 +392,7 @@ def forward(
                     qtz_args["find_embed_id"] = save_embed_ids
             qtz_args["save_codebook_spectra"] = save_codebook_spectra
             net_args["qtz_args"] = qtz_args
-        if regu_codebook_spectra:
+        if regularize_codebook_spectra:
             net_args["full_emitted_wave"] = data["full_emitted_wave"]
             requested_channels.append("full_range_codebook_spectra")
     else:

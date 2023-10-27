@@ -406,8 +406,8 @@ class AstroDataset(Dataset):
             out["wave"] = out["spectra_source_data"][:,0][...,None] # [bsz,nsmpl,1]
 
             if self.mode == "codebook_pretrain" and \
-               (self.kwargs["regu_within_codebook_spectra"] or \
-                self.kwargs["regu_across_codebook_spectra"]):
+               (self.kwargs["regularize_within_codebook_spectra"] or \
+                self.kwargs["regularize_across_codebook_spectra"]):
                 out["full_emitted_wave_masks"], out["full_emitted_wave"] = \
                     self.get_full_emitted_wave()
 

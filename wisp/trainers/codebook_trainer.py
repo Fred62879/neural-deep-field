@@ -49,8 +49,6 @@ class CodebookTrainer(BaseTrainer):
         self.verbose = extra_args["verbose"]
         self.space_dim = extra_args["space_dim"]
         self.gpu_fields = extra_args["gpu_data"]
-        self.recon_beta = extra_args["pretrain_pixel_beta"]
-        self.redshift_logits_regu_method = extra_args["redshift_logits_regu_method"]
 
         self.check_configs()
         self.summarize_training_tasks()
@@ -111,19 +109,32 @@ class CodebookTrainer(BaseTrainer):
         self.index_latent = True # index latents as coords in model
         self.split_latent = self.mode == "redshift_pretrain" and \
             self.extra_args["split_latent"]
-        self.regu_within_codebook_spectra = self.qtz_spectra and \
-            self.extra_args["regu_within_codebook_spectra"]
-        self.regu_across_codebook_spectra = self.qtz_spectra and \
-            self.extra_args["regu_across_codebook_spectra"]
-        self.regu_codebook_spectra = self.mode == "codebook_pretrain" and \
-            (self.regu_within_codebook_spectra or self.regu_across_codebook_spectra)
-        assert self.regu_within_codebook_spectra + \
-            self.regu_across_codebook_spectra <= 1
+
+        self.regularize_redshift_logits = self.classify_redshift and \
+            self.extra_args["regularize_redshift_logits"] and \
+            self.extra_args["redshift_classification_method"] == "weighted_avg"
+        self.redshift_logits_regu_method = self.extra_args["redshift_logits_regu_method"]
+
+        self.regularize_codebook_logits = self.qtz_spectra and \
+            self.extra_args["regularize_codebook_logits"]
+        self.regularize_codebook_latents = self.qtz_spectra and \
+            self.extra_args["regularize_codebook_latents"]
+
+        self.regularize_within_codebook_spectra = self.qtz_spectra and \
+            self.extra_args["regularize_within_codebook_spectra"]
+        self.regularize_across_codebook_spectra = self.qtz_spectra and \
+            self.extra_args["regularize_across_codebook_spectra"]
+        self.regularize_codebook_spectra = self.mode == "codebook_pretrain" and \
+            (self.regularize_within_codebook_spectra or self.regularize_across_codebook_spectra)
+        assert self.regularize_within_codebook_spectra + \
+            self.regularize_across_codebook_spectra <= 1
 
         self.optimize_codebook_latents = self.extra_args["optimize_codebook_latents"]
-        self.optimize_redshift_latents = self.extra_args["optimize_redshift_latents"]
+        self.optimize_redshift_latents = self.mode == "redshift_pretrain" and \
+            self.extra_args["optimize_redshift_latents"]
         self.optimize_codebook_latents_as_logits = self.extra_args["optimize_codebook_latents_as_logits"]
-        self.optimize_redshift_latents_as_logits = self.extra_args["optimize_redshift_latents_as_logits"]
+        self.optimize_redshift_latents_as_logits = self.mode == "redshift_pretrain" and \
+            self.extra_args["optimize_redshift_latents_as_logits"]
         if self.optimize_redshift_latents_as_logits:
             # no pretrained latents to load
             assert self.mode == "redshift_pretrain" and self.optimize_redshift_latents
@@ -135,13 +146,13 @@ class CodebookTrainer(BaseTrainer):
         if self.use_lbfgs:
             assert (self.optimize_codebook_latents_as_logits and \
                     self.optimize_redshift_latents_as_logits), \
-                    "Doesn't support optimizing alternately autodceoder arch"
+                    "Doesn't support optimizing alternately when using lbfgs!"
 
         if self.optimize_latents_alternately:
             # em optimization for codebook & redshift latents
             assert (self.optimize_codebook_latents_as_logits and \
                     self.optimize_redshift_latents_as_logits), \
-                    "Doesn't support optimizing alternately an autodecoder arch"
+                    "Doesn't support optimizing alternately when using autodecoder arch!"
 
     def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
@@ -194,16 +205,9 @@ class CodebookTrainer(BaseTrainer):
         if redshift_latents is not None:
             self.train_pipeline.set_redshift_latents(redshift_latents.weight)
 
-        print(latents.weight)
-        for n,p in self.train_pipeline.named_parameters():
-            # print(n, p.requires_grad)
-            if n == 'nef.latents': print(p)
-
+        # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
         self.freeze_and_load()
-        for n,p in self.train_pipeline.named_parameters():
-            # print(n, p.requires_grad)
-            if n == 'nef.latents': print(p)
-        assert 0
+        # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
 
         log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(
@@ -540,7 +544,7 @@ class CodebookTrainer(BaseTrainer):
         super().init_log_dict()
         self.log_dict["pixel_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
-        self.log_dict["spectra_latents_regu"] = 0.0
+        self.log_dict["codebook_latents_regu"] = 0.0
         self.log_dict["redshift_logits_regu"] = 0.0
         self.log_dict["codebook_spectra_regu"] = 0.0
 
@@ -549,7 +553,7 @@ class CodebookTrainer(BaseTrainer):
         # we should also update the input each time
         # however since dataset receives a reference to the latents,
         # we don't need to update dataset with updated latents manually
-        # self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
+        # self.dataset.set_hardcode_data("codebook_latents", self.latents.weight)
         pass
 
     def step(self, data):
@@ -557,11 +561,6 @@ class CodebookTrainer(BaseTrainer):
             @Param:
               data (dict): Dictionary of the input batch from the DataLoader.
         """
-        # if self.use_lbfgs:
-        #     # self.optimizer.set_loss_func(partial(self.calculate_loss, self))
-        #     self.optimizer.set_loss_func(self.calculate_loss)
-        #     self.optimizer.set_current_data(data)
-
         def closure(keep_ret=False):
             self.optimizer.zero_grad()
             self.timer.check("zero grad")
@@ -681,7 +680,7 @@ class CodebookTrainer(BaseTrainer):
         if self.optimize_codebook_latents_as_logits:
             dim = self.extra_args["qtz_num_embed"]
         else:
-            dim = self.extra_args["spectra_latent_dim"]
+            dim = self.extra_args["codebook_latent_dim"]
         latents = self.create_latents(
             self.num_spectra, dim,
             zero_init=self.extra_args["zero_init_codebook_latents"],
@@ -705,7 +704,7 @@ class CodebookTrainer(BaseTrainer):
         latents = None
         if self.optimize_codebook_latents_as_logits:
             sp_z_dim = self.extra_args["qtz_num_embed"]
-        else: sp_z_dim = self.extra_args["spectra_latent_dim"]
+        else: sp_z_dim = self.extra_args["codebook_latent_dim"]
 
         if self.extra_args["load_pretrained_codebook_latents"]:
             assert self.extra_args["sample_from_codebook_pretrain_spectra"]
@@ -732,6 +731,7 @@ class CodebookTrainer(BaseTrainer):
             latents = nn.Embedding.from_pretrained(pretrained, device=self.device)
         elif zero_init:
             zero_latents = torch.zeros(n, m)
+            # zero_latents = 0.01 * torch.ones(n,m)
             latents = nn.Embedding.from_pretrained(zero_latents).to(self.device)
         else:
             torch.manual_seed(seed)
@@ -975,20 +975,18 @@ class CodebookTrainer(BaseTrainer):
         add_to_device(data, self.gpu_fields, self.device)
         self.timer.check("added to gpu")
 
-        if self.classify_redshift and \
-           self.extra_args["redshift_classification_method"] == "bayesian_weighted_avg":
-            self.train_pipeline.set_bayesian_redshift_logits_calculation(
-                get_loss(self.extra_args["spectra_loss_cho"], self.cuda),
-                data["spectra_masks"], data["spectra_source_data"]
-            )
-
-        if self.extra_args["add_redshift_logit_bias"]:
-            init_redshift_prob = data["init_redshift_prob"]
-            # if self.epoch != 0:
-            #     init_redshift_prob = torch.zeros(
-            #         init_redshift_prob.shape, dtype=init_redshift_prob.dtype
-            #     ).to(init_redshift_prob.device)
-        else: init_redshift_prob = None
+        # if self.classify_redshift and \
+        #    self.extra_args["redshift_classification_method"] == "bayesian_weighted_avg":
+        #     self.train_pipeline.set_bayesian_redshift_logits_calculation(
+        #         get_loss(self.extra_args["spectra_loss_cho"], self.cuda),
+        #         data["spectra_masks"], data["spectra_source_data"])
+        # if self.extra_args["add_redshift_logit_bias"]:
+        #     init_redshift_prob = data["init_redshift_prob"]
+        #     if self.epoch != 0:
+        #         init_redshift_prob = torch.zeros(
+        #             init_redshift_prob.shape, dtype=init_redshift_prob.dtype
+        #         ).to(init_redshift_prob.device)
+        # else: init_redshift_prob = None
 
         steps = self.codebook_pretrain_total_steps \
             if self.mode == "redshift_pretrain" else self.total_steps
@@ -1005,15 +1003,14 @@ class CodebookTrainer(BaseTrainer):
             apply_gt_redshift=self.apply_gt_redshift,
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
-            regu_codebook_spectra=self.regu_codebook_spectra,
+            regularize_codebook_spectra=self.regularize_codebook_spectra,
             save_spectra=self.save_data and self.recon_gt_spectra,
             save_redshift=self.save_data and self.save_redshift,
-            save_redshift_logits=self.classify_redshift,
             save_qtz_weights=self.save_data and self.save_qtz_weights,
-            save_codebook_spectra=self.save_data and \
-                                  self.recon_codebook_spectra_individ,
-            save_spectra_all_bins=True, # debug
-            init_redshift_prob=init_redshift_prob, # debug
+            save_redshift_logits=self.regularize_redshift_logits or \
+                                 (self.save_data and self.classify_redshift),
+            save_codebook_logits=self.regularize_codebook_logits,
+            save_codebook_spectra=self.save_data and self.recon_codebook_spectra_individ
         )
         self.timer.check("forwarded")
 
@@ -1041,21 +1038,12 @@ class CodebookTrainer(BaseTrainer):
             gt_pixels = data["spectra_pixels"]
             recon_pixels = ret["intensity"]
             recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
-            recon_loss *= self.recon_beta
+            recon_loss *= extra_args["pretrain_pixel_beta"]
             self.log_dict["pixel_loss"] += recon_loss.item()
 
         # iii)
-        spectra_latents_regu = 0
-        if self.extra_args["regularize_pretrain_spectra_latents"]:
-            spectra_latents_regu = torch.abs(torch.mean(torch.sum(data["coords"],dim=-1)))
-            spectra_latents_regu *= self.extra_args["spectra_latents_regu_beta"]
-            self.log_dict["spectra_latents_regu"] += spectra_latents_regu.item()
-
-        # iv)
         redshift_logits_regu = 0
-        if self.classify_redshift and self.extra_args["regu_redshift_logits"] and \
-           self.extra_args["redshift_classification_method"] == "weighted_avg":
-
+        if self.regularize_redshift_logits:
             logits = ret["redshift_logits"]
             if self.redshift_logits_regu_method == "l1":
                 redshift_logits_regu = torch.mean(torch.sum(logits, dim=-1))
@@ -1073,28 +1061,43 @@ class CodebookTrainer(BaseTrainer):
             redshift_logits_regu *= self.extra_args["redshift_logits_regu_beta"]
             self.log_dict["redshift_logits_regu"] += redshift_logits_regu.item()
 
+        # iv)
+        codebook_logits_regu= 0
+        if self.regularize_codebook_logits:
+            codebook_logits_regu = torch.abs(
+                torch.mean(torch.sum(ret["codebook_logits"],dim=-1)))
+            codebook_logits_regu *= self.extra_args["codebook_logits_regu_beta"]
+            self.log_dict["codebook_logits_regu"] += codebook_logits_regu.item()
+
         # v)
-        codebook_regu = 0
-        if self.regu_codebook_spectra:
+        codebook_latents_regu = 0
+        if self.regularize_codebook_latents:
+            codebook_latents_regu = torch.abs(torch.mean(torch.sum(data["coords"],dim=-1)))
+            codebook_latents_regu *= self.extra_args["codebook_latents_regu_beta"]
+            self.log_dict["codebook_latents_regu"] += codebook_latents_regu.item()
+
+        # vi)
+        codebook_spectra_regu = 0
+        if self.regularize_codebook_spectra:
             sp = ret["full_range_codebook_spectra"].shape # [num_embed,nsmpl]
             dtp = ret["full_range_codebook_spectra"].device
-            if self.regu_within_codebook_spectra:
-                codebook_regu = F.l1_loss(
+            if self.regularize_within_codebook_spectra:
+                codebook_spectra_regu = F.l1_loss(
                     ret["full_range_codebook_spectra"],
                     torch.zeros(sp).to(dtp))
 
-            elif self.regu_across_codebook_spectra:
-                codebook_regu = F.l1_loss(
+            elif self.regularize_across_codebook_spectra:
+                codebook_spectra_regu = F.l1_loss(
                     ret["full_range_codebook_spectra"],
                     torch.zeros(sp).to(dtp),
                     reduction='none')
-                codebook_regu = torch.mean(torch.sum(codebook_regu, dim=0))
+                codebook_spectra_regu = torch.mean(torch.sum(codebook_spectra_regu, dim=0))
 
-        codebook_regu *= self.extra_args["codebook_spectra_regu_beta"]
-        self.log_dict["codebook_spectra_regu"] += codebook_regu
+            codebook_spectra_regu *= self.extra_args["codebook_spectra_regu_beta"]
+            self.log_dict["codebook_spectra_regu"] += codebook_spectra_regu
 
         total_loss = spectra_loss + recon_loss + \
-            spectra_latents_regu + redshift_logits_regu + codebook_regu
+            codebook_latents_regu + redshift_logits_regu + codebook_spectra_regu
 
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss calculated")
@@ -1107,20 +1110,23 @@ class CodebookTrainer(BaseTrainer):
         # Average over iterations
         n = len(self.train_data_loader)
         total_loss = self.log_dict["total_loss"] / n
-
         log_text = "EPOCH {}/{}".format(self.epoch, self.num_epochs)
+
         log_text += " | total loss: {:>.3E}".format(total_loss)
         log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
         if self.pixel_supervision:
             log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / n)
-        if self.extra_args["regularize_pretrain_spectra_latents"]:
-            log_text += " | spectra latents regu: {:>.3E}".format(
-                self.log_dict["spectra_latents_regu"] / n)
-        if self.classify_redshift and \
-           self.extra_args["redshift_classification_method"] == "weighted_avg":
+
+        if self.regularize_redshift_logits:
             log_text += " | redshift logits regu: {:>.3E}".format(
                 self.log_dict["redshift_logits_regu"] / n)
-        if self.regu_codebook_spectra:
+        if self.regularize_codebook_logits:
+            log_text += " | codebook logits regu: {:>.3E}".format(
+                self.log_dict["codebook_logits_regu"] / n)
+        if self.regularize_codebook_latents:
+            log_text += " | codebook latents regu: {:>.3E}".format(
+                self.log_dict["codebook_latents_regu"] / n)
+        if self.regularize_codebook_spectra:
             log_text += " | codebook spectra regu: {:>.3E}".format(
                 self.log_dict["codebook_spectra_regu"] / n)
 
@@ -1215,7 +1221,7 @@ class CodebookTrainer(BaseTrainer):
                 latents_group.append(codebook_latents)
             else:
                 latents_group.append({"params": codebook_latents,
-                                      "lr": self.extra_args["spectra_latents_lr"]})
+                                      "lr": self.extra_args["codebook_latents_lr"]})
         else:
             latents_group.append({"params": codebook_latents,
                                   "lr": self.extra_args["codebook_pretrain_lr"]})

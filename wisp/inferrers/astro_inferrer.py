@@ -1212,8 +1212,7 @@ class AstroInferrer(BaseInferrer):
                         qtz_strategy=self.qtz_strategy,
                         index_latent=self.index_latent,
                         split_latent=self.split_latent,
-                        apply_gt_redshift=self.recon_codebook_spectra_individ and \
-                                          self.apply_gt_redshift,
+                        apply_gt_redshift=self.apply_gt_redshift,
                         save_spectra=self.recon_codebook_spectra,
                         save_codebook_spectra=self.recon_codebook_spectra_individ
                     )

@@ -138,27 +138,6 @@ def define_cmd_line_args():
                              help="sample spectra for redshift pretrain from spectra \
                              used for codebook pretrain.")
 
-    debug_group.add_argument("--zero-init-codebook-latents", action="store_true")
-    debug_group.add_argument("--optimize-codebook-latents-as-logits", action="store_true",
-                             help="optimize latents directly as logits without autodecoder.")
-    debug_group.add_argument("--optimize-codebook-latents", action="store_true")
-    debug_group.add_argument("--load-pretrained-codebook-latents", action="store_true")
-    debug_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
-    debug_group.add_argument("--load-pretrained-codebook-logits-mlp", action="store_true")
-
-    debug_group.add_argument("--zero-init-redshift-latents", action="store_true")
-    debug_group.add_argument("--optimize-redshift-latents-as-logits", action="store_true")
-    debug_group.add_argument("--optimize-redshift-latents", action="store_true")
-    debug_group.add_argument("--optimize-redshift-logits-mlp", action="store_true")
-
-    debug_group.add_argument("--regularize-pretrain-spectra-latents", action="store_true",
-                             help="L2 regularize latents for autodecoder during pretrain.")
-    debug_group.add_argument("--spectra-latents-regu-beta", type=float)
-
-    debug_group.add_argument("--regu-within-codebook-spectra", action="store_true")
-    debug_group.add_argument("--regu-across-codebook-spectra", action="store_true")
-    debug_group.add_argument("--codebook-spectra-regu-beta", type=float)
-
     debug_group.add_argument("--debug-lbfgs", action="store_true")
 
     ###################
@@ -307,6 +286,10 @@ def define_cmd_line_args():
 
     pretrain_group.add_argument("--pretrain-codebook", action="store_true")
 
+    pretrain_group.add_argument("--pretrain-batch-size", type=int, default=512)
+    pretrain_group.add_argument("--pretrain-pixel-beta", type=float)
+    pretrain_group.add_argument("--pretrain-redshift-beta", type=float)
+
     pretrain_group.add_argument("--pretrain-optimize-latents-alternately", action="store_true",
                                 help="optimize codebook and redshift latents alternately \
                                 in redshfit pretrain (EM).")
@@ -316,14 +299,36 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--alternation-steps", nargs="+", type=int,
                                 help="alternately optimize each for given steps.")
 
-    pretrain_group.add_argument("--pretrain-batch-size", type=int, default=512)
-    pretrain_group.add_argument("--pretrain-pixel-beta", type=float)
-    pretrain_group.add_argument("--pretrain-redshift-beta", type=float)
+    pretrain_group.add_argument("--zero-init-codebook-latents", action="store_true")
+    pretrain_group.add_argument("--optimize-codebook-latents-as-logits", action="store_true",
+                                help="optimize latents directly as logits without autodecoder.")
+    pretrain_group.add_argument("--optimize-codebook-latents", action="store_true")
+    pretrain_group.add_argument("--load-pretrained-codebook-latents", action="store_true")
+    pretrain_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
+    pretrain_group.add_argument("--load-pretrained-codebook-logits-mlp", action="store_true")
 
-    pretrain_group.add_argument("--regu-redshift-logits", action="store_true")
+    pretrain_group.add_argument("--zero-init-redshift-latents", action="store_true")
+    pretrain_group.add_argument("--optimize-redshift-latents-as-logits", action="store_true")
+    pretrain_group.add_argument("--optimize-redshift-latents", action="store_true")
+    pretrain_group.add_argument("--optimize-redshift-logits-mlp", action="store_true")
+
+    pretrain_group.add_argument("--regularize-redshift-logits", action="store_true")
     pretrain_group.add_argument("--redshift-logits-regu-beta", type=float)
     pretrain_group.add_argument("--redshift-logits-regu-method",type=str,
                              choices=["l1","l1_excl_largest","laplace"])
+
+    pretrain_group.add_argument("--regularize-codebook-logits", action="store_true",
+                                help="Regularize codebook logits during pretrain.")
+    pretrain_group.add_argument("--codebook-logits-regu-beta", type=float)
+
+    pretrain_group.add_argument("--regularize-codebook-latents", action="store_true",
+                                help="Regularize codebook latents using L2 loss s.t. the \
+                                the latents are close to the manifold surface.")
+    pretrain_group.add_argument("--codebook-latents-regu-beta", type=float)
+
+    pretrain_group.add_argument("--regularize-within-codebook-spectra", action="store_true")
+    pretrain_group.add_argument("--regularize-across-codebook-spectra", action="store_true")
+    pretrain_group.add_argument("--codebook-spectra-regu-beta", type=float)
 
     pretrain_group.add_argument("--pretrain-log-dir", type=str)
     pretrain_group.add_argument("--pretrained-model-name", type=str)
@@ -533,7 +538,7 @@ def define_cmd_line_args():
     optim_group.add_argument("--lr", type=float, default=0.0001)
     optim_group.add_argument("--grid-lr", type=float, default=0.001)
     optim_group.add_argument("--codebook-lr", type=float, default=0.0001)
-    optim_group.add_argument("--spectra-latents-lr", type=float, default=0.001)
+    optim_group.add_argument("--codebook-latents-lr", type=float, default=0.001)
     optim_group.add_argument("--redshift-latents-lr", type=float, default=0.001)
     optim_group.add_argument("--codebook-pretrain-lr", type=float, default=0.0001)
 
@@ -586,7 +591,7 @@ def define_cmd_line_args():
                              help="use different latents for each decoder.")
 
     train_group.add_argument("--scaler-latent-dim", type=int)
-    train_group.add_argument("--spectra-latent-dim", type=int)
+    train_group.add_argument("--codebook-latent-dim", type=int)
     train_group.add_argument("--redshift-logit-latent-dim", type=int)
 
     train_group.add_argument("--train-with-all-pixels", action="store_true")
