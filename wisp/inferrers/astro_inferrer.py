@@ -22,7 +22,7 @@ from wisp.utils.plot import plot_horizontally, plot_embed_map, \
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
     sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, to_numpy, \
     load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, \
-    get_loss, get_bin_id
+    get_loss, get_bin_id, log_data
 
 
 class AstroInferrer(BaseInferrer):
@@ -565,7 +565,7 @@ class AstroInferrer(BaseInferrer):
                 nsmpl = np.sum(interp_trans != 0, axis=-1)
                 self.recon_pixels.append( np.einsum("j,kj->k", wave, interp_trans) / nsmpl )
 
-            self._log_data("recon_pixels", gt_field="gt_pixels", log_ratio=True)
+            log_data(self, "recon_pixels", gt_field="gt_pixels", log_ratio=True)
 
     #############
     # Infer with checkpoint
@@ -639,7 +639,7 @@ class AstroInferrer(BaseInferrer):
                         self.metrics_zscale, cur_metrics_zscale[:,None]), axis=1)
             else:
                 fname = join(self.recon_dir, f"model-{model_id}.pth")
-                self._log_data("recon_pixels", fname=fname, gt_field="gt_pixels")
+                log_data(self, "recon_pixels", fname=fname, gt_field="gt_pixels")
 
         if self.recon_synthetic_band:
             re_args = {
@@ -693,14 +693,14 @@ class AstroInferrer(BaseInferrer):
         if self.save_redshift_main:
             # if self.recon_spectra_pixels_only:
             #     if self.classify_redshift:
-            #         self._log_data("argmax_redshift", gt_field="gt_redshift")
-            #         self._log_data("weighted_redshift")
+            #         log_data(self, "argmax_redshift", gt_field="gt_redshift")
+            #         log_data(self, "weighted_redshift")
             #     else:
-            #         self._log_data("redshift", gt_field="gt_redshift")
+            #         log_data(self, "redshift", gt_field="gt_redshift")
             # else:
             #     self._plot_redshift_map(model_id)
             #     if len(self.gt_redshift) > 0:
-            #         self._log_data(
+            #         log_data(self,
             #             "redshift", gt_field="gt_redshift", mask=self.val_spectra_map)
 
             if not self.recon_spectra_pixels_only:
@@ -709,16 +709,16 @@ class AstroInferrer(BaseInferrer):
             else: mask = None
 
             if self.classify_redshift:
-                self._log_data("argmax_redshift", gt_field="gt_redshift", mask=mask)
-                self._log_data("weighted_redshift", mask=mask)
-            else: self._log_data("redshift", gt_field="gt_redshift", mask=mask)
+                log_data(self, "argmax_redshift", gt_field="gt_redshift", mask=mask)
+                log_data(self, "weighted_redshift", mask=mask)
+            else: log_data(self, "redshift", gt_field="gt_redshift", mask=mask)
 
         elif self.save_redshift_test:
             if self.classify_redshift:
-                self._log_data("argmax_redshift", gt_field="gt_redshift")
-                self._log_data("weighted_redshift")
+                log_data(self, "argmax_redshift", gt_field="gt_redshift")
+                log_data(self, "weighted_redshift")
             else:
-                self._log_data("redshift", gt_field="gt_redshift")
+                log_data(self, "redshift", gt_field="gt_redshift")
 
         if self.save_scaler:
             re_args = {
@@ -737,10 +737,10 @@ class AstroInferrer(BaseInferrer):
             _, _ = self.dataset.restore_evaluate_tiles(self.scalers, **re_args)
 
             if self.main_infer:
-                self._log_data("scalers", mask=self.val_spectra_map)
+                log_data(self, "scalers", mask=self.val_spectra_map)
 
         if self.save_qtz_w_pre:
-            self._log_data("qtz_weights")
+            log_data(self, "qtz_weights")
 
         elif self.save_qtz_w_main:
             re_args = {
@@ -756,7 +756,7 @@ class AstroInferrer(BaseInferrer):
                 "calculate_metrics": False,
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.qtz_weights, **re_args)
-            self._log_data("qtz_weights", mask=self.val_spectra_map)
+            log_data(self, "qtz_weights", mask=self.val_spectra_map)
 
         log.info("== All coords inferrence done for current checkpoint.")
 
@@ -870,25 +870,25 @@ class AstroInferrer(BaseInferrer):
             if self.classify_redshift:
                 self._log_redshift_residual_outlier(model_id)
                 fname = join(self.redshift_dir, f"model-{model_id}_max_redshift.txt")
-                self._log_data("argmax_redshift", gt_field="gt_redshift",
+                log_data(self, "argmax_redshift", gt_field="gt_redshift",
                                fname=fname)
                                #fname=fname, log_to_console=False)
                 fname = join(self.redshift_dir, f"model-{model_id}_avg_redshift.txt")
-                self._log_data("weighted_redshift", fname=fname)
+                log_data(self, "weighted_redshift", fname=fname)
             else:
-                self._log_data("redshift", gt_field="gt_redshift")
+                log_data(self, "redshift", gt_field="gt_redshift")
 
         if self.save_redshift_main:
             if self.classify_redshift:
-                self._log_data("argmax_redshift", gt_field="gt_redshift")
-                self._log_data("weighted_redshift")
+                log_data(self, "argmax_redshift", gt_field="gt_redshift")
+                log_data(self, "weighted_redshift")
             else:
-                self._log_data("redshift", gt_field="gt_redshift")
+                log_data(self, "redshift", gt_field="gt_redshift")
 
         if self.save_qtz_weights:
             fname = join(self.qtz_weights_dir, f"model-{model_id}.npy")
-            self._log_data("qtz_weights", fname=fname, log_to_console=False)
-            # self._log_data("qtz_weights")
+            log_data(self, "qtz_weights", fname=fname, log_to_console=False)
+            # log_data(self, "qtz_weights")
 
         # if self.save_pixel_values:
         #     self.recon_pixels = self.trans_obj.integrate(recon_fluxes)
@@ -896,7 +896,7 @@ class AstroInferrer(BaseInferrer):
         #         self.gt_pixels = self.dataset.get_supervision_spectra_pixels().numpy()
         #     else: self.gt_pixels = self.dataset.get_supervision_validation_pixels().numpy()
         #     self.gt_pixels = self.gt_pixels[:,0]
-        #     self._log_data(
+        #     log_data(self,
         #         "recon_pixels", gt_field="gt_pixels", log_ratio=self.log_pixel_ratio)
 
         log.info("== Spectral coords inferrence done for current checkpoint.")
@@ -1212,7 +1212,8 @@ class AstroInferrer(BaseInferrer):
                         qtz_strategy=self.qtz_strategy,
                         index_latent=self.index_latent,
                         split_latent=self.split_latent,
-                        apply_gt_redshift=self.apply_gt_redshift,
+                        apply_gt_redshift=self.apply_gt_redshift and \
+                                          self.recon_codebook_spectra_individ,
                         save_spectra=self.recon_codebook_spectra,
                         save_codebook_spectra=self.recon_codebook_spectra_individ
                     )
@@ -1299,51 +1300,12 @@ class AstroInferrer(BaseInferrer):
         self.dataset.set_hardcode_data(self.coords_source, coords)
         self.dataset_length = len(coords)
 
-    def _log_data(self, field, fname=None, gt_field=None, mask=None,
-                  log_ratio=False, log_to_console=True
-    ):
-        """ Log estimated and gt data is specified.
-            If `fname` is not None, we save recon data locally.
-            If `mask` is not None, we apply mask before logging.
-            If `log_ratio` is True, we log ratio of recon over gt data.
-        """
-        np.set_printoptions(suppress=True)
-        np.set_printoptions(precision=3)
-        log_ratio = log_ratio and gt_field is not None
-
-        if gt_field is not None:
-            gt = to_numpy(getattr(self, gt_field))
-        recon = to_numpy(getattr(self, field))
-        if mask is not None:
-            recon = recon[mask]
-
-        if fname is not None:
-            if gt_field is not None:
-                to_save = np.concatenate((gt[None,:], recon[None,:]), axis=0)
-            else: to_save = recon
-            if fname[-3:] == "npy":
-                np.save(fname, to_save)
-            elif fname[-3:] == "txt":
-                with open(fname, "w") as f:
-                    f.write(f"{to_save}")
-
-        if not log_to_console: return
-
-        if gt_field is None:
-            log.info(f"{field}: {recon}")
-        elif log_ratio:
-            ratio = recon/gt
-            log.info(f"{field}/{gt_field}: {ratio}")
-        else:
-            log.info(f"{gt_field}: {gt}")
-            log.info(f"recon {field}: {recon}")
-
     def _log_redshift_residual_outlier(self, model_id):
         gt_redshift = torch.stack(self.gt_redshift).detach().cpu().numpy()
         argmax_redshift = torch.stack(self.argmax_redshift).detach().cpu().numpy()
         self.redshift_residual = argmax_redshift - gt_redshift
         fname = join(self.redshift_dir, f"model-{model_id}_redshift_residual.txt")
-        self._log_data("redshift_residual", fname=fname, log_to_console=False)
+        log_data(self, "redshift_residual", fname=fname, log_to_console=False)
 
         ids = np.arange(len(self.redshift_residual))
         outlier = ids[np.abs(self.redshift_residual) > self.extra_args["redshift_bin_width"]]

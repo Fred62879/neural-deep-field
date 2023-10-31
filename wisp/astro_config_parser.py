@@ -22,7 +22,6 @@ def register_class(cls, name):
 def get_pretrain_pipelines(pipelines, tasks, args):
     if "codebook_pretrain" in tasks or "redshift_pretrain" in tasks:
         assert(args.quantize_latent or args.quantize_spectra)
-        # decode_redshift = "redshift_pretrain" in tasks
         decode_redshift = args.model_redshift and not args.apply_gt_redshift
         pretrain_nef = CodebookPretrainNerf(
             decode_redshift=decode_redshift,

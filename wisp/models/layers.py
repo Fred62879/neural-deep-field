@@ -387,3 +387,23 @@ def calculate_bayesian_redshift_logits(loss, mask, gt_spectra, recon_fluxes, red
     ## ends here
 
     return logits
+
+def calculate_redshift_logits(loss, masks, gt_spectra, recon_fluxes, ret, **kwargs):
+    """ Calculate bayesian logits for redshfit classification.
+        @Param
+          mask:       [bsz,num_smpls]
+          gt_spectra: [bsz,4+2*nbanbds,num_smpls]
+                      (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
+          recon_fluxes: [num_bins,bsz,num_smpls]
+        @Return
+          logits: [bsz,n_bins]
+    """
+    n_bins = recon_fluxes.shape[0]
+    spectra_binwise_loss = loss(
+        masks[None,:].tile(n_bins,1,1),
+        gt_spectra[None,:].tile(n_bins,1,1,1),
+        recon_fluxes, kwargs["weight_by_wave_coverage"]
+    ).T # [bsz,n_bins]
+    ret["spectra_binwise_loss"] = spectra_binwise_loss
+    logits = -spectra_binwise_loss * kwargs["binwise_loss_beta"]
+    ret["redshift_logits"] = F.softmax(logits, dim=-1)

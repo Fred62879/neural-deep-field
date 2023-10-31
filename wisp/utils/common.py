@@ -49,6 +49,44 @@ def get_loss(cho, cuda):
     if cuda: loss = loss.cuda()
     return loss
 
+def log_data(obj, field, fname=None, gt_field=None, mask=None,
+              log_ratio=False, log_to_console=True):
+    """ Log estimated and gt data is specified.
+        If `fname` is not None, we save recon data locally.
+        If `mask` is not None, we apply mask before logging.
+        If `log_ratio` is True, we log ratio of recon over gt data.
+    """
+    np.set_printoptions(suppress=True)
+    np.set_printoptions(precision=3)
+    log_ratio = log_ratio and gt_field is not None
+
+    if gt_field is not None:
+        gt = to_numpy(getattr(obj, gt_field))
+    recon = to_numpy(getattr(obj, field))
+    if mask is not None:
+        recon = recon[mask]
+
+    if fname is not None:
+        if gt_field is not None:
+            to_save = np.concatenate((gt[None,:], recon[None,:]), axis=0)
+        else: to_save = recon
+        if fname[-3:] == "npy":
+            np.save(fname, to_save)
+        elif fname[-3:] == "txt":
+            with open(fname, "w") as f:
+                f.write(f"{to_save}")
+
+    if not log_to_console: return
+
+    if gt_field is None:
+        log.info(f"{field}: {recon}")
+    elif log_ratio:
+        ratio = recon/gt
+        log.info(f"{field}/{gt_field}: {ratio}")
+    else:
+        log.info(f"{gt_field}: {gt}")
+        log.info(f"recon {field}: {recon}")
+
 def freeze_layers(model, excls=[]):
     """ Freeze layers in model (excluding those in `excls`).
     """
@@ -305,6 +343,7 @@ def forward(
         pipeline,
         step_num,
         space_dim,
+        spectra_loss_func=None,
         qtz=False,
         qtz_strategy="none",
         index_latent=False,
@@ -316,6 +355,7 @@ def forward(
         trans_sample_method="none",
         redshift_supervision_train=False,
         regularize_codebook_spectra=False,
+        calculate_binwise_spectra_loss=False,
         save_scaler=False,
         save_spectra=False,
         save_latents=False,
@@ -395,6 +435,11 @@ def forward(
         if regularize_codebook_spectra:
             net_args["full_emitted_wave"] = data["full_emitted_wave"]
             requested_channels.append("full_range_codebook_spectra")
+        if calculate_binwise_spectra_loss:
+            net_args["spectra_masks"] = data["spectra_masks"]
+            net_args["spectra_loss_func"] = spectra_loss_func
+            net_args["spectra_source_data"] = data["spectra_source_data"]
+            requested_channels.append("spectra_binwise_loss")
     else:
         raise ValueError("Unsupported space dimension.")
 

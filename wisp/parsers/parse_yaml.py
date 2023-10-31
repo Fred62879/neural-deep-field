@@ -307,6 +307,11 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
     pretrain_group.add_argument("--load-pretrained-codebook-logits-mlp", action="store_true")
 
+    pretrain_group.add_argument("--use-binwise-spectra-loss-as-redshift-logits",
+                                action="store_true", help="calculate redshift logits based \
+                                on recon loss for spectra corresponding to each redshift bin.")
+    pretrain_group.add_argument("--binwise-loss-beta", type=float)
+
     pretrain_group.add_argument("--zero-init-redshift-latents", action="store_true")
     pretrain_group.add_argument("--optimize-redshift-latents-as-logits", action="store_true")
     pretrain_group.add_argument("--optimize-redshift-latents", action="store_true")

@@ -70,11 +70,12 @@ class RedshiftDecoder(nn.Module):
                           show_memory=self.kwargs["show_memory"])
         timer.reset()
 
-        if self.kwargs["split_latent"]:
-            assert redshift_latents is not None
-            latents = redshift_latents # [bsz,dim]
-            assert latents.shape[-1] == self.kwargs["redshift_logit_latent_dim"]
-        else: latents = z[:,0]
+        if not self.kwargs["use_binwise_spectra_loss_as_redshift_logits"]:
+            if self.kwargs["split_latent"]:
+                assert redshift_latents is not None
+                latents = redshift_latents # [bsz,dim]
+                assert latents.shape[-1] == self.kwargs["redshift_logit_latent_dim"]
+            else: latents = z[:,0]
 
         if self.redshift_model_method == "regression":
             redshift = self.redshift_decoder(latents)[...,0]
@@ -83,7 +84,9 @@ class RedshiftDecoder(nn.Module):
         elif self.redshift_model_method == "classification":
             ret["redshift"]= self.redshift_bin_center # [num_bins]
 
-            if self.kwargs["optimize_redshift_latents_as_logits"]:
+            if self.kwargs["use_binwise_spectra_loss_as_redshift_logits"]:
+                pass
+            elif self.kwargs["optimize_redshift_latents_as_logits"]:
                 ret["redshift_logits"] = F.softmax(latents, dim=-1)
             else:
                 logits = self.redshift_decoder(latents)

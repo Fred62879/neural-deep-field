@@ -12,7 +12,7 @@ from wisp.models.activations import get_activation_class
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
 from wisp.models.hypers.hps_converter_batched import HyperSpectralConverter
 from wisp.models.layers import Intensifier, Quantization, get_layer_class, ArgMax, \
-    calculate_bayesian_redshift_logits
+    calculate_redshift_logits
 
 class HyperSpectralDecoderB(nn.Module):
 
@@ -172,12 +172,17 @@ class HyperSpectralDecoderB(nn.Module):
         spectra = torch.squeeze(spectra, dim=-2) # [...,bsz,nsmpl]
         return spectra
 
-    def spectra_dim_reduction(self, input, spectra, ret, qtz_args):
+    def spectra_dim_reduction(self, input, spectra, ret, qtz_args,
+                              spectra_masks, loss_func, gt_spectra
+    ):
         if self.qtz_spectra:
             if self.reduction_order == "qtz_first":
                 spectra = self.quantize_spectra(input, spectra, ret, qtz_args)
                 if self.classify_redshift:
                     ret["spectra_all_bins"] = spectra
+                    if self.kwargs["use_binwise_spectra_loss_as_redshift_logits"]:
+                        calculate_redshift_logits(
+                            loss_func, spectra_masks, gt_spectra, spectra, ret, **self.kwargs)
                     spectra = self.classify_redshift3D(spectra, ret)
 
             elif self.reduction_order == "bin_avg_first":
@@ -193,7 +198,8 @@ class HyperSpectralDecoderB(nn.Module):
         return spectra
 
     def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
-                            wave_bound, ret, codebook, qtz_args
+                            wave_bound, ret, codebook, qtz_args,
+                            spectra_masks, loss_func, gt_spectra
     ):
         """ Reconstruct emitted (under possibly multiple redshift values) spectra
               using given input and wave.
@@ -220,7 +226,8 @@ class HyperSpectralDecoderB(nn.Module):
             latents = self.convert(wave, input, redshift, wave_bound) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
 
-        spectra = self.spectra_dim_reduction(input, spectra, ret, qtz_args) # [bsz,nsmpl]
+        spectra = self.spectra_dim_reduction(
+            input, spectra, ret, qtz_args, spectra_masks, loss_func, gt_spectra) # [bsz,nsmpl]
 
         if self.scale:
             assert scaler is not None
@@ -254,6 +261,7 @@ class HyperSpectralDecoderB(nn.Module):
                 trans_mask=None,
                 full_emitted_wave=None,
                 codebook=None, qtz_args=None, ret=None,
+                spectra_masks=None, spectra_loss_func=None, spectra_source_data=None
     ):
         """ @Param
             latents:   (encoded or original) coords or logits for quantization.
@@ -301,7 +309,8 @@ class HyperSpectralDecoderB(nn.Module):
             None if ret["scaler"] is None else ret["scaler"][:bsz],
             None if ret["bias"] is None else ret["bias"][:bsz],
             redshift,
-            full_wave_bound, ret, codebook, qtz_args
+            full_wave_bound, ret, codebook, qtz_args,
+            spectra_masks, spectra_loss_func, spectra_source_data
         )
         timer.check("hps_decoder::spectra reconstruced")
 
