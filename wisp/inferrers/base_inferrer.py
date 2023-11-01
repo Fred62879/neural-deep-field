@@ -45,6 +45,11 @@ class BaseInferrer(ABC):
 
         self.classify_redshift = get_bool_classify_redshift(**extra_args)
 
+        self.calculate_binwise_spectra_loss = self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
+        if self.calculate_binwise_spectra_loss:
+            assert self.extra_args["spectra_batch_reduction_order"] == "qtz_first"
+
+
         self.timer = PerfTimer(activate=extra_args["perf"])
         self.timer.reset()
 

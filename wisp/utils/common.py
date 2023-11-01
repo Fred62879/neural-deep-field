@@ -440,7 +440,8 @@ def forward(
             net_args["spectra_masks"] = data["spectra_masks"]
             net_args["spectra_loss_func"] = spectra_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
-            requested_channels.append("spectra_binwise_loss")
+            requested_channels.extend(
+                ["spectra_binwise_loss","redshift_logits"])
     else:
         raise ValueError("Unsupported space dimension.")
 

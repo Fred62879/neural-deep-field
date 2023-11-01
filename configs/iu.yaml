@@ -12,8 +12,8 @@ global:
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
     tasks: ['codebook_pretrain_infer','plot_codebook_logits','recon_gt_spectra','save_redshift'] #'recon_codebook_spectra','save_redshift'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
-    #tasks: ['redshift_pretrain','recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'save_pixel_values','recon_codebook_spectra_individ']
-    #tasks: ['redshift_pretrain_infer','recon_gt_spectra','save_redshift','plot_redshift_logits','plot_codebook_logits'] #'recon_codebook_spectra''save_codebook_latents',] #,'save_qtz_weights'] #'recon_gt_spectra_all_bins']
+    tasks: ['redshift_pretrain','recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'save_pixel_values','recon_codebook_spectra_individ']
+    tasks: ['redshift_pretrain_infer','recon_gt_spectra','save_redshift','plot_redshift_logits','plot_binwise_spectra_loss','plot_codebook_logits'] #'recon_codebook_spectra''save_codebook_latents',] #,'save_qtz_weights'] #'recon_gt_spectra_all_bins']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -126,7 +126,7 @@ pretrain:
     load_pretrained_codebook_logits_mlp: False
 
     use_binwise_spectra_loss_as_redshift_logits: True
-    binwise_loss_beta: 1
+    binwise_loss_beta: 10
 
     zero_init_redshift_latents: True
     optimize_redshift_latents_as_logits: True
@@ -158,8 +158,8 @@ pretrain:
     redshift_logit_latent_dim: 330
 
     pretrain_use_all_wave: False
-    pretrain_num_wave_samples: 400
-    pretrain_wave_sample_method: 'uniform_non_random'
+    pretrain_num_wave_samples: 200
+    pretrain_wave_sample_method: 'uniform' #_non_random'
 
     pretrain_pixel_supervision: False
     main_train_with_pretrained_latents: False
@@ -270,7 +270,7 @@ trainer:
     pixel_supervision: False
     spectra_supervision: True
 
-    apply_gt_redshift: True         # -
+    apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
     redshift_semi_supervision: False # -
 
@@ -295,12 +295,12 @@ infer:
     infer_use_all_wave: True
     # infer_num_wave: 
     pretrain_infer_use_all_wave: False
-    pretrain_infer_num_wave: 2000
+    pretrain_infer_num_wave: 400
     pretrain_infer_wave_sample_method: 'uniform_non_random'
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20231030-113623_8_codes_8_spectra_zero_init'
+    #infer_log_dir: '20231031-175732_beta_1'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500

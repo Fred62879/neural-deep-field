@@ -13,6 +13,7 @@ from functools import partial
 from os.path import exists, join
 
 from wisp.inferrers import BaseInferrer
+from wisp.loss import spectra_supervision_loss
 from wisp.datasets.data_utils import get_bound_id
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
@@ -254,6 +255,10 @@ class AstroInferrer(BaseInferrer):
         self.plot_redshift_logits = "plot_redshift_logits" in tasks and \
             not self.extra_args["apply_gt_redshift"] and \
             self.extra_args["redshift_model_method"] == "classification"
+        self.plot_binwise_spectra_loss = "plot_binwise_spectra_loss" in tasks and \
+            not self.extra_args["apply_gt_redshift"] and \
+            self.extra_args["redshift_model_method"] == "classification" and \
+            self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
 
         # iii) infer all coords using modified model (recon codebook spectra)
         #   either we have the codebook spectra for all coords
@@ -784,6 +789,10 @@ class AstroInferrer(BaseInferrer):
             self.gt_redshift_l = []
             self.redshift_logits = []
 
+        if self.plot_binwise_spectra_loss:
+            self.gt_redshift_bl = []
+            self.binwise_loss = []
+
         if self.save_redshift:
             if self.classify_redshift:
                 self.argmax_redshift = []
@@ -798,7 +807,8 @@ class AstroInferrer(BaseInferrer):
         if self.pretrain_infer:
             self.spectra_infer_pipeline.set_latents(
                 checkpoint["model_state_dict"]["nef.latents"])
-            if not self.apply_gt_redshift and self.split_latent:
+            if not self.apply_gt_redshift and self.split_latent and \
+               not self.calculate_binwise_spectra_loss:
                 self.spectra_infer_pipeline.set_redshift_latents(
                     checkpoint["model_state_dict"]["nef.redshift_latents"])
 
@@ -865,6 +875,9 @@ class AstroInferrer(BaseInferrer):
 
         if self.plot_redshift_logits:
             self._plot_redshift_logits(model_id)
+
+        if self.plot_binwise_spectra_loss:
+            self._plot_binwise_spectra_loss(model_id)
 
         if self.save_redshift_pre:
             if self.classify_redshift:
@@ -1103,11 +1116,16 @@ class AstroInferrer(BaseInferrer):
                 if self.recon_gt_spectra_all_bins:
                     self.spectra_infer_pipeline.set_batch_reduction_order("qtz_first")
 
-                if self.classify_redshift and \
-                   self.extra_args["redshift_classification_method"] == "bayesian_weighted_avg":
-                    self.spectra_infer_pipeline.set_bayesian_redshift_logits_calculation(
-                        get_loss(self.extra_args["spectra_loss_cho"], self.cuda),
-                        data["spectra_masks"], data["spectra_source_data"])
+                # if self.classify_redshift and \
+                #    self.extra_args["redshift_classification_method"] == "bayesian_weighted_avg":
+                #     self.spectra_infer_pipeline.set_bayesian_redshift_logits_calculation(
+                #         get_loss(self.extra_args["spectra_loss_cho"], self.cuda),
+                #         data["spectra_masks"], data["spectra_source_data"])
+
+                if self.calculate_binwise_spectra_loss:
+                    self.spectra_infer_pipeline.set_batch_reduction_order("qtz_first")
+                    loss_func = self._get_spectra_loss_func(data)
+                else: loss_func = None
 
                 with torch.no_grad():
                     ret = forward(
@@ -1115,11 +1133,13 @@ class AstroInferrer(BaseInferrer):
                         self.spectra_infer_pipeline,
                         iterations,
                         self.space_dim,
+                        spectra_loss_func=loss_func,
                         qtz=self.qtz,
                         qtz_strategy=self.qtz_strategy,
                         index_latent=self.index_latent,
                         split_latent=self.split_latent,
                         apply_gt_redshift=self.apply_gt_redshift,
+                        calculate_binwise_spectra_loss=self.calculate_binwise_spectra_loss,
                         save_redshift=self.save_redshift,
                         save_spectra=self.recon_gt_spectra,
                         save_qtz_weights=self.save_qtz_weights,
@@ -1180,6 +1200,10 @@ class AstroInferrer(BaseInferrer):
                 if self.plot_redshift_logits:
                     self.gt_redshift_l.extend(data["spectra_redshift"])
                     self.redshift_logits.extend(ret["redshift_logits"])
+
+                if self.plot_binwise_spectra_loss:
+                    self.gt_redshift_bl.extend(data["spectra_redshift"])
+                    self.binwise_loss.extend(ret["spectra_binwise_loss"])
 
             except StopIteration:
                 log.info("spectra forward done")
@@ -1271,6 +1295,14 @@ class AstroInferrer(BaseInferrer):
                 self.num_spectra,
                 self.extra_args["pretrain_num_infer_upper_bound"])
             self.dataset.set_hardcode_data("selected_ids", ids)
+
+    def _get_spectra_loss_func(self, data):
+        if self.extra_args["spectra_loss_cho"] == "emd":
+            loss = spectra_supervision_emd_loss
+        else:
+            loss = partial(spectra_supervision_loss,
+                           get_loss(self.extra_args["spectra_loss_cho"], self.cuda))
+        return loss
 
     def _set_coords_from_checkpoint(self, checkpoint):
         """ Set dataset coords using saved model checkpoint.
@@ -1456,6 +1488,21 @@ class AstroInferrer(BaseInferrer):
         codebook_latents = torch.stack(self.codebook_latents).detach().cpu().numpy()
         fname = join(self.codebook_latents_dir, f"model-{model_id}_logits")
         np.save(fname, codebook_latents)
+
+    def _plot_binwise_spectra_loss(self, model_id):
+        losses = torch.stack(self.binwise_loss).detach().cpu().numpy()
+        gt_redshift = torch.stack(self.gt_redshift_bl).detach().cpu().numpy()
+        bin_centers = init_redshift_bins(
+            self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
+            self.extra_args["redshift_bin_width"])
+
+        fname = join(self.redshift_dir, f"model-{model_id}_losses")
+        np.save(fname, np.concatenate((bin_centers[None,:], losses), axis=0))
+
+        plot_multiple(
+            self.extra_args["num_spectrum_per_fig"],
+            self.extra_args["num_spectrum_per_row"],
+            losses, fname, x=bin_centers,vertical_xs=gt_redshift)
 
     def _plot_redshift_logits(self, model_id):
         gt_redshift = torch.stack(self.gt_redshift_l).detach().cpu().numpy()
