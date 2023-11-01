@@ -253,7 +253,7 @@ class CodebookTrainer(BaseTrainer):
         """
         if self.shuffle_dataloader: sampler_cls = RandomSampler
         else: sampler_cls = SequentialSampler
-        # sampler_cls = SequentialSampler
+        sampler_cls = SequentialSampler
         # sampler_cls = RandomSampler
 
         sampler = BatchSampler(
@@ -482,8 +482,12 @@ class CodebookTrainer(BaseTrainer):
             if self.save_redshift:
                 self.gt_redshift = []
                 self.est_redshift = []
-                self.binwise_loss = []
-                self.redshift_logits = []
+
+                if self.classify_redshift:
+                    self.redshift_logits = []
+                    if self.calculate_binwise_spectra_loss:
+                        self.binwise_loss = []
+
             if self.save_qtz_weights:
                 self.qtz_weights = []
             if self.save_pixel_values:
@@ -610,14 +614,17 @@ class CodebookTrainer(BaseTrainer):
         if self.save_data:
             if self.save_redshift:
                 self.gt_redshift.extend(data["spectra_redshift"])
-                if self.classify_redshift:
-                    ids = torch.argmax(ret["redshift_logits"], dim=-1)
-                    argmax_redshift = ret["redshift"][ids]
-                    self.est_redshift.extend(argmax_redshift)
-                    self.redshift_logits.extend(ret["redshift_logits"])
-                    self.binwise_loss.extend(ret["spectra_binwise_loss"])
+                if not self.apply_gt_redshift:
+                    if self.classify_redshift:
+                        ids = torch.argmax(ret["redshift_logits"], dim=-1)
+                        argmax_redshift = ret["redshift"][ids]
+                        self.est_redshift.extend(argmax_redshift)
+                        self.redshift_logits.extend(ret["redshift_logits"])
+                        self.binwise_loss.extend(ret["spectra_binwise_loss"])
+                    else:
+                        self.est_redshift.extend(ret["redshift"])
                 else:
-                    self.redshift.extend(ret["redshift"])
+                    self.est_redshift.extend(data["spectra_redshift"])
 
             if self.save_qtz_weights:
                 self.qtz_weights.extend(ret["qtz_weights"])
@@ -728,13 +735,13 @@ class CodebookTrainer(BaseTrainer):
             assert self.extra_args["sample_from_codebook_pretrain_spectra"]
             # checkpoint comes from codebook pretrain (use sup spectra)
             checkpoint = torch.load(self.pretrained_model_fname)
-            assert checkpoint["latents"].shape[1] == sp_z_dim
+            assert checkpoint["model_state_dict"]["nef.latents"].shape[1] == sp_z_dim
 
             # redshift pretrain use val spectra which is a permutation of sup spectra
             permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
-            latents = self.create_latent_mask(
+            latents = self.create_latents(
                 self.num_spectra, sp_z_dim,
-                pretrained=checkpoint["latents"][permute_ids],
+                pretrained=checkpoint["model_state_dict"]["nef.latents"][permute_ids],
                 freeze=not self.extra_args["optimize_codebook_latents"])
         else:
             latents = self.create_latents(
@@ -746,7 +753,7 @@ class CodebookTrainer(BaseTrainer):
 
     def create_latents(self, n, m, pretrained=None, zero_init=False, freeze=False, seed=0):
         if pretrained is not None:
-            latents = nn.Embedding.from_pretrained(pretrained, device=self.device)
+            latents = nn.Embedding.from_pretrained(pretrained).to(self.device)
         elif zero_init:
             zero_latents = torch.zeros(n, m)
             # zero_latents = 0.01 * torch.ones(n,m)
@@ -856,9 +863,11 @@ class CodebookTrainer(BaseTrainer):
             self._plot_codebook_logits()
         if self.save_redshift:
             self._save_redshift()
-            self._plot_redshift_logits()
-            self._plot_binwise_spectra_loss()
-            self._log_redshift_residual_outlier()
+            if self.classify_redshift:
+                self._plot_redshift_logits()
+                self._log_redshift_residual_outlier()
+                if self.calculate_binwise_spectra_loss:
+                    self._plot_binwise_spectra_loss()
 
     def _save_redshift(self):
         self.gt_redshift = torch.stack(
@@ -867,8 +876,8 @@ class CodebookTrainer(BaseTrainer):
             self.est_redshift)[self.selected_ids].detach().cpu().numpy()
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
-        # log.info(f"gt redshift values: {self.gt_redshift}")
-        # log.info(f"est redshift values: {self.est_redshift}")
+        log.info(f"gt redshift values: {self.gt_redshift}")
+        log.info(f"est redshift values: {self.est_redshift}")
 
     def _save_pixel_values(self):
         gt_vals = torch.stack(self.gt_pixel_vals).detach().cpu().numpy()[self.selected_ids,0]

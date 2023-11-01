@@ -7,6 +7,7 @@ import random
 import logging
 import nvidia_smi
 import numpy as np
+import logging as log
 import torch.nn as nn
 
 from os.path import join
