@@ -32,6 +32,16 @@ def get_bin_id(lo, bin_width, val):
     n = (val - lo) / bin_width
     return int(np.rint(n))
 
+def get_bin_ids(lo, bin_width, vals, add_batched_dim=False):
+    vals = vals - bin_width / 2
+    ids = (vals - lo) / bin_width
+    ids = np.rint(ids).astype(int)
+    if add_batched_dim:
+        bsz = len(vals)
+        indices = np.arange(bsz)[None,:]
+        ids = np.concatenate((indices, ids[None,:]), axis=0)
+    return ids
+
 def get_loss(cho, cuda):
     if cho == "l1_mean":
         loss = nn.L1Loss()
@@ -377,6 +387,7 @@ def forward(
         save_embed_ids=False,
         save_qtz_weights=False,
         save_codebook_loss=False,
+        save_gt_bin_spectra=False,
         save_codebook_logits=False,
         save_redshift_logits=False,
         save_codebook_latents=False,
@@ -405,6 +416,7 @@ def forward(
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if save_qtz_weights: requested_channels.append("qtz_weights")
         if save_codebook_loss: requested_channels.append("codebook_loss")
+        if save_gt_bin_spectra: requested_channels.append("gt_bin_spectra")
         if save_codebook_logits: requested_channels.append("codebook_logits")
         if save_redshift_logits: requested_channels.append("redshift_logits")
         if save_codebook_latents: requested_channels.append("codebook_latents")
@@ -454,6 +466,8 @@ def forward(
             net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.extend(
                 ["spectra_binwise_loss","redshift_logits"])
+        if save_gt_bin_spectra:
+            net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
     else:
         raise ValueError("Unsupported space dimension.")
 

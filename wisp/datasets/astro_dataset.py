@@ -6,7 +6,7 @@ from os.path import exists
 
 from typing import Callable
 from torch.utils.data import Dataset
-from wisp.utils.common import print_shape, get_bin_id
+from wisp.utils.common import print_shape, get_bin_ids
 from wisp.datasets.fits_data import FitsData
 from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
@@ -40,7 +40,8 @@ class AstroDataset(Dataset):
 
         if self.space_dim == 3:
             self.unbatched_fields = {
-                "idx","selected_ids","wave_data","spectra_data","redshift_data","model_data"
+                "idx","selected_ids","wave_data","spectra_data","redshift_data","model_data",
+                "gt_redshift_bin_ids"
             }
         else:
             self.unbatched_fields = set()
@@ -320,10 +321,15 @@ class AstroDataset(Dataset):
         if "selected_ids" in self.requested_fields:
             out["selected_ids"] = self.data["selected_ids"]
 
-        self.get_debug_data(out)
+        # self.get_debug_data(out)
+        # if "model_data" in self.requested_fields:
+        #     self.get_model_data(out)
 
-        if "model_data" in self.requested_fields:
-            self.get_model_data(out)
+        if self.kwargs["plot_logits_for_gt_bin"]:
+            self.get_gt_redshift_bin_ids(out)
+
+        if self.kwargs["add_redshift_logit_bias"]:
+            self.get_init_redshift_logit_bias(out)
 
         if "wave_data" in self.requested_fields:
             self.get_wave_data(len(idx), out)
@@ -332,7 +338,10 @@ class AstroDataset(Dataset):
             self.get_spectra_data(out)
 
         if "redshift_data" in self.requested_fields:
-           self.get_redshift_data(out)
+            self.get_redshift_data(out)
+
+        if "gt_redshift_bin_ids" in self.requested_fields:
+            self.get_gt_redshift_bin_ids(out)
 
     def index_selected_data(self, data, idx):
         """ Index data with both selected_ids and given idx
@@ -353,17 +362,17 @@ class AstroDataset(Dataset):
         full_wave = self.get_full_spectra_wave_coverage()
         return mask, full_wave
 
-    def get_debug_data(self, out):
-        if self.kwargs["plot_logits_for_gt_bin"]:
-            self.get_gt_redshift_bin_ids(out)
-        if self.kwargs["add_redshift_logit_bias"]:
-            self.get_init_redshift_logit_bias(out)
+    # def get_debug_data(self, out):
+    #     if self.kwargs["plot_logits_for_gt_bin"]:
+    #         self.get_gt_redshift_bin_ids(out)
+    #     if self.kwargs["add_redshift_logit_bias"]:
+    #         self.get_init_redshift_logit_bias(out)
 
-    def get_model_data(self, out):
-        if "scaler_latents" in self.data:
-            out["scaler_latents"] = self.data["scaler_latents"]
-        if "redshift_latents" in self.data:
-            out["redshift_latents"] = self.data["redshift_latents"]
+    # def get_model_data(self, out):
+    #     if "scaler_latents" in self.data:
+    #         out["scaler_latents"] = self.data["scaler_latents"]
+    #     if "redshift_latents" in self.data:
+    #         out["redshift_latents"] = self.data["redshift_latents"]
 
     def get_wave_data(self, batch_size, out):
         """ Get wave (lambda and transmission) data depending on data source.
@@ -492,27 +501,38 @@ class AstroDataset(Dataset):
         out["spectra_semi_sup_redshift"] = self.fits_dataset.get_spectra_pixel_redshift(ids)
         del out["spectra_id_map"]
 
+    def get_gt_redshift_bin_ids(self, out):
+        out["gt_redshift_bin_ids"] = get_bin_ids(
+            self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"],
+            out["spectra_redshift"].numpy(), add_batched_dim=True)
+
+    # def get_gt_redshift_bin_ids(self, out):
+    #     out["gt_redshift_bin_ids"] = np.array(
+    #         [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
+    #          for val in out["spectra_redshift"]])
+
     ############
     # Debug data
     ############
-
-    def get_gt_redshift_bin_ids(self, out):
-        out["gt_redshift_bin_ids"] = np.array(
-            [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
-             for val in out["spectra_redshift"]])
 
     def get_init_redshift_logit_bias(self, out):
         bsz = out["spectra_redshift"].shape[0]
         n_bins = int(np.rint((
             self.kwargs["redshift_hi"] - self.kwargs["redshift_lo"]) / self.kwargs["redshift_bin_width"]))
-        ids = np.array(
-            [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
-             for val in out["spectra_redshift"]])
-        ids = np.rint(ids).astype(int)
-        init_probs = np.zeros((bsz, n_bins)).astype(np.float32)
-        pos = np.arange(bsz)
-        ids = np.concatenate((pos[None,:],ids[None,:]),axis=0)
-        init_probs[ ids[0,:], ids[1:,] ] = 1
+        # ids = np.array(
+        #     [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
+        #      for val in out["spectra_redshift"]])
+        # ids = np.rint(ids).astype(int)
+        # init_probs = np.zeros((bsz, n_bins)).astype(np.float32)
+        # pos = np.arange(bsz)
+        # ids = np.concatenate((pos[None,:],ids[None,:]),axis=0)
+        # init_probs[ ids[0,:], ids[1:,] ] = 1
+        ids = get_bin_ids(
+            self.kwargs["redshift_lo"],
+            self.kwargs["redshift_bin_width"],
+            out["spectra_redshift"], add_batched_dim=True
+        )
+        init_probs[ids[0], ids[1]] = 1
         out["init_redshift_prob"] = init_probs
 
     ############
@@ -541,6 +561,7 @@ class AstroDataset(Dataset):
 
     def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
                       gt_wave, gt_fluxes, recon_wave, recon_fluxes,
+                      recon_fluxes2=None,
                       is_codebook=False, spectra_ids=None,
                       save_spectra=False, save_spectra_together=False,
                       gt_masks=None, recon_masks=None,
@@ -550,6 +571,7 @@ class AstroDataset(Dataset):
         return self.spectra_dataset.plot_spectrum(
             spectra_dir, name, flux_norm_cho,
             gt_wave, gt_fluxes, recon_wave, recon_fluxes,
+            recon_fluxes2=recon_fluxes2,
             is_codebook=is_codebook,
             save_spectra=save_spectra,
             save_spectra_together=save_spectra_together,

@@ -104,6 +104,9 @@ class CodebookTrainer(BaseTrainer):
                 self.extra_args["redshift_bin_width"]
             )
             self.num_redshift_bins = len(redshift_bins)
+        if self.apply_gt_redshift:
+            assert not self.extra_args["use_binwise_spectra_loss_as_redshift_logits"] and \
+                not self.extra_args["optimize_codebook_logits_for_each_redshift_bin"]
 
         self.sample_wave = not self.extra_args["pretrain_use_all_wave"] # True
         self.train_within_wave_range = not self.pixel_supervision and \

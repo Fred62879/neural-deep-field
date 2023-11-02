@@ -485,7 +485,7 @@ class SpectraData:
         # use the rest spectra for pretrain (spectra supervision)
         supervision_ids = np.array(list(set(ids)-set(validation_ids)-set(test_ids))).astype(int)
         np.random.seed(self.kwargs["seed"])
-        # np.random.shuffle(supervision_ids)
+        np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
 
         # select spectra for redshift pretrain from spectra used for codebook pretrain
@@ -1000,7 +1000,7 @@ class SpectraData:
         """
         sub_dir += flux_norm_cho + "_"
         if plot_recon_spectrum:
-            sub_dir += "with_recon_"
+            sub_dir = sub_dir + "with_recon_"
             if flux_norm_cho == "identity":
                 pass
             elif flux_norm_cho == "max":
@@ -1016,7 +1016,7 @@ class SpectraData:
             else: raise ValueError()
 
         if plot_gt_spectrum and not is_codebook:
-            sub_dir += "with_gt_"
+            sub_dir = sub_dir + "with_gt_"
             # assert(np.max(gt_flux) > 0)
             if flux_norm_cho == "identity":
                 pass
@@ -1040,7 +1040,7 @@ class SpectraData:
                                    save_spectra, calculate_metrics, idx, pargs):
         """ Plot one spectrum and save as required.
         """
-        sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux, \
+        sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux, recon_flux2, \
             plot_gt_spectrum, plot_recon_spectrum = pargs
 
         if self.kwargs["plot_spectrum_together"]:
@@ -1062,15 +1062,17 @@ class SpectraData:
         axis.set_title(title)
 
         if plot_gt_spectrum:
-            axis.plot(gt_wave, gt_flux, color="gray", label="GT")
+            axis.plot(gt_wave, gt_flux, color="gray", label="gt", linestyle="dotted")
         if plot_recon_spectrum:
             if above_threshold is not None: # plot recon flux according to zncc
-                axis.plot(recon_wave, recon_flux, color="blue", label="Recon.")
-
+                axis.plot(recon_wave, recon_flux, color="blue", label="recon")
                 segments = segment_bool_array(above_threshold)
                 for (lo, hi) in segments:
                     axis.plot(recon_wave[lo:hi], recon_flux[lo:hi], color="purple")
-            else: axis.plot(recon_wave, recon_flux, color="blue", label="Recon.")
+            else:
+                axis.plot(recon_wave, recon_flux, color="gray", label="recon")
+                if recon_flux2 is not None:
+                    axis.plot(recon_wave, recon_flux2, color="blue", label="gt bin")
 
         if sub_dir != "":
             if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]
@@ -1089,37 +1091,45 @@ class SpectraData:
 
         return sub_dir, metrics
 
-    def process_spectrum_plot_data(self, flux_norm_cho, is_codebook, clip,
-                                   spectra_clipped, calculate_metrics, data):
-        """ Collect data for spectrum plotting for the given spectra.
-        """
-        (title, gt_wave, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux) = data
-
-        sub_dir = str(self.kwargs["spectra_neighbour_size"]) + "_neighbours_"
-        if self.gt_convolved:
-            sub_dir += "convolved_"
-
-        plot_gt_spectrum = self.kwargs["plot_spectrum_with_gt"] \
-            and gt_flux is not None and not is_codebook
-        plot_recon_spectrum = self.kwargs["plot_spectrum_with_recon"]
-
-        # average spectra over neighbours
+    def process_recon_flux(self, recon_flux, recon_mask, clip, spectra_clipped, recon_wave=None):
         if recon_flux.ndim == 2:
             if self.kwargs["average_neighbour_spectra"]:
                 recon_flux = np.mean(recon_flux, axis=0)
             else: recon_flux = recon_flux[0]
         else: assert(recon_flux.ndim == 1)
+        if clip and not spectra_clipped:
+            if recon_wave is not None:
+                recon_wave = recon_wave[recon_mask]
+            recon_flux = recon_flux[recon_mask]
+        return recon_wave, recon_flux
 
-        if clip or spectra_clipped:
-            sub_dir += "clipped_"
-            if not spectra_clipped:
-                if plot_gt_spectrum:
-                    gt_wave = gt_wave[gt_mask]
-                    gt_flux = gt_flux[gt_mask]
-                if plot_recon_spectrum:
-                    recon_wave = recon_wave[recon_mask]
-                    recon_flux = recon_flux[recon_mask]
+    def process_spectrum_plot_data(self, flux_norm_cho, is_codebook, clip,
+                                   spectra_clipped, calculate_metrics, data):
+        """ Collect data for spectrum plotting for the given spectra.
+        """
+        (title, gt_wave, gt_mask, gt_flux,
+         recon_wave, recon_mask, recon_flux, recon_flux2) = data
 
+        sub_dir = str(self.kwargs["spectra_neighbour_size"]) + "_neighbours_"
+        if self.gt_convolved:       sub_dir += "convolved_"
+        if clip or spectra_clipped: sub_dir += "clipped_"
+
+        plot_gt_spectrum = self.kwargs["plot_spectrum_with_gt"] \
+            and gt_flux is not None and not is_codebook
+        plot_recon_spectrum = self.kwargs["plot_spectrum_with_recon"]
+
+        if plot_gt_spectrum and clip and not spectra_clipped:
+            gt_wave = gt_wave[gt_mask]
+            gt_flux = gt_flux[gt_mask]
+
+        if plot_recon_spectrum:
+            recon_wave, recon_flux = self.process_recon_flux(
+                recon_flux, recon_mask, clip, spectra_clipped, recon_wave=recon_wave)
+            if recon_flux2 is not None:
+                _, recon_flux2 = self.process_recon_flux(
+                    recon_flux2, recon_mask, clip, spectra_clipped)
+
+        # recon and gt spectra differ in shape, to calculate metrics, we do interpolation
         if calculate_metrics and not \
            ( recon_wave.shape == gt_wave.shape and (recon_wave == gt_wave).all() ):
             if wave_within_bound(recon_wave, gt_wave):
@@ -1134,15 +1144,20 @@ class SpectraData:
 
         sub_dir, gt_flux, recon_flux = self.normalize_one_flux(
             sub_dir, is_codebook, plot_gt_spectrum, plot_recon_spectrum,
-            flux_norm_cho, gt_flux, recon_flux
-        )
-        pargs = (sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux,
+            flux_norm_cho, gt_flux, recon_flux)
+        if recon_flux2 is not None:
+            _, _, recon_flux2 = self.normalize_one_flux(
+                sub_dir, is_codebook, False, plot_recon_spectrum,
+                flux_norm_cho, None, recon_flux2)
+
+        pargs = (sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux, recon_flux2,
                  plot_gt_spectrum, plot_recon_spectrum)
         return pargs
 
     def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
                       gt_wave, gt_fluxes,
                       recon_wave, recon_fluxes,
+                      recon_fluxes2=None,
                       is_codebook=False,
                       save_spectra=False,
                       save_spectra_together=False,
@@ -1182,9 +1197,7 @@ class SpectraData:
         if gt_masks is None: gt_masks = [None]*n
         if gt_fluxes is None: gt_fluxes = [None]*n
         if recon_masks is None: recon_masks = [None]*n
-
-        # print(gt_fluxes.shape, gt_wave.shape, gt_masks.shape)
-        # print(recon_fluxes.shape, recon_wave.shape, recon_masks.shape)
+        if recon_fluxes2 is None: recon_fluxes2 = [None]*n
 
         assert gt_fluxes[0] is None or \
             (len(gt_wave) == n and len(gt_fluxes) == n and len(gt_masks) == n)
@@ -1194,6 +1207,8 @@ class SpectraData:
         if not is_codebook:
             gt_fluxes = to_numpy(gt_fluxes)
         recon_fluxes = to_numpy(recon_fluxes)
+        if recon_fluxes2[0] is not None:
+            recon_fluxes2 = to_numpy(recon_fluxes2)
 
         if self.kwargs["plot_spectrum_together"]:
             ncols = min(n, self.kwargs["num_spectrum_per_row"])
@@ -1207,12 +1222,10 @@ class SpectraData:
                                 name, spectra_dir, fig, axs, nrows, ncols,
                                 save_spectra and not save_spectra_together,
                                 calculate_metrics)
-
-        # ids = np.array([10,6,18,15,11,16,14,7])
         metrics = []
         for idx, cur_plot_data in enumerate(
-            # zip(gt_wave[ids], gt_masks[ids], gt_fluxes[ids], recon_wave[ids], recon_masks[ids], recon_fluxes[ids])
-            zip(titles, gt_wave, gt_masks, gt_fluxes, recon_wave, recon_masks, recon_fluxes)
+            zip(titles, gt_wave, gt_masks, gt_fluxes,
+                recon_wave, recon_masks, recon_fluxes, recon_fluxes2)
         ):
             pargs = process_data(cur_plot_data)
             sub_dir, cur_metrics = plot_and_save(idx, pargs)

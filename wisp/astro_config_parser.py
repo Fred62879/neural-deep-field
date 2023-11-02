@@ -31,7 +31,6 @@ def get_pretrain_pipelines(pipelines, tasks, args):
         pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
 
     if "codebook_pretrain_infer" in tasks or "redshift_pretrain_infer" in tasks:
-        # decode_redshift = "redshift_pretrain_infer" in tasks
         decode_redshift = args.model_redshift and not args.apply_gt_redshift
         pretrain_nef = CodebookPretrainNerf(
             decode_redshift=decode_redshift,
@@ -40,7 +39,9 @@ def get_pretrain_pipelines(pipelines, tasks, args):
         )
         pipelines["full"] = AstroPipeline(pretrain_nef)
 
-        if "recon_gt_spectra" in tasks or "recon_gt_spectra_all_bins" in tasks:
+        if "recon_gt_spectra" in tasks or "recon_gt_spectra_all_bins" in tasks or \
+           "save_redshift" in tasks or "plot_redshift_logits" in tasks or \
+           "plot_binwise_spectra_loss" in tasks or "plot_codebook_logits" in tasks:
             spectra_nef = CodebookPretrainNerf(
                 decode_redshift=decode_redshift, **vars(args))
             pipelines["spectra_infer"] = AstroPipeline(spectra_nef)

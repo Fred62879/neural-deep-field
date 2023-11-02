@@ -48,13 +48,16 @@ class CodebookPretrainNerf(BaseNeuralField):
         """
         channels = ["intensity","spectra","spectra_all_bins","qtz_weights",
                     "codebook_spectra","codebook_logits","codebook_latents",
-                    "full_range_codebook_spectra","min_embed_ids","latents",
-                    "spectra_binwise_loss"]
+                    "full_range_codebook_spectra","min_embed_ids","latents"]
 
         if self.kwargs["model_redshift"]:
             channels.append("redshift")
             if get_bool_classify_redshift(**self.kwargs):
                 channels.append("redshift_logits")
+                if self.kwargs["use_binwise_spectra_loss_as_redshift_logits"]:
+                    channels.extend(["spectra_binwise_loss","spectra_all_bins"])
+                    if self.kwargs["plot_spectrum_under_gt_bin"]:
+                        channels.append("gt_bin_spectra")
 
         self._register_forward_function(self.pretrain, channels)
 
@@ -115,7 +118,8 @@ class CodebookPretrainNerf(BaseNeuralField):
                  init_redshift_prob=None, # debug
                  spectra_masks=None,
                  spectra_loss_func=None,
-                 spectra_source_data=None
+                 spectra_source_data=None,
+                 gt_redshift_bin_ids=None
     ):
         """ Pretrain codebook.
             @Param
@@ -171,6 +175,7 @@ class CodebookPretrainNerf(BaseNeuralField):
             spectra_masks=spectra_masks,
             spectra_loss_func=spectra_loss_func,
             spectra_source_data=spectra_source_data,
+            gt_redshift_bin_ids=gt_redshift_bin_ids
         )
 
         timer.check("hps decoding done")
