@@ -413,6 +413,9 @@ class SpectraData:
             # data for all spectra are saved together (small amount of spectra)
             self.load_cached_spectra_data()
 
+        if self.kwargs["correct_gt_redshift_based_on_redshift_bin"]:
+            self.correct_redshift_based_on_bins()
+
         self.get_full_emit_wave_mask()
         self.num_gt_spectra = len(self.data["gt_spectra"])
 
@@ -539,6 +542,16 @@ class SpectraData:
             self.data["full_emit_wave"]
         )
         self.data["full_emit_wave_mask"][id_lo:id_hi+1] = 1
+
+    def correct_redshift_based_on_bins(self):
+        """
+        """
+        # print(self.data["gt_spectra_redshift"][:20])
+        num_bins = (self.data["gt_spectra_redshift"] - self.kwargs["redshift_lo"]) // self.kwargs["redshift_bin_width"]
+        num_bins = num_bins.astype(np.int)
+        self.data["gt_spectra_redshift"] = num_bins * self.kwargs["redshift_bin_width"] + \
+            self.kwargs["redshift_lo"] + self.kwargs["redshift_bin_width"] / 2
+        # print(self.data["gt_spectra_redshift"][:20])
 
     def load_cached_spectra_data(self):
         """ Load spectra data (which are saved together).

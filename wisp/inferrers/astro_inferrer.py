@@ -780,6 +780,7 @@ class AstroInferrer(BaseInferrer):
                 self.recon_fluxes_all = []
 
         if self.plot_codebook_logits:
+            self.gt_redshift_cl = []
             self.codebook_logits = []
 
         if self.save_codebook_latents:
@@ -1192,6 +1193,7 @@ class AstroInferrer(BaseInferrer):
                         self.redshift.extend(ret["redshift"])
 
                 if self.plot_codebook_logits:
+                    self.gt_redshift_cl.extend(data["spectra_redshift"])
                     self.codebook_logits.extend(ret["codebook_logits"])
 
                 if self.save_codebook_latents:
@@ -1478,6 +1480,18 @@ class AstroInferrer(BaseInferrer):
         codebook_logits = torch.stack(self.codebook_logits).detach().cpu().numpy()
         fname = join(self.codebook_logits_dir, f"model-{model_id}_logits")
         np.save(fname, codebook_logits)
+
+        if self.optimize_codebook_logits_for_each_redshift_bin:
+            n = codebook_logits.shape[0]
+            gt_redshift = torch.stack(self.gt_redshift_cl).detach().cpu().numpy()
+            gt_bin_ids = np.array([
+                get_bin_id(self.extra_args["redshift_lo"],
+                           self.extra_args["redshift_bin_width"], val
+                ) for val in gt_redshift
+            ])[None,:]
+            indices = np.arange(n)[None,:]
+            gt_bin_ids = np.concatenate((indices, gt_bin_ids), axis=0)
+            codebook_logits = codebook_logits[gt_bin_ids[0], gt_bin_ids[1]]
 
         plot_multiple(
             self.extra_args["num_spectrum_per_fig"],

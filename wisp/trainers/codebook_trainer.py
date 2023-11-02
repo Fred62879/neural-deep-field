@@ -211,10 +211,9 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["spectra_batch_reduction_order"])
 
         latents, redshift_latents = self.init_latents()
-        # self.train_pipeline.set_latents(latents.weight) # todo, change all latents to tensor
         self.train_pipeline.set_latents(latents)
         if redshift_latents is not None:
-            self.train_pipeline.set_redshift_latents(redshift_latents.weight)
+            self.train_pipeline.set_redshift_latents(redshift_latents)
 
         # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
         self.freeze_and_load()
@@ -708,25 +707,23 @@ class CodebookTrainer(BaseTrainer):
     def init_codebook_pretrain_codebook_latents(self):
         if self.optimize_codebook_latents_as_logits:
             dim = self.extra_args["qtz_num_embed"]
-        else:
-            dim = self.extra_args["codebook_latent_dim"]
+        else: dim = self.extra_args["codebook_latent_dim"]
+        sp = (self.num_spectra, dim)
         latents = self.create_latents(
-            self.num_spectra, dim,
+            sp, seed=self.extra_args["seed"] + 1,
             zero_init=self.extra_args["zero_init_codebook_latents"],
-            freeze=not self.optimize_codebook_latents,
-            seed=self.extra_args["seed"] + 1
+            freeze=not self.optimize_codebook_latents
         )
         return latents
 
     def init_redshift_pretrain_redshift_latents(self):
         if not self.apply_gt_redshift and self.split_latent:
+            sp = (self.num_spectra, self.extra_args["redshift_logit_latent_dim"])
             latents = self.create_latents(
-                self.num_spectra, self.extra_args["redshift_logit_latent_dim"],
+                sp, seed=self.extra_args["seed"] + 2,
                 zero_init=self.extra_args["zero_init_redshift_latents"],
-                freeze=not self.optimize_redshift_latents,
-                seed=self.extra_args["seed"] + 2)
-        else:
-            latents = None
+                freeze=not self.optimize_redshift_latents)
+        else: latents = None
         return latents
 
     def init_redshift_pretrain_codebook_latents(self):

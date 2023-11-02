@@ -628,6 +628,7 @@ def define_cmd_line_args():
                              help="generate redshift w/o supervision.")
     train_group.add_argument("--redshift-semi-supervision", action="store_true",
                              help="generate redshift w. semi supervision.")
+    train_group.add_argument("--correct-gt-redshift-based-on-redshift-bin", action="store_true")
 
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")
     train_group.add_argument("--redshift-beta", type=float, help="redshift loss weight scaler.")
