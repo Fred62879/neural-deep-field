@@ -170,6 +170,10 @@ class CodebookTrainer(BaseTrainer):
         if self.calculate_binwise_spectra_loss:
             assert self.extra_args["spectra_batch_reduction_order"] == "qtz_first"
 
+        self.optimize_codebook_logits_for_each_redshift_bin = self.extra_args["optimize_codebook_logits_for_each_redshift_bin"]
+        if self.optimize_codebook_logits_for_each_redshift_bin:
+            assert self.calculate_binwise_spectra_loss
+
     def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         log.info(f"logging to {self.log_dir}")
@@ -1140,20 +1144,23 @@ class CodebookTrainer(BaseTrainer):
         self.timer.check("forwarded")
 
         # i) spectra supervision loss
-        spectra_loss = 0
-        recon_fluxes = ret["intensity"]
-        spectra_masks = data["spectra_masks"]
-        gt_spectra = data["spectra_source_data"]
+        if self.optimize_codebook_logits_for_each_redshift_bin:
+            spectra_loss = torch.mean(ret["spectra_binwise_loss"])
+        else:
+            spectra_loss = 0
+            recon_fluxes = ret["intensity"]
+            spectra_masks = data["spectra_masks"]
+            gt_spectra = data["spectra_source_data"]
 
-        if len(recon_fluxes) != 0:
-            spectra_loss = self.spectra_loss(
-                spectra_masks, gt_spectra, recon_fluxes,
-                weight_by_wave_coverage=self.extra_args["weight_by_wave_coverage"]
-            )
-            if self.extra_args["plot_individ_spectra_loss"]:
-                self.cur_spectra_individ_losses.extend(spectra_loss.detach().cpu().numpy())
-            spectra_loss = torch.mean(spectra_loss, dim=-1)
-            self.log_dict["spectra_loss"] += spectra_loss.item()
+            if len(recon_fluxes) != 0:
+                spectra_loss = self.spectra_loss(
+                    spectra_masks, gt_spectra, recon_fluxes,
+                    weight_by_wave_coverage=self.extra_args["weight_by_wave_coverage"]
+                )
+                if self.extra_args["plot_individ_spectra_loss"]:
+                    self.cur_spectra_individ_losses.extend(spectra_loss.detach().cpu().numpy())
+                spectra_loss = torch.mean(spectra_loss, dim=-1)
+                self.log_dict["spectra_loss"] += spectra_loss.item()
 
         # ii) pixel supervision loss
         recon_loss = 0

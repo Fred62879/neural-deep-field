@@ -50,6 +50,18 @@ def get_loss(cho, cuda):
     if cuda: loss = loss.cuda()
     return loss
 
+def create_batch_ids(ids):
+    """ Add batch dim id to a given list of ids.
+        @Param
+          ids: [n,] list of ids
+        @Return
+          ids: [2,n] ids with batch dim ([0,1,2,...,n])
+    """
+    n = len(ids)
+    indices = np.arange(n)[None,:]
+    ids = np.concatenate((indices, ids[None,:]), axis=0)
+    return ids
+
 def log_data(obj, field, fname=None, gt_field=None, mask=None,
               log_ratio=False, log_to_console=True):
     """ Log estimated and gt data is specified.

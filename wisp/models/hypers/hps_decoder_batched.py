@@ -5,7 +5,8 @@ import torch.nn.functional as F
 
 from functools import partial
 from wisp.utils import PerfTimer
-from wisp.utils.common import get_input_latent_dim, get_bool_classify_redshift
+from wisp.utils.common import get_input_latent_dim, get_bool_classify_redshift, \
+    create_batch_ids
 
 from wisp.models.decoders import Decoder, BasicDecoder
 from wisp.models.activations import get_activation_class
@@ -154,8 +155,18 @@ class HyperSpectralDecoderB(nn.Module):
               spectra [bsz,nsmpl]
         """
         assert self.kwargs["redshift_classification_method"] == "weighted_avg"
-        spectra = torch.matmul(
-            ret["redshift_logits"][:,None], spectra.permute(1,0,2))[:,0]
+        if self.kwargs["optimize_codebook_logits_for_each_redshift_bin"]:
+            # index with argmax, this spectra is for visualization only
+            #  optimization relies on loss calculated for each bin
+            # print(ret["redshift_logits"].shape, spectra.shape, ret["spectra_binwise_loss"].shape)
+            ids = torch.argmax(ret["redshift_logits"], dim=-1)
+            ids = torch.tensor(
+                create_batch_ids(ids.detach().cpu().numpy()), dtype=ids.dtype
+            ).to(ids.device)
+            spectra = spectra[ids[1], ids[0]]
+        else:
+            spectra = torch.matmul(
+                ret["redshift_logits"][:,None], spectra.permute(1,0,2))[:,0]
         # elif self.kwargs["redshift_classification_method"] == "argmax":
         #     # spectra = ArgMax.apply(ret["redshift_logits"], spectra)
         #     ids = ArgMax.apply(ret["redshift_logits"])
