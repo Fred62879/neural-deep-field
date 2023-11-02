@@ -116,10 +116,8 @@ class SpatialDecoder(nn.Module):
         # decode/quantize
         if self.quantize_spectra:
             if self.kwargs["optimize_codebook_latents_as_logits"]:
-                # logits = F.softmax(z, dim=-1)
                 logits = z
                 ret["codebook_logits"] = logits[:,0]
-                # print(logits.shape, torch.sum(logits, dim=-1)[:,0])
             else:
                 logits = self.decode(z)
         elif self.quantize_z:

@@ -212,7 +212,7 @@ class Quantization(nn.Module):
     def soft_quantize(self, z, codebook, ret, qtz_args):
         """ Soft quantization can be applied at both quantize latent and spectra.
             @Param
-              z: logits [bsz,1,num_embed]
+              z: coefficients [(...,)bsz,1,num_embed]
               codebook: codebook spectra [...,num_embed,bsz,nsmpl]
         """
         if qtz_args["find_embed_id"]:
@@ -231,17 +231,24 @@ class Quantization(nn.Module):
         # regu = torch.pow(torch.sum(weights**2, dim=-1, keepdim=True), 0.5)
         # weights = weights / (regu + 1e-10)
 
+        # print(weights.shape, codebook.shape)
+
         # codebook here is codebook spectra
         if self.kwargs["quantize_spectra"]:
             if codebook.ndim == 3:
                 codebook = codebook.permute(1,0,2) # [bsz,num_embeds,nsmpl]
             elif codebook.ndim == 4:
                 num_bins = codebook.shape[0]
-                weights = weights[None,...].tile(num_bins,1,1,1) # [...,bsz,1,num_embds]
+                if weights.ndim == 3:
+                    weights = weights[None,...].tile(num_bins,1,1,1) # [...,bsz,1,num_embds]
+                else:
+                    assert weights.ndim == 4 # [bsz,1,num_bins,num_embeds]
+                    weights = weights.permute(2,0,1,3)
                 codebook = codebook.permute(0,2,1,3) # [...,bsz,num_embds,nsmpl]
             else: raise ValueError()
 
         # [...,bsz,1,nsmpl]
+        # print(weights.shape, codebook.shape)
         z_q = torch.matmul(weights, codebook)
 
         if qtz_args["find_embed_id"]:

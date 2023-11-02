@@ -302,6 +302,8 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--zero-init-codebook-latents", action="store_true")
     pretrain_group.add_argument("--optimize-codebook-latents-as-logits", action="store_true",
                                 help="optimize latents directly as logits without autodecoder.")
+    pretrain_group.add_argument("--optimize-codebook-logits-for-each-redshift-bin",
+                                action="store_true")
     pretrain_group.add_argument("--optimize-codebook-latents", action="store_true")
     pretrain_group.add_argument("--load-pretrained-codebook-latents", action="store_true")
     pretrain_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")

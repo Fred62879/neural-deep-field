@@ -215,7 +215,6 @@ class HyperSpectralDecoderB(nn.Module):
                spectra: reconstructed emitted spectra [bsz,num_nsmpl]
         """
         bsz = wave.shape[0]
-        # print(input.shape, wave.shape)
 
         if self.qtz_spectra:
             codes = codebook.weight[:,None,None].tile(1,bsz,1,1)
