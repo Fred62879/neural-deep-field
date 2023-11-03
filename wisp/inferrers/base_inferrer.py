@@ -38,18 +38,14 @@ class BaseInferrer(ABC):
         self.plot_residual_map = extra_args["plot_residual_map"]
         self.infer_last_model_only = extra_args["infer_last_model_only"]
         self.recon_spectra_pixels_only = extra_args["train_spectra_pixels_only"]
-        self.use_pretrained_latents_as_coords = extra_args["main_train_with_pretrained_latents"]
+        self.use_pretrained_latents_as_coords = \
+            extra_args["main_train_with_pretrained_latents"]
+        self.optimize_codebook_logits_for_each_redshift_bin = \
+            self.extra_args["optimize_codebook_logits_for_each_redshift_bin"]
+
         self.index_latent = True
         self.split_latent = self.mode == "redshift_pretrain_infer" and \
             self.extra_args["split_latent"]
-
-        self.classify_redshift = get_bool_classify_redshift(**extra_args)
-
-        self.calculate_binwise_spectra_loss = self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
-        if self.calculate_binwise_spectra_loss:
-            assert self.extra_args["spectra_batch_reduction_order"] == "qtz_first"
-
-        self.optimize_codebook_logits_for_each_redshift_bin = self.extra_args["optimize_codebook_logits_for_each_redshift_bin"]
 
         self.timer = PerfTimer(activate=extra_args["perf"])
         self.timer.reset()

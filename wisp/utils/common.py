@@ -24,8 +24,9 @@ def get_bool_encode_coords(**kwargs):
           kwargs["main_train_with_pretrained_latents"] )
 
 def get_bool_classify_redshift(**kwargs):
-    return kwargs["model_redshift"] and not kwargs["apply_gt_redshift"] \
-        and kwargs["redshift_model_method"] == "classification"
+    return kwargs["space_dim"] == 3 and \
+        kwargs["model_redshift"] and not kwargs["apply_gt_redshift"] and \
+        kwargs["redshift_model_method"] == "classification"
 
 def get_bin_id(lo, bin_width, val):
     val = val - bin_width / 2
@@ -89,7 +90,7 @@ def log_data(obj, field, fname=None, gt_field=None, mask=None,
     if mask is not None:
         recon = recon[mask]
 
-    if fname is not None:
+    if fname is not None and len(recon) > 0:
         if gt_field is not None:
             to_save = np.concatenate((gt[None,:], recon[None,:]), axis=0)
         else: to_save = recon
@@ -383,6 +384,7 @@ def forward(
         save_redshift=False,
         save_embed_ids=False,
         save_qtz_weights=False,
+        save_optm_bin_ids=False,
         save_codebook_loss=False,
         save_gt_bin_spectra=False,
         save_codebook_logits=False,
@@ -412,6 +414,7 @@ def forward(
         if save_redshift: requested_channels.append("redshift")
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if save_qtz_weights: requested_channels.append("qtz_weights")
+        if save_optm_bin_ids: requested_channels.append("optm_bin_ids")
         if save_codebook_loss: requested_channels.append("codebook_loss")
         if save_gt_bin_spectra: requested_channels.append("gt_bin_spectra")
         if save_codebook_logits: requested_channels.append("codebook_logits")
