@@ -162,7 +162,11 @@ class HyperSpectralDecoderB(nn.Module):
             ids = torch.tensor(
                 create_batch_ids(ids.detach().cpu().numpy()), dtype=ids.dtype
             ).to(ids.device)
-            ret["gt_bin_spectra"] = spectra[gt_redshift_bin_ids[1], gt_redshift_bin_ids[0]]
+
+            if gt_redshift_bin_ids is not None:
+                ret["gt_bin_spectra"] = spectra[
+                    gt_redshift_bin_ids[1], gt_redshift_bin_ids[0]]
+
             spectra = spectra[ids[1], ids[0]]
         else:
             spectra = torch.matmul(

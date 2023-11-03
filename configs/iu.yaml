@@ -13,7 +13,7 @@ global:
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
     tasks: ['codebook_pretrain_infer','plot_codebook_logits','recon_gt_spectra','save_redshift'] #'recon_codebook_spectra','save_redshift'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
     tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'save_pixel_values','recon_codebook_spectra_individ']
-    tasks: ['redshift_pretrain_infer','save_redshift','plot_redshift_logits','plot_binwise_spectra_loss','plot_codebook_logits','recon_gt_spectra'] #,'recon_codebook_spectra''save_codebook_latents','save_qtz_weights','recon_gt_spectra_all_bins']
+    tasks: ['redshift_pretrain_infer','save_redshift','plot_redshift_logits','plot_binwise_spectra_loss','plot_codebook_logits','recon_outlier_spectra_only'] #,'recon_gt_spectra','recon_codebook_spectra''save_codebook_latents','save_qtz_weights','recon_gt_spectra_all_bins']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -148,8 +148,8 @@ pretrain:
     regularize_across_codebook_spectra: False
     codebook_spectra_regu_beta: 1
 
-    pretrain_log_dir: '20231102-123433_4_50'
-    pretrained_model_name: 'model-ep5000-it0.pth'
+    pretrain_log_dir: '20231102-170810_8_50_20k_epochs_resumed'
+    pretrained_model_name: 'model-ep10000-it0.pth'
 
     split_latent: True
     use_latents_as_coords: True
@@ -234,16 +234,16 @@ trainer:
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
-    num_epochs: 3000
+    num_epochs: 1000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 300
+    log_cli_every: 100
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 300
+    save_model_every: 200
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -285,12 +285,12 @@ trainer:
 
     resume_train: False
     resume_log_dir: ''
-    resume_model_fname: 'model-ep1000-it0.pth'
+    resume_model_fname: 'model-ep10000-it0.pth'
     #### ***********************************
 
 infer:
     inferrer_type: 'AstroInferrer'
-    infer_last_model_only: False
+    infer_last_model_only: True
 
     infer_batch_size: 500
     pretrain_infer_batch_size: 10
@@ -303,7 +303,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20231101-184049_beta_1_no_load'
+    infer_log_dir: '20231102-165321_sc_4_50'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
@@ -345,7 +345,7 @@ infer:
     plot_redshift_precision_recall_together: True
 
     num_spectrum_per_fig: 50
-    num_spectrum_per_row: 5
+    num_spectrum_per_row: 10
 
 dataset:
     dataset_num_workers: 0

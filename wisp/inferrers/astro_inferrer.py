@@ -244,8 +244,15 @@ class AstroInferrer(BaseInferrer):
 
         # ii) infer selected coords using partial model
         self.recon_gt_spectra = "recon_gt_spectra" in tasks and self.space_dim == 3
+        self.recon_outlier_spectra_only = "recon_outlier_spectra_only" in tasks and \
+            self.space_dim == 3 and self.classify_redshift and \
+            self.calculate_binwise_spectra_loss
         self.recon_gt_spectra_all_bins = "recon_gt_spectra_all_bins" in tasks and \
             self.space_dim == 3 and self.classify_redshift
+
+        assert not self.recon_outlier_spectra_only or self.save_redshift_pre, \
+            "We need to infer redshift to find outlier!"
+
         # save spectra pixel values, doing same job as
         #   `recon_img_sup_spectra` during pretran infer &
         #   `recon_img_val_spectra` during main train infer
@@ -781,7 +788,7 @@ class AstroInferrer(BaseInferrer):
             self.spectra_wave = []
             self.spectra_masks = []
 
-            if self.recon_gt_spectra:
+            if self.recon_gt_spectra or self.recon_outlier_spectra_only:
                 self.recon_fluxes = []
                 if self.plot_gt_bin_spectra:
                     self.gt_bin_fluxes = []
@@ -837,7 +844,7 @@ class AstroInferrer(BaseInferrer):
             self.recon_wave = self.gt_wave
             self.recon_masks = self.gt_masks
 
-            if self.recon_gt_spectra:
+            if self.recon_gt_spectra or self.recon_outlier_spectra_only:
                 self.recon_fluxes = torch.stack(self.recon_fluxes).view(
                     self.dataset_length, 1, -1).detach().cpu().numpy()
                 if self.plot_gt_bin_spectra:
@@ -887,15 +894,15 @@ class AstroInferrer(BaseInferrer):
         if self.save_codebook_latents:
             self._save_codebook_latents(model_id)
 
-        if self.plot_redshift_logits:
-            self._plot_redshift_logits(model_id)
+        #if self.plot_redshift_logits:
+        #    self._plot_redshift_logits(model_id)
 
-        if self.plot_binwise_spectra_loss:
-            self._plot_binwise_spectra_loss(model_id)
+        #if self.plot_binwise_spectra_loss:
+        #    self._plot_binwise_spectra_loss(model_id)
 
         if self.save_redshift_pre:
             if self.classify_redshift:
-                self._log_redshift_residual_outlier(model_id)
+                outlier_ids = self._log_redshift_residual_outlier(model_id)
                 fname = join(self.redshift_dir, f"model-{model_id}_max_redshift.txt")
                 log_data(self, "argmax_redshift", gt_field="gt_redshift",
                          fname=fname, log_to_console=False)
@@ -903,6 +910,17 @@ class AstroInferrer(BaseInferrer):
                 log_data(self, "weighted_redshift", fname=fname, log_to_console=False)
             else:
                 log_data(self, "redshift", gt_field="gt_redshift", log_to_console=False)
+
+        if self.recon_outlier_spectra_only:
+            # rely on outlier id obtained in redshift inferrence
+            print(outlier_ids)
+            self.gt_wave = self.gt_wave[outlier_ids]
+            self.gt_masks = self.gt_masks[outlier_ids]
+            self.gt_fluxes = self.gt_fluxes[outlier_ids]
+            self.recon_wave = self.recon_wave[outlier_ids]
+            self.recon_masks = self.recon_masks[outlier_ids]
+            self.recon_fluxes = self.recon_fluxes[outlier_ids]
+            self._recon_gt_spectra(len(outlier_ids), model_id, suffix="-outlier")
 
         if self.save_redshift_main:
             if self.classify_redshift:
@@ -1154,7 +1172,8 @@ class AstroInferrer(BaseInferrer):
                         apply_gt_redshift=self.apply_gt_redshift,
                         calculate_binwise_spectra_loss=self.calculate_binwise_spectra_loss,
                         save_redshift=self.save_redshift,
-                        save_spectra=self.recon_gt_spectra,
+                        save_spectra=self.recon_gt_spectra or \
+                                     self.recon_outlier_spectra_only,
                         save_qtz_weights=self.save_qtz_weights,
                         save_gt_bin_spectra=self.plot_gt_bin_spectra,
                         save_codebook_logits=self.plot_codebook_logits,
@@ -1169,7 +1188,7 @@ class AstroInferrer(BaseInferrer):
                     self.spectra_wave.extend(data["spectra_source_data"][:,0])
                     self.spectra_masks.extend(data["spectra_masks"])
 
-                if self.recon_gt_spectra:
+                if self.recon_gt_spectra or self.recon_outlier_spectra_only:
                     fluxes = ret["intensity"]
                     if fluxes.ndim == 3: # bandwise
                         fluxes = fluxes.flatten(1,2) # [bsz,nsmpl]
@@ -1367,6 +1386,7 @@ class AstroInferrer(BaseInferrer):
         log.info(f"argmax_redshift: {outlier_est}")
         fname = join(self.redshift_dir, f"model-{model_id}_redshift_outlier.txt")
         with open(fname, "w") as f: f.write(f"{to_save}")
+        return outlier
 
     def _plot_redshift_map(self, model_id):
         if self.extra_args["mark_spectra"]:
@@ -1392,23 +1412,27 @@ class AstroInferrer(BaseInferrer):
         # plot redshift img
         _, _ = self.dataset.restore_evaluate_tiles(self.redshift, **re_args)
 
-    def _recon_gt_spectra(self, num_spectra, model_id):
+    def _recon_gt_spectra(self, num_spectra, model_id, suffix=""):
         # plot spectrum in multiple figures, each figure contains several spectrum
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
         n_figs = int(np.ceil(num_spectra / n_spectrum_per_fig))
 
         cur_checkpoint_metrics = []
         for i in range(n_figs):
-            fname = f"model-{model_id}-plot{i}"
+            fname = f"model-{model_id}-plot{i}{suffix}"
             lo = i * n_spectrum_per_fig
             hi = min(lo + n_spectrum_per_fig, num_spectra)
+
+            if self.plot_gt_bin_spectra:
+                recon_fluxes2 = self.gt_bin_fluxes[lo:hi]
+            else: recon_fluxes2 = None
 
             cur_metrics = self.dataset.plot_spectrum(
                 self.spectra_dir, fname,
                 self.extra_args["flux_norm_cho"],
                 self.gt_wave[lo:hi], self.gt_fluxes[lo:hi],
                 self.recon_wave[lo:hi], self.recon_fluxes[lo:hi],
-                recon_fluxes2=self.gt_bin_fluxes[lo:hi],
+                recon_fluxes2=recon_fluxes2,
                 clip=self.extra_args["plot_clipped_spectrum"],
                 gt_masks=self.gt_masks[lo:hi],
                 recon_masks=self.recon_masks[lo:hi]
