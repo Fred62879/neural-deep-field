@@ -495,7 +495,7 @@ class SpectraData:
             # np.random.shuffle(indices)
             self.redshift_pretrain_ids = indices[:self.kwargs["redshift_pretrain_num_spectra"]]
             validation_ids = supervision_ids[self.redshift_pretrain_ids]
-            print(self.redshift_pretrain_ids)
+            # print(self.redshift_pretrain_ids)
 
         # log.info(f"test spectra ids: {test_ids}")
         # log.info(f"validation spectra ids: {validation_ids}")

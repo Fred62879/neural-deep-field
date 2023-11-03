@@ -9,8 +9,8 @@ import torch.nn.functional as F
 
 from tqdm import tqdm
 from pathlib import Path
-from functools import partial
 from os.path import exists, join
+from functools import partial, lru_cache
 
 from wisp.inferrers import BaseInferrer
 from wisp.loss import spectra_supervision_loss
@@ -250,6 +250,7 @@ class AstroInferrer(BaseInferrer):
         self.recon_gt_spectra_all_bins = "recon_gt_spectra_all_bins" in tasks and \
             self.space_dim == 3 and self.classify_redshift
 
+        assert self.recon_gt_spectra + self.recon_outlier_spectra_only <= 1
         assert not self.recon_outlier_spectra_only or self.save_redshift_pre, \
             "We need to infer redshift to find outlier!"
 
@@ -341,8 +342,8 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.append("spectra_redshift")
 
             if self.infer_selected:
-                self.dataset_length = min(
-                    self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
+                n = len(self._select_inferrence_ids())
+                self.dataset_length = min(n, self.num_spectra)
                 self.requested_fields.append("selected_ids")
             else: self.dataset_length = self.num_spectra
 
@@ -422,8 +423,8 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.append("gt_redshift_bin_ids")
 
             if self.infer_selected:
-                self.dataset_length = min(
-                    self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
+                n = len(self._select_inferrence_ids())
+                self.dataset_length = min(n, self.num_spectra)
                 self.requested_fields.append("selected_ids")
             else: self.dataset_length = self.num_spectra
 
@@ -517,9 +518,9 @@ class AstroInferrer(BaseInferrer):
                     "idx","spectra_source_data","spectra_masks","spectra_redshift"])
 
                 if self.infer_selected:
+                    n = len(self._select_inferrence_ids())
+                    self.dataset_length = min(n, self.num_spectra)
                     self.requested_fields.append("selected_ids")
-                    self.dataset_length = min(
-                        self.extra_args["pretrain_num_infer_upper_bound"], self.num_spectra)
                 else:
                     input("plot codebook spectra for all spectra, press Enter to confirm...")
                     self.dataset_length = self.num_spectra
@@ -894,11 +895,11 @@ class AstroInferrer(BaseInferrer):
         if self.save_codebook_latents:
             self._save_codebook_latents(model_id)
 
-        #if self.plot_redshift_logits:
-        #    self._plot_redshift_logits(model_id)
+        if self.plot_redshift_logits:
+            self._plot_redshift_logits(model_id)
 
-        #if self.plot_binwise_spectra_loss:
-        #    self._plot_binwise_spectra_loss(model_id)
+        if self.plot_binwise_spectra_loss:
+            self._plot_binwise_spectra_loss(model_id)
 
         if self.save_redshift_pre:
             if self.classify_redshift:
@@ -1328,10 +1329,18 @@ class AstroInferrer(BaseInferrer):
 
         # select the same random set of spectra to recon
         if self.codebook_pretrain_infer and self.infer_selected:
-            ids = select_inferrence_ids(
-                self.num_spectra,
-                self.extra_args["pretrain_num_infer_upper_bound"])
+            ids = self._select_inferrence_ids()
             self.dataset.set_hardcode_data("selected_ids", ids)
+
+    @lru_cache
+    def _select_inferrence_ids(self):
+        if exists(self.extra_args["spectra_inferrence_id_fname"]):
+            ids = np.load(self.extra_args["spectra_inferrence_id_fname"])
+            self.num_spectra = len(ids)
+        else:
+            ids = select_inferrence_ids(
+                self.num_spectra, self.extra_args["pretrain_num_infer_upper_bound"])
+        return ids
 
     def _get_spectra_loss_func(self, data):
         if self.extra_args["spectra_loss_cho"] == "emd":
@@ -1386,6 +1395,9 @@ class AstroInferrer(BaseInferrer):
         log.info(f"argmax_redshift: {outlier_est}")
         fname = join(self.redshift_dir, f"model-{model_id}_redshift_outlier.txt")
         with open(fname, "w") as f: f.write(f"{to_save}")
+
+        fname = join(self.redshift_dir, f"model-{model_id}_redshift_outlier_ids")
+        np.save(fname, outlier)
         return outlier
 
     def _plot_redshift_map(self, model_id):
@@ -1527,14 +1539,8 @@ class AstroInferrer(BaseInferrer):
             gt_bin_ids = get_bin_ids(
                 self.extra_args["redshift_lo"],
                 self.extra_args["redshift_bin_width"],
-                gt_redshift, add_batched_dim=True)
-            # gt_bin_ids = np.array([
-            #     get_bin_id(self.extra_args["redshift_lo"],
-            #                self.extra_args["redshift_bin_width"], val
-            #     ) for val in gt_redshift
-            # ])[None,:]
-            # indices = np.arange(n)[None,:]
-            # gt_bin_ids = np.concatenate((indices, gt_bin_ids), axis=0)
+                gt_redshift, add_batched_dim=True
+            )
             codebook_logits = codebook_logits[gt_bin_ids[0], gt_bin_ids[1]]
 
         plot_multiple(

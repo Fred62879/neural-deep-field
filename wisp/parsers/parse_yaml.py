@@ -720,6 +720,7 @@ def define_cmd_line_args():
                              help="max #spectra to infer for pretrain.")
     infer_group.add_argument("--test-num-infer-upper-bound", type=int, default=60,
                              help="max #spectra to infer for test.")
+    infer_group.add_argument("--spectra-inferrence-id-fname", type=str)
 
     # these several args, if specified, directs reconstructing smaller cutouts than train image
     # Note, if recon_img is included as inferrence tasks, we always reconstruct the full train image
