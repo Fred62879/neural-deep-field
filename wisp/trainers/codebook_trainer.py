@@ -28,7 +28,8 @@ from wisp.loss import spectra_supervision_loss, \
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     select_inferrence_ids, load_embed, load_model_weights, forward, \
     load_pretrained_model_weights, get_pretrained_model_fname, init_redshift_bins, \
-    get_bool_classify_redshift, freeze_layers, get_loss, create_latent_mask, set_seed, log_data
+    get_bool_classify_redshift, get_bool_has_redshift_latents, \
+    freeze_layers, get_loss, create_latent_mask, set_seed, log_data
 
 
 class CodebookTrainer(BaseTrainer):
@@ -68,6 +69,13 @@ class CodebookTrainer(BaseTrainer):
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
 
+        self.save_redshift = "save_redshift" in tasks
+        self.save_qtz_weights = "save_qtz_weights" in tasks
+        self.recon_gt_spectra = "recon_gt_spectra" in tasks
+        self.save_pixel_values = "save_pixel_values" in tasks
+        self.plot_codebook_logits = "plot_codebook_logits" in tasks
+        self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ" in tasks
+
         if "codebook_pretrain" in tasks:
             self.mode = "codebook_pretrain"
         elif "redshift_pretrain" in tasks:
@@ -90,13 +98,36 @@ class CodebookTrainer(BaseTrainer):
         self.qtz_n_embd = self.extra_args["qtz_num_embed"]
         self.qtz_strategy = self.extra_args["quantization_strategy"]
 
-        self.pixel_supervision = self.extra_args["pretrain_pixel_supervision"]
-        self.trans_sample_method = self.extra_args["trans_sample_method"]
-
         # redshift setup
+        self.apply_gt_redshift = self.extra_args["model_redshift"] and \
+            self.extra_args["apply_gt_redshift"]
         self.classify_redshift = get_bool_classify_redshift(**self.extra_args)
-        self.apply_gt_redshift = self.extra_args["model_redshift"] and self.extra_args["apply_gt_redshift"]
-        if self.mode == "codebook_pretrain": assert self.apply_gt_redshift
+        self.neg_sup_wrong_redshift = \
+            self.extra_args["negative_supervise_wrong_redshift"]
+        self.calculate_binwise_spectra_loss = \
+            self.extra_args["calculate_binwise_spectra_loss"]
+        self.use_binwise_spectra_loss_as_redshift_logits =  \
+            self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
+        self.optimize_codebook_latents_for_each_redshift_bin = \
+            self.extra_args["optimize_codebook_latents_for_each_redshift_bin"]
+        self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
+
+        assert not self.mode == "codebook_pretrain" or (
+            self.apply_gt_redshift or self.neg_sup_wrong_redshift)
+        assert not self.neg_sup_wrong_redshift or (
+            self.mode == "codebook_pretrain" and self.classify_redshift and \
+            self.calculate_binwise_spectra_loss)
+        assert not self.calculate_binwise_spectra_loss or \
+            self.extra_args["spectra_batch_reduction_order"] == "qtz_first"
+        assert not self.use_binwise_spectra_loss_as_redshift_logits or \
+            (self.classify_redshift and self.calculate_binwise_spectra_loss)
+        assert not self.optimize_codebook_latents_for_each_redshift_bin or \
+            self.calculate_binwise_spectra_loss
+        assert not self.optimize_codebook_latents_for_each_redshift_bin or \
+            (self.classify_redshift and not self.use_binwise_spectra_loss_as_redshift_logits), \
+            "For the brute force method, we keep spectra under all bins without averaging. \
+            During inferrence however, we can calculate logits for visualization purposes."
+
         if self.classify_redshift:
             redshift_bins = init_redshift_bins(
                 self.extra_args["redshift_lo"],
@@ -104,20 +135,13 @@ class CodebookTrainer(BaseTrainer):
                 self.extra_args["redshift_bin_width"]
             )
             self.num_redshift_bins = len(redshift_bins)
-        if self.apply_gt_redshift:
-            assert not self.extra_args["use_binwise_spectra_loss_as_redshift_logits"] and \
-                not self.extra_args["optimize_codebook_latents_for_each_redshift_bin"]
 
-        self.sample_wave = not self.extra_args["pretrain_use_all_wave"] # True
+        # wave sampling setup
+        self.sample_wave = not self.extra_args["pretrain_use_all_wave"]
+        self.pixel_supervision = self.extra_args["pretrain_pixel_supervision"]
         self.train_within_wave_range = not self.pixel_supervision and \
             self.extra_args["learn_spectra_within_wave_range"]
-
-        self.save_redshift = "save_redshift" in tasks
-        self.save_qtz_weights = "save_qtz_weights" in tasks
-        self.recon_gt_spectra = "recon_gt_spectra" in tasks
-        self.save_pixel_values = "save_pixel_values" in tasks
-        self.plot_codebook_logits = "plot_codebook_logits" in tasks
-        self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ" in tasks
+        self.trans_sample_method = self.extra_args["trans_sample_method"]
 
         # all others
         self.plot_loss = self.extra_args["plot_loss"]
@@ -169,16 +193,6 @@ class CodebookTrainer(BaseTrainer):
             (self.optimize_codebook_latents_as_logits and \
              self.optimize_redshift_latents_as_logits), \
              "Doesn't support optimizing alternately when using autodecoder arch!"
-
-        self.calculate_binwise_spectra_loss = \
-            self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
-        assert not self.calculate_binwise_spectra_loss or \
-            self.extra_args["spectra_batch_reduction_order"] == "qtz_first"
-
-        self.optimize_codebook_latents_for_each_redshift_bin = \
-            self.extra_args["optimize_codebook_latents_for_each_redshift_bin"]
-        assert not self.optimize_codebook_latents_for_each_redshift_bin or \
-            self.calculate_binwise_spectra_loss
 
     def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
@@ -330,6 +344,8 @@ class CodebookTrainer(BaseTrainer):
         # todo, codebook pretrain "coords" not handled
         if self.pixel_supervision:
             fields.append("spectra_pixels")
+        if self.neg_sup_wrong_redshift:
+            fields.append("gt_redshift_bin_ids")
 
         # use original spectra wave
         self.dataset.set_wave_source("spectra")
@@ -572,8 +588,9 @@ class CodebookTrainer(BaseTrainer):
         super().init_log_dict()
         self.log_dict["pixel_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
-        self.log_dict["codebook_latents_regu"] = 0.0
+        self.log_dict["wrong_bin_losses"] = 0.0
         self.log_dict["redshift_logits_regu"] = 0.0
+        self.log_dict["codebook_latents_regu"] = 0.0
         self.log_dict["codebook_spectra_regu"] = 0.0
 
     def pre_step(self):
@@ -665,7 +682,7 @@ class CodebookTrainer(BaseTrainer):
             redshift_latents = None
         elif self.mode == "redshift_pretrain":
             codebook_latents = self.init_redshift_pretrain_codebook_latents()
-            if self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]:
+            if not self.has_redshift_latents:
                 redshift_latents = None
             else: redshift_latents = self.init_redshift_pretrain_redshift_latents()
         else:
@@ -1151,7 +1168,19 @@ class CodebookTrainer(BaseTrainer):
 
         # i) spectra supervision loss
         if self.optimize_codebook_latents_for_each_redshift_bin:
-            spectra_loss = torch.mean(ret["spectra_binwise_loss"])
+            if self.neg_sup_wrong_redshift:
+                all_bin_losses = ret["spectra_binwise_loss"] # [bsz,n_bins]
+                ids = data["gt_redshift_bin_ids"]
+                bsz = len(all_bin_losses)
+                gt_bin_losses = torch.sum(all_bin_losses[ids[0],ids[1]]) # [bsz]->[1]
+                wrong_bin_losses = torch.sum(all_bin_losses) - gt_bin_losses
+                gt_bin_losses /= bsz
+                wrong_bin_losses /= (bsz*self.num_redshift_bins)
+                wrong_bin_losses *= self.extra_args["neg_sup_beta"]
+                spectra_loss = gt_bin_losses - wrong_bin_losses
+                self.log_dict["wrong_bin_losses"] += wrong_bin_losses.item()
+            else:
+                spectra_loss = torch.mean(ret["spectra_binwise_loss"])
         else:
             spectra_loss = 0
             recon_fluxes = ret["intensity"]
@@ -1166,7 +1195,8 @@ class CodebookTrainer(BaseTrainer):
                 if self.extra_args["plot_individ_spectra_loss"]:
                     self.cur_spectra_individ_losses.extend(spectra_loss.detach().cpu().numpy())
                 spectra_loss = torch.mean(spectra_loss, dim=-1)
-                self.log_dict["spectra_loss"] += spectra_loss.item()
+
+        self.log_dict["spectra_loss"] += spectra_loss.item()
 
         # ii) pixel supervision loss
         recon_loss = 0
@@ -1252,7 +1282,9 @@ class CodebookTrainer(BaseTrainer):
         log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
         if self.pixel_supervision:
             log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / n)
-
+        if self.neg_sup_wrong_redshift:
+            log_text += " | wrong bin loss: {:>.3E}".format(
+                self.log_dict["wrong_bin_losses"] / n)
         if self.regularize_redshift_logits:
             log_text += " | redshift logits regu: {:>.3E}".format(
                 self.log_dict["redshift_logits_regu"] / n)
@@ -1321,10 +1353,7 @@ class CodebookTrainer(BaseTrainer):
         net_params_group = []
 
         # redshift latents & parameters
-        if not self.apply_gt_redshift and not \
-           self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]:
-
-            assert self.split_latent
+        if self.has_redshift_latents:
             if self.optimize_latents_alternately:
                 self._add_redshift_latents(
                     redshift_latents, redshift_logit_params,

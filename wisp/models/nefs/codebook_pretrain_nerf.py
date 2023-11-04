@@ -5,7 +5,8 @@ import torch.nn as nn
 from collections import defaultdict
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import get_bool_classify_redshift
+from wisp.utils.common import get_bool_classify_redshift, \
+    get_bool_has_redshift_latents
 
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.embedders.encoder import Encoder
@@ -15,17 +16,18 @@ from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
 class CodebookPretrainNerf(BaseNeuralField):
-    def __init__(self, decode_redshift=False,
-                 codebook_pretrain_pixel_supervision=False,
-                 **kwargs
-    ):
+    def __init__(self, codebook_pretrain_pixel_supervision=False, **kwargs):
         self.kwargs = kwargs
 
         super(CodebookPretrainNerf, self).__init__()
 
-        self.decode_redshift = decode_redshift
-        self.pixel_supervision = codebook_pretrain_pixel_supervision
+        assert kwargs["model_redshift"], "we must model redshift during pretrain"
+
+        self.split_latents = kwargs["split_latent"]
         self.use_latents_as_coords = kwargs["use_latents_as_coords"]
+        self.pixel_supervision = codebook_pretrain_pixel_supervision
+        self.has_redshift_latents = get_bool_has_redshift_latents(**kwargs)
+
         self.init_model()
 
     def get_nef_type(self):
@@ -54,7 +56,7 @@ class CodebookPretrainNerf(BaseNeuralField):
             channels.append("redshift")
             if get_bool_classify_redshift(**self.kwargs):
                 channels.append("redshift_logits")
-                if self.kwargs["use_binwise_spectra_loss_as_redshift_logits"]:
+                if self.kwargs["calculate_binwise_spectra_loss"]:
                     channels.extend(["spectra_binwise_loss","spectra_all_bins","optm_bin_ids"])
                     if self.kwargs["plot_spectrum_under_gt_bin"]:
                         channels.append("gt_bin_spectra")
@@ -62,10 +64,6 @@ class CodebookPretrainNerf(BaseNeuralField):
         self._register_forward_function(self.pretrain, channels)
 
     def init_model(self):
-        assert self.kwargs["model_redshift"] and \
-            (self.kwargs["apply_gt_redshift"] or self.decode_redshift or \
-             self.kwargs["use_binwise_spectra_loss_as_redshift_logits"])
-
         if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
             self.codebook = init_codebook(
                 self.kwargs["qtz_seed"],
@@ -76,7 +74,6 @@ class CodebookPretrainNerf(BaseNeuralField):
         self.spatial_decoder = SpatialDecoder(
             output_bias=False,
             output_scaler=False,
-            decode_redshift=self.decode_redshift,
             qtz_calculate_loss=False,
             **self.kwargs)
 
@@ -151,8 +148,7 @@ class CodebookPretrainNerf(BaseNeuralField):
 
         coords = coords[:,None]
 
-        if not self.kwargs["apply_gt_redshift"] and self.kwargs["split_latent"] and \
-           not self.kwargs["use_binwise_spectra_loss_as_redshift_logits"]:
+        if self.has_redshift_latents:
             redshift_latents = self.redshift_latents
             redshift_latents = self.index_latents(redshift_latents, selected_ids, idx)
         else: redshift_latents = None

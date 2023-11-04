@@ -309,6 +309,7 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
     pretrain_group.add_argument("--load-pretrained-codebook-logits-mlp", action="store_true")
 
+    pretrain_group.add_argument("--calculate-binwise-spectra-loss", action="store_true")
     pretrain_group.add_argument("--use-binwise-spectra-loss-as-redshift-logits",
                                 action="store_true", help="calculate redshift logits based \
                                 on recon loss for spectra corresponding to each redshift bin.")
@@ -628,6 +629,10 @@ def define_cmd_line_args():
                              help="generate redshift w/o supervision.")
     train_group.add_argument("--redshift-semi-supervision", action="store_true",
                              help="generate redshift w. semi supervision.")
+    train_group.add_argument("--negative-supervise-wrong-redshift", action="store_true",
+                             help="discourage wrong redshift from generating high \
+                             quality spectra during codebook pretrain.")
+    train_group.add_argument("--neg-sup-beta", type=float)
     train_group.add_argument("--correct-gt-redshift-based-on-redshift-bin", action="store_true")
 
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")

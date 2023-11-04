@@ -12,8 +12,8 @@ global:
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
     #tasks: ['codebook_pretrain_infer','plot_codebook_logits','recon_gt_spectra'] #,'save_redshift'] #'recon_codebook_spectra'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
-    tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'save_pixel_values','recon_codebook_spectra_individ']
-    tasks: ['redshift_pretrain_infer','save_redshift','plot_redshift_logits','plot_binwise_spectra_loss','plot_codebook_coeff','save_optm_bin_ids','recon_gt_spectra'] #,'recon_codebook_spectra''save_codebook_latents','save_qtz_weights','recon_gt_spectra_all_bins']
+    #tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'save_pixel_values','recon_codebook_spectra_individ']
+    #tasks: ['redshift_pretrain_infer','save_redshift','plot_redshift_logits','plot_binwise_spectra_loss','plot_codebook_coeff','save_optm_bin_ids','recon_gt_spectra'] #,'recon_codebook_spectra''save_codebook_latents','save_qtz_weights','recon_gt_spectra_all_bins']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -101,7 +101,7 @@ pretrain:
     pretrain_codebook: True
     sample_from_codebook_pretrain_spectra: True
 
-    pretrain_batch_size: 40
+    pretrain_batch_size: 35
     pretrain_pixel_beta: 1
     pretrain_redshift_beta: 0.1
 
@@ -123,7 +123,8 @@ pretrain:
     optimize_codebook_logits_mlp: False
     load_pretrained_codebook_logits_mlp: False
 
-    use_binwise_spectra_loss_as_redshift_logits: True
+    calculate_binwise_spectra_loss: True
+    use_binwise_spectra_loss_as_redshift_logits: False
     binwise_loss_beta: 50
 
     zero_init_redshift_latents: True
@@ -233,16 +234,16 @@ trainer:
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
-    num_epochs: 1000
+    num_epochs: 500
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 100
+    log_cli_every: 50
     log_gpu_every: -1
-    plot_grad_every: -1
+    plot_grad_every: 1
     save_data_every: -1
-    save_model_every: 200
+    save_model_every: 100
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -274,6 +275,9 @@ trainer:
     redshift_unsupervision: False    #  |- these three conflict each other
     redshift_semi_supervision: False # -
 
+    negative_supervise_wrong_redshift: True
+    neg_sup_beta: 1e-3
+
     correct_gt_redshift_based_on_redshift_bin: True
 
     train_use_all_wave: False
@@ -282,8 +286,8 @@ trainer:
     train_num_wave_samples: 50
     spectra_supervision_num_wave_samples: 100
 
-    resume_train: True
-    resume_log_dir: '20231103-170704_sc_16_1000_mlp_coeff'
+    resume_train: False
+    resume_log_dir: ''
     resume_model_fname: 'model-ep1000-it0.pth'
     #### ***********************************
 
@@ -319,12 +323,12 @@ infer:
     recon_cutout_start_pos: [ [[256,256]], [[86,188]] ]
 
     # recon spectra
-    infer_selected: False
-    pretrain_num_infer_upper_bound: 20
+    infer_selected: True
+    pretrain_num_infer_upper_bound: 100
     test_num_infer_upper_bound: 10
     # spectra_inferrence_id_fname: '/scratch/projects/vision/data/pdr3/output/sanity-check-scale/20231103-170704_sc_16_1000_mlp_coeff/redshift/model-0_redshift_outlier_ids.npy'
 
-    infer_outlier_only: True
+    infer_outlier_only: False
 
     spectra_neighbour_size: 1
 
@@ -436,7 +440,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000  # #spectra to load
-    num_supervision_spectra_upper_bound: 1000
+    num_supervision_spectra_upper_bound: 100
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 

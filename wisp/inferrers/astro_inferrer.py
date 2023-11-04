@@ -23,7 +23,7 @@ from wisp.utils.plot import plot_horizontally, plot_embed_map, \
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
     sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, to_numpy, \
     load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, \
-    get_loss, get_bin_ids, log_data
+    get_loss, get_bin_ids, log_data, get_bool_has_redshift_latents
 
 
 class AstroInferrer(BaseInferrer):
@@ -199,13 +199,33 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["redshift_unsupervision"]
         self.redshift_semi_supervision = self.model_redshift and \
             self.extra_args["redshift_semi_supervision"]
-        self.classify_redshift = get_bool_classify_redshift(**self.extra_args)
-        self.calculate_binwise_spectra_loss = self.classify_redshift and \
-            self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
 
-        assert not self.codebook_pretrain_infer or self.apply_gt_redshift
+        self.classify_redshift = get_bool_classify_redshift(**self.extra_args)
+        self.neg_sup_wrong_redshift = \
+            self.extra_args["negative_supervise_wrong_redshift"]
+        self.calculate_binwise_spectra_loss = \
+            self.extra_args["calculate_binwise_spectra_loss"]
+        self.use_binwise_spectra_loss_as_redshift_logits = \
+            self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
+        self.optimize_codebook_latents_for_each_redshift_bin = \
+            self.extra_args["optimize_codebook_latents_for_each_redshift_bin"]
+        self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
+
+        assert not self.codebook_pretrain_infer or (
+            self.apply_gt_redshift or self.neg_sup_wrong_redshift)
+        assert not self.neg_sup_wrong_redshift or (
+            self.mode == "codebook_pretrain_infer" and self.classify_redshift and \
+            self.calculate_binwise_spectra_loss)
         assert not self.calculate_binwise_spectra_loss or \
             self.extra_args["spectra_batch_reduction_order"] == "qtz_first"
+        assert not self.use_binwise_spectra_loss_as_redshift_logits or \
+            (self.classify_redshift and self.calculate_binwise_spectra_loss)
+        assert not self.optimize_codebook_latents_for_each_redshift_bin or \
+            self.calculate_binwise_spectra_loss
+        assert not self.optimize_codebook_latents_for_each_redshift_bin or \
+            (self.classify_redshift and not self.use_binwise_spectra_loss_as_redshift_logits), \
+            "For the brute force method, we keep spectra under all bins without averaging. \
+            During inferrence however, we can calculate logits for visualization purposes."
 
         # i) infer all coords using original model
         self.recon_img_all_pixels = False
@@ -249,9 +269,9 @@ class AstroInferrer(BaseInferrer):
 
         # ii) infer selected coords using partial model
         self.infer_outlier_only = self.extra_args["infer_outlier_only"] and \
-            self.classify_redshift and self.calculate_binwise_spectra_loss
+            self.calculate_binwise_spectra_loss
         assert (not self.infer_outlier_only or self.mode == "redshift_pretrain_infer"), \
-            "currently only support inferring outlier only in sanity check mode!"
+            "currently only support inferring outlier in sanity check mode!"
         assert not self.infer_outlier_only or self.save_redshift_pre, \
             "we need to infer redshift to find outlier!"
 
@@ -275,9 +295,9 @@ class AstroInferrer(BaseInferrer):
             self.plot_binwise_spectra_loss or self.plot_codebook_coeff
 
         self.plot_gt_bin_spectra = self.extra_args["plot_spectrum_under_gt_bin"] and \
-            self.classify_redshift and self.calculate_binwise_spectra_loss
+            self.calculate_binwise_spectra_loss
         self.save_optm_bin_ids = "save_optm_bin_ids" in tasks and \
-            self.classify_redshift and self.calculate_binwise_spectra_loss
+            self.calculate_binwise_spectra_loss
 
         # iii) infer all coords using modified model (recon codebook spectra)
         #   either we have the codebook spectra for all coords
@@ -839,8 +859,7 @@ class AstroInferrer(BaseInferrer):
         if self.pretrain_infer:
             self.spectra_infer_pipeline.set_latents(
                 checkpoint["model_state_dict"]["nef.latents"])
-            if not self.apply_gt_redshift and self.split_latent and \
-               not self.calculate_binwise_spectra_loss:
+            if self.has_redshift_latents:
                 self.spectra_infer_pipeline.set_redshift_latents(
                     checkpoint["model_state_dict"]["nef.redshift_latents"])
 

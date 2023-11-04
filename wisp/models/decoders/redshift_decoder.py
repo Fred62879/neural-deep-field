@@ -4,7 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import get_input_latent_dim, init_redshift_bins
+from wisp.utils.common import get_input_latent_dim, init_redshift_bins, \
+    get_bool_has_redshift_latents
 
 from wisp.models.layers import get_layer_class
 from wisp.models.decoders import BasicDecoder
@@ -19,14 +20,18 @@ class RedshiftDecoder(nn.Module):
         super(RedshiftDecoder, self).__init__()
 
         self.kwargs = kwargs
+
+        self.split_latent = kwargs["split_latent"]
+        self.apply_gt_redshift = kwargs["apply_gt_redshift"]
+        self.redshift_model_method = kwargs["redshift_model_method"]
+        self.has_redshift_latents = get_bool_has_redshift_latents(**kwargs)
+
         self.init_model()
 
     def init_model(self):
-        if self.kwargs["split_latent"]:
+        if self.split_latent:
             self.input_dim = self.kwargs["redshift_logit_latent_dim"]
         else: self.input_dim = get_input_latent_dim(**self.kwargs)
-
-        self.redshift_model_method = self.kwargs["redshift_model_method"]
 
         if self.redshift_model_method == "regression":
             output_dim = 1
@@ -70,30 +75,34 @@ class RedshiftDecoder(nn.Module):
                           show_memory=self.kwargs["show_memory"])
         timer.reset()
 
-        if not self.kwargs["use_binwise_spectra_loss_as_redshift_logits"]:
-            if self.kwargs["split_latent"]:
+        if self.has_redshift_latents:
+            if self.split_latent:
                 assert redshift_latents is not None
                 latents = redshift_latents # [bsz,dim]
                 assert latents.shape[-1] == self.kwargs["redshift_logit_latent_dim"]
             else: latents = z[:,0]
 
-        if self.redshift_model_method == "regression":
-            redshift = self.redshift_decoder(latents)[...,0]
-            ret["redshift"] = self.redshift_adjust(redshift + 0.5)
-
-        elif self.redshift_model_method == "classification":
-            ret["redshift"]= self.redshift_bin_center # [num_bins]
-
-            if self.kwargs["use_binwise_spectra_loss_as_redshift_logits"]:
-                pass
-            elif self.kwargs["optimize_redshift_latents_as_logits"]:
-                ret["redshift_logits"] = F.softmax(latents, dim=-1)
-            else:
-                logits = self.redshift_decoder(latents)
-                if init_redshift_prob is not None:
-                    logits = logits + init_redshift_prob
-                ret["redshift_logits"] = F.softmax(logits, dim=-1) # [bsz,num_bins]
+        if self.apply_gt_redshift:
+            assert specz is not None
+            ret["redshift"] = specz
         else:
-            raise ValueError("Unsupported redshift model method!")
+            if self.redshift_model_method == "regression":
+                redshift = self.redshift_decoder(latents)[...,0]
+                ret["redshift"] = self.redshift_adjust(redshift + 0.5)
+
+            elif self.redshift_model_method == "classification":
+                ret["redshift"]= self.redshift_bin_center # [num_bins]
+
+                if not self.has_redshift_latents:
+                    pass
+                elif self.kwargs["optimize_redshift_latents_as_logits"]:
+                    ret["redshift_logits"] = F.softmax(latents, dim=-1)
+                else:
+                    logits = self.redshift_decoder(latents)
+                    if init_redshift_prob is not None:
+                        logits = logits + init_redshift_prob
+                    ret["redshift_logits"] = F.softmax(logits, dim=-1) # [bsz,num_bins]
+            else:
+                raise ValueError("Unsupported redshift model method!")
 
         timer.check("spatial_decod::redshift done")

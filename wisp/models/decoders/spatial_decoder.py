@@ -16,16 +16,14 @@ class SpatialDecoder(nn.Module):
     """ Accept as input latent variables and quantize based on
           a codebook which is optimizaed simultaneously during training
     """
-    def __init__(self, output_bias, output_scaler, decode_redshift, qtz_calculate_loss, **kwargs):
+    def __init__(self, output_bias, output_scaler, qtz_calculate_loss, **kwargs):
         super(SpatialDecoder, self).__init__()
 
         self.kwargs = kwargs
 
         self.output_bias = output_bias
         self.output_scaler = output_scaler
-        self.decode_redshift = decode_redshift
         self.model_redshift = kwargs["model_redshift"]
-        self.apply_gt_redshift = kwargs["apply_gt_redshift"]
 
         # we either quantize latents or spectra or none
         self.quantize_z = kwargs["quantize_latent"]
@@ -54,7 +52,7 @@ class SpatialDecoder(nn.Module):
             self.scaler_decoder = ScalerDecoder(
                 self.output_bias, self.output_scaler, qtz=self.qtz, **self.kwargs)
 
-        if self.model_redshift and self.decode_redshift:
+        if self.model_redshift:
             self.redshift_decoder = RedshiftDecoder(**self.kwargs)
 
     def init_decoder(self):
@@ -106,12 +104,8 @@ class SpatialDecoder(nn.Module):
             self.scaler_decoder(latent, ret, scaler_latents)
 
         if self.model_redshift:
-            if self.decode_redshift:
-                self.redshift_decoder(
-                    z, ret, specz, redshift_latents, init_redshift_prob)
-            elif self.apply_gt_redshift:
-                assert specz is not None
-                ret["redshift"] = specz
+            self.redshift_decoder(
+                z, ret, specz, redshift_latents, init_redshift_prob)
 
         # decode/quantize
         if self.quantize_spectra:
