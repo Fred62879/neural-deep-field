@@ -106,7 +106,7 @@ class CodebookTrainer(BaseTrainer):
             self.num_redshift_bins = len(redshift_bins)
         if self.apply_gt_redshift:
             assert not self.extra_args["use_binwise_spectra_loss_as_redshift_logits"] and \
-                not self.extra_args["optimize_codebook_logits_for_each_redshift_bin"]
+                not self.extra_args["optimize_codebook_latents_for_each_redshift_bin"]
 
         self.sample_wave = not self.extra_args["pretrain_use_all_wave"] # True
         self.train_within_wave_range = not self.pixel_supervision and \
@@ -147,35 +147,38 @@ class CodebookTrainer(BaseTrainer):
         self.optimize_codebook_latents = self.extra_args["optimize_codebook_latents"]
         self.optimize_redshift_latents = self.mode == "redshift_pretrain" and \
             self.extra_args["optimize_redshift_latents"]
-        self.optimize_codebook_latents_as_logits = self.extra_args["optimize_codebook_latents_as_logits"]
+        self.optimize_codebook_latents_as_logits = \
+            self.extra_args["optimize_codebook_latents_as_logits"]
         self.optimize_redshift_latents_as_logits = self.mode == "redshift_pretrain" and \
             self.extra_args["optimize_redshift_latents_as_logits"]
-        if self.optimize_redshift_latents_as_logits:
-            # no pretrained latents to load
-            assert self.mode == "redshift_pretrain" and self.optimize_redshift_latents
+        # no pretrained latents to load
+        assert not self.optimize_redshift_latents_as_logits or \
+            self.mode == "redshift_pretrain" and self.optimize_redshift_latents
 
         self.alternation_steps = self.extra_args["alternation_steps"]
         self.alternation_starts_with = self.extra_args["alternation_starts_with"]
         self.use_lbfgs = self.extra_args["optimize_latents_use_lbfgs"]
-        self.optimize_latents_alternately = self.extra_args["pretrain_optimize_latents_alternately"]
-        if self.use_lbfgs:
-            assert (self.optimize_codebook_latents_as_logits and \
-                    self.optimize_redshift_latents_as_logits), \
-                    "Doesn't support optimizing alternately when using lbfgs!"
+        self.optimize_latents_alternately = \
+            self.extra_args["pretrain_optimize_latents_alternately"]
+        assert not self.use_lbfgs or \
+            (self.optimize_codebook_latents_as_logits and \
+             self.optimize_redshift_latents_as_logits), \
+             "Doesn't support optimizing alternately when using lbfgs!"
+        # em optimization for codebook & redshift latents
+        assert not self.optimize_latents_alternately or \
+            (self.optimize_codebook_latents_as_logits and \
+             self.optimize_redshift_latents_as_logits), \
+             "Doesn't support optimizing alternately when using autodecoder arch!"
 
-        if self.optimize_latents_alternately:
-            # em optimization for codebook & redshift latents
-            assert (self.optimize_codebook_latents_as_logits and \
-                    self.optimize_redshift_latents_as_logits), \
-                    "Doesn't support optimizing alternately when using autodecoder arch!"
+        self.calculate_binwise_spectra_loss = \
+            self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
+        assert not self.calculate_binwise_spectra_loss or \
+            self.extra_args["spectra_batch_reduction_order"] == "qtz_first"
 
-        self.calculate_binwise_spectra_loss = self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
-        if self.calculate_binwise_spectra_loss:
-            assert self.extra_args["spectra_batch_reduction_order"] == "qtz_first"
-
-        self.optimize_codebook_logits_for_each_redshift_bin = self.extra_args["optimize_codebook_logits_for_each_redshift_bin"]
-        if self.optimize_codebook_logits_for_each_redshift_bin:
-            assert self.calculate_binwise_spectra_loss
+        self.optimize_codebook_latents_for_each_redshift_bin = \
+            self.extra_args["optimize_codebook_latents_for_each_redshift_bin"]
+        assert not self.optimize_codebook_latents_for_each_redshift_bin or \
+            self.calculate_binwise_spectra_loss
 
     def set_path(self):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
@@ -739,7 +742,7 @@ class CodebookTrainer(BaseTrainer):
             sp_z_dim = self.extra_args["qtz_num_embed"]
         else: sp_z_dim = self.extra_args["codebook_latent_dim"]
 
-        if self.extra_args["optimize_codebook_logits_for_each_redshift_bin"]:
+        if self.optimize_codebook_latents_for_each_redshift_bin:
             sp = (self.num_spectra, self.num_redshift_bins, sp_z_dim)
         else: sp = (self.num_spectra, sp_z_dim)
 
@@ -752,7 +755,7 @@ class CodebookTrainer(BaseTrainer):
             # redshift pretrain use val spectra which is a permutation of sup spectra
             permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
             pretrained=checkpoint["model_state_dict"]["nef.latents"][permute_ids]
-            if self.extra_args["optimize_codebook_logits_for_each_redshift_bin"]:
+            if self.optimize_codebook_latents_for_each_redshift_bin:
                 pretrained = pretrained[:,None].tile(1, self.num_redshift_bins, 1)
                 assert pretrained.shape == sp
         else:
@@ -1147,7 +1150,7 @@ class CodebookTrainer(BaseTrainer):
         self.timer.check("forwarded")
 
         # i) spectra supervision loss
-        if self.optimize_codebook_logits_for_each_redshift_bin:
+        if self.optimize_codebook_latents_for_each_redshift_bin:
             spectra_loss = torch.mean(ret["spectra_binwise_loss"])
         else:
             spectra_loss = 0
@@ -1279,12 +1282,12 @@ class CodebookTrainer(BaseTrainer):
 
     def _assign_codebook_pretrain_optimization_params(self):
         codebook_latents = None
-        other_params, codebook_logit_params = [], []
+        other_params, codebook_coeff_params = [], []
         for name in self.params_dict:
             if name == "nef.latents":
                 codebook_latents = self.params_dict[name]
             elif "spatial_decoder.decode" in name:
-                codebook_logit_params.append(self.params_dict[name])
+                codebook_coeff_params.append(self.params_dict[name])
             else:
                 other_params.append(self.params_dict[name])
 
@@ -1294,7 +1297,7 @@ class CodebookTrainer(BaseTrainer):
         net_params_group.append({"params": other_params,
                                  "lr": self.extra_args["codebook_pretrain_lr"]})
         if not self.optimize_codebook_latents_as_logits:
-            net_params_group.append({"params": spectra_logit_params,
+            net_params_group.append({"params": codebook_coeff_params,
                                      "lr": self.extra_args["codebook_pretrain_lr"]})
         return latents_group, net_params_group
 

@@ -141,10 +141,6 @@ class HyperSpectralDecoderB(nn.Module):
         assert self.kwargs["redshift_classification_method"] == "weighted_avg"
         num_embed = spectra.shape[1]
         spectra = torch.einsum("ij,jkim->kim", ret["redshift_logits"], spectra)
-        # spectra = torch.matmul(
-        #     ret["redshift_logits"][:,None,:,None].tile(1,num_embed,1,1), # [bsz,n_embed,1,.]
-        #     spectra.permute(2,1,0,3) # [bsz,n_embed,n_bins,nsmpl]
-        # )[:,:,0]
         return spectra
 
     def classify_redshift3D(self, spectra, gt_redshift_bin_ids, ret):
@@ -155,7 +151,7 @@ class HyperSpectralDecoderB(nn.Module):
               spectra [bsz,nsmpl]
         """
         assert self.kwargs["redshift_classification_method"] == "weighted_avg"
-        if self.kwargs["optimize_codebook_logits_for_each_redshift_bin"]:
+        if self.kwargs["optimize_codebook_latents_for_each_redshift_bin"]:
             # index with argmax, this spectra is for visualization only
             #  optimization relies on spectra loss calculated for each bin
             ids = torch.argmax(ret["redshift_logits"], dim=-1)
@@ -258,8 +254,7 @@ class HyperSpectralDecoderB(nn.Module):
         return spectra
 
     def forward_codebook_spectra(self, codebook, full_emitted_wave, full_wave_bound, ret):
-        """
-            @Params
+        """ @Params
               codebook: [num_embed,dim]
               full_wave: [nsmpl]
               full_wave_masks: [nsmpl]
@@ -285,7 +280,7 @@ class HyperSpectralDecoderB(nn.Module):
     ):
         """ @Param
             latents:   (encoded or original) coords or logits for quantization.
-                         [bsz,1,space_dim or coords_encode_dim]
+                         [bsz,1,...,space_dim or coords_encode_dim]
 
             - hyperspectral
               wave:      lambda values, used to convert ra/dec to hyperspectral latents.

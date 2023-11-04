@@ -302,7 +302,7 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--zero-init-codebook-latents", action="store_true")
     pretrain_group.add_argument("--optimize-codebook-latents-as-logits", action="store_true",
                                 help="optimize latents directly as logits without autodecoder.")
-    pretrain_group.add_argument("--optimize-codebook-logits-for-each-redshift-bin",
+    pretrain_group.add_argument("--optimize-codebook-latents-for-each-redshift-bin",
                                 action="store_true")
     pretrain_group.add_argument("--optimize-codebook-latents", action="store_true")
     pretrain_group.add_argument("--load-pretrained-codebook-latents", action="store_true")
@@ -720,11 +720,15 @@ def define_cmd_line_args():
                              help="max #spectra to infer for pretrain.")
     infer_group.add_argument("--test-num-infer-upper-bound", type=int, default=60,
                              help="max #spectra to infer for test.")
-    infer_group.add_argument("--spectra-inferrence-id-fname", type=str)
+    infer_group.add_argument("--spectra-inferrence-id-fname", type=str,
+                             help="during codebook pretrain, we can infer for given id only.")
 
-    # these several args, if specified, directs reconstructing smaller cutouts than train image
-    # Note, if recon_img is included as inferrence tasks, we always reconstruct the full train image
-    # regardless of whether these three are given or not
+    infer_group.add_argument("--infer-outlier-only", action="store_true", default=False,
+                             help="during sanity check, we infer only for outlier.")
+
+    # these several args, if specified, directs reconstructing smaller cutouts than train image.
+    # Note, if recon_img is included as inferrence tasks, we always reconstruct the full
+    #   train image regardless of whether these three are given or not.
     infer_group.add_argument("--recon-zoomed", action="store_true",
                              help="whether reconstruct zoomed in cutouts or not. \
                              If true, the three below args needs to be specified")

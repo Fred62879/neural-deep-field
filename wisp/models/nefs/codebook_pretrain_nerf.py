@@ -157,7 +157,7 @@ class CodebookPretrainNerf(BaseNeuralField):
             redshift_latents = self.index_latents(redshift_latents, selected_ids, idx)
         else: redshift_latents = None
 
-        # `latents` is either logits or qtz latents or latents dep on qtz method
+        # `latents` is either coefficients or qtz latents or latents dep on qtz method
         latents = self.spatial_decoder(
             coords, self.codebook, qtz_args, ret,
             specz=specz,

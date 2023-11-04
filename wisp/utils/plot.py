@@ -54,9 +54,11 @@ def plot_multiple(n_per_fig, n_per_row, data, fname, x=None,
             else:
                 if hist: axis.hist(x, weights=data[lo+j])
                 else:    axis.plot(x, data[lo+j])
-            if y2 is not None:
-                if x is None: _plot(axis, y2[lo+j], color="orange", hist=hist)
-                else:         _plot(axis, x, y2[lo+j], color="orange", hist=hist)
+            # if y2 is not None:
+            #     if x is None: _plot(axis, y2[lo+j], color="orange", hist=hist)
+            #     else:         _plot(axis, x, y2[lo+j], color="orange", hist=hist)
+
+            # plot vertical line to indicate e.g. gt location
             if vertical_xs is not None:
                 axis.axvline(x=vertical_xs[lo+j], color="red", linewidth=2, linestyle="--")
 

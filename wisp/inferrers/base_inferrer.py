@@ -40,8 +40,8 @@ class BaseInferrer(ABC):
         self.recon_spectra_pixels_only = extra_args["train_spectra_pixels_only"]
         self.use_pretrained_latents_as_coords = \
             extra_args["main_train_with_pretrained_latents"]
-        self.optimize_codebook_logits_for_each_redshift_bin = \
-            self.extra_args["optimize_codebook_logits_for_each_redshift_bin"]
+        self.optimize_codebook_latents_for_each_redshift_bin = \
+            self.extra_args["optimize_codebook_latents_for_each_redshift_bin"]
 
         self.index_latent = True
         self.split_latent = self.mode == "redshift_pretrain_infer" and \
