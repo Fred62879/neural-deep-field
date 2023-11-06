@@ -945,7 +945,10 @@ class AstroInferrer(BaseInferrer):
             self._recon_gt_spectra_all_bins(num_spectra, model_id)
 
         if self.plot_codebook_coeff:
-            self._plot_codebook_coefficients(model_id)
+            if self.infer_outlier_only:
+                self._plot_codebook_coefficients(
+                    model_id, suffix="-outlier", ids=outlier_ids)
+            else: self._plot_codebook_coefficients(model_id)
 
         if self.plot_redshift_logits:
             if self.infer_outlier_only:
@@ -1470,15 +1473,17 @@ class AstroInferrer(BaseInferrer):
         fname = join(self.codebook_latents_dir, f"model-{model_id}_logits")
         np.save(fname, codebook_latents)
 
-    def _plot_codebook_coefficients(self, model_id):
+    def _plot_codebook_coefficients(self, model_id, suffix="", ids=None):
         """ Plot coefficient of each code in the codebook.
         """
         codebook_coeff = torch.stack(self.codebook_coeff).detach().cpu().numpy()
-        fname = join(self.codebook_coeff_dir, f"model-{model_id}_logits")
+        if ids is not None: codebook_coeff = codebook_coeff[ids]
+        fname = join(self.codebook_coeff_dir, f"model-{model_id}_logits{suffix}")
         np.save(fname, codebook_coeff)
 
         if self.optimize_codebook_latents_for_each_redshift_bin:
             gt_redshift = torch.stack(self.gt_redshift_cl).detach().cpu().numpy()
+            if ids is not None: gt_redshift = gt_redshift[ids]
             gt_bin_ids = get_bin_ids(
                 self.extra_args["redshift_lo"],
                 self.extra_args["redshift_bin_width"],
