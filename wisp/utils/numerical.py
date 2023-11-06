@@ -314,6 +314,8 @@ def calculate_metrics(recon, gt, options, zscale=False, **kwargs):
         @Return
            metrics: [n_metrics(,n_bands)]
     """
+    if len(options) == 0: return {}
+
     assert recon.shape == gt.shape
     if recon.ndim == 3: # [nbands,sz,sz]
         metrics = np.zeros((len(options), recon.shape[0]))

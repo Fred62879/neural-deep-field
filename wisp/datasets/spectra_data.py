@@ -1069,12 +1069,12 @@ class SpectraData:
                 segments = segment_bool_array(above_threshold)
                 for (lo, hi) in segments:
                     axis.plot(recon_wave[lo:hi], recon_flux[lo:hi], color="purple")
-            else:
-                axis.plot(recon_wave, recon_flux, color="blue", label="recon")
-                if recon_flux2 is not None:
-                    axis.plot(recon_wave, recon_flux2, color="red", label="gt bin")
-                if recon_flux3 is not None:
-                    axis.plot(recon_wave, recon_flux3, color="yellow", label="wrong bin")
+            else: axis.plot(recon_wave, recon_flux, color="blue", label="recon")
+        if recon_flux2 is not None:
+            print(recon_wave.shape, recon_flux2.shape)
+            axis.plot(recon_wave, recon_flux2, color="red", label="gt bin")
+        if recon_flux3 is not None:
+            axis.plot(recon_wave, recon_flux3, color="yellow", label="wrong bin")
 
         if sub_dir != "":
             if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]
@@ -1127,12 +1127,12 @@ class SpectraData:
         if plot_recon_spectrum:
             recon_wave, recon_flux = self.process_recon_flux(
                 recon_flux, recon_mask, clip, spectra_clipped, recon_wave=recon_wave)
-            if recon_flux2 is not None:
-                _, recon_flux2 = self.process_recon_flux(
-                    recon_flux2, recon_mask, clip, spectra_clipped)
-            if recon_flux3 is not None:
-                _, recon_flux3 = self.process_recon_flux(
-                    recon_flux3, recon_mask, clip, spectra_clipped)
+        if recon_flux2 is not None:
+            _, recon_flux2 = self.process_recon_flux(
+                recon_flux2, recon_mask, clip, spectra_clipped)
+        if recon_flux3 is not None:
+            _, recon_flux3 = self.process_recon_flux(
+                recon_flux3, recon_mask, clip, spectra_clipped)
 
         # recon and gt spectra differ in shape, to calculate metrics, we do interpolation
         if calculate_metrics and not \
@@ -1215,9 +1215,8 @@ class SpectraData:
         assert recon_masks[0] is None or \
             (len(recon_fluxes) == n and len(recon_masks) == n)
 
-        if not is_codebook:
-            gt_fluxes = to_numpy(gt_fluxes)
         recon_fluxes = to_numpy(recon_fluxes)
+        if not is_codebook: gt_fluxes = to_numpy(gt_fluxes)
         if recon_fluxes2[0] is not None: recon_fluxes2 = to_numpy(recon_fluxes2)
         if recon_fluxes3[0] is not None: recon_fluxes3 = to_numpy(recon_fluxes3)
 

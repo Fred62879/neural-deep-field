@@ -458,7 +458,7 @@ class AstroInferrer(BaseInferrer):
                 "idx","spectra_source_data","spectra_masks","spectra_redshift"])
             if self.plot_gt_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_ids")
-            if self.neg_sup_wrong_redshift:
+            if self.neg_sup_wrong_redshift or self.plot_optimal_wrong_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_masks")
 
             if self.infer_selected:
@@ -1633,7 +1633,7 @@ class AstroInferrer(BaseInferrer):
             if self.plot_gt_bin_spectra:
                 self.gt_bin_fluxes = self.gt_bin_fluxes[ids]
             if self.plot_optimal_wrong_bin_spectra:
-                self.all_bin_fluxes = self.all_bin_fluxes[ids]
+                self.optimal_wrong_bin_fluxes = self.optimal_wrong_bin_fluxes[ids]
             num_spectra = len(ids)
 
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
