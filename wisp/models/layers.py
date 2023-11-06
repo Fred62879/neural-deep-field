@@ -395,7 +395,7 @@ def calculate_bayesian_redshift_logits(loss, mask, gt_spectra, recon_fluxes, red
 
     return logits
 
-def calculate_redshift_logits(loss, masks, gt_spectra, recon_fluxes, ret, **kwargs):
+def calculate_redshift_logits(loss, masks, gt_spectra, recon_fluxes, ret, gt_bin_ids=None, **kwargs):
     """ Calculate bayesian logits for redshfit classification.
         @Param
           mask:       [bsz,num_smpls]

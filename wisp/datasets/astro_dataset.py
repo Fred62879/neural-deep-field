@@ -41,7 +41,7 @@ class AstroDataset(Dataset):
         if self.space_dim == 3:
             self.unbatched_fields = {
                 "idx","selected_ids","wave_data","spectra_data","redshift_data","model_data",
-                "gt_redshift_bin_ids"
+                "gt_redshift_bin_ids","gt_redshift_bin_masks"
             }
         else:
             self.unbatched_fields = set()
@@ -125,6 +125,9 @@ class AstroDataset(Dataset):
               uniform_non_random: get every several wave (for pretrain infer)
         """
         self.wave_sample_method = method
+
+    def set_num_redshift_bins(self, num_bins):
+        self.num_redshift_bins = num_bins
 
     def toggle_integration(self, integrate: bool):
         self.perform_integration = integrate
@@ -317,31 +320,25 @@ class AstroDataset(Dataset):
     def get_unbatched_data(self, idx, out):
         if "idx" in self.requested_fields:
             out["idx"] = idx
-
         if "selected_ids" in self.requested_fields:
             out["selected_ids"] = self.data["selected_ids"]
-
         # self.get_debug_data(out)
         # if "model_data" in self.requested_fields:
         #     self.get_model_data(out)
-
-        if self.kwargs["plot_logits_for_gt_bin"]:
-            self.get_gt_redshift_bin_ids(out)
-
+        # if self.kwargs["plot_logits_for_gt_bin"]:
+        #     self.get_gt_redshift_bin_ids(out)
         if self.kwargs["add_redshift_logit_bias"]:
             self.get_init_redshift_logit_bias(out)
-
         if "wave_data" in self.requested_fields:
             self.get_wave_data(len(idx), out)
-
         if "spectra_data" in self.requested_fields:
             self.get_spectra_data(out)
-
         if "redshift_data" in self.requested_fields:
             self.get_redshift_data(out)
-
         if "gt_redshift_bin_ids" in self.requested_fields:
             self.get_gt_redshift_bin_ids(out)
+        if "gt_redshift_bin_masks" in self.requested_fields:
+            self.get_gt_redshift_bin_masks(out)
 
     def index_selected_data(self, data, idx):
         """ Index data with both selected_ids and given idx
@@ -506,10 +503,14 @@ class AstroDataset(Dataset):
             self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"],
             out["spectra_redshift"].numpy(), add_batched_dim=True)
 
-    # def get_gt_redshift_bin_ids(self, out):
-    #     out["gt_redshift_bin_ids"] = np.array(
-    #         [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
-    #          for val in out["spectra_redshift"]])
+    def get_gt_redshift_bin_masks(self, out):
+        """ Get mask with 0 in indices of wrong bins
+        """
+        bsz = len(out["spectra_redshift"])
+        masks = np.zeros((bsz,self.num_redshift_bins))
+        ids = out["gt_redshift_bin_ids"]
+        masks[ids[0],ids[1]] = 1
+        out["gt_redshift_bin_masks"] = masks.astype(bool)
 
     ############
     # Debug data

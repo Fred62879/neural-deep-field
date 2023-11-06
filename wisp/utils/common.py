@@ -482,6 +482,7 @@ def forward(
     else:
         raise ValueError("Unsupported space dimension.")
 
+    # print(requested_channels)
     requested_channels = set(requested_channels)
     return pipeline(channels=requested_channels, **net_args)
 

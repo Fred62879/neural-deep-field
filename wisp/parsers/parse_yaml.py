@@ -633,6 +633,7 @@ def define_cmd_line_args():
                              help="discourage wrong redshift from generating high \
                              quality spectra during codebook pretrain.")
     train_group.add_argument("--neg-sup-beta", type=float)
+    train_group.add_argument("--neg-sup-constant", type=float)
     train_group.add_argument("--correct-gt-redshift-based-on-redshift-bin", action="store_true")
 
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")

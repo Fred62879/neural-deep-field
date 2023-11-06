@@ -114,6 +114,8 @@ class CodebookTrainer(BaseTrainer):
 
         assert not self.mode == "codebook_pretrain" or (
             self.apply_gt_redshift or self.neg_sup_wrong_redshift)
+        assert not self.apply_gt_redshift or \
+            not self.calculate_binwise_spectra_loss
         assert not self.neg_sup_wrong_redshift or (
             self.mode == "codebook_pretrain" and self.classify_redshift and \
             self.calculate_binwise_spectra_loss)
@@ -345,7 +347,7 @@ class CodebookTrainer(BaseTrainer):
         if self.pixel_supervision:
             fields.append("spectra_pixels")
         if self.neg_sup_wrong_redshift:
-            fields.append("gt_redshift_bin_ids")
+            fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_masks"])
 
         # use original spectra wave
         self.dataset.set_wave_source("spectra")
@@ -375,6 +377,9 @@ class CodebookTrainer(BaseTrainer):
                 self.extra_args["pretrain_num_infer_upper_bound"])
         else:
             self.selected_ids = np.arange(self.num_spectra)
+
+        if self.classify_redshift:
+            self.dataset.set_num_redshift_bins(self.num_redshift_bins)
 
         self.dataset.set_fields(fields)
 
@@ -588,6 +593,7 @@ class CodebookTrainer(BaseTrainer):
         super().init_log_dict()
         self.log_dict["pixel_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
+        self.log_dict["bin_loss_diff"] = 0.0
         self.log_dict["wrong_bin_losses"] = 0.0
         self.log_dict["redshift_logits_regu"] = 0.0
         self.log_dict["codebook_latents_regu"] = 0.0
@@ -735,7 +741,9 @@ class CodebookTrainer(BaseTrainer):
         if self.optimize_codebook_latents_as_logits:
             dim = self.extra_args["qtz_num_embed"]
         else: dim = self.extra_args["codebook_latent_dim"]
-        sp = (self.num_spectra, dim)
+        if self.optimize_codebook_latents_for_each_redshift_bin:
+            sp = (self.num_spectra, self.num_redshift_bins, dim)
+        else: sp = (self.num_spectra, dim)
         latents = self.create_latents(
             sp, seed=self.extra_args["seed"] + 1,
             zero_init=self.extra_args["zero_init_codebook_latents"],
@@ -1170,15 +1178,45 @@ class CodebookTrainer(BaseTrainer):
         if self.optimize_codebook_latents_for_each_redshift_bin:
             if self.neg_sup_wrong_redshift:
                 all_bin_losses = ret["spectra_binwise_loss"] # [bsz,n_bins]
-                ids = data["gt_redshift_bin_ids"]
                 bsz = len(all_bin_losses)
-                gt_bin_losses = torch.sum(all_bin_losses[ids[0],ids[1]]) # [bsz]->[1]
-                wrong_bin_losses = torch.sum(all_bin_losses) - gt_bin_losses
-                gt_bin_losses /= bsz
-                wrong_bin_losses /= (bsz*self.num_redshift_bins)
-                wrong_bin_losses *= self.extra_args["neg_sup_beta"]
-                spectra_loss = gt_bin_losses - wrong_bin_losses
-                self.log_dict["wrong_bin_losses"] += wrong_bin_losses.item()
+                # ids = data["gt_redshift_bin_ids"]
+                # gt_bin_losses = torch.sum(all_bin_losses[ids[0],ids[1]]) # [bsz]->[1]
+                # wrong_bin_losses = torch.sum(all_bin_losses) - gt_bin_losses
+                # gt_bin_losses /= bsz
+                # wrong_bin_losses /= (bsz*self.num_redshift_bins)
+                # wrong_bin_losses *= self.extra_args["neg_sup_beta"]
+                # spectra_loss = gt_bin_losses - wrong_bin_losses
+
+                # gt_bin_losses = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
+                # wrong_bin_losses = all_bin_losses[
+                #     ~data["gt_redshift_bin_masks"]].reshape(-1,self.num_redshift_bins-1)
+                # wrong_bin_min_losses, _ = torch.min(wrong_bin_losses, dim=-1) # [bsz]
+                # wrong_bin_min_losses = torch.mean(wrong_bin_min_losses)
+                # spectra_loss = gt_bin_losses - wrong_bin_min_losses
+                # self.log_dict["bin_loss_diff"] += spectra_loss.item()
+                # spectra_loss = spectra_loss + self.extra_args["neg_sup_constant"]
+                # spectra_loss = max(0, spectra_loss)
+                # self.log_dict["wrong_bin_losses"] += wrong_bin_min_losses.item()
+
+                # ids = data["gt_redshift_bin_ids"]
+                # gt_bin_losses = torch.sum(all_bin_losses[ids[0],ids[1]]) # [bsz]->[1]
+                # wrong_bin_losses = torch.sum(all_bin_losses) - gt_bin_losses
+                # gt_bin_losses /= bsz
+                # wrong_bin_losses = wrong_bin_losses / (bsz*self.num_redshift_bins)
+                # self.log_dict["wrong_bin_losses"] += wrong_bin_losses.item()
+                # self.log_dict["bin_loss_diff"] += (gt_bin_losses - wrong_bin_losses).item()
+                # spectra_loss = gt_bin_losses + self.extra_args["neg_sup_beta"] * \
+                #     max(0, self.extra_args["neg_sup_constant"] - wrong_bin_losses)
+
+                gt_bin_losses = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
+                wrong_bin_losses = all_bin_losses[
+                    ~data["gt_redshift_bin_masks"]].reshape(-1,self.num_redshift_bins-1)
+                wrong_bin_min_losses, _ = torch.min(wrong_bin_losses, dim=-1) # [bsz]
+                wrong_bin_min_losses = torch.mean(wrong_bin_min_losses)
+                self.log_dict["wrong_bin_losses"] += wrong_bin_min_losses.item()
+                self.log_dict["bin_loss_diff"] += (gt_bin_losses - wrong_bin_min_losses).item()
+                spectra_loss = gt_bin_losses + self.extra_args["neg_sup_beta"] * \
+                    max(0, self.extra_args["neg_sup_constant"] - wrong_bin_min_losses)
             else:
                 spectra_loss = torch.mean(ret["spectra_binwise_loss"])
         else:
@@ -1196,7 +1234,9 @@ class CodebookTrainer(BaseTrainer):
                     self.cur_spectra_individ_losses.extend(spectra_loss.detach().cpu().numpy())
                 spectra_loss = torch.mean(spectra_loss, dim=-1)
 
-        self.log_dict["spectra_loss"] += spectra_loss.item()
+        if spectra_loss.__class__.__name__ == "Tensor":
+            self.log_dict["spectra_loss"] += spectra_loss.item()
+        else: self.log_dict["spectra_loss"] += spectra_loss()
 
         # ii) pixel supervision loss
         recon_loss = 0
@@ -1283,6 +1323,8 @@ class CodebookTrainer(BaseTrainer):
         if self.pixel_supervision:
             log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / n)
         if self.neg_sup_wrong_redshift:
+            log_text += " | bin loss diff: {:>.3E}".format(
+                self.log_dict["bin_loss_diff"] / n)
             log_text += " | wrong bin loss: {:>.3E}".format(
                 self.log_dict["wrong_bin_losses"] / n)
         if self.regularize_redshift_logits:
