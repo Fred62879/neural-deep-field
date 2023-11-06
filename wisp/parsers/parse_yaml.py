@@ -632,6 +632,8 @@ def define_cmd_line_args():
     train_group.add_argument("--negative-supervise-wrong-redshift", action="store_true",
                              help="discourage wrong redshift from generating high \
                              quality spectra during codebook pretrain.")
+    train_group.add_argument("--neg-sup-with-best-wrong-bin", action="store_true",
+                             help="neg sup with spectra loss of optimal wrong bin")
     train_group.add_argument("--neg-sup-beta", type=float)
     train_group.add_argument("--neg-sup-constant", type=float)
     train_group.add_argument("--correct-gt-redshift-based-on-redshift-bin", action="store_true")
@@ -752,6 +754,7 @@ def define_cmd_line_args():
     infer_group.add_argument("--plot-spectrum-with-recon", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-trans", action="store_true")
     infer_group.add_argument("--plot-spectrum-under-gt-bin", action="store_true")
+    infer_group.add_argument("--plot-spectrum-under-optimal-wrong-bin", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-sliding-zncc", action="store_true")
     infer_group.add_argument("--plot-spectrum-according-to-zncc", action="store_true")
     infer_group.add_argument("--plot-spectrum-together", action="store_true")

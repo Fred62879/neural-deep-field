@@ -562,7 +562,7 @@ class AstroDataset(Dataset):
 
     def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
                       gt_wave, gt_fluxes, recon_wave, recon_fluxes,
-                      recon_fluxes2=None,
+                      recon_fluxes2=None, recon_fluxes3=None,
                       is_codebook=False, spectra_ids=None,
                       save_spectra=False, save_spectra_together=False,
                       gt_masks=None, recon_masks=None,
@@ -573,6 +573,7 @@ class AstroDataset(Dataset):
             spectra_dir, name, flux_norm_cho,
             gt_wave, gt_fluxes, recon_wave, recon_fluxes,
             recon_fluxes2=recon_fluxes2,
+            recon_fluxes3=recon_fluxes3,
             is_codebook=is_codebook,
             save_spectra=save_spectra,
             save_spectra_together=save_spectra_together,

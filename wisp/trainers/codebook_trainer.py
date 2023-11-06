@@ -1198,25 +1198,27 @@ class CodebookTrainer(BaseTrainer):
                 # spectra_loss = max(0, spectra_loss)
                 # self.log_dict["wrong_bin_losses"] += wrong_bin_min_losses.item()
 
-                # ids = data["gt_redshift_bin_ids"]
-                # gt_bin_losses = torch.sum(all_bin_losses[ids[0],ids[1]]) # [bsz]->[1]
-                # wrong_bin_losses = torch.sum(all_bin_losses) - gt_bin_losses
-                # gt_bin_losses /= bsz
-                # wrong_bin_losses = wrong_bin_losses / (bsz*self.num_redshift_bins)
-                # self.log_dict["wrong_bin_losses"] += wrong_bin_losses.item()
-                # self.log_dict["bin_loss_diff"] += (gt_bin_losses - wrong_bin_losses).item()
-                # spectra_loss = gt_bin_losses + self.extra_args["neg_sup_beta"] * \
-                #     max(0, self.extra_args["neg_sup_constant"] - wrong_bin_losses)
-
-                gt_bin_losses = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
-                wrong_bin_losses = all_bin_losses[
-                    ~data["gt_redshift_bin_masks"]].reshape(-1,self.num_redshift_bins-1)
-                wrong_bin_min_losses, _ = torch.min(wrong_bin_losses, dim=-1) # [bsz]
-                wrong_bin_min_losses = torch.mean(wrong_bin_min_losses)
-                self.log_dict["wrong_bin_losses"] += wrong_bin_min_losses.item()
-                self.log_dict["bin_loss_diff"] += (gt_bin_losses - wrong_bin_min_losses).item()
-                spectra_loss = gt_bin_losses + self.extra_args["neg_sup_beta"] * \
-                    max(0, self.extra_args["neg_sup_constant"] - wrong_bin_min_losses)
+                if self.extra_args["neg_sup_with_best_wrong_bin"]:
+                    gt_bin_losses = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
+                    wrong_bin_losses = all_bin_losses[
+                        ~data["gt_redshift_bin_masks"]].reshape(-1,self.num_redshift_bins-1)
+                    wrong_bin_min_losses, _ = torch.min(wrong_bin_losses, dim=-1) # [bsz]
+                    wrong_bin_min_losses = torch.mean(wrong_bin_min_losses)
+                    self.log_dict["wrong_bin_losses"] += wrong_bin_min_losses.item()
+                    self.log_dict["bin_loss_diff"] += (
+                        gt_bin_losses - wrong_bin_min_losses).item()
+                    spectra_loss = gt_bin_losses + self.extra_args["neg_sup_beta"] * \
+                        max(0, self.extra_args["neg_sup_constant"] - wrong_bin_min_losses)
+                else:
+                    ids = data["gt_redshift_bin_ids"]
+                    gt_bin_losses = torch.sum(all_bin_losses[ids[0],ids[1]]) # [bsz]->[1]
+                    wrong_bin_losses = torch.sum(all_bin_losses) - gt_bin_losses
+                    gt_bin_losses /= bsz
+                    wrong_bin_losses = wrong_bin_losses / (bsz*self.num_redshift_bins)
+                    self.log_dict["wrong_bin_losses"] += wrong_bin_losses.item()
+                    self.log_dict["bin_loss_diff"] += (gt_bin_losses - wrong_bin_losses).item()
+                    spectra_loss = gt_bin_losses + self.extra_args["neg_sup_beta"] * \
+                        max(0, self.extra_args["neg_sup_constant"] - wrong_bin_losses)
             else:
                 spectra_loss = torch.mean(ret["spectra_binwise_loss"])
         else:
