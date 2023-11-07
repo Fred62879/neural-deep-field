@@ -1743,7 +1743,6 @@ class AstroInferrer(BaseInferrer):
         log.info("all bin spectrum plotting done")
 
     def _get_optimal_wrong_bin_fluxes(self, ret, data):
-        # print(ret.keys(), data.keys())
         fluxes = ret["spectra_all_bins"] # [nbins,bsz,nsmpl]
         all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
         bsz = len(all_bin_losses)

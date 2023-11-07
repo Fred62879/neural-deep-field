@@ -1071,10 +1071,9 @@ class SpectraData:
                     axis.plot(recon_wave[lo:hi], recon_flux[lo:hi], color="purple")
             else: axis.plot(recon_wave, recon_flux, color="blue", label="recon")
         if recon_flux2 is not None:
-            print(recon_wave.shape, recon_flux2.shape)
             axis.plot(recon_wave, recon_flux2, color="red", label="gt bin")
         if recon_flux3 is not None:
-            axis.plot(recon_wave, recon_flux3, color="yellow", label="wrong bin")
+            axis.plot(recon_wave, recon_flux3, color="green", label="wrong bin")
 
         if sub_dir != "":
             if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]

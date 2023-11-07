@@ -293,10 +293,16 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--pretrain-optimize-latents-alternately", action="store_true",
                                 help="optimize codebook and redshift latents alternately \
                                 in redshfit pretrain (EM).")
-    pretrain_group.add_argument("--alternation-starts-with", type=str,
+    pretrain_group.add_argument("--em-alternation-starts-with", type=str,
                                 choices=["codebook_latents","redshift_latents"],
                                 help="alternate optimization starts with.")
-    pretrain_group.add_argument("--alternation-steps", nargs="+", type=int,
+    pretrain_group.add_argument("--em-alternation-steps", nargs="+", type=int,
+                                help="alternately optimize each for given steps.")
+
+    pretrain_group.add_argument("--neg-sup-alternation-starts-with", type=str,
+                                choices=["codebook","latents"],
+                                help="alternate optimization starts with.")
+    pretrain_group.add_argument("--neg-sup-alternation-steps", nargs="+", type=int,
                                 help="alternately optimize each for given steps.")
 
     pretrain_group.add_argument("--zero-init-codebook-latents", action="store_true")
