@@ -299,8 +299,19 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--em-alternation-steps", nargs="+", type=int,
                                 help="alternately optimize each for given steps.")
 
+    pretrain_group.add_argument("--negative-supervise-wrong-redshift", action="store_true",
+                                help="discourage wrong redshift from generating high \
+                                quality spectra during codebook pretrain.")
+    pretrain_group.add_argument("--neg-sup-with-best-wrong-bin", action="store_true",
+                                help="neg sup with spectra loss of optimal wrong bin")
+    pretrain_group.add_argument("--neg-sup-beta", type=float)
+    pretrain_group.add_argument("--neg-sup-constant", type=float)
+
+    pretrain_group.add_argument("--neg-sup-optimize-alternately", action="store_true",
+                                help="optimize network and latents alternately during \
+                                negative supervision")
     pretrain_group.add_argument("--neg-sup-alternation-starts-with", type=str,
-                                choices=["codebook","latents"],
+                                choices=["net","latents"],
                                 help="alternate optimization starts with.")
     pretrain_group.add_argument("--neg-sup-alternation-steps", nargs="+", type=int,
                                 help="alternately optimize each for given steps.")
@@ -635,13 +646,7 @@ def define_cmd_line_args():
                              help="generate redshift w/o supervision.")
     train_group.add_argument("--redshift-semi-supervision", action="store_true",
                              help="generate redshift w. semi supervision.")
-    train_group.add_argument("--negative-supervise-wrong-redshift", action="store_true",
-                             help="discourage wrong redshift from generating high \
-                             quality spectra during codebook pretrain.")
-    train_group.add_argument("--neg-sup-with-best-wrong-bin", action="store_true",
-                             help="neg sup with spectra loss of optimal wrong bin")
-    train_group.add_argument("--neg-sup-beta", type=float)
-    train_group.add_argument("--neg-sup-constant", type=float)
+
     train_group.add_argument("--correct-gt-redshift-based-on-redshift-bin", action="store_true")
 
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")

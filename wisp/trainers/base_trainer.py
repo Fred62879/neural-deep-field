@@ -3,10 +3,12 @@ import os
 import time
 import torch
 import wandb
+import shutil
 import numpy as np
 import torch.nn as nn
 import logging as log
 
+from os.path import join
 from datetime import datetime
 from abc import ABC, abstractmethod
 from torch.utils.data import DataLoader
@@ -62,6 +64,11 @@ class BaseTrainer(ABC):
         log.info(f'Training on {extra_args["dataset_path"]}')
 
         self.extra_args = extra_args
+
+        self.cuda = "cuda" in str(device)
+        self.verbose = extra_args["verbose"]
+        self.space_dim = extra_args["space_dim"]
+        self.gpu_fields = extra_args["gpu_data"]
 
         self.pipeline = pipeline
 
@@ -137,6 +144,10 @@ class BaseTrainer(ABC):
                     step_metric=f"LOD-{d}-360-Degree-Scene/step")
 
         self.iteration = 1
+
+        # save config file to log directory
+        dst = join(self.log_dir, "config.yaml")
+        shutil.copyfile(extra_args["config"], dst)
 
     def init_dataloader(self):
         self.train_data_loader = DataLoader(self.dataset,
@@ -316,7 +327,9 @@ class BaseTrainer(ABC):
     def next_batch(self):
         """Actually iterate the data loader.
         """
-        return next(self.train_data_loader_iter)
+        data = next(self.train_data_loader_iter)
+        self.timer.check("got data")
+        return data
 
     def iterate(self):
         """Advances the training by one training step (batch).

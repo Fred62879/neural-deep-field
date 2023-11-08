@@ -456,7 +456,7 @@ class AstroInferrer(BaseInferrer):
 
             self.requested_fields.extend([
                 "idx","spectra_source_data","spectra_masks","spectra_redshift"])
-            if self.plot_gt_bin_spectra:
+            if self.plot_gt_bin_spectra or self.plot_optimal_wrong_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_ids")
             if self.neg_sup_wrong_redshift or self.plot_optimal_wrong_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_masks")
@@ -1661,11 +1661,11 @@ class AstroInferrer(BaseInferrer):
             if self.plot_gt_bin_spectra:
                 recon_fluxes2 = self.gt_bin_fluxes[lo:hi]
                 recon_losses2 = self.gt_bin_spectra_losses[lo:hi]
-            else: recon_fluxes2 = None
+            else: recon_fluxes2, recon_losses2 = None, None
             if self.plot_optimal_wrong_bin_spectra:
                 recon_fluxes3 = self.optimal_wrong_bin_fluxes[lo:hi]
                 recon_losses3 = self.optimal_wrong_bin_spectra_losses[lo:hi]
-            else: recon_fluxes3 = None
+            else: recon_fluxes3, recon_losses3 = None, None
 
             cur_metrics = self.dataset.plot_spectrum(
                 self.spectra_dir, fname,
@@ -1758,7 +1758,6 @@ class AstroInferrer(BaseInferrer):
         log.info("all bin spectrum plotting done")
 
     def _get_gt_bin_spectra_losses(self, ret, data):
-        fluxes = ret["spectra_all_bins"] # [nbins,bsz,nsmpl]
         all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
         bsz = len(all_bin_losses)
         gt_bin_losses = all_bin_losses[data["gt_redshift_bin_masks"]]

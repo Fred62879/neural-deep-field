@@ -2,7 +2,6 @@
 import os
 import time
 import torch
-import shutil
 import nvidia_smi
 import numpy as np
 import torch.nn as nn
@@ -37,14 +36,6 @@ class AstroTrainer(BaseTrainer):
     def __init__(self, pipeline, dataset, optim_cls, optim_params, device, **extra_args):
         super().__init__(pipeline, dataset, optim_cls, optim_params, device, **extra_args)
 
-        # save config file to log directory
-        dst = join(self.log_dir, "config.yaml")
-        shutil.copyfile(extra_args["config"], dst)
-
-        self.cuda = "cuda" in str(self.device)
-        self.verbose = self.extra_args["verbose"]
-        self.space_dim = self.extra_args["space_dim"]
-        self.gpu_fields = self.extra_args["gpu_data"]
         self.weight_train = self.extra_args["weight_train"]
         self.spectra_beta = self.extra_args["spectra_beta"]
         self.redshift_beta = self.extra_args["redshift_beta"]

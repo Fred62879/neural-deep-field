@@ -1156,10 +1156,12 @@ class SpectraData:
             _, _, recon_flux2 = self.normalize_one_flux(
                 sub_dir, is_codebook, False, plot_recon_spectrum,
                 flux_norm_cho, None, recon_flux2)
+            sub_dir += 'with_gt_bin_'
         if recon_flux3 is not None:
             _, _, recon_flux3 = self.normalize_one_flux(
                 sub_dir, is_codebook, False, plot_recon_spectrum,
                 flux_norm_cho, None, recon_flux3)
+            sub_dir += 'with_wrong_bin_'
 
         pargs = (sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux,
                  recon_flux2, recon_loss2, recon_flux3, recon_loss3,

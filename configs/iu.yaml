@@ -115,6 +115,15 @@ pretrain:
     em_alternation_starts_with: "codebook_latents"
     em_alternation_steps: [10,20]
 
+    negative_supervise_wrong_redshift: True
+    neg_sup_with_best_wrong_bin: True
+    neg_sup_beta: 1
+    neg_sup_constant: 0.1
+
+    neg_sup_optimize_alternately: True
+    neg_sup_alternation_starts_with: "latents"
+    neg_sup_alternation_steps: [1,1]
+
     zero_init_codebook_latents: True
     optimize_codebook_latents_as_logits: True
     optimize_codebook_latents_for_each_redshift_bin: True
@@ -234,16 +243,16 @@ trainer:
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
-    num_epochs: 2000
+    num_epochs: 6000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 200
+    log_cli_every: 600
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 400
+    save_model_every: 1200
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -274,14 +283,6 @@ trainer:
     apply_gt_redshift: False         # -
     redshift_unsupervision: False    #  |- these three conflict each other
     redshift_semi_supervision: False # -
-
-    negative_supervise_wrong_redshift: True
-    neg_sup_with_best_wrong_bin: True
-    neg_sup_beta: 1
-    neg_sup_constant: 0.1
-
-    neg_sup_alternation_starts_with: "latents"
-    neg_sup_alternation_steps: [1,1]
 
     correct_gt_redshift_based_on_redshift_bin: True
 
@@ -346,7 +347,7 @@ infer:
     plot_spectrum_with_trans: False
 
     plot_spectrum_under_gt_bin: True
-    plot_spectrum_under_optimal_wrong_bin: True
+    plot_spectrum_under_optimal_wrong_bin: False
 
     plot_spectrum_according_to_zncc: True
     plot_spectrum_with_sliding_zncc: False
@@ -447,7 +448,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000  # #spectra to load
-    num_supervision_spectra_upper_bound: 5
+    num_supervision_spectra_upper_bound: 10
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 
