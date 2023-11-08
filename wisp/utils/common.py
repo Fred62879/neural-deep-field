@@ -122,15 +122,23 @@ def log_data(obj, field, fname=None, gt_field=None, mask=None,
         log.info(f"{gt_field}: {gt}")
         log.info(f"recon {field}: {recon}")
 
-def freeze_layers(model, excls=[]):
+def freeze_layers_incl(model, incls=[]):
+    """ Freeze layers (in incls) in model.
+    """
+    for n, p in model.named_parameters():
+        freeze = False
+        for incl in incls:
+            if incl in n: freeze = True; break
+        if freeze: p.requires_grad = False
+
+def freeze_layers_excl(model, excls=[]):
     """ Freeze layers in model (excluding those in `excls`).
     """
     for n, p in model.named_parameters():
-        to_exclude = False
+        freeze = True
         for excl in excls:
-            if excl in n: to_exclude = True
-        if not to_exclude:
-            p.requires_grad = False
+            if excl in n: freeze = False; break
+        if freeze: p.requires_grad = False
 
 def init_redshift_bins(lo, hi, bin_width):
     redshift_bin_center = torch.arange(lo, hi, bin_width)

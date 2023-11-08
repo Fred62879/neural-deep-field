@@ -97,8 +97,9 @@ def define_cmd_line_args():
 
     global_group.add_argument("--config", type=str, help="Path to config file to replace defaults.")
 
-    global_group.add_argument("--use_gpu", action="store_true")
     global_group.add_argument("--verbose", action="store_true")
+    global_group.add_argument("--use-gpu", action="store_true")
+    global_group.add_argument("--use-tqdm", action="store_true")
     global_group.add_argument("--print-shape", action="store_true")
     global_group.add_argument("--show-memory", action="store_true")
     global_group.add_argument("--activate-model-timer", action="store_true")

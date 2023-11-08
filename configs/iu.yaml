@@ -1,17 +1,17 @@
         
 global:
     verbose: False
+    use_gpu: True
+    use_tqdm: False
     print_shape: False
     show_memory: True
     activate_model_timer: False
     activate_trainer_timer: False
-    dataloader_drop_last: False
     exp_name: 'neg-sup' #sanity-check-scale'
-    use_gpu: True
     seed: 80
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
-    tasks: ['codebook_pretrain_infer','plot_codebook_coeff','recon_spectra','save_optm_bin_ids'] #,'save_redshift'] #'recon_codebook_spectra'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra','recon_spectra_all_bins']
+    #tasks: ['codebook_pretrain_infer','plot_codebook_coeff','recon_spectra','save_optm_bin_ids'] #,'save_redshift'] #'recon_codebook_spectra'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra','recon_spectra_all_bins']
     #tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
     #tasks: ['redshift_pretrain_infer','save_redshift','plot_redshift_logits','plot_binwise_spectra_loss','plot_codebook_coeff','save_optm_bin_ids','recon_spectra'] #,'recon_codebook_spectra''save_codebook_latents','save_qtz_weights','recon_spectra_all_bins']
 
@@ -166,7 +166,7 @@ pretrain:
     redshift_logit_latent_dim: 330
 
     main_train_with_pretrained_latents: False
-    redshift_pretrain_num_spectra: 5
+    redshift_pretrain_num_spectra: 10
 
     add_redshift_logit_bias: False
     plot_logits_for_gt_bin: False
@@ -192,7 +192,7 @@ qtz:
     quantization_strategy: 'soft'
     quantization_calculate_loss: False # only if hard qtz
     qtz_latent_dim: 32
-    qtz_num_embed: 5
+    qtz_num_embed: 4
     qtz_beta: 1
     qtz_seed: 8
 
@@ -312,7 +312,7 @@ infer:
 
     # recon img
     to_HDU: False
-    infer_log_dir: '20231107-203651_5_codes_5_spectra_alt_opt'
+    # infer_log_dir: '20231107-203651_5_codes_5_spectra_alt_opt'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
@@ -365,6 +365,7 @@ dataset:
     dataset_num_workers: 0
     space_dim: 3
 
+    dataloader_drop_last: False
     dataset_type: 'astro'
     plot_img_distrib: True
     load_patch_data_cache: True
@@ -448,7 +449,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000  # #spectra to load
-    num_supervision_spectra_upper_bound: 5
+    num_supervision_spectra_upper_bound: 10
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 

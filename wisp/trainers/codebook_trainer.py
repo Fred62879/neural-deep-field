@@ -28,7 +28,7 @@ from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     select_inferrence_ids, load_embed, load_model_weights, forward, \
     load_pretrained_model_weights, get_pretrained_model_fname, init_redshift_bins, \
     get_bool_classify_redshift, get_bool_has_redshift_latents, \
-    freeze_layers, get_loss, create_latent_mask, set_seed, log_data
+    freeze_layers_incl, freeze_layers_excl, get_loss, create_latent_mask, set_seed, log_data
 
 
 class CodebookTrainer(BaseTrainer):
@@ -52,8 +52,10 @@ class CodebookTrainer(BaseTrainer):
     def train(self):
         self.begin_train()
 
-        # for epoch in tqdm(range(self.num_epochs + 1)):
-        for self.epoch in range(self.num_epochs + 1):
+        if self.use_tqdm: iter = tqdm(range(self.num_epochs + 1))
+        else: iter = range(self.num_epochs + 1)
+
+        for self.epoch in iter:
             self.begin_epoch()
 
             for batch in range(self.num_iterations_cur_epoch):
@@ -260,10 +262,7 @@ class CodebookTrainer(BaseTrainer):
         self.train_pipeline.set_latents(latents)
         if redshift_latents is not None:
             self.train_pipeline.set_redshift_latents(redshift_latents)
-
-        # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
         self.freeze_and_load()
-        # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
 
         log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(
@@ -458,20 +457,19 @@ class CodebookTrainer(BaseTrainer):
     def begin_epoch(self):
         self.iteration = 0
         self.reset_data_iterator()
-        self.pre_epoch()
         self.init_log_dict()
+        self.pre_epoch()
 
         if self.extra_args["plot_logits_for_gt_bin"]:
             self.cur_gt_bin_logits = []
         if self.extra_args["plot_individ_spectra_loss"]:
             self.cur_spectra_individ_losses = []
 
-        if self.optimize_latents_alternately:
-            self.cur_optm_target = self._get_current_optm_target()
-        else: self.cur_optm_target = None
+        self._get_current_em_latents_target()
+        self._get_current_neg_sup_target()
+        self._toggle_grad(on_off="off")
 
-        if self.neg_sup_optimize_alternately:
-            self.cur_neg_sup_round = self._get_current_neg_sup_round()
+        # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
 
         self.timer.check("begun epoch")
 
@@ -487,12 +485,15 @@ class CodebookTrainer(BaseTrainer):
         if self.extra_args["plot_individ_spectra_loss"]:
             self.spectra_individ_losses.append(self.cur_spectra_individ_losses)
 
+        self._toggle_grad(on_off="on")
+        freeze_layers_incl( # always freeze pe
+            self.train_pipeline, incls=["wave_encoder"])
+
         self.timer.check("epoch ended")
 
     def reset_data_iterator(self):
         """ Rewind the iterator for the new epoch.
         """
-        # self.scene_state.optimization.iterations_per_epoch = len(self.train_data_loader)
         self.train_data_loader_iter = iter(self.train_data_loader)
 
     #############
@@ -553,17 +554,17 @@ class CodebookTrainer(BaseTrainer):
         self.train_pipeline.eval()
 
         total_loss = self.log_dict["total_loss"] / len(self.train_data_loader)
-        # self.scene_state.optimization.losses["total_loss"].append(total_loss)
 
         if self.plot_loss:
             self.losses.append(total_loss)
-            if self.neg_sup_optimize_alternately and self.cur_neg_sup_round == "net":
+            if self.neg_sup_optimize_alternately:
                 self.gt_bin_losses.append(
                     self.log_dict["gt_bin_losses"] / len(self.train_data_loader))
-                self.wrong_bin_regus.append(
-                    self.log_dict["wrong_bin_regus"] / len(self.train_data_loader))
                 self.wrong_bin_losses.append(
                     self.log_dict["wrong_bin_losses"] / len(self.train_data_loader))
+                if self.cur_neg_sup_target == "net":
+                    self.wrong_bin_regus.append(
+                        self.log_dict["wrong_bin_regus"] / len(self.train_data_loader))
 
         if self.log_tb_every > -1 and self.epoch % self.log_tb_every == 0:
             self.log_tb()
@@ -722,7 +723,7 @@ class CodebookTrainer(BaseTrainer):
             load_excls.append("nef.latents")
 
             if self.optimize_codebook_latents_as_logits:
-                # directly optimize logits
+                # directly optimize latents as coefficients
                 pass
             else:
                 # optimize an autodecoder
@@ -741,7 +742,7 @@ class CodebookTrainer(BaseTrainer):
                     freeze_excls.append("redshift_decoder")
                     freeze_excls.append("nef.redshift_latents")
 
-            freeze_layers(self.train_pipeline, excls=freeze_excls)
+            freeze_layers_excl(self.train_pipeline, excls=freeze_excls)
             self.load_model(self.pretrained_model_fname, excls=load_excls)
         else:
             raise ValueError()
@@ -1304,10 +1305,10 @@ class CodebookTrainer(BaseTrainer):
     def _calculate_neg_sup_loss(self, ret, data):
         """ Calculate spectra loss under negative supervision settings.
         """
-        if self.cur_neg_sup_round == "latents":
+        if self.cur_neg_sup_target == "latents":
             # optimize latents for all bins
             spectra_loss = torch.mean(ret["spectra_binwise_loss"])
-        elif self.cur_neg_sup_round == "net":
+        elif self.cur_neg_sup_target == "net":
             # regularize wrong bins to fit poorly with the current codebook
             all_bin_losses = ret["spectra_binwise_loss"] # [bsz,n_bins]
             bsz = len(all_bin_losses)
@@ -1378,28 +1379,55 @@ class CodebookTrainer(BaseTrainer):
     # Optimizer Helpers
     ###################
 
+    def _toggle_grad(self, on_off="on"):
+        if self.optimize_latents_alternately:
+            raise NotImplementedError()
+        elif self.neg_sup_optimize_alternately:
+            if self.cur_neg_sup_target == "latents":
+                self._toggle_net_grad(on_off)
+            elif self.cur_neg_sup_target == "net":
+                self._toggle_codebook_latents_grad(on_off)
+            else: raise ValueError()
+        else: raise ValueError()
+
+    def _toggle_net_grad(self, on_off):
+        for n,p in self.train_pipeline.named_parameters():
+            if n != "nef.latents": p.requires_grad = on_off == "on"
+
+    def _toggle_codebook_latents_grad(self, on_off):
+        for n,p in self.train_pipeline.named_parameters():
+            if n == "nef.latents": p.requires_grad = on_off == "on"
+
     def _get_optm_target(self):
+        """ Get the current optimization target when doing alternate optimization.
+        """
         if self.neg_sup_optimize_alternately:
-            target = self.cur_neg_sup_round
+            target = self.cur_neg_sup_target
         elif self.optimize_latents_alternately:
             target = self.cur_optm_target
         else: target = None
         return target
 
-    def _get_current_optm_target(self):
+    def _get_current_em_latents_target(self):
+        if not self.optimize_latents_alternately: return
         residu = self.epoch % (sum(self.em_alternation_steps))
         if self.em_alternation_starts_with == "codebook_latents":
-            return "codebook_latents" if residu < self.em_alternation_steps[0] else "redshift_latents"
+           self.cur_optm_target = "codebook_latents" \
+               if residu < self.em_alternation_steps[0] else "redshift_latents"
         elif self.em_alternation_starts_with == "redshift_latents":
-            return "redshift_latents" if residu < self.em_alternation_steps[0] else "codebook_latents"
+            self.cur_optm_target = "redshift_latents" \
+                if residu < self.em_alternation_steps[0] else "codebook_latents"
         else: raise ValueError()
 
-    def _get_current_neg_sup_round(self):
+    def _get_current_neg_sup_target(self):
+        if not self.neg_sup_optimize_alternately: return
         residu = self.epoch % (sum(self.neg_sup_alternation_steps))
         if self.neg_sup_alternation_starts_with == "net":
-            return "net" if residu < self.neg_sup_alternation_steps[0] else "latents"
+            self.cur_neg_sup_target = "net" \
+                if residu < self.neg_sup_alternation_steps[0] else "latents"
         elif self.neg_sup_alternation_starts_with == "latents":
-            return "latents" if residu < self.neg_sup_alternation_steps[0] else "net"
+            self.cur_neg_sup_target = "latents" \
+                if residu < self.neg_sup_alternation_steps[0] else "net"
         else: raise ValueError()
 
     def _assign_codebook_pretrain_optimization_params(self):

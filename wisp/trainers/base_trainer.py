@@ -67,6 +67,8 @@ class BaseTrainer(ABC):
 
         self.cuda = "cuda" in str(device)
         self.verbose = extra_args["verbose"]
+        self.use_gpu = extra_args["use_gpu"]
+        self.use_tqdm = extra_args["use_tqdm"]
         self.space_dim = extra_args["space_dim"]
         self.gpu_fields = extra_args["gpu_data"]
 
