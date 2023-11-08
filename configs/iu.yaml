@@ -11,7 +11,7 @@ global:
     seed: 80
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
-    tasks: ['codebook_pretrain_infer','plot_codebook_coeff','recon_spectra'] #,'save_redshift'] #'recon_codebook_spectra'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra','recon_spectra_all_bins']
+    tasks: ['codebook_pretrain_infer','plot_codebook_coeff','recon_spectra','save_optm_bin_ids'] #,'save_redshift'] #'recon_codebook_spectra'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra','recon_spectra_all_bins']
     #tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
     #tasks: ['redshift_pretrain_infer','save_redshift','plot_redshift_logits','plot_binwise_spectra_loss','plot_codebook_coeff','save_optm_bin_ids','recon_spectra'] #,'recon_codebook_spectra''save_codebook_latents','save_qtz_weights','recon_spectra_all_bins']
 
@@ -312,7 +312,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20231107-115847_16_5_alt_1_1_1_1_4k_epochs_resumed'
+    infer_log_dir: '20231107-203651_5_codes_5_spectra_alt_opt'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
@@ -347,7 +347,7 @@ infer:
     plot_spectrum_with_trans: False
 
     plot_spectrum_under_gt_bin: True
-    plot_spectrum_under_optimal_wrong_bin: False
+    plot_spectrum_under_optm_wrong_bin: True
 
     plot_spectrum_according_to_zncc: True
     plot_spectrum_with_sliding_zncc: False
@@ -448,7 +448,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000  # #spectra to load
-    num_supervision_spectra_upper_bound: 10
+    num_supervision_spectra_upper_bound: 5
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 

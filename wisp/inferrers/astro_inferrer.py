@@ -235,6 +235,11 @@ class AstroInferrer(BaseInferrer):
             )
             self.num_redshift_bins = len(redshift_bins)
 
+        self.save_redshift = "save_redshift" in tasks and self.model_redshift and self.qtz
+        self.save_redshift_pre = self.save_redshift and self.pretrain_infer
+        self.save_redshift_main = self.save_redshift and self.main_infer
+        self.save_redshift_test = self.save_redshift and self.test
+
         # i) infer all coords using original model
         self.recon_img_all_pixels = False
         self.recon_img_sup_spectra = False  # -
@@ -261,19 +266,12 @@ class AstroInferrer(BaseInferrer):
 
         self.plot_embed_map = "plot_embed_map" in tasks and self.qtz
         self.plot_latent_embed = "plot_latent_embed" in tasks and self.qtz
-
         self.save_qtz_weights = "save_qtz_weights" in tasks and \
             ((self.qtz_latent and self.qtz_strategy == "soft") or self.qtz_spectra)
         self.save_qtz_w_main = self.save_qtz_weights and self.main_infer
         self.save_qtz_w_pre = self.save_qtz_weights and self.pretrain_infer
-
         self.save_scaler = "save_scaler" in tasks and self.generate_scaler and \
             self.qtz and self.main_infer
-
-        self.save_redshift = "save_redshift" in tasks and self.model_redshift and self.qtz
-        self.save_redshift_pre = self.save_redshift and self.pretrain_infer
-        self.save_redshift_main = self.save_redshift and self.main_infer
-        self.save_redshift_test = self.save_redshift and self.test
 
         # ii) infer selected coords using partial model
         self.infer_outlier_only = self.extra_args["infer_outlier_only"] and \
@@ -283,29 +281,31 @@ class AstroInferrer(BaseInferrer):
         assert not self.infer_outlier_only or self.save_redshift_pre, \
             "we need to infer redshift to find outlier!"
 
-        self.recon_spectra = "recon_spectra" in tasks and self.space_dim == 3
-        self.recon_spectra_all_bins = "recon_spectra_all_bins" in tasks and self.space_dim == 3
-
+        self.recon_spectra = "recon_spectra" in tasks
         # save spectra pixel values, doing same job as
         #   `recon_img_sup_spectra` during pretran infer &
         #   `recon_img_val_spectra` during main train infer
         self.save_pixel_values = "save_pixel_values" in tasks
-        self.plot_codebook_coeff = "plot_codebook_coeff" in tasks and self.qtz_spectra
-        self.save_codebook_latents = "save_codebook_latents" in tasks and self.qtz_spectra
-        self.plot_redshift_logits = "plot_redshift_logits" in tasks and \
-            not self.extra_args["apply_gt_redshift"] and \
-            self.extra_args["redshift_model_method"] == "classification"
-        self.plot_binwise_spectra_loss = "plot_binwise_spectra_loss" in tasks and \
-            self.calculate_binwise_spectra_loss
-        self.recon_redshift = self.save_redshift or self.plot_redshift_logits or \
-            self.plot_binwise_spectra_loss or self.plot_codebook_coeff
+        self.save_optm_bin_ids = "save_optm_bin_ids" in tasks
+        self.plot_codebook_coeff = "plot_codebook_coeff" in tasks
+        self.plot_redshift_logits = "plot_redshift_logits" in tasks
+        self.save_codebook_latents = "save_codebook_latents" in tasks
+        self.recon_spectra_all_bins = "recon_spectra_all_bins" in tasks
+        self.plot_binwise_spectra_loss = "plot_binwise_spectra_loss" in tasks
 
-        self.plot_gt_bin_spectra = self.calculate_binwise_spectra_loss and \
-            self.extra_args["plot_spectrum_under_gt_bin"]
-        self.plot_optimal_wrong_bin_spectra = self.calculate_binwise_spectra_loss and \
-            self.extra_args["plot_spectrum_under_optimal_wrong_bin"]
-        self.save_optm_bin_ids = "save_optm_bin_ids" in tasks and \
-            self.calculate_binwise_spectra_loss
+        self.plot_gt_bin_spectra = self.extra_args["plot_spectrum_under_gt_bin"]
+        self.plot_optm_wrong_bin_spectra = self.extra_args["plot_spectrum_under_optm_wrong_bin"]
+
+        assert not self.plot_codebook_coeff or self.qtz_spectra
+        assert not self.save_codebook_latents or self.qtz_spectra
+        assert not self.plot_redshift_logits or self.classify_redshift
+        assert not self.save_optm_bin_ids or self.calculate_binwise_spectra_loss
+        assert not self.plot_gt_bin_spectra or self.calculate_binwise_spectra_loss
+        assert not self.plot_binwise_spectra_loss or self.calculate_binwise_spectra_loss
+        assert not self.plot_optm_wrong_bin_spectra or self.calculate_binwise_spectra_loss
+
+        self.recon_redshift = self.save_redshift or self.save_optm_bin_ids or \
+            self.plot_redshift_logits or self.plot_binwise_spectra_loss
 
         # iii) infer all coords using modified model (recon codebook spectra)
         #   either we have the codebook spectra for all coords
@@ -315,12 +315,12 @@ class AstroInferrer(BaseInferrer):
             and self.qtz and self.model_redshift
         assert not (self.recon_codebook_spectra and self.recon_codebook_spectra_individ)
 
-        # (iv) infer w/o no modeling running
+        # iv) infer w/o no modeling running
         self.plot_img_residual = "plot_img_residual" in tasks
         self.integrate_gt_spectra = "integrate_gt_spectra" in tasks
         self.plot_gt_pixel_distrib = "plot_gt_pixel_distrib" in tasks
 
-        # keep only tasks required to perform
+        # *) keep only tasks required
         self.group_tasks = []
 
         if self.recon_img or self.save_qtz_weights or \
@@ -456,9 +456,9 @@ class AstroInferrer(BaseInferrer):
 
             self.requested_fields.extend([
                 "idx","spectra_source_data","spectra_masks","spectra_redshift"])
-            if self.plot_gt_bin_spectra or self.plot_optimal_wrong_bin_spectra:
+            if self.plot_gt_bin_spectra or self.plot_optm_wrong_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_ids")
-            if self.neg_sup_wrong_redshift or self.plot_optimal_wrong_bin_spectra:
+            if self.neg_sup_wrong_redshift or self.plot_optm_wrong_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_masks")
 
             if self.infer_selected:
@@ -835,7 +835,7 @@ class AstroInferrer(BaseInferrer):
             if self.plot_gt_bin_spectra:
                 self.gt_bin_fluxes = []
                 self.gt_bin_spectra_losses = []
-            if self.plot_optimal_wrong_bin_spectra:
+            if self.plot_optm_wrong_bin_spectra:
                 self.optimal_wrong_bin_fluxes = []
                 self.optimal_wrong_bin_spectra_losses = []
 
@@ -857,6 +857,7 @@ class AstroInferrer(BaseInferrer):
         if self.save_optm_bin_ids:
             self.gt_bin_ids = []
             self.optm_bin_ids = []
+            self.optm_wrong_bin_ids = []
 
         if self.save_redshift:
             if self.classify_redshift:
@@ -901,7 +902,7 @@ class AstroInferrer(BaseInferrer):
                         self.dataset_length, 1, -1).detach().cpu().numpy()
                     self.gt_bin_spectra_losses = torch.stack(
                         self.gt_bin_spectra_losses).detach().cpu().numpy()
-                if self.plot_optimal_wrong_bin_spectra:
+                if self.plot_optm_wrong_bin_spectra:
                     self.optimal_wrong_bin_fluxes = torch.stack(
                         self.optimal_wrong_bin_fluxes
                     ).view(self.dataset_length, 1, -1).detach().cpu().numpy()
@@ -1243,7 +1244,7 @@ class AstroInferrer(BaseInferrer):
                         save_redshift_logits=self.plot_redshift_logits,
                         save_codebook_latents=self.save_codebook_latents,
                         save_spectra_all_bins=self.recon_spectra_all_bins or \
-                                              self.plot_optimal_wrong_bin_spectra,
+                                              self.plot_optm_wrong_bin_spectra,
                         init_redshift_prob= None if "init_redshift_prob" not in data else \
                                                 data["init_redshift_prob"])
 
@@ -1260,14 +1261,11 @@ class AstroInferrer(BaseInferrer):
                     if self.plot_gt_bin_spectra:
                         self.gt_bin_fluxes.extend(ret["gt_bin_spectra"])
                         gt_bin_losses = self._get_gt_bin_spectra_losses(ret, data)
-                        # print('*', gt_bin_losses)
                         self.gt_bin_spectra_losses.extend(gt_bin_losses)
-                    if self.plot_optimal_wrong_bin_spectra:
-                        wrong_bin_fluxes, wrong_bin_losses = \
-                            self._get_optimal_wrong_bin_fluxes(ret, data)
-                        self.optimal_wrong_bin_fluxes.extend(wrong_bin_fluxes)
-                        # print('**', wrong_bin_losses)
-                        self.optimal_wrong_bin_spectra_losses.extend(wrong_bin_losses)
+                    if self.plot_optm_wrong_bin_spectra:
+                        fluxes, losses = self._get_optimal_wrong_bin_fluxes(ret, data)
+                        self.optimal_wrong_bin_fluxes.extend(fluxes)
+                        self.optimal_wrong_bin_spectra_losses.extend(losses)
 
                 if self.recon_spectra_all_bins:
                     self.recon_fluxes_all.extend(
@@ -1278,7 +1276,9 @@ class AstroInferrer(BaseInferrer):
                     self.qtz_weights.extend(ret["qtz_weights"])
 
                 if self.save_optm_bin_ids:
+                    optm_wrong_bin_ids, _ = self._get_optimal_wrong_bin_ids(ret, data)
                     self.optm_bin_ids.extend(ret["optm_bin_ids"])
+                    self.optm_wrong_bin_ids.extend(optm_wrong_bin_ids)
                     self.gt_bin_ids.extend(data["gt_redshift_bin_ids"][1])
 
                 if self.save_redshift_pre:
@@ -1494,13 +1494,16 @@ class AstroInferrer(BaseInferrer):
         """
         self.gt_bin_ids = torch.stack(self.gt_bin_ids).detach().cpu().numpy()
         self.optm_bin_ids = torch.stack(self.optm_bin_ids).detach().cpu().numpy()
+        self.optm_wrong_bin_ids = torch.stack(self.optm_wrong_bin_ids).detach().cpu().numpy()
         if ids is not None:
             self.gt_bin_ids = self.gt_bin_ids[ids]
             self.optm_bin_ids = self.optm_bin_ids[ids]
+            self.optm_wrong_bin_ids = self.optm_wrong_bin_ids[ids]
 
         fname = join(self.codebook_latents_dir, f"model-{model_id}_logits")
         log_data(self, "optm_bin_ids", gt_field="gt_bin_ids",
                  fname=fname, log_to_console=True)
+        log_data(self, "optm_wrong_bin_ids", fname=fname, log_to_console=True)
 
     def _save_codebook_latents(self, model_id):
         codebook_latents = torch.stack(self.codebook_latents).detach().cpu().numpy()
@@ -1644,7 +1647,7 @@ class AstroInferrer(BaseInferrer):
             if self.plot_gt_bin_spectra:
                 self.gt_bin_fluxes = self.gt_bin_fluxes[ids]
                 self.gt_bin_spectra_losses = self.gt_bin_spectra_losses[ids]
-            if self.plot_optimal_wrong_bin_spectra:
+            if self.plot_optm_wrong_bin_spectra:
                 self.optimal_wrong_bin_fluxes = self.optimal_wrong_bin_fluxes[ids]
                 self.wrong_bin_spectra_losses = self.wrong_bin_spectra_losses[ids]
             num_spectra = len(ids)
@@ -1662,7 +1665,7 @@ class AstroInferrer(BaseInferrer):
                 recon_fluxes2 = self.gt_bin_fluxes[lo:hi]
                 recon_losses2 = self.gt_bin_spectra_losses[lo:hi]
             else: recon_fluxes2, recon_losses2 = None, None
-            if self.plot_optimal_wrong_bin_spectra:
+            if self.plot_optm_wrong_bin_spectra:
                 recon_fluxes3 = self.optimal_wrong_bin_fluxes[lo:hi]
                 recon_losses3 = self.optimal_wrong_bin_spectra_losses[lo:hi]
             else: recon_fluxes3, recon_losses3 = None, None
@@ -1763,18 +1766,21 @@ class AstroInferrer(BaseInferrer):
         gt_bin_losses = all_bin_losses[data["gt_redshift_bin_masks"]]
         return gt_bin_losses
 
-    def _get_optimal_wrong_bin_fluxes(self, ret, data):
-        fluxes = ret["spectra_all_bins"] # [nbins,bsz,nsmpl]
+    def _get_optimal_wrong_bin_ids(self, ret, data):
+        """ Get id of the non-GT redshift bin that achieves the lowest spectra loss.
+        """
         all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
-        bsz = len(all_bin_losses)
-        wrong_bin_losses = all_bin_losses[
-            ~data["gt_redshift_bin_masks"]].reshape(bsz,-1)
-        # print(torch.min(wrong_bin_losses))
-        wrong_bin_losses, ids = torch.min(
-            wrong_bin_losses, dim=-1) # ids of optimal wrong bins
+        all_bin_losses[data["gt_redshift_bin_masks"]] = float('inf')
+        optimal_wrong_bin_losses, optimal_wrong_bin_ids = torch.min(
+            all_bin_losses, dim=-1) # ids of optimal wrong bins
+        return optimal_wrong_bin_ids, optimal_wrong_bin_losses
+
+    def _get_optimal_wrong_bin_fluxes(self, ret, data):
+        ids, optimal_wrong_bin_losses = self._get_optimal_wrong_bin_ids(ret, data)
         ids = create_batch_ids(ids.detach().cpu().numpy())
+        fluxes = ret["spectra_all_bins"] # [nbins,bsz,nsmpl]
         fluxes = fluxes[ids[1],ids[0]]
-        return fluxes, wrong_bin_losses
+        return fluxes, optimal_wrong_bin_losses
 
     def configure_img_metrics(self):
         self.metric_options = self.extra_args["metric_options"]
