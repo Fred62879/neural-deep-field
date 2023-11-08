@@ -496,6 +496,19 @@ class CodebookTrainer(BaseTrainer):
         """
         self.train_data_loader_iter = iter(self.train_data_loader)
 
+    def init_log_dict(self):
+        """ Custom log dict.
+        """
+        super().init_log_dict()
+        self.log_dict["pixel_loss"] = 0.0
+        self.log_dict["spectra_loss"] = 0.0
+        self.log_dict["gt_bin_losses"] = 0.0
+        self.log_dict["wrong_bin_regus"] = 0.0
+        self.log_dict["wrong_bin_losses"] = 0.0
+        self.log_dict["redshift_logits_regu"] = 0.0
+        self.log_dict["codebook_latents_regu"] = 0.0
+        self.log_dict["codebook_spectra_regu"] = 0.0
+
     #############
     # One epoch
     #############
@@ -592,18 +605,6 @@ class CodebookTrainer(BaseTrainer):
     #############
     # One step
     #############
-
-    def init_log_dict(self):
-        """ Custom log dict. """
-        super().init_log_dict()
-        self.log_dict["pixel_loss"] = 0.0
-        self.log_dict["spectra_loss"] = 0.0
-        self.log_dict["gt_bin_losses"] = 0.0
-        self.log_dict["wrong_bin_regus"] = 0.0
-        self.log_dict["wrong_bin_losses"] = 0.0
-        self.log_dict["redshift_logits_regu"] = 0.0
-        self.log_dict["codebook_latents_regu"] = 0.0
-        self.log_dict["codebook_spectra_regu"] = 0.0
 
     def pre_step(self):
         # since we are optimizing latents which are inputs for the pipeline
@@ -803,20 +804,6 @@ class CodebookTrainer(BaseTrainer):
 
         return latents
 
-    # def create_latents(self, n, m, pretrained=None, zero_init=False, freeze=False, seed=0):
-    #     if pretrained is not None:
-    #         latents = nn.Embedding.from_pretrained(pretrained).to(self.device)
-    #     elif zero_init:
-    #         zero_latents = torch.zeros(n, m)
-    #         # zero_latents = 0.01 * torch.ones(n,m)
-    #         latents = nn.Embedding.from_pretrained(zero_latents).to(self.device)
-    #     else:
-    #         torch.manual_seed(seed)
-    #         latents = nn.Embedding(n, m, device=self.device)
-
-    #     latents = latents.requires_grad_(not freeze)
-    #     return latents
-
     def create_latents(self, sp, pretrained=None, zero_init=False, freeze=False, seed=0):
         if pretrained is not None:
             latents = pretrained.to(self.device)
@@ -859,17 +846,6 @@ class CodebookTrainer(BaseTrainer):
     def resume_train(self):
         try:
             checkpoint = self.load_model(self.resume_train_model_fname)
-            # a = checkpoint["optimizer_state_dict"]
-            # b = a["state"];c = a["param_groups"];print(b[0])
-
-            # TODO: can we load latents as part of the model
-            # self.latents = nn.Embedding.from_pretrained(
-            #     checkpoint["latents"],
-            #     freeze=not self.optimize_codebook_latents)
-            # if not self.apply_gt_redshift and self.split_latent:
-            #     self.redshift_latents = nn.Embedding.from_pretrained(
-            #         checkpoint["redshift_latents"],
-            #         freeze=self.optimize_redshift_latents)
 
             # re-init
             self.collect_model_params()
