@@ -444,8 +444,8 @@ class AstroInferrer(BaseInferrer):
 
         if self.pretrain_infer:
             self.infer_selected = self.extra_args["infer_selected"]
-            assert (not self.codebook_pretrain_infer or self.infer_selected), \
-                "we shall only infer selected spectra during codebook pretrain infer."
+            # assert (not self.codebook_pretrain_infer or self.infer_selected), \
+            #     "we shall only infer selected spectra during codebook pretrain infer."
 
             self.coords_source = None
             self.wave_source = "spectra"
@@ -834,8 +834,10 @@ class AstroInferrer(BaseInferrer):
             self.recon_fluxes = []
             if self.plot_gt_bin_spectra:
                 self.gt_bin_fluxes = []
+                self.gt_bin_spectra_losses = []
             if self.plot_optimal_wrong_bin_spectra:
                 self.optimal_wrong_bin_fluxes = []
+                self.optimal_wrong_bin_spectra_losses = []
 
         if self.recon_spectra_all_bins:
             self.recon_fluxes_all = []
@@ -897,10 +899,14 @@ class AstroInferrer(BaseInferrer):
                 if self.plot_gt_bin_spectra:
                     self.gt_bin_fluxes = torch.stack(self.gt_bin_fluxes).view(
                         self.dataset_length, 1, -1).detach().cpu().numpy()
+                    self.gt_bin_spectra_losses = torch.stack(
+                        self.gt_bin_spectra_losses).detach().cpu().numpy()
                 if self.plot_optimal_wrong_bin_spectra:
                     self.optimal_wrong_bin_fluxes = torch.stack(
                         self.optimal_wrong_bin_fluxes
                     ).view(self.dataset_length, 1, -1).detach().cpu().numpy()
+                    self.optimal_wrong_bin_spectra_losses = torch.stack(
+                        self.optimal_wrong_bin_spectra_losses).detach().cpu().numpy()
         else:
             if self.main_infer:
                 if self.recon_spectra_pixels_only:
@@ -1253,9 +1259,15 @@ class AstroInferrer(BaseInferrer):
                     self.recon_fluxes.extend(fluxes)
                     if self.plot_gt_bin_spectra:
                         self.gt_bin_fluxes.extend(ret["gt_bin_spectra"])
+                        gt_bin_losses = self._get_gt_bin_spectra_losses(ret, data)
+                        # print('*', gt_bin_losses)
+                        self.gt_bin_spectra_losses.extend(gt_bin_losses)
                     if self.plot_optimal_wrong_bin_spectra:
-                        wrong_bin_fluxes = self._get_optimal_wrong_bin_fluxes(ret, data)
+                        wrong_bin_fluxes, wrong_bin_losses = \
+                            self._get_optimal_wrong_bin_fluxes(ret, data)
                         self.optimal_wrong_bin_fluxes.extend(wrong_bin_fluxes)
+                        # print('**', wrong_bin_losses)
+                        self.optimal_wrong_bin_spectra_losses.extend(wrong_bin_losses)
 
                 if self.recon_spectra_all_bins:
                     self.recon_fluxes_all.extend(
@@ -1464,7 +1476,6 @@ class AstroInferrer(BaseInferrer):
 
         ids = np.arange(len(self.redshift_residual))
         outlier = ids[np.abs(self.redshift_residual) > self.extra_args["redshift_bin_width"]]
-        # outlier = np.array([0,37,87])
         outlier_gt = gt_redshift[outlier]
         outlier_est = argmax_redshift[outlier]
         to_save = np.array(list(outlier) + list(outlier_gt) + list(outlier_est)).reshape(3,-1)
@@ -1632,8 +1643,10 @@ class AstroInferrer(BaseInferrer):
             self.recon_fluxes = self.recon_fluxes[ids]
             if self.plot_gt_bin_spectra:
                 self.gt_bin_fluxes = self.gt_bin_fluxes[ids]
+                self.gt_bin_spectra_losses = self.gt_bin_spectra_losses[ids]
             if self.plot_optimal_wrong_bin_spectra:
                 self.optimal_wrong_bin_fluxes = self.optimal_wrong_bin_fluxes[ids]
+                self.wrong_bin_spectra_losses = self.wrong_bin_spectra_losses[ids]
             num_spectra = len(ids)
 
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
@@ -1647,9 +1660,11 @@ class AstroInferrer(BaseInferrer):
 
             if self.plot_gt_bin_spectra:
                 recon_fluxes2 = self.gt_bin_fluxes[lo:hi]
+                recon_losses2 = self.gt_bin_spectra_losses[lo:hi]
             else: recon_fluxes2 = None
             if self.plot_optimal_wrong_bin_spectra:
                 recon_fluxes3 = self.optimal_wrong_bin_fluxes[lo:hi]
+                recon_losses3 = self.optimal_wrong_bin_spectra_losses[lo:hi]
             else: recon_fluxes3 = None
 
             cur_metrics = self.dataset.plot_spectrum(
@@ -1657,8 +1672,8 @@ class AstroInferrer(BaseInferrer):
                 self.extra_args["flux_norm_cho"],
                 self.gt_wave[lo:hi], self.gt_fluxes[lo:hi],
                 self.recon_wave[lo:hi], self.recon_fluxes[lo:hi],
-                recon_fluxes2=recon_fluxes2,
-                recon_fluxes3=recon_fluxes3,
+                recon_fluxes2=recon_fluxes2, recon_losses2=recon_losses2,
+                recon_fluxes3=recon_fluxes3, recon_losses3=recon_losses3,
                 clip=self.extra_args["plot_clipped_spectrum"],
                 gt_masks=self.gt_masks[lo:hi],
                 recon_masks=self.recon_masks[lo:hi]
@@ -1742,16 +1757,25 @@ class AstroInferrer(BaseInferrer):
 
         log.info("all bin spectrum plotting done")
 
+    def _get_gt_bin_spectra_losses(self, ret, data):
+        fluxes = ret["spectra_all_bins"] # [nbins,bsz,nsmpl]
+        all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
+        bsz = len(all_bin_losses)
+        gt_bin_losses = all_bin_losses[data["gt_redshift_bin_masks"]]
+        return gt_bin_losses
+
     def _get_optimal_wrong_bin_fluxes(self, ret, data):
         fluxes = ret["spectra_all_bins"] # [nbins,bsz,nsmpl]
         all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
         bsz = len(all_bin_losses)
         wrong_bin_losses = all_bin_losses[
             ~data["gt_redshift_bin_masks"]].reshape(bsz,-1)
-        _, ids = torch.min(wrong_bin_losses, dim=-1) # ids of optimal wrong bins
+        # print(torch.min(wrong_bin_losses))
+        wrong_bin_losses, ids = torch.min(
+            wrong_bin_losses, dim=-1) # ids of optimal wrong bins
         ids = create_batch_ids(ids.detach().cpu().numpy())
         fluxes = fluxes[ids[1],ids[0]]
-        return fluxes
+        return fluxes, wrong_bin_losses
 
     def configure_img_metrics(self):
         self.metric_options = self.extra_args["metric_options"]

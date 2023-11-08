@@ -182,18 +182,15 @@ def get_pretrained_model_fname(log_dir, dname, model_fname):
     """ Format checkpoint fname from given experiemnt directory.
     """
     if dname is not None:
-        pretrained_model_dir = join(log_dir, "..", dname)
+        pretrained_dir = join(log_dir, "..", dname)
     else:
         # if log dir not specified, use last directory (exclude newly created one)
         dnames = os.listdir(join(log_dir, ".."))
         assert(len(dnames) > 1)
         dnames.sort()
-        pretrained_model_dir = join(log_dir, "..", dnames[-2])
+        pretrained_dir = join(log_dir, "..", dnames[-2])
 
-    loss_fname = join(pretrained_model_dir, "losses", "loss.npy")
-
-    pretrained_model_dir = join(pretrained_model_dir, "models")
-
+    pretrained_model_dir = join(pretrained_dir, "models")
     if model_fname is not None:
         pretrained_model_fname = join(pretrained_model_dir, model_fname)
     else:
@@ -202,7 +199,7 @@ def get_pretrained_model_fname(log_dir, dname, model_fname):
         fnames = sort_alphanumeric(fnames)
         pretrained_model_fname = join(pretrained_model_dir, fnames[-1])
 
-    return pretrained_model_fname, loss_fname
+    return pretrained_dir, pretrained_model_fname
 
 def set_seed(seed: int = 42) -> None:
     random.seed(seed)

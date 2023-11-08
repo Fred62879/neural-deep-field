@@ -1040,8 +1040,8 @@ class SpectraData:
                                    save_spectra, calculate_metrics, idx, pargs):
         """ Plot one spectrum and save as required.
         """
-        sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux, recon_flux2, \
-            recon_flux3, plot_gt_spectrum, plot_recon_spectrum = pargs
+        sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux, recon_flux2, recon_loss2, \
+            recon_flux3, recon_loss3, plot_gt_spectrum, plot_recon_spectrum = pargs
 
         if self.kwargs["plot_spectrum_together"]:
             if nrows == 1: axis = axs if ncols == 1 else axs[idx%ncols]
@@ -1058,8 +1058,7 @@ class SpectraData:
                 gt_flux, recon_flux, sub_dir, axis)
         else: metrics, above_threshold = None, None
 
-        if title is None: title = idx
-        axis.set_title(title)
+        if title is None: title = str(idx)
 
         if plot_gt_spectrum:
             axis.plot(gt_wave, gt_flux, color="gray", label="gt", linestyle="dotted")
@@ -1072,8 +1071,12 @@ class SpectraData:
             else: axis.plot(recon_wave, recon_flux, color="blue", label="recon")
         if recon_flux2 is not None:
             axis.plot(recon_wave, recon_flux2, color="red", label="gt bin")
+            title += f": {recon_loss2:.{3}f}"
         if recon_flux3 is not None:
             axis.plot(recon_wave, recon_flux3, color="green", label="wrong bin")
+            title += f"/{recon_loss3:.{3}f}"
+
+        axis.set_title(title)
 
         if sub_dir != "":
             if sub_dir[-1] == "_": sub_dir = sub_dir[:-1]
@@ -1108,8 +1111,8 @@ class SpectraData:
                                    spectra_clipped, calculate_metrics, data):
         """ Collect data for spectrum plotting for the given spectra.
         """
-        (title, gt_wave, gt_mask, gt_flux,
-         recon_wave, recon_mask, recon_flux, recon_flux2, recon_flux3) = data
+        (title, gt_wave, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux,
+         recon_flux2, recon_loss2, recon_flux3, recon_loss3) = data
 
         sub_dir = str(self.kwargs["spectra_neighbour_size"]) + "_neighbours_"
         if self.gt_convolved:       sub_dir += "convolved_"
@@ -1159,14 +1162,15 @@ class SpectraData:
                 flux_norm_cho, None, recon_flux3)
 
         pargs = (sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux,
-                 recon_flux2, recon_flux3, plot_gt_spectrum, plot_recon_spectrum)
+                 recon_flux2, recon_loss2, recon_flux3, recon_loss3,
+                 plot_gt_spectrum, plot_recon_spectrum)
         return pargs
 
     def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
                       gt_wave, gt_fluxes,
                       recon_wave, recon_fluxes,
-                      recon_fluxes2=None,
-                      recon_fluxes3=None,
+                      recon_fluxes2=None, recon_losses2=None,
+                      recon_fluxes3=None, recon_losses3=None,
                       is_codebook=False,
                       save_spectra=False,
                       save_spectra_together=False,
@@ -1207,7 +1211,9 @@ class SpectraData:
         if gt_fluxes is None: gt_fluxes = [None]*n
         if recon_masks is None: recon_masks = [None]*n
         if recon_fluxes2 is None: recon_fluxes2 = [None]*n
+        if recon_losses2 is None: recon_losses2 = [None]*n
         if recon_fluxes3 is None: recon_fluxes3 = [None]*n
+        if recon_losses3 is None: recon_losses3 = [None]*n
 
         assert gt_fluxes[0] is None or \
             (len(gt_wave) == n and len(gt_fluxes) == n and len(gt_masks) == n)
@@ -1233,8 +1239,8 @@ class SpectraData:
                                 calculate_metrics)
         metrics = []
         for idx, cur_plot_data in enumerate(
-            zip(titles, gt_wave, gt_masks, gt_fluxes,
-                recon_wave, recon_masks, recon_fluxes, recon_fluxes2, recon_fluxes3)
+            zip(titles, gt_wave, gt_masks, gt_fluxes, recon_wave, recon_masks, recon_fluxes,
+                recon_fluxes2, recon_losses2, recon_fluxes3, recon_losses3)
         ):
             pargs = process_data(cur_plot_data)
             sub_dir, cur_metrics = plot_and_save(idx, pargs)

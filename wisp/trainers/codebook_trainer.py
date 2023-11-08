@@ -219,20 +219,25 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_loss:
             self.loss_fname = join(self.loss_dir, "loss")
             if self.neg_sup_wrong_redshift:
+                self.gt_bin_loss_fname = join(self.loss_dir, "gt_bin_loss")
                 self.wrong_bin_loss_fname = join(self.loss_dir, "wrong_bin_loss")
 
         if self.mode == "redshift_pretrain":
             # redshift pretrain use pretrained model from codebook pretrain
-            self.pretrained_model_fname, _ = get_pretrained_model_fname(
+            _, self.pretrained_model_fname = get_pretrained_model_fname(
                 self.log_dir,
                 self.extra_args["pretrain_log_dir"],
                 self.extra_args["pretrained_model_name"])
 
         if self.extra_args["resume_train"]:
-            self.resume_train_model_fname, self.resume_loss_fname = get_pretrained_model_fname(
+            pretrained_dir, self.resume_train_model_fname = get_pretrained_model_fname(
                 self.log_dir,
                 self.extra_args["resume_log_dir"],
                 self.extra_args["resume_model_fname"])
+
+            self.resume_loss_fname = join(pretrained_dir, "losses", "loss.npy")
+            self.resume_gt_bin_loss_fname = join(pretrained_dir, "losses", "gt_bin_loss.npy")
+            self.resume_wrong_bin_loss_fname = join(pretrained_dir, "losses", "wrong_bin_loss.npy")
 
         if self.extra_args["plot_logits_for_gt_bin"]:
             self.gt_bin_logits_fname = join(self.log_dir, "gt_bin_logits")
@@ -400,6 +405,7 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_loss:
             self.losses = []
             if self.neg_sup_wrong_redshift:
+                self.gt_bin_losses = []
                 self.wrong_bin_losses = []
         if self.extra_args["plot_individ_spectra_loss"]:
             self.spectra_individ_losses = []
@@ -452,6 +458,7 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_loss:
             self._plot_loss(self.losses, self.loss_fname)
             if self.neg_sup_wrong_redshift:
+                self._plot_loss(self.gt_bin_losses, self.gt_bin_loss_fname)
                 self._plot_loss(self.wrong_bin_losses, self.wrong_bin_loss_fname)
             if self.extra_args["plot_individ_spectra_loss"]:
                 self._plot_individ_spectra_loss()
@@ -564,6 +571,8 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_loss:
             self.losses.append(total_loss)
             if self.neg_sup_wrong_redshift and self.cur_neg_sup_round == "codebook":
+                self.gt_bin_losses.append(
+                    self.log_dict["gt_bin_losses"] / len(self.train_data_loader))
                 self.wrong_bin_losses.append(
                     self.log_dict["wrong_bin_losses"] / len(self.train_data_loader))
 
@@ -599,7 +608,7 @@ class CodebookTrainer(BaseTrainer):
         super().init_log_dict()
         self.log_dict["pixel_loss"] = 0.0
         self.log_dict["spectra_loss"] = 0.0
-        self.log_dict["bin_loss_diff"] = 0.0
+        self.log_dict["gt_bin_losses"] = 0.0
         self.log_dict["wrong_bin_losses"] = 0.0
         self.log_dict["redshift_logits_regu"] = 0.0
         self.log_dict["codebook_latents_regu"] = 0.0
@@ -879,6 +888,11 @@ class CodebookTrainer(BaseTrainer):
             if self.plot_loss:
                 if exists(self.resume_loss_fname):
                     self.losses = list(np.load(self.resume_loss_fname))
+                if self.neg_sup_wrong_redshift:
+                    if exists(self.resume_gt_bin_loss_fname):
+                        self.gt_bin_losses = list(np.load(self.resume_gt_bin_loss_fname))
+                    if exists(self.resume_wrong_bin_loss_fname):
+                        self.wrong_bin_losses = list(np.load(self.resume_wrong_bin_loss_fname))
                 if self.extra_args["plot_individ_spectra_loss"]:
                     fname = self.resume_loss_fname[:-4] + "_individ.npy"
                     if exists(fname):
@@ -1307,10 +1321,11 @@ class CodebookTrainer(BaseTrainer):
 
             if self.extra_args["neg_sup_with_best_wrong_bin"]:
                 wrong_bin_min_losses, _ = torch.min(wrong_bin_losses, dim=-1) # [bsz]
+                self.log_dict["wrong_bin_losses"] += torch.mean(wrong_bin_min_losses).item()
                 wrong_bin_losses = self.extra_args["neg_sup_constant"] - wrong_bin_min_losses
                 wrong_bin_losses[wrong_bin_losses < 0] = 0
             else:
-                # print(torch.min(wrong_bin_losses, dim=-1), torch.max(wrong_bin_losses, dim=-1))
+                self.log_dict["wrong_bin_losses"] += torch.mean(wrong_bin_losses).item()
                 wrong_bin_losses = self.extra_args["neg_sup_constant"] - wrong_bin_losses
                 # stop training on bins with negative loss [bsz,nbins-1]
                 wrong_bin_losses[wrong_bin_losses < 0] = 0
@@ -1319,9 +1334,7 @@ class CodebookTrainer(BaseTrainer):
 
             gt_bin_losses = torch.mean(gt_bin_losses)
             wrong_bin_losses = torch.mean(wrong_bin_losses)
-            print(wrong_bin_losses)
-            # self.log_dict["wrong_bin_losses"] += wrong_bin_losses.item()
-            # self.log_dict["bin_loss_diff"] += (gt_bin_losses - wrong_bin_losses).item()
+            self.log_dict["gt_bin_losses"] += gt_bin_losses.item()
             spectra_loss = gt_bin_losses + self.extra_args["neg_sup_beta"] * wrong_bin_losses
         else:
             raise ValueError()
@@ -1341,10 +1354,12 @@ class CodebookTrainer(BaseTrainer):
         if self.pixel_supervision:
             log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / n)
         if self.neg_sup_wrong_redshift:
-            log_text += " | bin loss diff: {:>.3E}".format(
-                self.log_dict["bin_loss_diff"] / n)
+            # print(self.log_dict["gt_bin_losses"]/n, self.log_dict["wrong_bin_losses"]/n)
+            log_text += " | gt bin loss: {:>.3E}".format(
+                self.log_dict["gt_bin_losses"] / n)
             log_text += " | wrong bin loss: {:>.3E}".format(
                 self.log_dict["wrong_bin_losses"] / n)
+
         if self.regularize_redshift_logits:
             log_text += " | redshift logits regu: {:>.3E}".format(
                 self.log_dict["redshift_logits_regu"] / n)
