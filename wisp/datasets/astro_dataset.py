@@ -583,4 +583,4 @@ class AstroDataset(Dataset):
             spectra_ids=spectra_ids,
             gt_masks=gt_masks, recon_masks=recon_masks,
             clip=clip, spectra_clipped=spectra_clipped,
-            calculate_metrics=True, titles=titles)
+            calculate_metrics=calculate_metrics, titles=titles)

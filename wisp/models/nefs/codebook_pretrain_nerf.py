@@ -57,7 +57,8 @@ class CodebookPretrainNerf(BaseNeuralField):
             if get_bool_classify_redshift(**self.kwargs):
                 channels.append("redshift_logits")
                 if self.kwargs["calculate_binwise_spectra_loss"]:
-                    channels.extend(["spectra_binwise_loss","spectra_all_bins","optm_bin_ids"])
+                    channels.extend([
+                        "spectra_binwise_loss","spectra_all_bins","optimal_bin_ids"])
                     if self.kwargs["plot_spectrum_under_gt_bin"]:
                         channels.append("gt_bin_spectra")
 

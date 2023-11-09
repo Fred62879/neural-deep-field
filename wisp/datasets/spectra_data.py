@@ -1095,15 +1095,14 @@ class SpectraData:
 
         return sub_dir, metrics
 
-    def process_recon_flux(self, recon_flux, recon_mask, clip, spectra_clipped, recon_wave=None):
+    def process_recon_flux(self, recon_flux, recon_mask, clip, spectra_clipped, recon_wave):
         if recon_flux.ndim == 2:
             if self.kwargs["average_neighbour_spectra"]:
                 recon_flux = np.mean(recon_flux, axis=0)
             else: recon_flux = recon_flux[0]
         else: assert(recon_flux.ndim == 1)
         if clip and not spectra_clipped:
-            if recon_wave is not None:
-                recon_wave = recon_wave[recon_mask]
+            recon_wave = recon_wave[recon_mask]
             recon_flux = recon_flux[recon_mask]
         return recon_wave, recon_flux
 
@@ -1127,19 +1126,21 @@ class SpectraData:
             gt_flux = gt_flux[gt_mask]
 
         if plot_recon_spectrum:
-            recon_wave, recon_flux = self.process_recon_flux(
-                recon_flux, recon_mask, clip, spectra_clipped, recon_wave=recon_wave)
+            recon_wave_p, recon_flux = self.process_recon_flux(
+                recon_flux, recon_mask, clip, spectra_clipped, recon_wave)
         if recon_flux2 is not None:
-            _, recon_flux2 = self.process_recon_flux(
-                recon_flux2, recon_mask, clip, spectra_clipped)
+            recon_wave_p, recon_flux2 = self.process_recon_flux(
+                recon_flux2, recon_mask, clip, spectra_clipped, recon_wave)
         if recon_flux3 is not None:
-            _, recon_flux3 = self.process_recon_flux(
-                recon_flux3, recon_mask, clip, spectra_clipped)
+            recon_wave_p, recon_flux3 = self.process_recon_flux(
+                recon_flux3, recon_mask, clip, spectra_clipped, recon_wave)
+
+        recon_wave = recon_wave_p
 
         # recon and gt spectra differ in shape, to calculate metrics, we do interpolation
-        if calculate_metrics and not \
+        if plot_recon_spectrum and calculate_metrics and not \
            ( recon_wave.shape == gt_wave.shape and (recon_wave == gt_wave).all() ):
-            if wave_within_bound(recon_wave, gt_wave):
+            if not wave_within_bound(recon_wave, gt_wave):
                 f = interp1d(gt_wave, gt_flux)
                 gt_flux = f(recon_wave)
                 gt_wave = recon_wave
@@ -1204,7 +1205,7 @@ class SpectraData:
              metrics: [n_spectra,n_metrics]
         """
         assert not clip or (recon_masks is not None or spectra_clipped)
-        calculate_metrics = not is_codebook and (clip or spectra_clipped) and calculate_metrics
+        calculate_metrics = calculate_metrics and not is_codebook and (clip or spectra_clipped)
 
         n = len(recon_wave)
         if titles is None: titles = [None]*n

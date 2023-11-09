@@ -39,6 +39,15 @@ def get_bool_has_redshift_latents(**kwargs):
         not kwargs["use_binwise_spectra_loss_as_redshift_logits"] and \
         not kwargs["optimize_codebook_latents_for_each_redshift_bin"]
 
+def get_optimal_wrong_bin_ids(ret, data):
+    """ Get id of the non-GT redshift bin that achieves the lowest spectra loss.
+    """
+    all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
+    all_bin_losses[data["gt_redshift_bin_masks"]] = float('inf')
+    optimal_wrong_bin_losses, optimal_wrong_bin_ids = torch.min(
+        all_bin_losses, dim=-1) # ids of optimal wrong bins
+    return optimal_wrong_bin_ids, optimal_wrong_bin_losses
+
 def get_bin_id(lo, bin_width, val):
     val = val - bin_width / 2
     n = (val - lo) / bin_width
@@ -400,9 +409,9 @@ def forward(
         save_redshift=False,
         save_embed_ids=False,
         save_qtz_weights=False,
-        save_optm_bin_ids=False,
         save_codebook_loss=False,
         save_gt_bin_spectra=False,
+        save_optimal_bin_ids=False,
         save_codebook_logits=False,
         save_redshift_logits=False,
         save_codebook_latents=False,
@@ -430,9 +439,9 @@ def forward(
         if save_redshift: requested_channels.append("redshift")
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if save_qtz_weights: requested_channels.append("qtz_weights")
-        if save_optm_bin_ids: requested_channels.append("optm_bin_ids")
         if save_codebook_loss: requested_channels.append("codebook_loss")
         if save_gt_bin_spectra: requested_channels.append("gt_bin_spectra")
+        if save_optimal_bin_ids: requested_channels.append("optimal_bin_ids")
         if save_codebook_logits: requested_channels.append("codebook_logits")
         if save_redshift_logits: requested_channels.append("redshift_logits")
         if save_codebook_latents: requested_channels.append("codebook_latents")

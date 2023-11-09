@@ -155,7 +155,7 @@ class HyperSpectralDecoderB(nn.Module):
             # index with argmax, this spectra is for visualization only
             #  optimization relies on spectra loss calculated for each bin
             ids = torch.argmax(ret["redshift_logits"], dim=-1)
-            ret["optm_bin_ids"] = ids
+            ret["optimal_bin_ids"] = ids
             ids = torch.tensor(
                 create_batch_ids(ids.detach().cpu().numpy()), dtype=ids.dtype
             ).to(ids.device)

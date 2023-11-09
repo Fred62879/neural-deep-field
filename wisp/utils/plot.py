@@ -34,6 +34,17 @@ def plot_multiple(n_per_fig, n_per_row, data, fname, x=None,
     n = len(data)
     n_figs = int(np.ceil(n / n_per_fig))
 
+    def _plot(axis, idx, x, y, hist):
+        # plot a single subplot
+        if x is None:
+            if hist:
+                bins = np.arange(len(y[idx]) + 1) - 0.5
+                axis.hist(bins[:-1], bins, weights=y[idx])
+            else: axis.plot(y[idx])
+        else:
+            if hist: axis.hist(x, weights=y[idx])
+            else:    axis.plot(x, y[idx])
+
     for i in range(n_figs):
         lo = i * n_per_fig
         hi = min(lo + n_per_fig, n)
@@ -46,17 +57,8 @@ def plot_multiple(n_per_fig, n_per_row, data, fname, x=None,
         for j in range(cur_n):
             if nrows == 1: axis = axs if ncols == 1 else axs[j%ncols]
             else:          axis = axs[j//ncols, j%ncols]
-            if x is None:
-                if hist:
-                    bins = np.arange(len(data[lo+j]) + 1) - 0.5
-                    axis.hist(bins[:-1], bins, weights=data[lo+j])
-                else: axis.plot(data[lo+j])
-            else:
-                if hist: axis.hist(x, weights=data[lo+j])
-                else:    axis.plot(x, data[lo+j])
-            # if y2 is not None:
-            #     if x is None: _plot(axis, y2[lo+j], color="orange", hist=hist)
-            #     else:         _plot(axis, x, y2[lo+j], color="orange", hist=hist)
+            _plot(axis, lo+j, x, data, hist)
+            if y2 is not None: _plot(axis, lo+j, x, y2, hist=hist)
 
             # plot vertical line to indicate e.g. gt location
             if vertical_xs is not None:

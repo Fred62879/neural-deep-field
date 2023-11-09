@@ -27,7 +27,7 @@ from wisp.loss import spectra_supervision_loss, \
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     select_inferrence_ids, load_embed, load_model_weights, forward, \
     load_pretrained_model_weights, get_pretrained_model_fname, init_redshift_bins, \
-    get_bool_classify_redshift, get_bool_has_redshift_latents, \
+    get_bool_classify_redshift, get_bool_has_redshift_latents, get_optimal_wrong_bin_ids, \
     freeze_layers_incl, freeze_layers_excl, get_loss, create_latent_mask, set_seed, log_data
 
 
@@ -1281,38 +1281,37 @@ class CodebookTrainer(BaseTrainer):
     def _calculate_neg_sup_loss(self, ret, data):
         """ Calculate spectra loss under negative supervision settings.
         """
-        if self.cur_neg_sup_target == "latents":
-            # optimize latents for all bins
-            spectra_loss = torch.mean(ret["spectra_binwise_loss"])
-        elif self.cur_neg_sup_target == "net":
-            # regularize wrong bins to fit poorly with the current codebook
-            all_bin_losses = ret["spectra_binwise_loss"] # [bsz,n_bins]
-            bsz = len(all_bin_losses)
-            gt_bin_losses = all_bin_losses[data["gt_redshift_bin_masks"]]
-            wrong_bin_losses = all_bin_losses[
-                ~data["gt_redshift_bin_masks"]].reshape(-1,self.num_redshift_bins-1)
+        all_bin_losses = ret["spectra_binwise_loss"] # [bsz,n_bins]
+        gt_bin_losses = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
+        self.log_dict["gt_bin_losses"] += gt_bin_losses.item()
 
-            if self.extra_args["neg_sup_with_best_wrong_bin"]:
-                wrong_bin_min_losses, _ = torch.min(wrong_bin_losses, dim=-1) # [bsz]
-                self.log_dict["wrong_bin_losses"] += torch.mean(wrong_bin_min_losses).item()
-                wrong_bin_losses = self.extra_args["neg_sup_constant"] - wrong_bin_min_losses
+        if self.cur_neg_sup_target == "latents":
+            spectra_loss = torch.mean(ret["spectra_binwise_loss"])
+            _, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(ret, data)
+            self.log_dict["wrong_bin_losses"] += torch.mean(optimal_wrong_bin_losses).item()
+
+        elif self.cur_neg_sup_target == "net":
+            if self.extra_args["neg_sup_with_optimal_wrong_bin"]:
+                _, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(ret, data)
+                self.log_dict["wrong_bin_losses"] += torch.mean(
+                    optimal_wrong_bin_losses).item()
+                wrong_bin_losses = self.extra_args["neg_sup_constant"] - optimal_wrong_bin_losses
                 wrong_bin_losses[wrong_bin_losses < 0] = 0
             else:
+                wrong_bin_losses = all_bin_losses[~data["gt_redshift_bin_masks"]] # [n,]
                 self.log_dict["wrong_bin_losses"] += torch.mean(wrong_bin_losses).item()
                 wrong_bin_losses = self.extra_args["neg_sup_constant"] - wrong_bin_losses
-                # stop training on bins with negative loss [bsz,nbins-1]
                 wrong_bin_losses[wrong_bin_losses < 0] = 0
                 wrong_bin_losses = torch.sum(wrong_bin_losses, dim=-1) / \
                     (self.num_redshift_bins-1)
 
-            gt_bin_losses = torch.mean(gt_bin_losses)
             wrong_bin_losses = torch.mean(wrong_bin_losses)
-            self.log_dict["gt_bin_losses"] += gt_bin_losses.item()
-            self.log_dict["wrong_bin_regus"] += \
-                self.extra_args["neg_sup_beta"] * wrong_bin_losses.item()
-            spectra_loss = gt_bin_losses + self.extra_args["neg_sup_beta"] * wrong_bin_losses
+            wrong_bin_regus = self.extra_args["neg_sup_beta"] * wrong_bin_losses
+            self.log_dict["wrong_bin_regus"] += wrong_bin_regus.item()
+            spectra_loss = gt_bin_losses + wrong_bin_regus
         else:
             raise ValueError()
+
         return spectra_loss
 
     def log_cli(self):
@@ -1364,7 +1363,6 @@ class CodebookTrainer(BaseTrainer):
             elif self.cur_neg_sup_target == "net":
                 self._toggle_codebook_latents_grad(on_off)
             else: raise ValueError()
-        else: raise ValueError()
 
     def _toggle_net_grad(self, on_off):
         for n,p in self.train_pipeline.named_parameters():
@@ -1416,12 +1414,7 @@ class CodebookTrainer(BaseTrainer):
             else: net_params.append(self.params_dict[name])
 
         latents_group, net_params_group = [], []
-        if self.use_lbfgs:
-            assert self.optimize_codebook_latents_as_logits
-            latents_group.append(codebook_latents)
-        else:
-            latents_group.append({"params": codebook_latents,
-                                  "lr": self.extra_args["codebook_latents_lr"]})
+        self._add_codebook_latents(codebook_latents, latents_group)
         net_params_group.append({"params": net_params,
                                  "lr": self.extra_args["codebook_pretrain_lr"]})
         return latents_group, net_params_group
@@ -1474,6 +1467,14 @@ class CodebookTrainer(BaseTrainer):
         if self.optimize_latents_alternately:
             return codebook_latents_group, redshift_latents_group, net_params_group
         return latents_group, net_params_group
+
+    def _add_codebook_latents(self, codebook_latents, latents_group):
+        if self.use_lbfgs:
+            assert self.optimize_codebook_latents_as_logits
+            latents_group.append(codebook_latents)
+        else:
+            latents_group.append({"params": codebook_latents,
+                                  "lr": self.extra_args["codebook_latents_lr"]})
 
     def _add_redshift_latents(self, redshift_latents, redshift_logit_params,
                               latents_group, net_params_group
