@@ -1135,7 +1135,9 @@ class SpectraData:
             recon_wave_p, recon_flux3 = self.process_recon_flux(
                 recon_flux3, recon_mask, clip, spectra_clipped, recon_wave)
 
-        recon_wave = recon_wave_p
+        plot_recon_spectrum = plot_recon_spectrum or recon_flux2 is not None or \
+            recon_flux3 is not None
+        if plot_recon_spectrum: recon_wave = recon_wave_p
 
         # recon and gt spectra differ in shape, to calculate metrics, we do interpolation
         if plot_recon_spectrum and calculate_metrics and not \

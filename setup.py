@@ -106,24 +106,25 @@ def get_extensions():
     return extensions
 
 if __name__ == '__main__':
-    setup(
-        # Metadata
-        name=PACKAGE_NAME,
-        version=version,
-        author=AUTHOR,
-        description=DESCRIPTION,
-        url=URL,
-        license=LICENSE,
-        python_requires='>=3.8',
+    # setup(
+    #     # Metadata
+    #     name=PACKAGE_NAME,
+    #     version=version,
+    #     author=AUTHOR,
+    #     description=DESCRIPTION,
+    #     url=URL,
+    #     license=LICENSE,
+    #     python_requires='>=3.8',
 
-        # Package info
-        packages=['wisp'] + find_packages(),
-        #package_dir={'':'wisp'},
-        include_package_data=True,
-        zip_safe=True,
-        ext_modules=get_extensions(),
-        cmdclass={
-            'build_ext': BuildExtension.with_options(no_python_abi_suffix=True)
-        }
+    #     # Package info
+    #     packages=['wisp'] + find_packages(),
+    #     #package_dir={'':'wisp'},
+    #     include_package_data=True,
+    #     zip_safe=True,
+    #     ext_modules=get_extensions(),
+    #     cmdclass={
+    #         'build_ext': BuildExtension.with_options(no_python_abi_suffix=True)
+    #     }
 
-    )
+    # )
+    setup(package=["wisp"])

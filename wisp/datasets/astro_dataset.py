@@ -347,7 +347,9 @@ class AstroDataset(Dataset):
                selected_ids: select from source data (filter index)
                idx: dataset index (batch index)
         """
-        if self.mode == "codebook_pretrain_infer" and self.infer_selected:
+        if self.infer_selected:
+            assert self.mode == "codebook_pretrain_infer" or \
+                self.mode == "redshift_pretrain_infer"
             assert "selected_ids" in self.data
             data = data[self.data["selected_ids"]]
         return data[idx]
