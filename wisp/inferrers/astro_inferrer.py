@@ -285,6 +285,7 @@ class AstroInferrer(BaseInferrer):
         self.save_codebook_latents = "save_codebook_latents" in tasks
         self.recon_spectra_all_bins = "recon_spectra_all_bins" in tasks
         self.plot_binwise_spectra_loss = "plot_binwise_spectra_loss" in tasks
+        self.plot_codebook_coeff_all_bins = "plot_codebook_coeff_all_bins" in tasks
 
         self.plot_gt_bin_spectra = not self.recon_spectra_all_bins and \
             self.extra_args["plot_spectrum_under_gt_bin"]
@@ -301,10 +302,13 @@ class AstroInferrer(BaseInferrer):
         assert not self.plot_binwise_spectra_loss or self.calculate_binwise_spectra_loss
         assert not self.plot_optimal_wrong_bin_spectra or self.calculate_binwise_spectra_loss
         assert not self.plot_optimal_wrong_bin_codebook_coeff or self.calculate_binwise_spectra_loss
+        assert not self.plot_codebook_coeff_all_bins or (
+            self.qtz_spectra and self.calculate_binwise_spectra_loss)
         assert sum([self.recon_spectra, self.recon_spectra_all_bins]) <= 1
 
         self.recon_redshift = self.save_redshift or self.save_optimal_bin_ids or \
-            self.plot_redshift_logits or self.plot_binwise_spectra_loss
+            self.plot_redshift_logits or self.plot_binwise_spectra_loss or \
+            self.plot_codebook_coeff or self.plot_codebook_coeff_all_bins
 
         # iii) infer all coords using modified model (recon codebook spectra)
         #   either we have the codebook spectra for all coords
@@ -457,7 +461,8 @@ class AstroInferrer(BaseInferrer):
 
             self.requested_fields.extend([
                 "idx","spectra_source_data","spectra_masks","spectra_redshift"])
-            if self.plot_gt_bin_spectra or self.plot_optimal_wrong_bin_spectra:
+            if self.plot_gt_bin_spectra or self.plot_optimal_wrong_bin_spectra or \
+               self.recon_spectra_all_bins:
                 self.requested_fields.append("gt_redshift_bin_ids")
             if self.neg_sup_wrong_redshift or self.plot_optimal_wrong_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_masks")
@@ -845,6 +850,9 @@ class AstroInferrer(BaseInferrer):
             if self.plot_optimal_wrong_bin_codebook_coeff:
                 self.optimal_wrong_bin_ids_cc = []
 
+        if self.plot_codebook_coeff_all_bins:
+            self.codebook_coeff_all_bins = []
+
         if self.plot_redshift_logits:
             self.gt_redshift_l = []
             self.redshift_logits = []
@@ -970,6 +978,9 @@ class AstroInferrer(BaseInferrer):
 
         if self.recon_spectra_all_bins:
             self._recon_spectra_all_bins(num_spectra, model_id)
+
+        if self.plot_codebook_coeff_all_bins:
+            self._plot_codebook_coeff_all_bins(num_spectra, model_id)
 
         if self.plot_codebook_coeff:
             if self.infer_outlier_only:
@@ -1244,7 +1255,8 @@ class AstroInferrer(BaseInferrer):
                         save_qtz_weights=self.save_qtz_weights,
                         save_optimal_bin_ids=self.save_optimal_bin_ids,
                         save_gt_bin_spectra=self.plot_gt_bin_spectra,
-                        save_codebook_logits=self.plot_codebook_coeff,
+                        save_codebook_logits=self.plot_codebook_coeff or \
+                                             self.plot_codebook_coeff_all_bins,
                         save_redshift_logits=self.plot_redshift_logits,
                         save_codebook_latents=self.save_codebook_latents,
                         save_spectra_all_bins=self.recon_spectra_all_bins or \
@@ -1294,6 +1306,10 @@ class AstroInferrer(BaseInferrer):
                     if self.plot_optimal_wrong_bin_codebook_coeff:
                         ids, _ = get_optimal_wrong_bin_ids(ret, data)
                         self.optimal_wrong_bin_ids_cc.extend(ids)
+
+                if self.plot_codebook_coeff_all_bins:
+                    print(ret["codebook_logits"].shape)
+                    self.codebook_coeff_all_bins.extend(ret["codebook_logits"])
 
                 if self.plot_redshift_logits:
                     self.gt_redshift_l.extend(data["spectra_redshift"])
@@ -1804,6 +1820,46 @@ class AstroInferrer(BaseInferrer):
                 )
 
         log.info("all bin spectrum plotting done")
+
+    def _plot_codebook_coeff_all_bins(self, num_spectra, model_id):
+        """ Plot spectrum under all redshift for each spectra
+        """
+        codebook_coeff_all = self.codebook_coeff_all_bins.transpose(1,0,2) # [num_bins,bsz,nsmpl]
+        print(codebook_coeff_all.shape)
+        assert 0
+        assert num_spectra == codebook_coeff_all.shape[1]
+
+        num_bins = codebook_coeff_all.shape[0]
+        n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
+        n_figs_each = int(np.ceil(num_bins / n_spectrum_per_fig))
+        redshift_bins = init_redshift_bins(
+            self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
+            self.extra_args["redshift_bin_width"]).numpy()
+
+        spectra_ids = np.arange(self.dataset_length)
+        if self.infer_selected:
+            n = len(self._select_inferrence_ids())
+            spectra_dir = join(self.spectra_dir, f"selected-{n}")
+        else: spectra_dir = self.spectra_dir
+
+        for i in spectra_ids:
+            cur_dir = join(spectra_dir, f"{i}-all-bins")
+            Path(cur_dir).mkdir(parents=True, exist_ok=True)
+
+            titles = redshift_bins
+
+            for j in range(n_figs_each):
+                fname = f"model-{model_id}-plot{j}-all_bins"
+                lo = j * n_spectrum_per_fig
+                hi = min(lo + n_spectrum_per_fig, num_bins)
+                m = hi - lo
+
+                plot_multiple(
+                    self.extra_args["num_spectrum_per_fig"],
+                    self.extra_args["num_spectrum_per_row"],
+                    codebook_coeff[1], fname, hist=True)
+
+        log.info("all bin codebook coeff plotting done")
 
     def _get_gt_bin_spectra_losses(self, ret, data):
         all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
