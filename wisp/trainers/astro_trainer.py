@@ -15,7 +15,7 @@ from os.path import exists, join
 from torch.utils.data import BatchSampler, SequentialSampler, \
     RandomSampler, DataLoader
 
-from wisp.datasets import default_collate
+#from wisp.datasets import default_collate
 from wisp.datasets.patch_data import PatchData
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow

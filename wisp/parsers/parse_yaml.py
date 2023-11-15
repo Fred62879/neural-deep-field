@@ -101,6 +101,7 @@ def define_cmd_line_args():
     global_group.add_argument("--use-gpu", action="store_true")
     global_group.add_argument("--use-tqdm", action="store_true")
     global_group.add_argument("--on-cedar", action="store_true")
+    global_group.add_argument("--on-graham", action="store_true")
     global_group.add_argument("--print-shape", action="store_true")
     global_group.add_argument("--show-memory", action="store_true")
     global_group.add_argument("--activate-model-timer", action="store_true")
@@ -452,6 +453,7 @@ def define_cmd_line_args():
     data_group.add_argument("--dataset-path", type=str, help="Path to the dataset")
     data_group.add_argument("--cedar-dataset-path", type=str, help="Path to the dataset")
     data_group.add_argument("--cedar-input-fits-path", type=str, help="Path to the dataset")
+    data_group.add_argument("--graham-input-fits-path", type=str, help="Path to the dataset")
 
     data_group.add_argument("--dataset-num-workers", type=int, default=-1,
                             help="Number of workers for dataset preprocessing, \

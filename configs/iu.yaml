@@ -3,7 +3,8 @@ global:
     verbose: False
     use_gpu: True
     use_tqdm: False
-    on_cedar: True
+    on_cedar: False
+    on_graham: True
     print_shape: False
     show_memory: True
     activate_model_timer: False
@@ -376,6 +377,7 @@ dataset:
     dataset_path: '/scratch/projects/vision/data/pdr3'
     cedar_dataset_path: '/home/fred862/scratch/vision/data/pdr3'
     cedar_input_fits_path: '/home/fred862/projects/rrg-kyi/astro/hsc/pdr3_dud'
+    graham_input_fits_path: '/home/fred862/projects/rrg-kyi/astro/fred862/pdr3_dud'
 
     wave_range_fname: 'wave_range0.npy'
     coords_type: "img"

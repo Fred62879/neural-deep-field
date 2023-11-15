@@ -36,10 +36,6 @@ class SpectraData:
 
         self.device = device
         self.trans_obj = trans_obj
-        if kwargs["on_cedar"]:
-            self.dataset_path = kwargs["cedar_dataset_path"]
-        else: self.dataset_path = kwargs["dataset_path"]
-        self.set_path(self.dataset_path)
 
         self.num_bands = kwargs["num_bands"]
         self.space_dim = kwargs["space_dim"]
@@ -65,7 +61,11 @@ class SpectraData:
         self.trans_range = self.trans_obj.get_wave_range()
         self.gt_convolved = kwargs["convolve_spectra"]
 
+        if kwargs["on_cedar"] or kwargs["on_graham"]:
+            self.dataset_path = kwargs["cedar_dataset_path"]
+        else: self.dataset_path = kwargs["dataset_path"]
         self.set_path(self.dataset_path)
+
         self.load_accessory_data()
         self.load_spectra()
 
@@ -76,7 +76,11 @@ class SpectraData:
         """
         paths = []
         if self.kwargs["on_cedar"]:
-            self.input_patch_path = self.kwargs["input_fits_path"]
+            self.input_patch_path = self.kwargs["cedar_input_fits_path"]
+            _, img_data_path = set_input_path(
+                dataset_path, self.kwargs["sensor_collection_name"])
+        elif self.kwargs["on_graham"]:
+            self.input_patch_path = self.kwargs["graham_input_fits_path"]
             _, img_data_path = set_input_path(
                 dataset_path, self.kwargs["sensor_collection_name"])
         else:
@@ -557,7 +561,7 @@ class SpectraData:
         """
         # print(self.data["gt_spectra_redshift"][:20])
         num_bins = (self.data["gt_spectra_redshift"] - self.kwargs["redshift_lo"]) // self.kwargs["redshift_bin_width"]
-        num_bins = num_bins.astype(np.int)
+        num_bins = num_bins.astype(int)
         self.data["gt_spectra_redshift"] = num_bins * self.kwargs["redshift_bin_width"] + \
             self.kwargs["redshift_lo"] + self.kwargs["redshift_bin_width"] / 2
         # print(self.data["gt_spectra_redshift"][:20])
@@ -581,7 +585,10 @@ class SpectraData:
     def gather_processed_spectra(self):
         """ Load processed data for each spectra and save together.
         """
+        print(self.processed_metadata_table_fname)
         df = pandas.read_pickle(self.processed_metadata_table_fname)
+        print(df)
+        assert 0
         with open(self.gt_spectra_ids_fname, "rb") as fp:
             ids = pickle.load(fp)
         self.data["gt_spectra_ids"] = defaultdict(list, ids)
@@ -589,6 +596,8 @@ class SpectraData:
         img_coords, world_coords, spectra = [], [], []
         plot_masks, redshift, pixels = [], [], []
 
+        print(df)
+        assert 0
         n = len(df)
         for i in range(n):
             redshift.append(df.iloc[i]["zspec"])
@@ -603,6 +612,8 @@ class SpectraData:
             world_coords.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["world_coord_fname"]))[None,...])
 
+        print(pixels.shape)
+        assert 0
         self.data["full_emit_wave"] = np.load(self.emit_wave_coverage_fname)[0]
 
         # [n_spectra,4+2*nbands,nsmpl]

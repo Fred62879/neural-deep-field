@@ -6,5 +6,5 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
-from . import ops
-import wisp.config_parser
+# from . import ops
+# import wisp.config_parser

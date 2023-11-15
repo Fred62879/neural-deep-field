@@ -1,0 +1,15 @@
+astropy
+matplotlib
+pyyaml
+pandas
+tqdm
+Pillow
+scipy==1.5.2
+scikit-learn
+torch
+nvidia-ml-py3
+tifffile==2022.10.10
+networkx==3.0
+scikit-image==0.19.3
+requests
+configargparse

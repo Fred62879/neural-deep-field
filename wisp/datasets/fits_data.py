@@ -31,7 +31,7 @@ class FitsData:
 
         if not self.require_any_data(kwargs["tasks"]): return
 
-        if kwargs["on_cedar"]:
+        if kwargs["on_cedar"] or kwargs["on_graham"]:
             self.dataset_path = kwargs["cedar_dataset_path"]
         else: self.dataset_path = kwargs["dataset_path"]
 

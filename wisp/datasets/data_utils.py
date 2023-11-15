@@ -41,8 +41,10 @@ def patch_exists(path, tract, patch):
     return exists(fname)
 
 def get_wave_range_fname(**kwargs):
-    fname = join(
-        kwargs["dataset_path"], "input/wave", kwargs["wave_range_fname"])
+    if kwargs["on_cedar"] or kwargs["on_graham"]:
+        dataset_path = kwargs["cedar_dataset_path"]
+    else: dataset_path = kwargs["dataset_path"]
+    fname = join(dataset_path, "input/wave", kwargs["wave_range_fname"])
     return fname
 
 def get_coords_norm_range_fname(**kwargs):

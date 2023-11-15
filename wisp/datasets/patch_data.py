@@ -60,13 +60,13 @@ class PatchData:
 
         self.patch_uid = create_patch_uid(tract, patch)
 
-        if kwargs["on_cedar"]:
+        if kwargs["on_cedar"] or kwargs["on_graham"]:
             self.dataset_path = kwargs["cedar_dataset_path"]
         else: self.dataset_path = kwargs["dataset_path"]
         self.set_path(self.dataset_path)
 
-        self.verify_patch_exists(tract, patch)
-        if not self.patch_exists(): return
+        #self.verify_patch_exists(tract, patch)
+        #if not self.patch_exists(): return
 
         self.compile_patch_fnames()
         self.load_data()
@@ -104,7 +104,11 @@ class PatchData:
 
     def set_path(self, dataset_path):
         if self.kwargs["on_cedar"]:
-            self.input_patch_path = self.kwargs["input_fits_path"]
+            self.input_patch_path = self.kwargs["cedar_input_fits_path"]
+            _, img_data_path = set_input_path(
+                dataset_path, self.kwargs["sensor_collection_name"])
+        elif self.kwargs["on_graham"]:
+            self.input_patch_path = self.kwargs["graham_input_fits_path"]
             _, img_data_path = set_input_path(
                 dataset_path, self.kwargs["sensor_collection_name"])
         else:
@@ -328,6 +332,8 @@ class PatchData:
             self.cur_num_rows = num_rows
             self.cur_num_cols = num_cols
 
+        print(self.header)
+        assert 0
         self.header = header
 
     def load_patch(self):

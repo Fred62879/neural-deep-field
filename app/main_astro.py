@@ -3,6 +3,12 @@ if __name__ == "__main__":
 
     import logging as log
 
+    import os
+    from pathlib import Path
+    import sys
+    path_root = Path(__file__).parents[1]
+    sys.path.append(str(path_root))
+
     from wisp.astro_config_parser import *
     from wisp.parsers.parser import parse_args
     from wisp.trainers import AstroTrainer, CodebookTrainer

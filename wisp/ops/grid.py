@@ -10,10 +10,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import wisp._C as wisp_C
-import kaolin.ops.spc as spc_ops
+#import wisp._C as wisp_C
+#import kaolin.ops.spc as spc_ops
 
-from kaolin import _C
+#from kaolin import _C
 
 
 PRIMES = [1, 265443567, 805459861]

@@ -7,9 +7,9 @@
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
 from .base_nef import *
-from .neural_sdf import *
-from .nerf import *
-from .spc_field import *
+#from .neural_sdf import *
+#from .nerf import *
+#from .spc_field import *
 
 from .astro2d_nerf import *
 from .hyper_nerf import *

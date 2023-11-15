@@ -6,8 +6,7 @@ import torch.nn as nn
 import logging as log
 import wisp.ops.grid as grid_ops
 
-from wisp.models.grids import BLASGrid
-from wisp.utils import PsDebugger, PerfTimer
+from wisp.utils import PerfTimer
 
 
 class DenseGrid(nn.Module):

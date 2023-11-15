@@ -40,7 +40,7 @@ class TransData:
         self.smpl_interval = kwargs["trans_sample_interval"]
         assert(self.smpl_interval == 10)
 
-        if kwargs["on_cedar"]:
+        if kwargs["on_cedar"] or kwargs["on_graham"]:
             self.dataset_path = kwargs["cedar_dataset_path"]
         else: self.dataset_path = kwargs["dataset_path"]
         self.set_path(self.dataset_path)
@@ -266,8 +266,6 @@ class TransData:
               is raising error to matplotlib)
         """
         if exists(self.source_wave_fname) and exists(self.source_trans_fname):
-            print(self.source_wave_fname, self.source_trans_fname)
-            assert 0
             log.info(f"wave and transmission data cached.")
             with open(self.source_wave_fname, 'rb') as fp:
                 source_wave = pickle.load(fp)
