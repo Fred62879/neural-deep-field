@@ -59,7 +59,11 @@ class PatchData:
         self.qtz = kwargs["quantize_latent"] or kwargs["quantize_spectra"]
 
         self.patch_uid = create_patch_uid(tract, patch)
-        self.set_path(kwargs["dataset_path"])
+
+        if kwargs["on_cedar"]:
+            self.dataset_path = kwargs["cedar_dataset_path"]
+        else: self.dataset_path = kwargs["dataset_path"]
+        self.set_path(self.dataset_path)
 
         self.verify_patch_exists(tract, patch)
         if not self.patch_exists(): return
@@ -99,8 +103,13 @@ class PatchData:
             (hsc_patch_fname, nb_patch_fname, megau_weights_fname))
 
     def set_path(self, dataset_path):
-        self.input_patch_path, img_data_path = set_input_path(
-            dataset_path, self.kwargs["sensor_collection_name"])
+        if self.kwargs["on_cedar"]:
+            self.input_patch_path = self.kwargs["input_fits_path"]
+            _, img_data_path = set_input_path(
+                dataset_path, self.kwargs["sensor_collection_name"])
+        else:
+            self.input_patch_path, img_data_path = set_input_path(
+                dataset_path, self.kwargs["sensor_collection_name"])
 
         self.coords_norm_range_fname = get_coords_norm_range_fname(**self.kwargs)
 

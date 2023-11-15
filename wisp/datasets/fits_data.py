@@ -31,9 +31,12 @@ class FitsData:
 
         if not self.require_any_data(kwargs["tasks"]): return
 
+        if kwargs["on_cedar"]:
+            self.dataset_path = kwargs["cedar_dataset_path"]
+        else: self.dataset_path = kwargs["dataset_path"]
+
         self.device = device
         self.spectra_obj = spectra_obj
-        self.dataset_path = kwargs["dataset_path"]
         self.verbose = kwargs["verbose"]
         self.num_bands = kwargs["num_bands"]
         self.u_band_scale = kwargs["u_band_scale"]

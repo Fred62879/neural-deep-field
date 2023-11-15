@@ -3,6 +3,7 @@ global:
     verbose: False
     use_gpu: True
     use_tqdm: False
+    on_cedar: True
     print_shape: False
     show_memory: True
     activate_model_timer: False
@@ -11,7 +12,7 @@ global:
     seed: 80
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
-    tasks: ['codebook_pretrain_infer','plot_codebook_coeff_all_bins'] #,'recon_spectra_all_bins'] #'plot_codebook_coeff','recon_spectra','save_optimal_bin_ids','save_redshift'] #'recon_codebook_spectra'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
+    #tasks: ['codebook_pretrain_infer','plot_codebook_coeff_all_bins'] #,'recon_spectra_all_bins'] #'plot_codebook_coeff','recon_spectra','save_optimal_bin_ids','save_redshift'] #'recon_codebook_spectra'] #,'save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
     #tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
     #tasks: ['redshift_pretrain_infer','recon_spectra_all_bins','save_redshift'] #,'recon_spectra','plot_redshift_logits','plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids'] #,'recon_codebook_spectra''save_codebook_latents','save_qtz_weights',]
 
@@ -166,7 +167,7 @@ pretrain:
     redshift_logit_latent_dim: 330
 
     main_train_with_pretrained_latents: False
-    redshift_pretrain_num_spectra: 10
+    redshift_pretrain_num_spectra: 200
 
     add_redshift_logit_bias: False
     plot_logits_for_gt_bin: False
@@ -192,7 +193,7 @@ qtz:
     quantization_strategy: 'soft'
     quantization_calculate_loss: False # only if hard qtz
     qtz_latent_dim: 32
-    qtz_num_embed: 4
+    qtz_num_embed: 32
     qtz_beta: 1
     qtz_seed: 8
 
@@ -237,22 +238,23 @@ hyperspectral:
 trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '/scratch/projects/vision/data/pdr3/output'
+    cedar_log_dir: '/home/fred862/scratch/vision/data/pdr3/output'
 
     plot_loss: True
     pixel_loss_cho: l1_mean
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
-    num_epochs: 5000
+    num_epochs: 1000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 500
+    log_cli_every: 100
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 1000
+    save_model_every: 100
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -370,7 +372,11 @@ dataset:
     dataset_type: 'astro'
     plot_img_distrib: True
     load_patch_data_cache: True
+
     dataset_path: '/scratch/projects/vision/data/pdr3'
+    cedar_dataset_path: '/home/fred862/scratch/vision/data/pdr3'
+    cedar_input_fits_path: '/home/fred862/projects/rrg-kyi/astro/hsc/pdr3_dud'
+
     wave_range_fname: 'wave_range0.npy'
     coords_type: "img"
     normalize_coords: True
@@ -450,7 +456,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000  # #spectra to load
-    num_supervision_spectra_upper_bound: 10
+    num_supervision_spectra_upper_bound: 200
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 

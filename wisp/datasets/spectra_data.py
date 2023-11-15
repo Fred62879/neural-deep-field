@@ -36,7 +36,10 @@ class SpectraData:
 
         self.device = device
         self.trans_obj = trans_obj
-        self.dataset_path = kwargs["dataset_path"]
+        if kwargs["on_cedar"]:
+            self.dataset_path = kwargs["cedar_dataset_path"]
+        else: self.dataset_path = kwargs["dataset_path"]
+        self.set_path(self.dataset_path)
 
         self.num_bands = kwargs["num_bands"]
         self.space_dim = kwargs["space_dim"]
@@ -72,8 +75,14 @@ class SpectraData:
             processed_metadata_table: added pixel val and tract-patch
         """
         paths = []
-        self.input_patch_path, img_data_path = set_input_path(
-            dataset_path, self.kwargs["sensor_collection_name"])
+        if self.kwargs["on_cedar"]:
+            self.input_patch_path = self.kwargs["input_fits_path"]
+            _, img_data_path = set_input_path(
+                dataset_path, self.kwargs["sensor_collection_name"])
+        else:
+            self.input_patch_path, img_data_path = set_input_path(
+                dataset_path, self.kwargs["sensor_collection_name"])
+
         spectra_path = join(dataset_path, "input/spectra")
 
         n_neighbours = self.kwargs["spectra_neighbour_size"]
