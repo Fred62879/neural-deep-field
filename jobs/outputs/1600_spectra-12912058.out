@@ -1,0 +1,71 @@
+Total memory: 17.179869184GB
+Free memory: 16.935288832GB
+Used memory: 0.244580352GB
+2023-11-16 14:06:25,904|    INFO| set seed as 80
+2023-11-16 14:06:42,407|    INFO| spectra train/valid/test: 1600/1600/0
+2023-11-16 14:06:45,400|    INFO| Training on /scratch/projects/vision/data/pdr3
+2023-11-16 14:06:45,598|    INFO| logging to /home/fred862/scratch/vision/data/pdr3/output/neg-sup/20231116-140645
+2023-11-16 14:06:45,905|    INFO| AstroPipeline(
+  (nef): CodebookPretrainNerf(
+    (codebook): Embedding(32, 32)
+    (spatial_decoder): SpatialDecoder(
+      (redshift_decoder): RedshiftDecoder()
+    )
+    (hps_decoder): HyperSpectralDecoderB(
+      (convert): HyperSpectralConverter(
+        (wave_encoder): Encoder(
+          (embedder): RandGaus(
+            (mappings): ModuleList(
+              (0): Linear(in_features=1, out_features=16, bias=True)
+            )
+          )
+        )
+      )
+      (spectra_decoder): BasicDecoder(
+        (layers): ModuleList(
+          (0): Linear(in_features=64, out_features=128, bias=True)
+          (1): Linear(in_features=128, out_features=128, bias=True)
+        )
+        (lout): Linear(in_features=128, out_features=1, bias=True)
+      )
+      (qtz): Quantization()
+      (inte): HyperSpectralIntegrator()
+    )
+  )
+)
+2023-11-16 14:06:45,906|    INFO| Total number of parameters: 16922017
+2023-11-16 14:06:45,907|    INFO| 80 batches per epoch.
+Traceback (most recent call last):
+  File "app/main_astro.py", line 36, in <module>
+    trainer.train()
+  File "/scratch/fred862/vision/code/implicit-universe-wisp/./wisp/trainers/codebook_trainer.py", line 63, in train
+    ret = self.step(data)
+  File "/scratch/fred862/vision/code/implicit-universe-wisp/./wisp/trainers/codebook_trainer.py", line 637, in step
+    loss, ret = closure(True) # forward backward without step
+  File "/scratch/fred862/vision/code/implicit-universe-wisp/./wisp/trainers/codebook_trainer.py", line 625, in closure
+    loss, ret = self.calculate_loss(data)
+  File "/scratch/fred862/vision/code/implicit-universe-wisp/./wisp/trainers/codebook_trainer.py", line 1156, in calculate_loss
+    ret = forward(
+  File "/scratch/fred862/vision/code/implicit-universe-wisp/./wisp/utils/common.py", line 501, in forward
+    return pipeline(channels=requested_channels, **net_args)
+  File "/home/fred862/envs/wisp_env/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/scratch/fred862/vision/code/implicit-universe-wisp/./wisp/models/astro_pipeline.py", line 52, in forward
+    return self.nef(*args, **kwargs)
+  File "/home/fred862/envs/wisp_env/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/scratch/fred862/vision/code/implicit-universe-wisp/./wisp/models/nefs/base_nef.py", line 150, in forward
+    output = fn(**input_args)
+  File "/scratch/fred862/vision/code/implicit-universe-wisp/./wisp/models/nefs/codebook_pretrain_nerf.py", line 166, in pretrain
+    self.hps_decoder(
+  File "/home/fred862/envs/wisp_env/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/scratch/fred862/vision/code/implicit-universe-wisp/./wisp/models/hypers/hps_decoder_batched.py", line 322, in forward
+    ret["spectra"] = self.reconstruct_spectra(
+  File "/scratch/fred862/vision/code/implicit-universe-wisp/./wisp/models/hypers/hps_decoder_batched.py", line 235, in reconstruct_spectra
+    spectra = self.spectra_decoder(latents)[...,0] # [...,num_embed,bsz,nsmpl]
+  File "/home/fred862/envs/wisp_env/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/scratch/fred862/vision/code/implicit-universe-wisp/./wisp/models/decoders/basic_decoders.py", line 115, in forward
+    h = self.activation(l(h))
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 5.04 GiB (GPU 0; 15.77 GiB total capacity; 12.65 GiB already allocated; 2.29 GiB free; 12.66 GiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF

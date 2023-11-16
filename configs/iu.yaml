@@ -2,7 +2,7 @@
 global:
     verbose: False
     use_gpu: True
-    use_tqdm: False
+    use_tqdm: True
     on_cedar: False
     on_graham: True
     print_shape: False
@@ -103,7 +103,7 @@ pretrain:
     pretrain_codebook: True
     sample_from_codebook_pretrain_spectra: True
 
-    pretrain_batch_size: 25
+    pretrain_batch_size: 20
     pretrain_pixel_beta: 1
     pretrain_redshift_beta: 0.1
 
@@ -246,16 +246,16 @@ trainer:
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
-    num_epochs: 1000
+    num_epochs: 10000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 100
+    log_cli_every: 1000
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 100
+    save_model_every: 1000
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -377,7 +377,7 @@ dataset:
     dataset_path: '/scratch/projects/vision/data/pdr3'
     cedar_dataset_path: '/home/fred862/scratch/vision/data/pdr3'
     cedar_input_fits_path: '/home/fred862/projects/rrg-kyi/astro/hsc/pdr3_dud'
-    graham_input_fits_path: '/home/fred862/projects/rrg-kyi/astro/fred862/pdr3_dud'
+    graham_input_fits_path: '/home/fred862/projects/rrg-kyi/fred862/astro/hsc/pdr3_dud'
 
     wave_range_fname: 'wave_range0.npy'
     coords_type: "img"
@@ -458,7 +458,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000  # #spectra to load
-    num_supervision_spectra_upper_bound: 200
+    num_supervision_spectra_upper_bound: 1000
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 

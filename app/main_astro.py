@@ -12,7 +12,9 @@ if __name__ == "__main__":
     from wisp.astro_config_parser import *
     from wisp.parsers.parser import parse_args
     from wisp.trainers import AstroTrainer, CodebookTrainer
-    from wisp.utils.common import set_seed, default_log_setup
+    from wisp.utils.common import set_seed, default_log_setup, query_GPU_mem
+
+    query_GPU_mem()
 
     args, args_str = parse_args()
     tasks = set(args.tasks)

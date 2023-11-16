@@ -12,7 +12,7 @@ from os.path import join
 from datetime import datetime
 from abc import ABC, abstractmethod
 from torch.utils.data import DataLoader
-#from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 from wisp.utils import PerfTimer
 #from wisp.datasets import default_collate
@@ -79,8 +79,6 @@ class BaseTrainer(ABC):
             device_name = torch.cuda.get_device_name(device=self.device)
             log.info(f'Using {device_name} with CUDA v{torch.version.cuda}')
 
-        self.init_renderer()
-
         self.dataset = dataset
 
         # Optimizer params
@@ -95,23 +93,11 @@ class BaseTrainer(ABC):
         self.num_epochs = extra_args["num_epochs"]
         self.batch_size = extra_args["batch_size"]
 
-        # initialize scene_state
-        if scene_state is None:
-            scene_state = WispState()
-        self.scene_state = scene_state
-        self.scene_state.graph.neural_pipelines[self.exp_name] = self.pipeline
-        self.scene_state.optimization.train_data.append(dataset)
-        if hasattr(self.dataset, "data"):
-            self.scene_state.graph.cameras = self.dataset.data.get("cameras", dict())
-        self.scene_state.optimization.max_epochs = self.num_epochs
-
         self.timer = PerfTimer(
             activate=extra_args["activate_trainer_timer"],
             show_memory=extra_args["show_memory"]
         )
         self.timer.reset()
-
-        self.scaler = torch.cuda.amp.GradScaler()
 
         # In-training variables
         self.train_data_loader_iter = None
@@ -122,12 +108,15 @@ class BaseTrainer(ABC):
         self.log_fname = f'{datetime.now().strftime("%Y%m%d-%H%M%S")}'
         if self.extra_args["log_fname"] is not None:
             self.log_fname += "-" + self.extra_args["log_fname"]
-        self.log_dir = os.path.join(extra_args["log_dir"], self.exp_name, self.log_fname)
+
+        if extra_args["on_cedar"] or extra_args["on_graham"]:
+            log_dir = extra_args["cedar_log_dir"]
+        else: log_dir = extra_args["log_dir"]
+        self.log_dir = os.path.join(log_dir, self.exp_name, self.log_fname)
 
         # Default TensorBoard Logging
         self.writer = SummaryWriter(self.log_dir, purge_step=0)
         # self.writer.add_text('Info', self.info)
-        self.using_wandb = extra_args["using_wandb"]
 
         self.valid_every = extra_args["valid_every"]
         self.log_tb_every = extra_args["log_tb_every"]
@@ -137,13 +126,6 @@ class BaseTrainer(ABC):
         self.save_data_every = extra_args["save_data_every"]
         self.save_model_every = extra_args["save_model_every"]
         # self.timer.check('set_logger')
-
-        if self.using_wandb:
-            for d in range(self.extra_args["num_lods"]):
-                wandb.define_metric(f"LOD-{d}-360-Degree-Scene")
-                wandb.define_metric(
-                    f"LOD-{d}-360-Degree-Scene",
-                    step_metric=f"LOD-{d}-360-Degree-Scene/step")
 
         self.iteration = 1
 
@@ -449,18 +431,18 @@ class BaseTrainer(ABC):
     # Properties
     #######################
 
-    @property
-    def epoch(self) -> int:
-        return self.scene_state.optimization.epoch
+    # @property
+    # def epoch(self) -> int:
+    #     return self.scene_state.optimization.epoch
 
-    @epoch.setter
-    def epoch(self, epoch: int) -> int:
-        self.scene_state.optimization.epoch = epoch
+    # @epoch.setter
+    # def epoch(self, epoch: int) -> int:
+    #     self.scene_state.optimization.epoch = epoch
 
-    @property
-    def iteration(self) -> int:
-        return self.scene_state.optimization.iteration
+    # @property
+    # def iteration(self) -> int:
+    #     return self.scene_state.optimization.iteration
 
-    @iteration.setter
-    def iteration(self, iteration: int) -> int:
-        self.scene_state.optimization.iteration = iteration
+    # @iteration.setter
+    # def iteration(self, iteration: int) -> int:
+    #     self.scene_state.optimization.iteration = iteration

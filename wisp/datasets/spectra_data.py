@@ -585,10 +585,7 @@ class SpectraData:
     def gather_processed_spectra(self):
         """ Load processed data for each spectra and save together.
         """
-        print(self.processed_metadata_table_fname)
         df = pandas.read_pickle(self.processed_metadata_table_fname)
-        print(df)
-        assert 0
         with open(self.gt_spectra_ids_fname, "rb") as fp:
             ids = pickle.load(fp)
         self.data["gt_spectra_ids"] = defaultdict(list, ids)
@@ -596,8 +593,6 @@ class SpectraData:
         img_coords, world_coords, spectra = [], [], []
         plot_masks, redshift, pixels = [], [], []
 
-        print(df)
-        assert 0
         n = len(df)
         for i in range(n):
             redshift.append(df.iloc[i]["zspec"])
@@ -612,8 +607,6 @@ class SpectraData:
             world_coords.append(
                 np.load(join(self.processed_spectra_path, df.iloc[i]["world_coord_fname"]))[None,...])
 
-        print(pixels.shape)
-        assert 0
         self.data["full_emit_wave"] = np.load(self.emit_wave_coverage_fname)[0]
 
         # [n_spectra,4+2*nbands,nsmpl]

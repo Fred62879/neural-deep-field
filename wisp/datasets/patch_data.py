@@ -332,8 +332,6 @@ class PatchData:
             self.cur_num_rows = num_rows
             self.cur_num_cols = num_cols
 
-        print(self.header)
-        assert 0
         self.header = header
 
     def load_patch(self):

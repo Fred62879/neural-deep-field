@@ -13,3 +13,4 @@ networkx==3.0
 scikit-image==0.19.3
 requests
 configargparse
+tensorboard==2.12.0

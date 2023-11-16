@@ -48,9 +48,10 @@ def get_wave_range_fname(**kwargs):
     return fname
 
 def get_coords_norm_range_fname(**kwargs):
-    _, img_data_path = set_input_path(
-        kwargs["dataset_path"], kwargs["sensor_collection_name"]
-    )
+    if kwargs["on_cedar"] or kwargs["on_graham"]:
+        dataset_path = kwargs["cedar_dataset_path"]
+    else: dataset_path = kwargs["dataset_path"]
+    _, img_data_path = set_input_path(dataset_path, kwargs["sensor_collection_name"])
     # patch = "full_patch"
     if kwargs["use_full_patch"]: patch = "full_patch"
     else: patch = kwargs["patch_selection_cho"]
