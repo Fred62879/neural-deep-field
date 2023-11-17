@@ -19,7 +19,8 @@ from wisp.utils.numerical import normalize_coords, normalize, \
 
 from wisp.datasets.patch_data import PatchData
 from wisp.datasets.data_utils import set_input_path, add_dummy_dim, \
-    create_selected_patches_uid, get_coords_norm_range_fname
+    create_selected_patches_uid, get_coords_norm_range_fname, \
+    get_dataset_path, get_img_data_path
 
 
 class FitsData:
@@ -31,9 +32,7 @@ class FitsData:
 
         if not self.require_any_data(kwargs["tasks"]): return
 
-        if kwargs["on_cedar"] or kwargs["on_graham"]:
-            self.dataset_path = kwargs["cedar_dataset_path"]
-        else: self.dataset_path = kwargs["dataset_path"]
+        self.dataset_path = get_dataset_path(**kwargs)
 
         self.device = device
         self.spectra_obj = spectra_obj

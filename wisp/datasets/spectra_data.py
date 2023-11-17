@@ -14,7 +14,8 @@ from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
-    get_coords_norm_range_fname, add_dummy_dim, wave_within_bound
+    get_coords_norm_range_fname, add_dummy_dim, wave_within_bound, \
+    get_dataset_path, get_img_data_path
 
 from pathlib import Path
 from astropy.io import fits
@@ -61,9 +62,7 @@ class SpectraData:
         self.trans_range = self.trans_obj.get_wave_range()
         self.gt_convolved = kwargs["convolve_spectra"]
 
-        if kwargs["on_cedar"] or kwargs["on_graham"]:
-            self.dataset_path = kwargs["cedar_dataset_path"]
-        else: self.dataset_path = kwargs["dataset_path"]
+        self.dataset_path = get_dataset_path(**kwargs)
         self.set_path(self.dataset_path)
 
         self.load_accessory_data()
@@ -75,18 +74,7 @@ class SpectraData:
             processed_metadata_table: added pixel val and tract-patch
         """
         paths = []
-        if self.kwargs["on_cedar"]:
-            self.input_patch_path = self.kwargs["cedar_input_fits_path"]
-            _, img_data_path = set_input_path(
-                dataset_path, self.kwargs["sensor_collection_name"])
-        elif self.kwargs["on_graham"]:
-            self.input_patch_path = self.kwargs["graham_input_fits_path"]
-            _, img_data_path = set_input_path(
-                dataset_path, self.kwargs["sensor_collection_name"])
-        else:
-            self.input_patch_path, img_data_path = set_input_path(
-                dataset_path, self.kwargs["sensor_collection_name"])
-
+        self.input_patch_path, img_data_path = get_img_data_path(dataset_path, **self.kwargs)
         spectra_path = join(dataset_path, "input/spectra")
 
         n_neighbours = self.kwargs["spectra_neighbour_size"]

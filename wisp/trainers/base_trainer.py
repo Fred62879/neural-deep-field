@@ -109,8 +109,10 @@ class BaseTrainer(ABC):
         if self.extra_args["log_fname"] is not None:
             self.log_fname += "-" + self.extra_args["log_fname"]
 
-        if extra_args["on_cedar"] or extra_args["on_graham"]:
+        if self.extra_args["on_cedar"] or self.extra_args["on_graham"]:
             log_dir = extra_args["cedar_log_dir"]
+        elif self.extra_args["on_sockeye"]:
+            log_dir = extra_args["sockeye_log_dir"]
         else: log_dir = extra_args["log_dir"]
         self.log_dir = os.path.join(log_dir, self.exp_name, self.log_fname)
 
@@ -125,7 +127,7 @@ class BaseTrainer(ABC):
         self.render_tb_every = extra_args["render_tb_every"]
         self.save_data_every = extra_args["save_data_every"]
         self.save_model_every = extra_args["save_model_every"]
-        # self.timer.check('set_logger')
+        self.timer.check('set_logger')
 
         self.iteration = 1
 

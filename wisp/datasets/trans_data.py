@@ -13,7 +13,7 @@ from scipy.interpolate import interp1d
 
 from wisp.utils.plot import plot_save
 from wisp.utils.numerical import normalize_data
-from wisp.datasets.data_utils import get_wave_range_fname, get_bound_id
+from wisp.datasets.data_utils import get_wave_range_fname, get_bound_id, get_dataset_path
 
 
 class TransData:
@@ -40,9 +40,7 @@ class TransData:
         self.smpl_interval = kwargs["trans_sample_interval"]
         assert(self.smpl_interval == 10)
 
-        if kwargs["on_cedar"] or kwargs["on_graham"]:
-            self.dataset_path = kwargs["cedar_dataset_path"]
-        else: self.dataset_path = kwargs["dataset_path"]
+        self.dataset_path = get_dataset_path(**kwargs)
         self.set_path(self.dataset_path)
 
         self.init_trans()
@@ -90,7 +88,8 @@ class TransData:
         self.flat_trans_fname = join(self.trans_dir, "flat_trans")
 
         # create path
-        for path in [source_wave_path, self.trans_dir]:
+        # for path in [source_wave_path, self.trans_dir]:
+        for path in [self.trans_dir]:
             Path(path).mkdir(parents=True, exist_ok=True)
 
     def init_trans(self):
@@ -254,8 +253,8 @@ class TransData:
                 wave_range = (min(self.data["hdcd_wave"]), max(self.data["hdcd_wave"]))
             else:
                 wave_range = (min(self.data["full_wave"]), max(self.data["full_wave"]))
+            np.save(self.wave_range_fname, wave_range)
         self.data["wave_range"] = wave_range
-        np.save(self.wave_range_fname, wave_range)
 
     def load_source_wave_trans(self):
         """ Load source lambda and transmission data.
@@ -319,11 +318,14 @@ class TransData:
     def process_wave_trans(self):
         """ Process source wave and transmission.
         """
-        if exists(self.processed_wave_fname) and exists(self.processed_trans_fname):
+        if exists(self.processed_wave_fname) and exists(self.processed_trans_fname) and \
+           exists(self.band_coverage_range_fname) and exists(self.nsmpl_within_bands_fname):
             with open(self.processed_wave_fname, "rb") as fp:
                 wave = pickle.load(fp)
             with open(self.processed_trans_fname, "rb") as fp:
                 trans = pickle.load(fp)
+            nsmpl_within_bands = np.load(self.nsmpl_within_bands_fname)
+            band_coverage_range = np.load(self.band_coverage_range_fname)
         else:
             source_wave, source_trans = self.load_source_wave_trans()
 
@@ -340,15 +342,15 @@ class TransData:
             with open(self.processed_trans_fname, "wb") as fp:
                 pickle.dump(trans, fp)
 
-        # coverage range of lambda (in angstrom) for each band [nbands]
-        band_coverage_range = [cur_wave[-1] - cur_wave[0] for cur_wave in wave]
-        np.save(self.band_coverage_range_fname, band_coverage_range)
+            # coverage range of lambda (in angstrom) for each band [nbands]
+            band_coverage_range = [cur_wave[-1] - cur_wave[0] for cur_wave in wave]
+            np.save(self.band_coverage_range_fname, band_coverage_range)
 
-        # number of lambda samples for each band [nbands]
-        cur_trans_range = [v for k,v in self.trans_range.items()
-                           if k in self.kwargs["filters"]]
-        nsmpl_within_bands = count_avg_nsmpl(cur_trans_range)
-        np.save(self.nsmpl_within_bands_fname, nsmpl_within_bands)
+            # number of lambda samples for each band [nbands]
+            cur_trans_range = [v for k,v in self.trans_range.items()
+                               if k in self.kwargs["filters"]]
+            nsmpl_within_bands = count_avg_nsmpl(cur_trans_range)
+            np.save(self.nsmpl_within_bands_fname, nsmpl_within_bands)
 
         integration = integrate_trans(wave, trans)
         if self.verbose:
@@ -377,10 +379,10 @@ class TransData:
     def load_full_wave_trans(self):
         """ Load wave, trans, and distribution for mixture sampling.
         """
-        if not exists(self.full_wave_fname) or \
-           not exists(self.full_trans_fname) or \
-           (not self.uniform_sample and not exists(self.full_distrib_fname)) or \
-           (self.learn_trusted_spectra and not exists(self.full_wave_masks_fname)):
+        if not exists(self.full_wave_fname + ".npy") or \
+           not exists(self.full_trans_fname + ".npy") or \
+           (not self.uniform_sample and not exists(self.full_distrib_fname + ".npy")) or \
+           (self.learn_trusted_spectra and not exists(self.full_wave_masks_fname + ".npy")):
 
             # average all bands to get probability for mixture sampling
             trans_pdf = pnormalize(self.data["trans"])
@@ -403,12 +405,13 @@ class TransData:
             plot_save(self.full_distrib_fname, full_wave, distrib)
 
         else:
-            full_wave = np.load(self.full_wave_fname)
-            full_trans = np.load(self.full_trans_fname)
+            encd_ids = np.load(self.encd_ids_fname)
+            full_wave = np.load(self.full_wave_fname + ".npy")
+            full_trans = np.load(self.full_trans_fname + ".npy")
             if not self.uniform_sample:
-                distrib = np.load(self.full_distrib_fname)
+                distrib = np.load(self.full_distrib_fname + ".npy")
             if self.learn_trusted_spectra:
-                full_wave_masks = np.load(self.full_wave_masks_fname)
+                full_wave_masks = np.load(self.full_wave_masks_fname + ".npy")
 
         if self.uniform_sample:
             distrib = np.ones(len(full_wave)).astype(np.float64)

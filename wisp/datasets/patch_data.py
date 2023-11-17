@@ -14,7 +14,8 @@ from wisp.utils.plot import plot_horizontally, mark_on_img
 from wisp.utils.common import generate_hdu, create_patch_uid
 from wisp.utils.numerical import normalize, normalize_coords, calculate_zscale_ranges
 from wisp.datasets.data_utils import set_input_path, create_patch_fname, \
-    create_selected_patches_uid, get_mgrid_np, get_coords_norm_range_fname
+    create_selected_patches_uid, get_mgrid_np, get_coords_norm_range_fname, \
+    get_dataset_path, get_img_data_path
 
 
 class PatchData:
@@ -60,13 +61,13 @@ class PatchData:
 
         self.patch_uid = create_patch_uid(tract, patch)
 
-        if kwargs["on_cedar"] or kwargs["on_graham"]:
-            self.dataset_path = kwargs["cedar_dataset_path"]
-        else: self.dataset_path = kwargs["dataset_path"]
+        self.dataset_path = get_dataset_path(**kwargs)
         self.set_path(self.dataset_path)
 
-        #self.verify_patch_exists(tract, patch)
-        #if not self.patch_exists(): return
+        self.verify_patch_exists(tract, patch)
+        print(tract, patch)
+        if not self.patch_exists(): 
+            raise ValueError()
 
         self.compile_patch_fnames()
         self.load_data()
@@ -103,18 +104,7 @@ class PatchData:
             (hsc_patch_fname, nb_patch_fname, megau_weights_fname))
 
     def set_path(self, dataset_path):
-        if self.kwargs["on_cedar"]:
-            self.input_patch_path = self.kwargs["cedar_input_fits_path"]
-            _, img_data_path = set_input_path(
-                dataset_path, self.kwargs["sensor_collection_name"])
-        elif self.kwargs["on_graham"]:
-            self.input_patch_path = self.kwargs["graham_input_fits_path"]
-            _, img_data_path = set_input_path(
-                dataset_path, self.kwargs["sensor_collection_name"])
-        else:
-            self.input_patch_path, img_data_path = set_input_path(
-                dataset_path, self.kwargs["sensor_collection_name"])
-
+        self.input_patch_path, img_data_path = get_img_data_path(dataset_path, **self.kwargs)
         self.coords_norm_range_fname = get_coords_norm_range_fname(**self.kwargs)
 
         norm = self.kwargs["gt_img_norm_cho"]

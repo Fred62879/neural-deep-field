@@ -4,7 +4,8 @@ global:
     use_gpu: True
     use_tqdm: True
     on_cedar: False
-    on_graham: True
+    on_graham: False
+    on_sockeye: True
     print_shape: False
     show_memory: True
     activate_model_timer: False
@@ -103,7 +104,7 @@ pretrain:
     pretrain_codebook: True
     sample_from_codebook_pretrain_spectra: True
 
-    pretrain_batch_size: 20
+    pretrain_batch_size: 10
     pretrain_pixel_beta: 1
     pretrain_redshift_beta: 0.1
 
@@ -240,6 +241,7 @@ trainer:
     trainer_type: 'AstroTrainer'
     log_dir: '/scratch/projects/vision/data/pdr3/output'
     cedar_log_dir: '/home/fred862/scratch/vision/data/pdr3/output'
+    sockeye_log_dir: '/arc/project/pr-kmyi-1/fred/data/pdr3/output'
 
     plot_loss: True
     pixel_loss_cho: l1_mean
@@ -376,8 +378,10 @@ dataset:
 
     dataset_path: '/scratch/projects/vision/data/pdr3'
     cedar_dataset_path: '/home/fred862/scratch/vision/data/pdr3'
+    sockeye_dataset_path: '/arc/project/pr-kmyi-1/fred/data/pdr3'
     cedar_input_fits_path: '/home/fred862/projects/rrg-kyi/astro/hsc/pdr3_dud'
-    graham_input_fits_path: '/home/fred862/projects/rrg-kyi/fred862/astro/hsc/pdr3_dud'
+    graham_input_fits_path: '/home/fred862/projects/rrg-kyi/astro/fred862/pdr3_dud'
+    sockeye_input_fits_path: '/arc/project/pr-kmyi-1/fred/data/pdr3/input/pdr3_dud'
 
     wave_range_fname: 'wave_range0.npy'
     coords_type: "img"

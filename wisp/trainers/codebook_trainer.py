@@ -50,6 +50,7 @@ class CodebookTrainer(BaseTrainer):
         self.init_optimizer()
 
     def train(self):
+        torch.autograd.set_detect_anomaly(True)
         self.begin_train()
 
         if self.use_tqdm: iter = tqdm(range(self.num_epochs + 1))

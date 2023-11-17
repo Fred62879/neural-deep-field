@@ -11,11 +11,11 @@ import torch
 import collections
 import numpy as np
 
-from wisp.core import Rays
+# from wisp.core import Rays
 from functools import lru_cache
 from os.path import join, exists
-from torch._six import string_classes
-from torch.utils.data._utils.collate import default_convert
+# from torch._six import string_classes
+# from torch.utils.data._utils.collate import default_convert
 
 np_str_obj_array_pattern = re.compile(r'[SaUO]')
 
@@ -40,18 +40,44 @@ def patch_exists(path, tract, patch):
     fname = join(path, fname)
     return exists(fname)
 
+def get_dataset_path(**kwargs):
+    if kwargs["on_cedar"] or kwargs["on_graham"]:
+        dataset_path = kwargs["cedar_dataset_path"]
+    elif kwargs["on_sockeye"]:
+        dataset_path = kwargs["sockeye_dataset_path"]
+    else: dataset_path = kwargs["dataset_path"]
+    return dataset_path
+
+def get_img_data_path(local_dataset_path, **kwargs):
+    if kwargs["on_cedar"]:
+        input_patch_path = kwargs["cedar_input_fits_path"]
+        _, img_data_path = set_input_path(
+            local_dataset_path, kwargs["sensor_collection_name"])
+    elif kwargs["on_graham"]:
+        input_patch_path = kwargs["graham_input_fits_path"]
+        _, img_data_path = set_input_path(
+            local_dataset_path, kwargs["sensor_collection_name"])
+    elif kwargs["on_sockeye"]:
+        input_patch_path = kwargs["sockeye_input_fits_path"]
+        _, img_data_path = set_input_path(
+            local_dataset_path, kwargs["sensor_collection_name"])
+    else:
+        input_patch_path, img_data_path = set_input_path(
+            local_dataset_path, kwargs["sensor_collection_name"])
+    return input_patch_path, img_data_path
+
 def get_wave_range_fname(**kwargs):
     if kwargs["on_cedar"] or kwargs["on_graham"]:
         dataset_path = kwargs["cedar_dataset_path"]
+    elif kwargs["on_sockeye"]:
+        dataset_path = kwargs["sockeye_dataset_path"]
     else: dataset_path = kwargs["dataset_path"]
     fname = join(dataset_path, "input/wave", kwargs["wave_range_fname"])
     return fname
 
 def get_coords_norm_range_fname(**kwargs):
-    if kwargs["on_cedar"] or kwargs["on_graham"]:
-        dataset_path = kwargs["cedar_dataset_path"]
-    else: dataset_path = kwargs["dataset_path"]
-    _, img_data_path = set_input_path(dataset_path, kwargs["sensor_collection_name"])
+    local_dataset_path = get_dataset_path(**kwargs)
+    _, img_data_path = get_img_data_path(local_dataset_path, **kwargs)
     # patch = "full_patch"
     if kwargs["use_full_patch"]: patch = "full_patch"
     else: patch = kwargs["patch_selection_cho"]
@@ -244,63 +270,63 @@ def add_dummy_dim(coords, **kwargs):
     coords = torch.FloatTensor(coords)
     return coords
 
-def default_collate(batch):
-    r"""
-        Function that extends torch.utils.data._utils.collate.default_collate
-        to support Rays.
-    """
-    elem = batch[0]
-    elem_type = type(elem)
-    if isinstance(elem, torch.Tensor):
-        out = None
-        if torch.utils.data.get_worker_info() is not None:
-            # If we're in a background process, concatenate directly into a
-            # shared memory tensor to avoid an extra copy
-            numel = sum(x.numel() for x in batch)
-            storage = elem.storage()._new_shared(numel, device=elem.device)
-            out = elem.new(storage).resize_(len(batch), *list(elem.size()))
-        return torch.stack(batch, 0, out=out)
-    elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
-            and elem_type.__name__ != 'string_':
-        if elem_type.__name__ == 'ndarray' or elem_type.__name__ == 'memmap':
-            # array of string classes and object
-            if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
-                raise TypeError(default_collate_err_msg_format.format(elem.dtype))
+# def default_collate(batch):
+#     r"""
+#         Function that extends torch.utils.data._utils.collate.default_collate
+#         to support Rays.
+#     """
+#     elem = batch[0]
+#     elem_type = type(elem)
+#     if isinstance(elem, torch.Tensor):
+#         out = None
+#         if torch.utils.data.get_worker_info() is not None:
+#             # If we're in a background process, concatenate directly into a
+#             # shared memory tensor to avoid an extra copy
+#             numel = sum(x.numel() for x in batch)
+#             storage = elem.storage()._new_shared(numel, device=elem.device)
+#             out = elem.new(storage).resize_(len(batch), *list(elem.size()))
+#         return torch.stack(batch, 0, out=out)
+#     elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
+#             and elem_type.__name__ != 'string_':
+#         if elem_type.__name__ == 'ndarray' or elem_type.__name__ == 'memmap':
+#             # array of string classes and object
+#             if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
+#                 raise TypeError(default_collate_err_msg_format.format(elem.dtype))
 
-            return default_collate([torch.as_tensor(b) for b in batch])
-        elif elem.shape == ():  # scalars
-            return torch.as_tensor(batch)
-    elif isinstance(elem, float):
-        return torch.tensor(batch, dtype=torch.float64)
-    elif isinstance(elem, int):
-        return torch.tensor(batch)
-    elif isinstance(elem, string_classes):
-        return batch
-    elif isinstance(elem, collections.abc.Mapping):
-        try:
-            return elem_type({key: default_collate([d[key] for d in batch]) for key in elem})
-        except TypeError:
-            # The mapping type may not support `__init__(iterable)`.
-            return {key: default_collate([d[key] for d in batch]) for key in elem}
-    elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
-        return elem_type(*(default_collate(samples) for samples in zip(*batch)))
-    elif isinstance(elem, collections.abc.Sequence):
-        # check to make sure that the elements in batch have consistent size
-        it = iter(batch)
-        elem_size = len(next(it))
-        if not all(len(elem) == elem_size for elem in it):
-            raise RuntimeError('each element in list of batch should be of equal size')
-        transposed = list(zip(*batch))  # It may be accessed twice, so we use a list.
+#             return default_collate([torch.as_tensor(b) for b in batch])
+#         elif elem.shape == ():  # scalars
+#             return torch.as_tensor(batch)
+#     elif isinstance(elem, float):
+#         return torch.tensor(batch, dtype=torch.float64)
+#     elif isinstance(elem, int):
+#         return torch.tensor(batch)
+#     elif isinstance(elem, string_classes):
+#         return batch
+#     elif isinstance(elem, collections.abc.Mapping):
+#         try:
+#             return elem_type({key: default_collate([d[key] for d in batch]) for key in elem})
+#         except TypeError:
+#             # The mapping type may not support `__init__(iterable)`.
+#             return {key: default_collate([d[key] for d in batch]) for key in elem}
+#     elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
+#         return elem_type(*(default_collate(samples) for samples in zip(*batch)))
+#     elif isinstance(elem, collections.abc.Sequence):
+#         # check to make sure that the elements in batch have consistent size
+#         it = iter(batch)
+#         elem_size = len(next(it))
+#         if not all(len(elem) == elem_size for elem in it):
+#             raise RuntimeError('each element in list of batch should be of equal size')
+#         transposed = list(zip(*batch))  # It may be accessed twice, so we use a list.
 
-        if isinstance(elem, tuple):
-            return [default_collate(samples) for samples in transposed]  # Backwards compatibility.
-        else:
-            try:
-                return elem_type([default_collate(samples) for samples in transposed])
-            except TypeError:
-                # The sequence type may not support `__init__(iterable)` (e.g., `range`).
-                return [default_collate(samples) for samples in transposed]
-    elif isinstance(elem, Rays):
-        return Rays.cat(batch)
+#         if isinstance(elem, tuple):
+#             return [default_collate(samples) for samples in transposed]  # Backwards compatibility.
+#         else:
+#             try:
+#                 return elem_type([default_collate(samples) for samples in transposed])
+#             except TypeError:
+#                 # The sequence type may not support `__init__(iterable)` (e.g., `range`).
+#                 return [default_collate(samples) for samples in transposed]
+#     elif isinstance(elem, Rays):
+#         return Rays.cat(batch)
 
-    raise TypeError(default_collate_err_msg_format.format(elem_type))
+#     raise TypeError(default_collate_err_msg_format.format(elem_type))

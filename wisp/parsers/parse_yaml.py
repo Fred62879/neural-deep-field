@@ -102,6 +102,7 @@ def define_cmd_line_args():
     global_group.add_argument("--use-tqdm", action="store_true")
     global_group.add_argument("--on-cedar", action="store_true")
     global_group.add_argument("--on-graham", action="store_true")
+    global_group.add_argument("--on-sockeye", action="store_true")
     global_group.add_argument("--print-shape", action="store_true")
     global_group.add_argument("--show-memory", action="store_true")
     global_group.add_argument("--activate-model-timer", action="store_true")
@@ -452,8 +453,10 @@ def define_cmd_line_args():
 
     data_group.add_argument("--dataset-path", type=str, help="Path to the dataset")
     data_group.add_argument("--cedar-dataset-path", type=str, help="Path to the dataset")
+    data_group.add_argument("--sockeye-dataset-path", type=str, help="Path to the dataset")
     data_group.add_argument("--cedar-input-fits-path", type=str, help="Path to the dataset")
     data_group.add_argument("--graham-input-fits-path", type=str, help="Path to the dataset")
+    data_group.add_argument("--sockeye-input-fits-path", type=str, help="Path to the dataset")
 
     data_group.add_argument("--dataset-num-workers", type=int, default=-1,
                             help="Number of workers for dataset preprocessing, \
@@ -590,6 +593,7 @@ def define_cmd_line_args():
     train_group.add_argument("--log-dir", type=str, default="_results/logs/runs/",
                              help="Log file directory for checkpoints.")
     train_group.add_argument("--cedar-log-dir", type=str)
+    train_group.add_argument("--sockeye-log-dir", type=str)
 
     train_group.add_argument("--plot-loss", action="store_true")
     train_group.add_argument("--using-wandb", action="store_true")
