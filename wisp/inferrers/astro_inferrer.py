@@ -957,7 +957,7 @@ class AstroInferrer(BaseInferrer):
                 outlier_ids = self._log_redshift_residual_outlier(model_id)
                 fname = join(self.redshift_dir, f"model-{model_id}_max_redshift.txt")
                 log_data(self, "argmax_redshift", gt_field="gt_redshift",
-                         fname=fname, log_to_console=True)
+                         fname=fname, log_to_console=False)
                 fname = join(self.redshift_dir, f"model-{model_id}_avg_redshift.txt")
                 log_data(self, "weighted_redshift", fname=fname, log_to_console=False)
             else:
@@ -1308,7 +1308,6 @@ class AstroInferrer(BaseInferrer):
                         self.optimal_wrong_bin_ids_cc.extend(ids)
 
                 if self.plot_codebook_coeff_all_bins:
-                    print(ret["codebook_logits"].shape)
                     self.codebook_coeff_all_bins.extend(ret["codebook_logits"])
 
                 if self.plot_redshift_logits:
@@ -1824,12 +1823,12 @@ class AstroInferrer(BaseInferrer):
     def _plot_codebook_coeff_all_bins(self, num_spectra, model_id):
         """ Plot spectrum under all redshift for each spectra
         """
-        codebook_coeff_all = self.codebook_coeff_all_bins.transpose(1,0,2) # [num_bins,bsz,nsmpl]
-        print(codebook_coeff_all.shape)
-        assert 0
-        assert num_spectra == codebook_coeff_all.shape[1]
+        codebook_coeff = torch.stack(
+            self.codebook_coeff_all_bins
+        ).permute(1,0,2).detach().cpu().numpy() # [num_bins,bsz,nsmpl]
+        assert num_spectra == codebook_coeff.shape[1]
 
-        num_bins = codebook_coeff_all.shape[0]
+        num_bins = codebook_coeff.shape[0]
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
         n_figs_each = int(np.ceil(num_bins / n_spectrum_per_fig))
         redshift_bins = init_redshift_bins(
@@ -1839,17 +1838,18 @@ class AstroInferrer(BaseInferrer):
         spectra_ids = np.arange(self.dataset_length)
         if self.infer_selected:
             n = len(self._select_inferrence_ids())
-            spectra_dir = join(self.spectra_dir, f"selected-{n}")
-        else: spectra_dir = self.spectra_dir
+            codebook_coeff_dir = join(self.codebook_coeff_dir, f"selected-{n}")
+        else: codebook_coeff_dir = self.codebook_coeff_dir
+
 
         for i in spectra_ids:
-            cur_dir = join(spectra_dir, f"{i}-all-bins")
+            cur_dir = join(codebook_coeff_dir, f"{i}-all-bins")
             Path(cur_dir).mkdir(parents=True, exist_ok=True)
 
             titles = redshift_bins
 
             for j in range(n_figs_each):
-                fname = f"model-{model_id}-plot{j}-all_bins"
+                fname = join(cur_dir, f"model-{model_id}-plot{j}-all_bins")
                 lo = j * n_spectrum_per_fig
                 hi = min(lo + n_spectrum_per_fig, num_bins)
                 m = hi - lo
@@ -1857,7 +1857,9 @@ class AstroInferrer(BaseInferrer):
                 plot_multiple(
                     self.extra_args["num_spectrum_per_fig"],
                     self.extra_args["num_spectrum_per_row"],
-                    codebook_coeff[1], fname, hist=True)
+                    codebook_coeff[lo:hi,i], fname, hist=True,
+                    titles=titles[lo:hi]
+                )
 
         log.info("all bin codebook coeff plotting done")
 
