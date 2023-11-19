@@ -30,7 +30,7 @@ def plot_grad_flow(named_parameters, gradFileName=None):
     plt.title("Gradient flow");plt.grid(True)
 
 def plot_multiple(n_per_fig, n_per_row, data, fname, x=None,
-                  y2=None, vertical_xs=None, hist=False):
+                  y2=None, vertical_xs=None, hist=False, titles=None):
     n = len(data)
     n_figs = int(np.ceil(n / n_per_fig))
 
@@ -55,6 +55,9 @@ def plot_multiple(n_per_fig, n_per_row, data, fname, x=None,
         fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
 
         for j in range(cur_n):
+            if titles is not None: title = f"{titles[i*n_per_fig + j]:.{3}f}"
+            else: title = str(i*n_per_fig + j)
+
             if nrows == 1: axis = axs if ncols == 1 else axs[j%ncols]
             else:          axis = axs[j//ncols, j%ncols]
             _plot(axis, lo+j, x, data, hist)
@@ -64,7 +67,7 @@ def plot_multiple(n_per_fig, n_per_row, data, fname, x=None,
             if vertical_xs is not None:
                 axis.axvline(x=vertical_xs[lo+j], color="red", linewidth=2, linestyle="--")
 
-            axis.set_title(i*n_per_fig + j)
+            axis.set_title(title)
 
         fig.tight_layout(); plt.savefig(f"{fname}-{i}"); plt.close()
 

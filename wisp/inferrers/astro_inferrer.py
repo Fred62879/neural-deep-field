@@ -957,7 +957,7 @@ class AstroInferrer(BaseInferrer):
                 outlier_ids = self._log_redshift_residual_outlier(model_id)
                 fname = join(self.redshift_dir, f"model-{model_id}_max_redshift.txt")
                 log_data(self, "argmax_redshift", gt_field="gt_redshift",
-                         fname=fname, log_to_console=True)
+                         fname=fname, log_to_console=False)
                 fname = join(self.redshift_dir, f"model-{model_id}_avg_redshift.txt")
                 log_data(self, "weighted_redshift", fname=fname, log_to_console=False)
             else:
@@ -1857,7 +1857,9 @@ class AstroInferrer(BaseInferrer):
                 plot_multiple(
                     self.extra_args["num_spectrum_per_fig"],
                     self.extra_args["num_spectrum_per_row"],
-                    codebook_coeff[lo:hi,i], fname, hist=True)
+                    codebook_coeff[lo:hi,i], fname, hist=True,
+                    titles=titles[lo:hi]
+                )
 
         log.info("all bin codebook coeff plotting done")
 

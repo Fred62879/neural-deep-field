@@ -5,7 +5,7 @@ import logging as log
 
 from wisp.utils import PerfTimer
 from wisp.datasets.patch_data import PatchData
-from wisp.utils.common import create_patch_uid, get_bool_classify_redshift
+from wisp.utils.common import create_patch_uid, get_bool_classify_redshift, query_GPU_mem
 
 from os.path import join
 from datetime import datetime
@@ -151,6 +151,7 @@ class BaseInferrer(ABC):
             Override if needed.
         """
         for model_id, model_fname in enumerate(self.selected_model_fnames):
+            query_GPU_mem()
             model_fname = join(self.model_dir, model_fname)
             log.info(f"infer with {model_fname}")
             checkpoint = torch.load(model_fname)

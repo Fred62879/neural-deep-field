@@ -1064,7 +1064,7 @@ class SpectraData:
             axis.plot(gt_wave, gt_flux, color="gray", label="gt", linestyle="dotted")
         if plot_recon_spectrum:
             if above_threshold is not None: # plot recon flux according to zncc
-                axis.plot(recon_wave, recon_flux, color="blue", label="recon")
+                axis.plot(recon_wave, recon_flux, color="green", label="recon")
                 segments = segment_bool_array(above_threshold)
                 for (lo, hi) in segments:
                     axis.plot(recon_wave[lo:hi], recon_flux[lo:hi], color="purple")
@@ -1073,7 +1073,7 @@ class SpectraData:
             axis.plot(recon_wave, recon_flux2, color="red", label="gt bin")
             title += f": {recon_loss2:.{3}f}"
         if recon_flux3 is not None:
-            axis.plot(recon_wave, recon_flux3, color="green", label="wrong bin")
+            axis.plot(recon_wave, recon_flux3, color="blue", label="wrong bin")
             title += f"/{recon_loss3:.{3}f}"
 
         axis.set_title(title)
