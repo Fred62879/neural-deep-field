@@ -18,6 +18,11 @@ from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
+def get_current_ablate_param_and_val(args):
+    param = args.ablat_params[args.ablat_param_id]
+    val = args.ablat_vals[args.ablat_param_id][args.ablat_val_id]
+    return param, val
+
 def get_bool_encode_coords(**kwargs):
     return kwargs["encode_coords"] and not \
         ( kwargs["pretrain_codebook"] and \

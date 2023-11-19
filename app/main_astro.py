@@ -1,7 +1,6 @@
 
 if __name__ == "__main__":
 
-    import logging as log
 
     import os
     from pathlib import Path
@@ -9,20 +8,18 @@ if __name__ == "__main__":
     path_root = Path(__file__).parents[1]
     sys.path.append(str(path_root))
 
-    from wisp.astro_config_parser import *
-    from wisp.parsers.parser import parse_args
+    import logging as log
+
+    from wisp.configuration import *
+    from wisp.parser import parse_args
+    from wisp.utils.common import query_GPU_mem
     from wisp.trainers import AstroTrainer, CodebookTrainer
-    from wisp.utils.common import set_seed, default_log_setup, query_GPU_mem
 
     query_GPU_mem()
 
     args, args_str = parse_args()
+
     tasks = set(args.tasks)
-    default_log_setup(args.log_level)
-
-    set_seed(args.seed)
-    log.info(f"set seed as {args.seed}")
-
     dataset = get_dataset_from_config(args)
     device, pipelines = get_pipelines_from_config(args, tasks=tasks)
 

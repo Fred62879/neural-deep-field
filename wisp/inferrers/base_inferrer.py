@@ -10,7 +10,7 @@ from wisp.utils.common import create_patch_uid, get_bool_classify_redshift, quer
 from os.path import join
 from datetime import datetime
 from abc import ABC, abstractmethod
-#from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import BatchSampler, SequentialSampler, DataLoader
 
 class BaseInferrer(ABC):

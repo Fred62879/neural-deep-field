@@ -2,21 +2,22 @@
 global:
     verbose: False
     use_gpu: True
-    use_tqdm: True
+    use_tqdm: False
     on_cedar: False
     on_graham: False
-    on_sockeye: True
+    on_sockeye: False
     print_shape: False
     show_memory: True
     activate_model_timer: False
     activate_trainer_timer: False
     exp_name: 'neg-sup' #sanity-check-scale'
+    # log_fname:
     seed: 80
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
-    tasks: ['codebook_pretrain_infer','recon_spectra','save_redshift'] #'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','recon_spectra','save_optimal_bin_ids','save_redshift','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
+    #tasks: ['codebook_pretrain_infer','recon_spectra','save_redshift'] #'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','recon_spectra','save_optimal_bin_ids','save_redshift','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
     #tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
-    #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'recon_spectra_all_bins','plot_redshift_logits','plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_codebook_latents','save_qtz_weights',]
+    #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'recon_spectra_all_bins','plot_redshift_logits','plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_codebook_latents','save_qtz_weights']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -36,6 +37,13 @@ global:
     #tasks: ['train'] #,'save_redshift_during_train','recon_gt_spectra_during_train','recon_img_during_train'] #,'recon_codebook_spectra_individ_during_train','save_qtz_weights_during_train'
     #tasks: ['main_infer','recon_gt_spectra','save_redshift','recon_img'] #,'recon_codebook_spectra_individ']
     #tasks: ['test','recon_gt_spectra','save_redshift','recon_codebook_spectra_individ','save_qtz_weights','recon_img']
+
+ablation:
+    perform_ablation: True
+    ablat_param_id: 0
+    ablat_val_id: 2
+    ablat_params: ["neg_sup_beta","neg_sup_constant"]
+    ablat_vals: [[1,2,4,8],[0.1,0.2,0.3]]
 
 optimizer:
     optimizer_type: 'adam'

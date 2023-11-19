@@ -107,7 +107,7 @@ class BaseTrainer(ABC):
 
         self.log_fname = f'{datetime.now().strftime("%Y%m%d-%H%M%S")}'
         if self.extra_args["log_fname"] is not None:
-            self.log_fname += "-" + self.extra_args["log_fname"]
+            self.log_fname += "_" + self.extra_args["log_fname"]
 
         if self.extra_args["on_cedar"] or self.extra_args["on_graham"]:
             log_dir = extra_args["cedar_log_dir"]
