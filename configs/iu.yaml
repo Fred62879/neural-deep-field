@@ -40,10 +40,10 @@ global:
 
 ablation:
     perform_ablation: True
-    ablat_param_id: 0
-    ablat_val_id: 2
+    ablat_id: 5
     ablat_params: ["neg_sup_beta","neg_sup_constant"]
     ablat_vals: [[1,2,4,8],[0.1,0.2,0.3]]
+    ablat_num_vals: [4,3]
 
 optimizer:
     optimizer_type: 'adam'

@@ -14,13 +14,21 @@ from os.path import join
 from astropy.io import fits
 from astropy.wcs import WCS
 from functools import reduce
+from itertools import accumulate
 from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
 def get_current_ablate_param_and_val(args):
-    param = args.ablat_params[args.ablat_param_id]
-    val = args.ablat_vals[args.ablat_param_id][args.ablat_val_id]
+    id = args.ablat_id
+    num_vals = args.ablat_num_vals
+    acc = list(accumulate(num_vals))
+    acc = np.array(acc) - id
+    param_id = np.where(acc > 0)[0][0]
+    val_id = num_vals[param_id] - acc[param_id]
+    # print(id, acc, param_id, val_id)
+    param = args.ablat_params[param_id]
+    val = args.ablat_vals[param_id][val_id]
     return param, val
 
 def get_bool_encode_coords(**kwargs):

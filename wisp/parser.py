@@ -166,10 +166,10 @@ def define_cmd_line_args():
     ablat_group = parser.add_argument_group("ablation")
 
     ablat_group.add_argument("--perform-ablation", action="store_true")
-    ablat_group.add_argument("--ablat-param-id", type=int)
-    ablat_group.add_argument("--ablat-val-id", type=int)
+    ablat_group.add_argument("--ablat-id", type=int)
     ablat_group.add_argument("--ablat-params", nargs="+")
     ablat_group.add_argument("--ablat-vals", nargs="+")
+    ablat_group.add_argument("--ablat-num-vals", nargs="+")
 
     ###################
     # Debug options
