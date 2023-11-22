@@ -65,8 +65,7 @@ class PatchData:
         self.set_path(self.dataset_path)
 
         self.verify_patch_exists(tract, patch)
-        print(tract, patch)
-        if not self.patch_exists(): 
+        if not self.patch_exists():
             raise ValueError()
 
         self.compile_patch_fnames()

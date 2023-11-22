@@ -13,6 +13,16 @@ from wisp.utils.numerical import calculate_sam_spectrum, \
     calculate_precision_recall, calculate_precision_recall_single
 
 
+def plot_line(x, y, fname, xlabel=None, ylabel=None, x_range=None):
+    plt.scatter(x, y)
+    if xlabel is not None: plt.xlabel(xlabel)
+    if ylabel is not None: plt.ylabel(ylabel)
+    if x_range is not None:
+        lo, hi = x_range
+        plt.xlim(lo, hi)
+    plt.savefig(fname)
+    plt.close()
+
 def plot_grad_flow(named_parameters, gradFileName=None):
     layers, ave_grads = [], []
     for n, p in named_parameters:
