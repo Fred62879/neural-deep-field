@@ -1689,8 +1689,14 @@ class AstroInferrer(BaseInferrer):
             self.spectra_ivar = self.spectra_ivar[ids]
             num_spectra = len(ids)
 
+        def norm(data):
+            lo, hi = np.min(data, axis=-1)[:,None], np.max(data, axis=-1)[:,None]
+            data = (data - lo) / (hi - lo)
+            return data
+
         spectra_residual = self.recon_fluxes[:,0] - self.gt_fluxes
-        print(spectra_residual.shape, self.spectra_ivar.shape)
+        spectra_residual = norm(spectra_residual)
+        self.spectra_ivar = norm(self.spectra_ivar)
 
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
         n_figs = int(np.ceil(num_spectra / n_spectrum_per_fig))
