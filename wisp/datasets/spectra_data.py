@@ -1072,10 +1072,10 @@ class SpectraData:
             else: axis.plot(recon_wave, recon_flux, color="blue", label="recon")
         if recon_flux2 is not None:
             axis.plot(recon_wave, recon_flux2, color="red", label="gt bin")
-            title += f": {recon_loss2:.{3}f}"
+            if recon_loss2 is not None: title += f": {recon_loss2:.{3}f}"
         if recon_flux3 is not None:
             axis.plot(recon_wave, recon_flux3, color="blue", label="wrong bin")
-            title += f"/{recon_loss3:.{3}f}"
+            if recon_loss3 is not None: title += f"/{recon_loss3:.{3}f}"
 
         axis.set_title(title)
 
@@ -1227,7 +1227,7 @@ class SpectraData:
             (len(recon_fluxes) == n and len(recon_masks) == n)
 
         recon_fluxes = to_numpy(recon_fluxes)
-        if not is_codebook: gt_fluxes = to_numpy(gt_fluxes)
+        if gt_fluxes[0] is not None: gt_fluxes = to_numpy(gt_fluxes)
         if recon_fluxes2[0] is not None: recon_fluxes2 = to_numpy(recon_fluxes2)
         if recon_fluxes3[0] is not None: recon_fluxes3 = to_numpy(recon_fluxes3)
 

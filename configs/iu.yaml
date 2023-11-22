@@ -15,7 +15,7 @@ global:
     seed: 80
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
-    tasks: ['codebook_pretrain_infer','save_redshift','plot_redshift_residual'] #,'recon_spectra','plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','recon_spectra','save_optimal_bin_ids','save_redshift','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
+    tasks: ['codebook_pretrain_infer','recon_spectra','plot_spectra_residual','save_redshift'] #,'plot_redshift_residual'] #'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','recon_spectra','save_optimal_bin_ids','save_redshift','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
     #tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
     #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift','plot_redshift_logits','plot_redshift_residual'] #,'plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_codebook_latents','save_qtz_weights','recon_spectra_all_bins']
 
