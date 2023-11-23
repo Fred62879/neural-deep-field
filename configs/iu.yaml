@@ -2,7 +2,7 @@
 global:
     verbose: False
     use_gpu: True
-    use_tqdm: False
+    use_tqdm: True
     on_cedar: False
     on_graham: False
     on_sockeye: False
@@ -127,7 +127,7 @@ pretrain:
     em_alternation_steps: [10,20]
 
     negative_supervise_wrong_redshift: True
-    neg_sup_with_optimal_wrong_bin: True
+    neg_sup_with_optimal_wrong_bin: False
     neg_sup_beta: 1
     neg_sup_constant: 0.1
 
@@ -177,7 +177,7 @@ pretrain:
     redshift_logit_latent_dim: 330
 
     main_train_with_pretrained_latents: False
-    redshift_pretrain_num_spectra: 10
+    redshift_pretrain_num_spectra: 1
 
     add_redshift_logit_bias: False
     plot_logits_for_gt_bin: False
@@ -366,6 +366,11 @@ infer:
     plot_spectrum_according_to_zncc: True
     plot_spectrum_with_sliding_zncc: False
     local_zncc_threshold: 0.5
+
+    plot_residual_with_ivar: False # 
+    plot_residual_times_ivar: False # exclusive
+    plot_ivar_region: True        #
+
     average_neighbour_spectra: True
     infer_spectra_individually: False
 

@@ -1683,6 +1683,8 @@ class AstroInferrer(BaseInferrer):
 
     def _plot_spectra_residual(self, num_spectra, model_id, suffix="", ids=None):
         titles = np.char.mod("%d", np.arange(num_spectra))
+        colors = ("black","blue","gray","gray")
+        self.spectra_ivar[self.spectra_ivar < 0] = 0
 
         if ids is not None:
             titles = titles[ids]
@@ -1694,15 +1696,27 @@ class AstroInferrer(BaseInferrer):
             data = (data - lo) / (hi - lo)
             return data
 
-        spectra_residual = self.recon_fluxes[:,0] - self.gt_fluxes
-        spectra_residual = norm(spectra_residual)
-        self.spectra_ivar = norm(self.spectra_ivar)
+        if self.extra_args["plot_residual_with_ivar"]:
+            option = "overlay"
+            spectra_residual = self.recon_fluxes[:,0] - self.gt_fluxes
+            spectra_residual = norm(spectra_residual)
+            self.spectra_ivar = norm(self.spectra_ivar)
+        elif self.extra_args["plot_residual_times_ivar"]:
+            option = "multiply"
+            spectra_residual = self.recon_fluxes[:,0] - self.gt_fluxes
+            spectra_residual = spectra_residual * np.sqrt(self.spectra_ivar)
+        elif self.extra_args["plot_ivar_region"]:
+            option = "region"
+            std = np.sqrt(1 / self.spectra_ivar)
+            lower = self.gt_fluxes - std
+            upper = self.gt_fluxes + std
+        else: raise ValueError()
 
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
         n_figs = int(np.ceil(num_spectra / n_spectrum_per_fig))
 
         for i in range(n_figs):
-            fname = f"model-{model_id}-residual-plot{i}{suffix}"
+            fname = f"model-{model_id}-residual-{option}-plot{i}{suffix}"
             lo = i * n_spectrum_per_fig
             hi = min(lo + n_spectrum_per_fig, num_spectra)
 
@@ -1712,17 +1726,34 @@ class AstroInferrer(BaseInferrer):
                 Path(spectra_dir).mkdir(parents=True, exist_ok=True)
             else: spectra_dir = self.spectra_dir
 
+            gt_wave, gt_fluxes, fluxes1, fluxes2, fluxes3 = [None]*5
+            if self.extra_args["plot_residual_with_ivar"]:
+                fluxes1 = spectra_residual[lo:hi]
+                fluxes2 = self.spectra_ivar[lo:hi]
+            elif self.extra_args["plot_residual_times_ivar"]:
+                fluxes1 = spectra_residual[lo:hi]
+            elif self.extra_args["plot_ivar_region"]:
+                fluxes1 = self.recon_fluxes[lo:hi]
+                fluxes2 = lower[lo:hi]
+                fluxes3 = upper[lo:hi]
+                gt_wave = self.recon_wave[lo:hi]
+                gt_fluxes = self.gt_fluxes[lo:hi]
+            else: raise ValueError()
+
             cur_metrics = self.dataset.plot_spectrum(
                 spectra_dir, fname,
                 self.extra_args["flux_norm_cho"],
-                None, None,
-                self.recon_wave[lo:hi], spectra_residual[lo:hi],
-                recon_fluxes2=self.spectra_ivar[lo:hi],
-                clip=self.extra_args["plot_clipped_spectrum"],
+                gt_wave, gt_fluxes,
+                self.recon_wave[lo:hi],
+                fluxes1,
+                recon_fluxes2=fluxes2,
+                recon_fluxes3=fluxes3,
+                colors=colors,
+                titles=titles,
                 gt_masks=self.gt_masks[lo:hi],
                 recon_masks=self.recon_masks[lo:hi],
-                calculate_metrics=not self.infer_outlier_only,
-                titles=titles)
+                clip=self.extra_args["plot_clipped_spectrum"],
+                calculate_metrics=not self.infer_outlier_only)
 
     def _plot_codebook_coeff(self, model_id, suffix="", ids=None):
         """ Plot coefficient of each code in the codebook.
