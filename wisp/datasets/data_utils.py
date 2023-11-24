@@ -41,7 +41,7 @@ def patch_exists(path, tract, patch):
     return exists(fname)
 
 def get_dataset_path(**kwargs):
-    if kwargs["on_cedar"] or kwargs["on_graham"]:
+    if kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
         dataset_path = kwargs["cedar_dataset_path"]
     elif kwargs["on_sockeye"]:
         dataset_path = kwargs["sockeye_dataset_path"]
@@ -49,7 +49,7 @@ def get_dataset_path(**kwargs):
     return dataset_path
 
 def get_img_data_path(local_dataset_path, **kwargs):
-    if kwargs["on_cedar"]:
+    if kwargs["on_cedar"] or kwargs["on_narval"]:
         input_patch_path = kwargs["cedar_input_fits_path"]
         _, img_data_path = set_input_path(
             local_dataset_path, kwargs["sensor_collection_name"])
@@ -67,7 +67,7 @@ def get_img_data_path(local_dataset_path, **kwargs):
     return input_patch_path, img_data_path
 
 def get_wave_range_fname(**kwargs):
-    if kwargs["on_cedar"] or kwargs["on_graham"]:
+    if kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
         dataset_path = kwargs["cedar_dataset_path"]
     elif kwargs["on_sockeye"]:
         dataset_path = kwargs["sockeye_dataset_path"]

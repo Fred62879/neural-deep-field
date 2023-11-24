@@ -19,6 +19,14 @@ from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
+def get_log_dir(**kwargs):
+    if kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
+        log_dir = kwargs["cedar_log_dir"]
+    elif kwargs["on_sockeye"]:
+        log_dir = kwargs["sockeye_log_dir"]
+    else: log_dir = kwargs["log_dir"]
+    return log_dir
+
 def get_current_ablate_param_and_val(args):
     id = args.ablat_id
     num_vals = args.ablat_num_vals

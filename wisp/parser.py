@@ -24,8 +24,9 @@ def parse_args():
     set_seed(args.seed)
     logging.info(f"set seed as {args.seed}")
 
-    param, val = get_current_ablate_param_and_val(args)
-    logging.info(f"ablate {param} with val: {val}")
+    if args.perform_ablation:
+        param, val = get_current_ablate_param_and_val(args)
+        logging.info(f"ablate {param} with val: {val}")
 
     return args, args_str
 
@@ -135,6 +136,7 @@ def define_cmd_line_args():
     global_group.add_argument("--use-tqdm", action="store_true")
     global_group.add_argument("--on-cedar", action="store_true")
     global_group.add_argument("--on-graham", action="store_true")
+    global_group.add_argument("--on-narval", action="store_true")
     global_group.add_argument("--on-sockeye", action="store_true")
     global_group.add_argument("--print-shape", action="store_true")
     global_group.add_argument("--show-memory", action="store_true")

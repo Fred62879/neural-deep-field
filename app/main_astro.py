@@ -15,9 +15,10 @@ if __name__ == "__main__":
     from wisp.utils.common import query_GPU_mem
     from wisp.trainers import AstroTrainer, CodebookTrainer
 
-    query_GPU_mem()
-
     args, args_str = parse_args()
+
+    if args.use_gpu:
+        query_GPU_mem()
 
     tasks = set(args.tasks)
     dataset = get_dataset_from_config(args)

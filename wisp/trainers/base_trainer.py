@@ -15,9 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from wisp.utils import PerfTimer
-#from wisp.datasets import default_collate
-#from wisp.offline_renderer import OfflineRenderer
-#from wisp.framework import WispState, BottomLevelRendererState
+from wisp.utils.common import get_log_dir
 
 
 def log_metric_to_wandb(key, _object, step):
@@ -109,11 +107,7 @@ class BaseTrainer(ABC):
         if self.extra_args["log_fname"] is not None:
             self.log_fname += "_" + self.extra_args["log_fname"]
 
-        if self.extra_args["on_cedar"] or self.extra_args["on_graham"]:
-            log_dir = extra_args["cedar_log_dir"]
-        elif self.extra_args["on_sockeye"]:
-            log_dir = extra_args["sockeye_log_dir"]
-        else: log_dir = extra_args["log_dir"]
+        log_dir = get_log_dir(**extra_args)
         self.log_dir = os.path.join(log_dir, self.exp_name, self.log_fname)
 
         # Default TensorBoard Logging
