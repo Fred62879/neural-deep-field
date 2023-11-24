@@ -831,6 +831,14 @@ def define_cmd_line_args():
     infer_group.add_argument("--local-zncc-threshold", type=float,
                              help="if plot spectrum according to zncc, we highlight region of \
                              the spectra above this threshold with a different color.")
+
+    infer_group.add_argument("--plot-residual-with-ivar", action="store_true",
+                             help="plot spectra residual and ivar together")
+    infer_group.add_argument("--plot-residual-times-ivar", action="store_true",
+                             help="plot residual times ivar, should follow N(0,1)")
+    infer_group.add_argument("--plot-ivar-region", action="store_true",
+                             help="plot gt spectra +- sqrt(1/ivar) region.")
+
     infer_group.add_argument("--infer-spectra-individually", action="store_true")
     infer_group.add_argument("--codebook-spectra-clip-range", nargs="+")
 

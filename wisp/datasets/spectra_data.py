@@ -1038,7 +1038,7 @@ class SpectraData:
         return sub_dir, gt_flux, recon_flux
 
     def plot_and_save_one_spectrum(self, name, spectra_dir, fig, axs, nrows, ncols,
-                                   save_spectra, calculate_metrics, idx, pargs):
+                                   colors, save_spectra, calculate_metrics, idx, pargs):
         """ Plot one spectrum and save as required.
         """
         sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux, recon_flux2, recon_loss2, \
@@ -1061,21 +1061,25 @@ class SpectraData:
 
         if title is None: title = str(idx)
 
+        if colors is not None:
+            (gt_color, recon_color, flux2_color, flux3_color) = colors
+        else: gt_color, recon_color, flux2_color, flux3_color = "gray","blue","green","red"
+
         if plot_gt_spectrum:
-            axis.plot(gt_wave, gt_flux, color="gray", label="gt", linestyle="dotted")
+            axis.plot(gt_wave, gt_flux, color=gt_color, label="gt", linestyle="dotted")
         if plot_recon_spectrum:
             if above_threshold is not None: # plot recon flux according to zncc
-                axis.plot(recon_wave, recon_flux, color="green", label="recon")
+                axis.plot(recon_wave, recon_flux, color=recon_color, label="recon")
                 segments = segment_bool_array(above_threshold)
                 for (lo, hi) in segments:
                     axis.plot(recon_wave[lo:hi], recon_flux[lo:hi], color="purple")
-            else: axis.plot(recon_wave, recon_flux, color="blue", label="recon")
+            else: axis.plot(recon_wave, recon_flux, color=recon_color, label="recon")
         if recon_flux2 is not None:
-            axis.plot(recon_wave, recon_flux2, color="red", label="gt bin")
-            title += f": {recon_loss2:.{3}f}"
+            axis.plot(recon_wave, recon_flux2, color=flux2_color, label="gt bin")
+            if recon_loss2 is not None: title += f": {recon_loss2:.{3}f}"
         if recon_flux3 is not None:
-            axis.plot(recon_wave, recon_flux3, color="blue", label="wrong bin")
-            title += f"/{recon_loss3:.{3}f}"
+            axis.plot(recon_wave, recon_flux3, color=flux3_color, label="wrong bin")
+            if recon_loss3 is not None: title += f"/{recon_loss3:.{3}f}"
 
         axis.set_title(title)
 
@@ -1175,16 +1179,18 @@ class SpectraData:
     def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
                       gt_wave, gt_fluxes,
                       recon_wave, recon_fluxes,
-                      recon_fluxes2=None, recon_losses2=None,
-                      recon_fluxes3=None, recon_losses3=None,
+                      recon_fluxes2=None,
+                      recon_losses2=None,
+                      recon_fluxes3=None,
+                      recon_losses3=None,
+                      colors=None,
+                      titles=None,
                       is_codebook=False,
                       save_spectra=False,
-                      save_spectra_together=False,
-                      spectra_ids=None,
-                      gt_masks=None, recon_masks=None,
-                      clip=False, spectra_clipped=False,
                       calculate_metrics=True,
-                      titles=None
+                      save_spectra_together=False,
+                      gt_masks=None, recon_masks=None,
+                      clip=False, spectra_clipped=False
     ):
         """ Plot all given spectra.
             @Param
@@ -1195,9 +1201,6 @@ class SpectraData:
               wave:        corresponding wave for gt and recon fluxes
               gt_fluxes:   [num_spectra,nsmpl]
               recon_fluxs: [num_spectra(,num_neighbours),nsmpl]
-
-              gt/recon_spectra_ids: if not None, indicates selected spectra to plot
-                   (when we have large amount of spectra, we only select some to plot)
 
             - clip config:
               clip: whether or not we plot spectra within certain range
@@ -1227,7 +1230,7 @@ class SpectraData:
             (len(recon_fluxes) == n and len(recon_masks) == n)
 
         recon_fluxes = to_numpy(recon_fluxes)
-        if not is_codebook: gt_fluxes = to_numpy(gt_fluxes)
+        if gt_fluxes[0] is not None: gt_fluxes = to_numpy(gt_fluxes)
         if recon_fluxes2[0] is not None: recon_fluxes2 = to_numpy(recon_fluxes2)
         if recon_fluxes3[0] is not None: recon_fluxes3 = to_numpy(recon_fluxes3)
 
@@ -1241,7 +1244,7 @@ class SpectraData:
                                calculate_metrics)
         plot_and_save = partial(self.plot_and_save_one_spectrum,
                                 name, spectra_dir, fig, axs, nrows, ncols,
-                                save_spectra and not save_spectra_together,
+                                colors, save_spectra and not save_spectra_together,
                                 calculate_metrics)
         metrics = []
         for idx, cur_plot_data in enumerate(

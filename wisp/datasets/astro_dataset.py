@@ -564,13 +564,18 @@ class AstroDataset(Dataset):
 
     def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
                       gt_wave, gt_fluxes, recon_wave, recon_fluxes,
-                      recon_fluxes2=None, recon_losses2=None,
-                      recon_fluxes3=None, recon_losses3=None,
-                      is_codebook=False, spectra_ids=None,
-                      save_spectra=False, save_spectra_together=False,
+                      recon_fluxes2=None,
+                      recon_losses2=None,
+                      recon_fluxes3=None,
+                      recon_losses3=None,
+                      colors=None,
+                      titles=None,
+                      is_codebook=False,
+                      save_spectra=False,
+                      calculate_metrics=True,
+                      save_spectra_together=False,
                       gt_masks=None, recon_masks=None,
-                      clip=False, spectra_clipped=False,
-                      calculate_metrics=True, titles=None
+                      clip=False, spectra_clipped=False
     ):
         return self.spectra_dataset.plot_spectrum(
             spectra_dir, name, flux_norm_cho,
@@ -579,10 +584,11 @@ class AstroDataset(Dataset):
             recon_losses2=recon_losses2,
             recon_fluxes3=recon_fluxes3,
             recon_losses3=recon_losses3,
+            colors=colors,
+            titles=titles,
             is_codebook=is_codebook,
             save_spectra=save_spectra,
+            calculate_metrics=calculate_metrics,
             save_spectra_together=save_spectra_together,
-            spectra_ids=spectra_ids,
             gt_masks=gt_masks, recon_masks=recon_masks,
-            clip=clip, spectra_clipped=spectra_clipped,
-            calculate_metrics=calculate_metrics, titles=titles)
+            clip=clip, spectra_clipped=spectra_clipped)
