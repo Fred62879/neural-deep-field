@@ -34,6 +34,7 @@ class BaseInferrer(ABC):
         self.trans_sample_method = extra_args["trans_sample_method"]
 
         self.verbose = extra_args["verbose"]
+        self.process_ivar = extra_args["process_ivar"]
         self.infer_selected = extra_args["infer_selected"]
         self.plot_residual_map = extra_args["plot_residual_map"]
         self.infer_last_model_only = extra_args["infer_last_model_only"]

@@ -91,7 +91,9 @@ def plot_save(fname, x, y):
     plt.savefig(fname)
     plt.close()
 
-def plot_precision_recall_all(logits, gt_redshift, lo, hi, bin_width, n_per_row, fname):
+def plot_precision_recall_individually(logits, gt_redshift, lo, hi, bin_width, n_per_row, fname):
+    """ Plot precision recall for each spectra individually.
+    """
     n = len(logits)
     ncols = min(n, n_per_row)
     nrows = int(np.ceil(n / ncols))
@@ -107,7 +109,9 @@ def plot_precision_recall_all(logits, gt_redshift, lo, hi, bin_width, n_per_row,
         axis.set_xlabel("recall");axis.set_ylabel("precision")
     fig.tight_layout(); plt.savefig(fname); plt.close()
 
-def plot_precision_recall_single(logits, gt_redshifts, lo, hi, bin_width, fname):
+def plot_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width, fname):
+    """ Plot precision recall combining all spectra together.
+    """
     n = len(logits)
     precision, recall = calculate_precision_recall_single(
         logits, gt_redshifts, lo, hi, bin_width)

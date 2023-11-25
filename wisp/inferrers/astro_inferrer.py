@@ -19,7 +19,7 @@ from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
 from wisp.utils.plot import plot_horizontally, plot_embed_map, \
     plot_latent_embed, annotated_heat, plot_simple, plot_multiple, \
-    plot_precision_recall_all, plot_precision_recall_single, plot_line
+    plot_precision_recall_individually, plot_precision_recall_together, plot_line
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
     sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, to_numpy, \
     load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, \
@@ -1865,20 +1865,20 @@ class AstroInferrer(BaseInferrer):
         fname = join(sub_dir, f"model-{model_id}_logits")
         np.save(fname, np.concatenate((bin_centers[None,:], redshift_logits), axis=0))
 
-        plot_multiple(
-            self.extra_args["num_spectrum_per_fig"],
-            self.extra_args["num_spectrum_per_row"],
-            redshift_logits, fname, x=bin_centers,
-            vertical_xs=gt_redshift) #,y2=gt_logits)
+        # plot_multiple(
+        #     self.extra_args["num_spectrum_per_fig"],
+        #     self.extra_args["num_spectrum_per_row"],
+        #     redshift_logits, fname, x=bin_centers,
+        #     vertical_xs=gt_redshift) #,y2=gt_logits)
 
         if self.extra_args["plot_redshift_precision_recall"]:
-            plot_precision_recall_all(
+            plot_precision_recall_all_individually(
                 redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
                 self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
                 self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png")
 
         if self.extra_args["plot_redshift_precision_recall_together"]:
-            plot_precision_recall_single(
+            plot_precision_recall_together(
                 redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
                 self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
                 f"{fname}_precision_recall.png")

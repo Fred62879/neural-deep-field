@@ -584,6 +584,7 @@ def define_cmd_line_args():
     data_group.add_argument("--spectra-markers", type=int, nargs='+',
                             help="marker to plot each spectra.")
 
+    data_group.add_argument("--process-ivar", action="store_true")
     data_group.add_argument("--convolve-spectra", action="store_true")
     data_group.add_argument("--spectra-smooth-sigma",type=int, default=5)
     data_group.add_argument("--flux-norm-cho",type=str,

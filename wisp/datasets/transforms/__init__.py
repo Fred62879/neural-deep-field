@@ -7,5 +7,4 @@
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
 
-from .ray_sampler import *
 from .to_device import *

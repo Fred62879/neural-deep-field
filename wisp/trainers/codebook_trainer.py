@@ -21,7 +21,7 @@ from wisp.utils import PerfTimer
 from wisp.trainers import BaseTrainer
 from wisp.optimizers import multi_optimizer
 from wisp.utils.plot import plot_grad_flow, plot_multiple, \
-    plot_precision_recall_all, plot_precision_recall_single
+    plot_precision_recall_individually, plot_precision_recall_together
 from wisp.loss import spectra_supervision_loss, \
     spectra_supervision_emd_loss, pretrain_pixel_loss
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
@@ -154,8 +154,8 @@ class CodebookTrainer(BaseTrainer):
         # wave sampling setup
         self.sample_wave = not self.extra_args["pretrain_use_all_wave"]
         self.pixel_supervision = self.extra_args["pretrain_pixel_supervision"]
-        self.train_within_wave_range = not self.pixel_supervision and \
-            self.extra_args["learn_spectra_within_wave_range"]
+        # self.train_within_wave_range = not self.pixel_supervision and \
+        #     self.extra_args["learn_spectra_within_wave_range"]
         self.trans_sample_method = self.extra_args["trans_sample_method"]
 
         # all others
@@ -388,10 +388,10 @@ class CodebookTrainer(BaseTrainer):
         if self.sample_wave:
             self.dataset.set_num_wave_samples(self.extra_args["pretrain_num_wave_samples"])
             self.dataset.set_wave_sample_method(self.extra_args["pretrain_wave_sample_method"])
-        if self.train_within_wave_range:
-            self.dataset.set_wave_range(
-                self.extra_args["spectra_supervision_wave_lo"],
-                self.extra_args["spectra_supervision_wave_hi"])
+        # if self.train_within_wave_range:
+        #     self.dataset.set_wave_range(
+        #         self.extra_args["spectra_supervision_wave_lo"],
+        #         self.extra_args["spectra_supervision_wave_hi"])
 
         self.dataset.set_length(self.num_spectra)
         if self.extra_args["infer_selected"]:

@@ -55,6 +55,7 @@ class PatchData:
         self.verbose = kwargs["verbose"]
         self.num_bands = kwargs["num_bands"]
         self.u_band_scale = kwargs["u_band_scale"]
+        self.process_ivar = kwargs["process_ivar"]
         self.sensors_full_name = kwargs["sensors_full_name"]
         self.load_patch_data_cache = kwargs["load_patch_data_cache"]
         self.qtz = kwargs["quantize_latent"] or kwargs["quantize_spectra"]
@@ -356,11 +357,13 @@ class PatchData:
     def load_spectra_data(self):
         """ Load spectra fluxes and redshift values for all pixels with gt spectra.
         """
+        suffix = "_ivar_processed" if self.process_ivar else ""
+
         path = self.spectra_obj.get_processed_spectra_path()
-        cur_patch_spectra_fname = join(path, f"{self.patch_uid}.npy")
+        cur_patch_spectra_fname = join(path, f"{self.patch_uid}{suffix}.npy")
         cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
+        cur_patch_spectra_masks_fname = join(path, f"{self.patch_uid}_masks.npy")
         cur_patch_img_coords_fname = join(path, f"{self.patch_uid}_img_coords.npy")
-        cur_patch_spectra_masks_fname = join(path, f"{self.patch_uid}_plot_mask.npy")
 
         spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]
         redshift = np.load(cur_patch_redshift_fname)
