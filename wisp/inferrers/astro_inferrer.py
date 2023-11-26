@@ -1878,10 +1878,13 @@ class AstroInferrer(BaseInferrer):
                 self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png")
 
         if self.extra_args["plot_redshift_precision_recall_together"]:
+            n = -1 if self.extra_args["use_logits_as_precision_recall_threshes"] else \
+                self.extra_args["num_precision_recall_threshes"]
+
             plot_precision_recall_together(
                 redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
                 self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
-                f"{fname}_precision_recall.png")
+                f"{fname}_precision_recall", n)
 
         log.info("redshift logits plotting done")
 

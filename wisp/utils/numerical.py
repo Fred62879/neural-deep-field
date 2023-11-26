@@ -136,31 +136,43 @@ def calculate_precision_recall(logits, gt_redshift, lo, hi, bin_width):
         precision.append(cur_precision)
     return np.array(precision), np.array(recall)
 
-def calculate_precision_recall_single(logits, gt_redshifts, lo, hi, bin_width):
-    """ Calculate precision and recall for all examples together.
-        @Param
-          logits: [bsz,nbins]
+def calculate_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width,
+                                        num_precision_recall_threshes
+):
+    """ Calculate precision and recall based on result for all spectra.
+        @param
+          logits: [num_spectra,num_bins]
     """
     n_spectra = len(logits)
     bins = init_redshift_bins(lo, hi, bin_width)
     gt_ids = [get_bin_id(lo, bin_width, gt_redshift) for gt_redshift in gt_redshifts]
     ids = np.arange(len(bins))
-    # mn, mx = np.min(logits), np.max(logits)
-    # step = (mx - mn) / 20
-    # threshes = np.arange(mn, mx, step)
-    threshes = np.array(list(set(logits.flatten())))
-    threshes = np.sort(threshes)
-    precision, recall = [], []
-    for thresh in threshes:
+
+    if num_precision_recall_threshes <= 0:
+        threshes = np.array(list(set(logits.flatten())))
+        threshes = np.sort(threshes)
+    else:
+        mn, mx = np.min(logits), np.max(logits)
+        step = (mx - mn) / num_precision_recall_threshes
+        threshes = np.arange(mn, mx, step)
+
+    def calculate(thresh):
         ps = logits > thresh
-        if np.sum(ps) == 0: break
+        ns = logits <= thresh
+        # if np.sum(ps) == 0: return
         n_tps_each = [sum(ids[p] == gt_id) for p, gt_id in zip(ps, gt_ids)]
+        n_fns_each = [sum(ids[n] == gt_id) for n, gt_id in zip(ns, gt_ids)]
         n_tps = sum(n_tps_each)
-        cur_precision = n_tps / np.sum(ps)
-        cur_recall = n_tps / n_spectra
-        recall.append(cur_recall)
-        precision.append(cur_precision)
-    return np.array(precision), np.array(recall)
+        n_fns = sum(n_fns_each)
+        # recall.append(n_tps / n_spectra)
+        recall.append(n_tps / (n_tps + n_fns) )
+        precision.append(n_tps / np.sum(ps))
+        # recall.append(n_fns)
+        # precision.append(n_tps)
+
+    precision, recall = [], []
+    [ calculate(thresh) for thresh in threshes ]
+    return threshes, np.array(precision), np.array(recall)
 
 def calculate_zscale_ranges(pixels):
     """ Calculate zscale ranges based on given pixels for each bands separately.

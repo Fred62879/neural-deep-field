@@ -400,7 +400,6 @@ class SpectraData:
 
         if not self.load_spectra_data_from_cache or \
            not exists(self.emitted_wave_fname) or \
-           not exists(self.emitted_wave_masks_fname) or \
            not exists(self.processed_metadata_table_fname) or \
            not exists(self.gt_spectra_fname) or \
            not exists(self.gt_spectra_ids_fname) or \
@@ -1482,9 +1481,9 @@ def normalize_spectra(spectra, bound, process_ivar=False):
     flux = spectra[1][id_lo:id_hi+1]
     lo, hi = min(flux), max(flux)
     spectra[1] = (spectra[1] - lo) / (hi - lo)
-    print(spectra[2], lo, (hi-lo)**2)
+    # print(spectra[2], lo, (hi-lo)**2)
     if process_ivar:
-        spectra[2] = (spectra[2] - lo) / (hi - lo)**2
+        spectra[2] = (hi - lo)**2 / (spectra[2] - lo)
     return spectra
 
 def get_wave_weight(spectra, redshift, emitted_wave_distrib, bound):

@@ -10,7 +10,7 @@ from pathlib import Path
 from os.path import join
 from astropy.visualization import ZScaleInterval
 from wisp.utils.numerical import calculate_sam_spectrum, \
-    calculate_precision_recall, calculate_precision_recall_single
+    calculate_precision_recall, calculate_precision_recall_together
 
 
 def plot_line(x, y, fname, xlabel=None, ylabel=None, x_range=None):
@@ -109,19 +109,35 @@ def plot_precision_recall_individually(logits, gt_redshift, lo, hi, bin_width, n
         axis.set_xlabel("recall");axis.set_ylabel("precision")
     fig.tight_layout(); plt.savefig(fname); plt.close()
 
-def plot_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width, fname):
+def plot_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width, fname,
+                                   num_precision_recall_threshes
+):
     """ Plot precision recall combining all spectra together.
+        @param
+          logits: estimated redshift logits for each spectra [num_spectra,num_bins]
+          gt_redshifts: gt redshift value for each spectra [num_spectra,]
+          use_logits_as_threshes: use each logit value as threshold for pr calculation
     """
     n = len(logits)
-    precision, recall = calculate_precision_recall_single(
-        logits, gt_redshifts, lo, hi, bin_width)
+    threshes, precision, recall = calculate_precision_recall_together(
+        logits, gt_redshifts, lo, hi, bin_width,
+        num_precision_recall_threshes
+    )
     plt.plot(recall, precision)
-    # plt.xlim(xmin=0,xmax=1.0);plt.ylim(ymin=-0.05,ymax=1)
-    # plt.xlim(xmin=0,xmax=1);plt.ylim(ymin=0,ymax=1)
     plt.xlim(xmin=0,xmax=1.2);plt.ylim(ymin=0,ymax=1.2)
     plt.xlabel("recall");plt.ylabel("precision")
     plt.title(f"Precision Recall over {n} spectra")
-    plt.tight_layout(); plt.savefig(fname); plt.close()
+    plt.tight_layout(); plt.savefig(fname + ".png"); plt.close()
+
+    plt.plot(threshes, precision)
+    plt.xlabel("threshold"); plt.ylabel("precision")
+    plt.title(f"Precision under different threshold")
+    plt.tight_layout(); plt.savefig(fname + "_precision.png"); plt.close()
+
+    plt.plot(threshes, recall)
+    plt.xlabel("threshold"); plt.ylabel("recall")
+    plt.title(f"Recall under different threshold")
+    plt.tight_layout(); plt.savefig(fname + "_recall.png"); plt.close()
 
 def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):
     """ Plot latent variable distributions and each codebook embedding.
