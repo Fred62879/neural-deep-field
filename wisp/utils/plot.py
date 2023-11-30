@@ -110,18 +110,18 @@ def plot_precision_recall_individually(logits, gt_redshift, lo, hi, bin_width, n
     fig.tight_layout(); plt.savefig(fname); plt.close()
 
 def plot_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width, fname,
-                                   num_precision_recall_threshes
+                                   num_precision_recall_residuals
 ):
     """ Plot precision recall combining all spectra together.
         @param
           logits: estimated redshift logits for each spectra [num_spectra,num_bins]
           gt_redshifts: gt redshift value for each spectra [num_spectra,]
-          use_logits_as_threshes: use each logit value as threshold for pr calculation
+          num_precision_recall_residuals: num residual levels to calculate the two stats
     """
     n = len(logits)
-    threshes, precision, recall = calculate_precision_recall_together(
+    residuals, precision, recall = calculate_precision_recall_together(
         logits, gt_redshifts, lo, hi, bin_width,
-        num_precision_recall_threshes
+        num_precision_recall_residuals
     )
     plt.plot(recall, precision)
     plt.xlim(xmin=0,xmax=1.2);plt.ylim(ymin=0,ymax=1.2)
@@ -129,14 +129,14 @@ def plot_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width, fnam
     plt.title(f"Precision Recall over {n} spectra")
     plt.tight_layout(); plt.savefig(fname + ".png"); plt.close()
 
-    plt.plot(threshes, precision)
-    plt.xlabel("threshold"); plt.ylabel("precision")
-    plt.title(f"Precision under different threshold")
+    plt.plot(residuals, precision)
+    plt.xlabel("residual"); plt.ylabel("precision")
+    plt.title(f"Precision under different residual levels")
     plt.tight_layout(); plt.savefig(fname + "_precision.png"); plt.close()
 
-    plt.plot(threshes, recall)
-    plt.xlabel("threshold"); plt.ylabel("recall")
-    plt.title(f"Recall under different threshold")
+    plt.plot(residuals, recall)
+    plt.xlabel("residual"); plt.ylabel("recall")
+    plt.title(f"Recall under different residual levels")
     plt.tight_layout(); plt.savefig(fname + "_recall.png"); plt.close()
 
 def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):

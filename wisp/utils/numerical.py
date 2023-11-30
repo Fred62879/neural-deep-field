@@ -193,6 +193,7 @@ def calculate_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width,
     est_bin_ids = np.argmax(logits, axis=-1)
     est_redshifts = bins[est_bin_ids]
     residuals = np.abs(est_redshifts - gt_redshifts)
+    residuals = np.around(residuals, decimals=2)
 
     lo, hi = np.min(residuals), np.max(residuals)
     if num_precision_recall_residuals <= 0:
@@ -203,19 +204,16 @@ def calculate_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width,
         residual_levels = np.arange(lo, hi, step)
 
     def calculate(residual_level):
-        ps = residuals <= residual_level
-        ns = residuals > residual_level
-
-        n_tps_each = [sum(ids[p] == gt_id) for p, gt_id in zip(ps, gt_ids)]
-        n_fns_each = [sum(ids[n] == gt_id) for n, gt_id in zip(ns, gt_ids)]
-        n_tps = sum(n_tps_each)
-        n_fns = sum(n_fns_each)
+        tps = residuals <= residual_level
+        fns = residuals > residual_level
+        n_tps = sum(tps)
+        n_fns = sum(fns)
         recall.append(n_tps / (n_tps + n_fns) )
-        precision.append(n_tps / np.sum(ps))
+        precision.append(n_tps / n_spectra)
 
     precision, recall = [], []
     [ calculate(residual_level) for residual_level in residual_levels ]
-    return residuals, np.array(precision), np.array(recall)
+    return residual_levels, np.array(precision), np.array(recall)
 
 def calculate_zscale_ranges(pixels):
     """ Calculate zscale ranges based on given pixels for each bands separately.

@@ -15,7 +15,7 @@ global:
     seed: 80
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
-    tasks: ['codebook_pretrain_infer','save_redshift','plot_redshift_logits','recon_spectra','plot_spectra_residual','save_redshift','plot_redshift_residual'] #'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','recon_spectra','save_optimal_bin_ids','save_redshift','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
+    tasks: ['codebook_pretrain_infer','save_redshift','plot_redshift_logits'] #,'recon_spectra','plot_spectra_residual','save_redshift','plot_redshift_residual'] #'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','recon_spectra','save_optimal_bin_ids','save_redshift','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
     #tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
     #tasks: ['redshift_pretrain_infer','plot_redshift_logits','recon_spectra','save_redshift','plot_redshift_residual'] #,'plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_codebook_latents','save_qtz_weights','recon_spectra_all_bins']
 
@@ -327,7 +327,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20231125-155158_sc_400_32_200_epochs_223640'
+    infer_log_dir: '20231120-223640_neg_sup_constant_0.3_400_32_20k_epochs_narval'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
@@ -348,7 +348,7 @@ infer:
     pretrain_num_infer_upper_bound: 5
     test_num_infer_upper_bound: 10
     # spectra_inferrence_id_fname: '/scratch/projects/vision/data/pdr3/output/neg-sup/?/redshift/model-5_redshift_outlier_ids.npy'
-    infer_outlier_only: True
+    infer_outlier_only: False
 
     spectra_neighbour_size: 1
 
@@ -478,8 +478,8 @@ spectra_data:
     spectra_data_source: "deimos"
     max_spectra_len: 8191 # hardcoded
 
-    num_gt_spectra_upper_bound: 10 #7000 # spectra to load
-    num_supervision_spectra_upper_bound: 10 #400
+    num_gt_spectra_upper_bound: 7000 # spectra to load
+    num_supervision_spectra_upper_bound: 400
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 
@@ -488,10 +488,10 @@ spectra_data:
     spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
-    process_ivar: True
+    process_ivar: False
     convolve_spectra: True
     spectra_smooth_sigma: 50
-    processed_spectra_cho: "debug1" #v7_table"
+    processed_spectra_cho: "v7_table"
     # **************************************************
 
     spectra_supervision_wave_lo: 6000
