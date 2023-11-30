@@ -170,8 +170,9 @@ def freeze_layers_excl(model, excls=[]):
             if excl in n: freeze = False; break
         if freeze: p.requires_grad = False
 
-def init_redshift_bins(lo, hi, bin_width):
-    redshift_bin_center = torch.arange(lo, hi, bin_width)
+def init_redshift_bins(lo, hi, bin_width, init_np=False):
+    if init_np: redshift_bin_center = np.arange(lo, hi, bin_width)
+    else:       redshift_bin_center = torch.arange(lo, hi, bin_width)
     offset = bin_width / 2
     redshift_bin_center += offset
     return redshift_bin_center

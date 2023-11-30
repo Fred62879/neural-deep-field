@@ -1231,6 +1231,9 @@ class AstroInferrer(BaseInferrer):
                         self.argmax_redshift.extend(argmax_redshift)
                         weighted_redshift = torch.sum(
                             ret["redshift"] * ret["redshift_logits"], dim=-1)
+                        # print(ids.shape, ret["redshift"].shape)
+                        # print(ret["redshift"], ids)
+                        # print(argmax_redshift)
                         self.weighted_redshift.extend(weighted_redshift)
                     else:
                         self.redshift.extend(ret["redshift"])
@@ -1513,19 +1516,19 @@ class AstroInferrer(BaseInferrer):
               bins whose estimations are identified as outliers.
         """
         self.gt_redshift = torch.stack(self.gt_redshift).detach().cpu().numpy()
-        argmax_redshift = torch.stack(self.argmax_redshift).detach().cpu().numpy()
-        self.redshift_residual = argmax_redshift - self.gt_redshift
+        self.argmax_redshift = torch.stack(self.argmax_redshift).detach().cpu().numpy()
+        self.redshift_residual = self.argmax_redshift - self.gt_redshift
         fname = join(self.redshift_dir, f"model-{model_id}_redshift_residual.txt")
         log_data(self, "redshift_residual", fname=fname, log_to_console=False)
 
         ids = np.arange(len(self.redshift_residual))
         outlier = ids[np.abs(self.redshift_residual) > self.extra_args["redshift_bin_width"]]
         outlier_gt = self.gt_redshift[outlier]
-        outlier_est = argmax_redshift[outlier]
+        outlier_est = self.argmax_redshift[outlier]
         to_save = np.array(list(outlier) + list(outlier_gt) + list(outlier_est)).reshape(3,-1)
         log.info(f"outlier spectra: {outlier}")
         log.info(f"gt_redshift: {outlier_gt}")
-        log.info(f"argmax_redshift: {outlier_est}")
+        log.info(f"self.argmax_redshift: {outlier_est}")
         fname = join(self.redshift_dir, f"model-{model_id}_redshift_outlier.txt")
         with open(fname, "w") as f: f.write(f"{to_save}")
 
@@ -1707,7 +1710,7 @@ class AstroInferrer(BaseInferrer):
             spectra_residual = spectra_residual * np.sqrt(self.spectra_ivar)
         elif self.extra_args["plot_ivar_region"]:
             option = "region"
-            std = np.sqrt(1 / self.spectra_ivar)
+            std = np.sqrt(1 / (self.spectra_ivar + 1e-10))
             lower = self.gt_fluxes - std
             upper = self.gt_fluxes + std
         else: raise ValueError()
@@ -1881,10 +1884,10 @@ class AstroInferrer(BaseInferrer):
             n = -1 if self.extra_args["use_logits_as_precision_recall_threshes"] else \
                 self.extra_args["num_precision_recall_threshes"]
 
-            plot_precision_recall_together(
-                redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
-                self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
-                f"{fname}_precision_recall", n)
+            # plot_precision_recall_together(
+            #     redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
+            #     self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
+            #     f"{fname}_precision_recall", n)
 
         log.info("redshift logits plotting done")
 
@@ -1893,9 +1896,11 @@ class AstroInferrer(BaseInferrer):
         """
         if ids is not None:
             gt_redshift = self.gt_redshift[ids]
+            est_redshift = self.argmax_redshift[ids]
             redshift_residual = self.redshift_residual[ids]
         else:
             gt_redshift = self.gt_redshift
+            est_redshift = self.argmax_redshift
             redshift_residual = self.redshift_residual
 
         ids = np.argsort(gt_redshift)
@@ -1905,8 +1910,12 @@ class AstroInferrer(BaseInferrer):
         fname = join(self.redshift_dir, f"model-{model_id}_residual")
         plot_line(gt_redshift, redshift_residual, fname,
                   xlabel="gt_redshift", ylabel="residual",
-                  x_range=[self.extra_args["redshift_lo"], self.extra_args["redshift_hi"]]
-        )
+                  x_range=[self.extra_args["redshift_lo"], self.extra_args["redshift_hi"]])
+
+        fname = join(self.redshift_dir, f"model-{model_id}_est")
+        plot_line(gt_redshift, est_redshift, fname,
+                  xlabel="gt redshift", ylabel="est redshift",
+                  x_range=[self.extra_args["redshift_lo"], self.extra_args["redshift_hi"]])
 
     def _plot_binwise_spectra_loss(self, model_id, suffix="", ids=None):
         """ Plot reconstruction loss for spectra corresponding to each redshift bin.

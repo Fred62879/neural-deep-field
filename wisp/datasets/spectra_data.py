@@ -501,11 +501,18 @@ class SpectraData:
             # np.random.shuffle(indices)
             self.redshift_pretrain_ids = indices[:self.kwargs["redshift_pretrain_num_spectra"]]
             validation_ids = supervision_ids[self.redshift_pretrain_ids]
-            # print(self.redshift_pretrain_ids)
+
+        if self.kwargs["add_validation_spectra_not_in_supervision"]:
+            unseen_spectra_ids = np.array(
+                list(set(ids) - set(supervision_ids) - set(validation_ids)))
+            np.random.shuffle(unseen_spectra_ids)
+            selected_ids = unseen_spectra_ids[:self.kwargs["num_extra_validation_spectra"]]
+            validation_ids = np.append(validation_ids, selected_ids)
+            assert len(set(validation_ids) & set(supervision_ids)) == 0
 
         # log.info(f"test spectra ids: {test_ids}")
         # log.info(f"validation spectra ids: {validation_ids}")
-        log.info(f"supervision spectra ids: {supervision_ids}")
+        # log.info(f"supervision spectra ids: {supervision_ids}")
 
         self.num_test_spectra = len(test_ids)
         self.num_validation_spectra = len(validation_ids)
@@ -1441,13 +1448,17 @@ def convolve_spectra(spectra, bound, std=5, border=True, process_ivar=False):
         nume = convolve(spectra[1][lo:hi+1], kernel) # flux
         denom = convolve(np.ones(n), kernel)
         spectra[1][lo:hi+1] = nume / denom
-        if process_ivar:
-            nume = convolve(spectra[2][lo:hi+1], kernel) # ivar
-            spectra[2][lo:hi+1] = nume / denom
     else:
         spectra[1][lo:hi+1] = convolve(spectra[1][lo:hi+1], kernel)
-        if process_ivar:
-            spectra[2][lo:hi+1] = convolve(spectra[2][lo:hi+1], kernel)
+
+    if process_ivar:
+        mask = spectra[2][lo:hi+1] != 0
+        conved = 1/convolve(1/spectra[2][lo:hi+1][mask], kernel)
+        if border:
+            denom = convolve(np.ones(sum(mask)), kernel)
+            spectra[2][lo:hi+1][mask] = conved / denom
+        else: spectra[2][lo:hi+1][mask] = conved
+
     return spectra
 
 def mask_spectra_range(spectra, mask, bound, trans_range, trusted_range):
@@ -1481,9 +1492,11 @@ def normalize_spectra(spectra, bound, process_ivar=False):
     flux = spectra[1][id_lo:id_hi+1]
     lo, hi = min(flux), max(flux)
     spectra[1] = (spectra[1] - lo) / (hi - lo)
-    # print(spectra[2], lo, (hi-lo)**2)
+    # print(np.min(spectra[2]), np.max(spectra[2]))
     if process_ivar:
-        spectra[2] = (hi - lo)**2 / (spectra[2] - lo)
+        mask = spectra[2] != 0
+        spectra[2][mask] = (hi - lo)**2 / ( 1/spectra[2][mask] - lo)
+    # print(np.min(spectra[2]), np.max(spectra[2]))
     return spectra
 
 def get_wave_weight(spectra, redshift, emitted_wave_distrib, bound):

@@ -186,6 +186,8 @@ def define_cmd_line_args():
     debug_group.add_argument("--sample-from-codebook-pretrain-spectra", action="store_true",
                              help="sample spectra for redshift pretrain from spectra \
                              used for codebook pretrain.")
+    debug_group.add_argument("--add-validation-spectra-not-in-supervision", action="store_true")
+    debug_group.add_argument("--num-extra-validation-spectra", type=int)
 
     debug_group.add_argument("--debug-lbfgs", action="store_true")
 
