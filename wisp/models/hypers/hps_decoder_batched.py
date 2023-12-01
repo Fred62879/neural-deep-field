@@ -40,6 +40,7 @@ class HyperSpectralDecoderB(nn.Module):
         #     self.kwargs["space_dim"] == 3 and self.kwargs["quantize_spectra"]
 
         self.convert = HyperSpectralConverter(
+            _qtz_spectra=qtz_spectra,
             _model_redshift=_model_redshift, **kwargs
         )
 
@@ -205,7 +206,9 @@ class HyperSpectralDecoderB(nn.Module):
                 raise ValueError()
         else:
             if self.classify_redshift:
-                spectra = self.classify_redshift3D(spectra, ret)
+                calculate_redshift_logits(
+                    loss_func, spectra_masks, gt_spectra, spectra, ret, **self.kwargs)
+                spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
         return spectra
 
     def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
@@ -234,6 +237,7 @@ class HyperSpectralDecoderB(nn.Module):
                                                            # [...,num_embed,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,num_embed,bsz,nsmpl]
         else:
+            print(wave.shape, input.shape, redshift.shape)
             latents = self.convert(wave, input, redshift, wave_bound) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
 
@@ -319,6 +323,7 @@ class HyperSpectralDecoderB(nn.Module):
         redshift = None if ret["redshift"] is None else \
             ret["redshift"] if self.classify_redshift else ret["redshift"][:bsz]
 
+        print('**', latents.shape, wave.shape)
         ret["spectra"] = self.reconstruct_spectra(
             latents, wave,
             None if ret["scaler"] is None else ret["scaler"][:bsz],

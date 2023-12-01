@@ -12,13 +12,14 @@ from wisp.models.decoders import BasicDecoder, Siren
 class HyperSpectralConverter(nn.Module):
     """ Processing module, no weights to update here.
     """
-    def __init__(self, _model_redshift=True, **kwargs):
+    def __init__(self, _qtz_spectra=True, _model_redshift=True, **kwargs):
         """ @Param:
               wave_encoder: encoder network for lambda.
         """
         super(HyperSpectralConverter, self).__init__()
 
         self.kwargs = kwargs
+        self._qtz_spectra = _qtz_spectra
         self._model_redshift = _model_redshift
         self.wave_multiplier = kwargs["wave_multiplier"]
 
@@ -105,14 +106,17 @@ class HyperSpectralConverter(nn.Module):
     def combine_spatial_spectral(self, spatial, spectral):
         """ Combine spatial with spectral latent variables.
             @Param
-              spatial:   [(num_codes,)bsz,1,2/embed_dim]
+              spatial:   [(num_codes,)bsz,1,2/embed_dim] if qtz_spectra
+                         [bsz,1,(num_bins),embed_dim]    o.w.
               spectral:  [(num_bins,)bsz,nsmpl,1/embed_dim]
             @Return
               if add:    [(num_codes,num_bins,)bsz,nsmpls,embed_dim]
               if concat: [(num_codes,num_bins,)bsz,nsmpls,spa_dim+spe_dim]
         """
+        print(spatial.shape, spectral.shape)
         nsmpls = spectral.shape[-2]
-        if spatial.ndim == 4: num_codes = spatial.shape[0]
+        if spatial.ndim == 4 and self._qtz_spectra:
+            num_codes = spatial.shape[0]
         if spectral.ndim == 4: num_bins = spectral.shape[0]
 
         # print(spatial.shape, spectral.shape)
@@ -120,16 +124,21 @@ class HyperSpectralConverter(nn.Module):
             if spectral.ndim == 3:
                 spatial = spatial.tile(1,nsmpls,1)
             elif spectral.ndim == 4:
+                assert self._qtz_spectra
                 spatial = spatial[None,...].tile(num_bins,1,nsmpls,1)
             else: raise ValueError()
 
         elif spatial.ndim == 4:
             if spectral.ndim == 3:
+                assert self._qtz_spectra
                 spatial = spatial.tile(1,1,nsmpls,1)
                 spectral = spectral[None,...].tile(num_codes,1,1,1)
             elif spectral.ndim == 4:
-                spatial = spatial[None,...].tile(num_bins,1,1,nsmpls,1)
-                spectral = spectral[:,None,...].tile(1,num_codes,1,1,1)
+                if self._qtz_spectra:
+                    spatial = spatial[None,...].tile(num_bins,1,1,nsmpls,1)
+                    spectral = spectral[:,None,...].tile(1,num_codes,1,1,1)
+                else:
+                    spatial = spatial.permute(2,0,1,3).tile(1,1,nsmpls,1)
         else:
             raise ValueError("Wrong wave dimension when combining.")
 

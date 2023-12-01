@@ -319,6 +319,9 @@ def define_cmd_line_args():
     ###################
     qtz_group = parser.add_argument_group("quantization")
 
+    qtz_group.add_argument("--quantize-latent", action="store_true")
+    qtz_group.add_argument("--quantize-spectra", action="store_true")
+
     qtz_group.add_argument("--quantization-strategy", type=str)
     qtz_group.add_argument("--quantization-calculate-loss", action="store_true")
     qtz_group.add_argument("--qtz-latent-dim", type=int)
@@ -713,8 +716,6 @@ def define_cmd_line_args():
     train_group.add_argument("--spectra-beta", type=float, help="spectra loss weight scaler.")
     train_group.add_argument("--redshift-beta", type=float, help="redshift loss weight scaler.")
 
-    train_group.add_argument("--quantize-latent", action="store_true")
-    train_group.add_argument("--quantize-spectra", action="store_true")
     train_group.add_argument("--decode-spatial-embedding", action="store_true")
 
     train_group.add_argument("--resume-train", action="store_true")
