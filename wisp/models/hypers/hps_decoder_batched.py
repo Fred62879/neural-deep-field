@@ -152,7 +152,7 @@ class HyperSpectralDecoderB(nn.Module):
               spectra [bsz,nsmpl]
         """
         assert self.kwargs["redshift_classification_method"] == "weighted_avg"
-        if self.kwargs["optimize_codebook_latents_for_each_redshift_bin"]:
+        if self.kwargs["optimize_spectra_for_each_redshift_bin"]:
             # index with argmax, this spectra is for visualization only
             #  optimization relies on spectra loss calculated for each bin
             ids = torch.argmax(ret["redshift_logits"], dim=-1)
@@ -206,6 +206,7 @@ class HyperSpectralDecoderB(nn.Module):
                 raise ValueError()
         else:
             if self.classify_redshift:
+                ret["spectra_all_bins"] = spectra
                 calculate_redshift_logits(
                     loss_func, spectra_masks, gt_spectra, spectra, ret, **self.kwargs)
                 spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
@@ -237,7 +238,6 @@ class HyperSpectralDecoderB(nn.Module):
                                                            # [...,num_embed,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,num_embed,bsz,nsmpl]
         else:
-            print(wave.shape, input.shape, redshift.shape)
             latents = self.convert(wave, input, redshift, wave_bound) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
 
@@ -323,7 +323,6 @@ class HyperSpectralDecoderB(nn.Module):
         redshift = None if ret["redshift"] is None else \
             ret["redshift"] if self.classify_redshift else ret["redshift"][:bsz]
 
-        print('**', latents.shape, wave.shape)
         ret["spectra"] = self.reconstruct_spectra(
             latents, wave,
             None if ret["scaler"] is None else ret["scaler"][:bsz],

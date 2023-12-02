@@ -494,15 +494,16 @@ class SpectraData:
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
 
-        # select spectra for redshift pretrain from spectra used for codebook pretrain
+        # add extra validation spectra
         if self.kwargs["sample_from_codebook_pretrain_spectra"]:
+            # select spectra for redshift pretrain from spectra used for codebook pretrain
             indices = np.arange(len(supervision_ids))
             np.random.seed(self.kwargs["seed"])
             # np.random.shuffle(indices)
             self.redshift_pretrain_ids = indices[:self.kwargs["redshift_pretrain_num_spectra"]]
             validation_ids = supervision_ids[self.redshift_pretrain_ids]
 
-        if self.kwargs["add_validation_spectra_not_in_supervision"]:
+        elif self.kwargs["add_validation_spectra_not_in_supervision"]:
             unseen_spectra_ids = np.array(
                 list(set(ids) - set(supervision_ids) - set(validation_ids)))
             np.random.shuffle(unseen_spectra_ids)
@@ -786,6 +787,7 @@ class SpectraData:
                     if len(spectra_ids[patch_uid]) == 0 or \
                        not patch_exists(self.input_patch_path, tract, f"{patch_r},{patch_c}"):
                         continue
+                    # if patch_uid != "981324": continue
 
                     cur_patch = PatchData(
                         tract, f"{patch_r},{patch_c}",
@@ -868,6 +870,7 @@ class SpectraData:
               idx: spectra idx (within the df table)
               img_coord: img coord for current spectra
         """
+        # if idx != 6039: return
         spectra_fname = df.iloc[idx]["spectra_fname"]
         if self.spectra_data_format == "fits":
             fname = spectra_fname[:-5]
@@ -1453,11 +1456,12 @@ def convolve_spectra(spectra, bound, std=5, border=True, process_ivar=False):
 
     if process_ivar:
         mask = spectra[2][lo:hi+1] != 0
-        conved = 1/convolve(1/spectra[2][lo:hi+1][mask], kernel)
-        if border:
-            denom = convolve(np.ones(sum(mask)), kernel)
-            spectra[2][lo:hi+1][mask] = conved / denom
-        else: spectra[2][lo:hi+1][mask] = conved
+        if sum(mask) != 0:
+            conved = 1/convolve(1/spectra[2][lo:hi+1][mask], kernel)
+            if border:
+                denom = convolve(np.ones(sum(mask)), kernel)
+                spectra[2][lo:hi+1][mask] = conved / denom
+            else: spectra[2][lo:hi+1][mask] = conved
 
     return spectra
 

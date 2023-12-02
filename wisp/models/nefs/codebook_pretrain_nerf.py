@@ -144,7 +144,6 @@ class CodebookPretrainNerf(BaseNeuralField):
         if self.use_latents_as_coords:
             assert coords is None
             coords = self.latents
-            # print(coords.shape, selected_ids, idx)
             coords = self.index_latents(coords, selected_ids, idx)
 
         coords = coords[:,None]
@@ -154,7 +153,8 @@ class CodebookPretrainNerf(BaseNeuralField):
             redshift_latents = self.index_latents(redshift_latents, selected_ids, idx)
         else: redshift_latents = None
 
-        # `latents` is either coefficients or qtz latents or latents dep on qtz method
+        # `latents` is either coefficients or qtz latents or latents
+        #   dep on whether we qtz and qtz method
         latents = self.spatial_decoder(
             coords, self.codebook, qtz_args, ret,
             specz=specz,

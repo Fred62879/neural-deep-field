@@ -207,8 +207,8 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["calculate_binwise_spectra_loss"]
         self.use_binwise_spectra_loss_as_redshift_logits = \
             self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
-        self.optimize_codebook_latents_for_each_redshift_bin = \
-            self.extra_args["optimize_codebook_latents_for_each_redshift_bin"]
+        self.optimize_spectra_for_each_redshift_bin = \
+            self.extra_args["optimize_spectra_for_each_redshift_bin"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
 
         assert not self.codebook_pretrain_infer or (
@@ -220,9 +220,9 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["spectra_batch_reduction_order"] == "qtz_first"
         assert not self.use_binwise_spectra_loss_as_redshift_logits or \
             (self.classify_redshift and self.calculate_binwise_spectra_loss)
-        assert not self.optimize_codebook_latents_for_each_redshift_bin or \
+        assert not self.optimize_spectra_for_each_redshift_bin or \
             self.calculate_binwise_spectra_loss
-        assert not self.optimize_codebook_latents_for_each_redshift_bin or \
+        assert not self.optimize_spectra_for_each_redshift_bin or \
             (self.classify_redshift and not self.use_binwise_spectra_loss_as_redshift_logits), \
             "For the brute force method, we keep spectra under all bins without averaging. \
             During inferrence however, we can calculate logits for visualization purposes."
@@ -235,7 +235,7 @@ class AstroInferrer(BaseInferrer):
             )
             self.num_redshift_bins = len(redshift_bins)
 
-        self.save_redshift = "save_redshift" in tasks and self.model_redshift and self.qtz
+        self.save_redshift = "save_redshift" in tasks and self.model_redshift
         self.save_redshift_pre = self.save_redshift and self.pretrain_infer
         self.save_redshift_main = self.save_redshift and self.main_infer
         self.save_redshift_test = self.save_redshift and self.test
@@ -1710,7 +1710,7 @@ class AstroInferrer(BaseInferrer):
             spectra_residual = spectra_residual * np.sqrt(self.spectra_ivar)
         elif self.extra_args["plot_ivar_region"]:
             option = "region"
-            std = np.sqrt(1 / (self.spectra_ivar + 1e-10))
+            std = np.sqrt(1 / self.spectra_ivar)
             lower = self.gt_fluxes - std
             upper = self.gt_fluxes + std
         else: raise ValueError()
@@ -1775,7 +1775,7 @@ class AstroInferrer(BaseInferrer):
         np.save(fname, codebook_coeff)
 
         y, y2 = codebook_coeff, None
-        if self.optimize_codebook_latents_for_each_redshift_bin:
+        if self.optimize_spectra_for_each_redshift_bin:
             # if each bin has its own set of codebook coeff, we plot that for gt bin only
             gt_redshift = torch.stack(self.gt_redshift_cl).detach().cpu().numpy()
             if ids is not None: gt_redshift = gt_redshift[ids]
@@ -1874,6 +1874,8 @@ class AstroInferrer(BaseInferrer):
         #     redshift_logits, fname, x=bin_centers,
         #     vertical_xs=gt_redshift) #,y2=gt_logits)
 
+        if self.extra_args["infer_outlier_only"]: return
+
         if self.extra_args["plot_redshift_precision_recall"]:
             plot_precision_recall_all_individually(
                 redshift_logits, gt_redshift, self.extra_args["redshift_lo"],
@@ -1905,6 +1907,7 @@ class AstroInferrer(BaseInferrer):
 
         ids = np.argsort(gt_redshift)
         gt_redshift = gt_redshift[ids]
+        est_redshift = est_redshift[ids]
         redshift_residual = np.abs(redshift_residual[ids])
 
         fname = join(self.redshift_dir, f"model-{model_id}_residual")

@@ -196,11 +196,16 @@ def calculate_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width,
     residuals = np.around(residuals, decimals=2)
 
     lo, hi = np.min(residuals), np.max(residuals)
+    if lo == hi:
+        assert lo == 0
+        return None, None, None
+
     if num_precision_recall_residuals <= 0:
         residual_levels = np.array(list(set(residuals.flatten())))
         residual_levels = np.sort(residual_levels)
     else:
         step = (hi - lo) / num_precision_recall_residuals
+        print(lo, hi, step)
         residual_levels = np.arange(lo, hi, step)
 
     def calculate(residual_level):

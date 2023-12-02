@@ -123,6 +123,8 @@ def plot_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width, fnam
         logits, gt_redshifts, lo, hi, bin_width,
         num_precision_recall_residuals
     )
+    if residuals is None: return # residuals all 0
+
     plt.plot(recall, precision)
     plt.xlim(xmin=0,xmax=1.2);plt.ylim(ymin=0,ymax=1.2)
     plt.xlabel("recall");plt.ylabel("precision")

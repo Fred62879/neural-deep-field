@@ -113,7 +113,6 @@ class HyperSpectralConverter(nn.Module):
               if add:    [(num_codes,num_bins,)bsz,nsmpls,embed_dim]
               if concat: [(num_codes,num_bins,)bsz,nsmpls,spa_dim+spe_dim]
         """
-        print(spatial.shape, spectral.shape)
         nsmpls = spectral.shape[-2]
         if spatial.ndim == 4 and self._qtz_spectra:
             num_codes = spatial.shape[0]

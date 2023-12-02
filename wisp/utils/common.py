@@ -58,7 +58,7 @@ def get_bool_has_redshift_latents(**kwargs):
         kwargs["split_latent"] and \
         not kwargs["apply_gt_redshift"] and \
         not kwargs["use_binwise_spectra_loss_as_redshift_logits"] and \
-        not kwargs["optimize_codebook_latents_for_each_redshift_bin"]
+        not kwargs["optimize_spectra_for_each_redshift_bin"]
 
 def get_optimal_wrong_bin_ids(ret, data):
     """ Get id of the non-GT redshift bin that achieves the lowest spectra loss.

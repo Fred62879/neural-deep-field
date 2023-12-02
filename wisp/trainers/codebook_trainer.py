@@ -112,14 +112,14 @@ class CodebookTrainer(BaseTrainer):
         self.calculate_binwise_spectra_loss = self.extra_args["calculate_binwise_spectra_loss"]
         self.use_binwise_spectra_loss_as_redshift_logits =  \
             self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
-        self.optimize_codebook_latents_for_each_redshift_bin = \
-            self.extra_args["optimize_codebook_latents_for_each_redshift_bin"]
+        self.optimize_spectra_for_each_redshift_bin = \
+            self.extra_args["optimize_spectra_for_each_redshift_bin"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
 
         assert not self.mode == "codebook_pretrain" or (
             self.apply_gt_redshift or self.neg_sup_wrong_redshift)
         assert not self.apply_gt_redshift or \
-            not self.calculate_binwise_spectra_loss
+             not self.calculate_binwise_spectra_loss
         assert not self.neg_sup_wrong_redshift or (
             self.mode == "codebook_pretrain" and self.classify_redshift and \
             self.calculate_binwise_spectra_loss)
@@ -129,9 +129,9 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["spectra_batch_reduction_order"] == "qtz_first"
         assert not self.use_binwise_spectra_loss_as_redshift_logits or \
             (self.classify_redshift and self.calculate_binwise_spectra_loss)
-        assert not self.optimize_codebook_latents_for_each_redshift_bin or \
+        assert not self.optimize_spectra_for_each_redshift_bin or \
             self.calculate_binwise_spectra_loss
-        assert not self.optimize_codebook_latents_for_each_redshift_bin or \
+        assert not self.optimize_spectra_for_each_redshift_bin or \
             (self.classify_redshift and not self.use_binwise_spectra_loss_as_redshift_logits), \
             "For the brute force method, we keep spectra under all bins without averaging. \
             During inferrence however, we can calculate logits for visualization purposes."
@@ -753,7 +753,7 @@ class CodebookTrainer(BaseTrainer):
         if self.optimize_codebook_latents_as_logits:
             dim = self.extra_args["qtz_num_embed"]
         else: dim = self.extra_args["codebook_latent_dim"]
-        if self.optimize_codebook_latents_for_each_redshift_bin:
+        if self.optimize_spectra_for_each_redshift_bin:
             sp = (self.num_spectra, self.num_redshift_bins, dim)
         else: sp = (self.num_spectra, dim)
         latents = self.create_latents(
@@ -779,7 +779,7 @@ class CodebookTrainer(BaseTrainer):
             sp_z_dim = self.extra_args["qtz_num_embed"]
         else: sp_z_dim = self.extra_args["codebook_latent_dim"]
 
-        if self.optimize_codebook_latents_for_each_redshift_bin:
+        if self.optimize_spectra_for_each_redshift_bin:
             sp = (self.num_spectra, self.num_redshift_bins, sp_z_dim)
         else: sp = (self.num_spectra, sp_z_dim)
 
@@ -792,7 +792,7 @@ class CodebookTrainer(BaseTrainer):
             # redshift pretrain use val spectra which is a permutation of sup spectra
             permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
             pretrained=checkpoint["model_state_dict"]["nef.latents"][permute_ids]
-            if self.optimize_codebook_latents_for_each_redshift_bin:
+            if self.optimize_spectra_for_each_redshift_bin:
                 pretrained = pretrained[:,None].tile(1, self.num_redshift_bins, 1)
                 assert pretrained.shape == sp
         else:
@@ -1254,7 +1254,7 @@ class CodebookTrainer(BaseTrainer):
         return total_loss, ret
 
     def _calculate_spectra_loss(self, ret, data):
-        if self.optimize_codebook_latents_for_each_redshift_bin:
+        if self.optimize_spectra_for_each_redshift_bin:
             if self.neg_sup_wrong_redshift:
                 spectra_loss = self._calculate_neg_sup_loss(ret, data)
             else:
