@@ -15,9 +15,9 @@ global:
     seed: 80
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
-    tasks: ['codebook_pretrain_infer','save_redshift','plot_redshift_residual','plot_redshift_logits'] #'save_spectra'#'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
-    tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
-    tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift','plot_redshift_logits','recon_spectra'] #,'plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_codebook_latents','save_qtz_weights','recon_spectra_all_bins']
+    #tasks: ['codebook_pretrain_infer','save_redshift','plot_redshift_residual','plot_redshift_logits','recon_spectra'] #'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
+    #tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
+    #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift','plot_redshift_logits','recon_spectra'] #,'plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_codebook_latents','save_qtz_weights','recon_spectra_all_bins']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -39,11 +39,11 @@ global:
     #tasks: ['test','recon_gt_spectra','save_redshift','recon_codebook_spectra_individ','save_qtz_weights','recon_img']
 
 ablation:
-    perform_ablation: False
-    ablat_id: 5
+    perform_ablation: True
+    ablat_id: 11
     ablat_params: ["neg_sup_beta","neg_sup_constant"]
-    ablat_vals: [[1,2,4,8],[0.1,0.2,0.3]]
-    ablat_num_vals: [4,3]
+    ablat_vals: [[1,2,4],[0.05,0.08,0.1,0.2]]
+    ablat_num_vals: [3,4]
 
 optimizer:
     optimizer_type: 'adam'
@@ -128,12 +128,12 @@ pretrain:
     em_alternation_starts_with: "codebook_latents"
     em_alternation_steps: [10,20]
 
-    negative_supervise_wrong_redshift: False
+    negative_supervise_wrong_redshift: True
     neg_sup_with_optimal_wrong_bin: False
     neg_sup_beta: 1
     neg_sup_constant: 0.1
 
-    neg_sup_optimize_alternately: False
+    neg_sup_optimize_alternately: True
     neg_sup_alternation_starts_with: "latents"
     neg_sup_alternation_steps: [1,1]
 
@@ -168,8 +168,8 @@ pretrain:
     regularize_across_codebook_spectra: False
     codebook_spectra_regu_beta: 1
 
-    pretrain_log_dir: '20231201-202123_100_spectra_neg_sup_5k_epochs'
-    pretrained_model_name: 'model-ep2000-it0.pth'
+    pretrain_log_dir: '20231204-181449_neg_sup_beta_1_constant_0.1'
+    pretrained_model_name: 'model-ep20000-it0.pth'
 
     split_latent: True
     use_latents_as_coords: True
@@ -179,7 +179,7 @@ pretrain:
     redshift_logit_latent_dim: 330
 
     main_train_with_pretrained_latents: False
-    redshift_pretrain_num_spectra: 100
+    redshift_pretrain_num_spectra: 400
 
     add_redshift_logit_bias: False
     plot_logits_for_gt_bin: False
@@ -261,16 +261,16 @@ trainer:
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
-    num_epochs: 2000
+    num_epochs: 20000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 200
+    log_cli_every: 2000
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 200
+    save_model_every: 2000
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -480,7 +480,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000 # spectra to load
-    num_supervision_spectra_upper_bound: 100 #400
+    num_supervision_spectra_upper_bound: 400
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 

@@ -8,7 +8,7 @@ import argparse
 import configargparse
 
 from wisp.utils.common import set_seed, default_log_setup, \
-    get_current_ablate_param_and_val
+    get_current_ablate_params_and_vals
 
 
 str2optim = {m.lower(): getattr(torch.optim, m) for m in dir(torch.optim) if m[0].isupper()}
@@ -25,8 +25,11 @@ def parse_args():
     logging.info(f"set seed as {args.seed}")
 
     if args.perform_ablation:
-        param, val = get_current_ablate_param_and_val(args)
-        logging.info(f"ablate {param} with val: {val}")
+        # param, val = get_current_ablate_param_and_val(args)
+        # logging.info(f"ablate {param} with val: {val}")
+        params, vals = get_current_ablate_params_and_vals(args)
+        for param, val in zip(params, vals):
+            logging.info(f"ablate {param} with val: {val}")
 
     return args, args_str
 
@@ -63,11 +66,19 @@ def argparse_to_str(parser, args):
 def setup_ablation(args):
     config = vars(args)
     if args.perform_ablation:
-        param, val = get_current_ablate_param_and_val(args)
-        config[param] = val
-        if "log_fname" in config and config["log_fname"] is not None:
-            config["log_fname"] += f"_{param}_{val}"
-        else: config["log_fname"] = f"{param}_{val}"
+        # param, val = get_current_ablate_param_and_val(args)
+        # config[param] = val
+        # if "log_fname" in config and config["log_fname"] is not None:
+        #     config["log_fname"] += f"_{param}_{val}"
+        # else: config["log_fname"] = f"{param}_{val}"
+
+        # each param is combined with the following params
+        params, vals = get_current_ablate_params_and_vals(args)
+        for param, val in zip(params, vals):
+            config[param] = val
+            if "log_fname" in config and config["log_fname"] is not None:
+                config["log_fname"] += f"_{param}_{val}"
+            else: config["log_fname"] = f"{param}_{val}"
     return config
 
 def parse_yaml_config(config_path, parser):

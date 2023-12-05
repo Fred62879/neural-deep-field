@@ -39,6 +39,29 @@ def get_current_ablate_param_and_val(args):
     val = args.ablat_vals[param_id][val_id]
     return param, val
 
+def get_current_ablate_params_and_vals(args):
+    """
+        params[0] is combined with all values of params[1] ...
+    """
+    id = args.ablat_id
+    num_vals = args.ablat_num_vals
+    n = len(num_vals)
+    params = args.ablat_params
+    vals = args.ablat_vals
+    acc = [num_vals[-1]]
+    for i in range(1, n-1):
+        acc.append(acc[i-1]*num_vals[n-1-i])
+    acc = acc[::-1]
+    acc.append(1)
+    # print(acc)
+    final_vals = []
+    for i in range(n):
+        final_vals.append(vals[i][id // acc[i]])
+        id = id % acc[i]
+    # print(params, final_vals)
+    return params, final_vals
+
+
 def get_bool_encode_coords(**kwargs):
     return kwargs["encode_coords"] and not \
         ( kwargs["pretrain_codebook"] and \
