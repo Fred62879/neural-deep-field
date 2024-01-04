@@ -205,8 +205,7 @@ def calculate_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width,
         residual_levels = np.sort(residual_levels)
     else:
         step = (hi - lo) / num_precision_recall_residuals
-        print(lo, hi, step)
-        residual_levels = np.arange(lo, hi, step)
+        residual_levels = np.arange(lo, hi + 1e-6, step)
 
     def calculate(residual_level):
         tps = residuals <= residual_level

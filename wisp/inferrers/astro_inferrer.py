@@ -79,12 +79,12 @@ class AstroInferrer(BaseInferrer):
                 ["model_dir","recon_dir","recon_synthetic_dir","metric_dir",
                  "zoomed_recon_dir","scaler_dir","pixel_distrib_dir","qtz_weights_dir",
                  "embed_map_dir","latent_dir","redshift_dir","latent_embed_dir","spectra_dir",
-                 "codebook_coeff_dir","codebook_latents_dir",
+                 "codebook_coeff_dir","spectra_latents_dir",
                  "codebook_spectra_dir", "codebook_spectra_individ_dir"],
                 ["models","recons","recon_synthetic","metrics",
                  "zoomed_recon","scaler","pixel_distrib","qtz_weights",
                  "embed_map","latents","redshift","latent_embed",f"{prefix}_spectra",
-                 f"{prefix}_codebook_coeff",f"{prefix}_codebook_latents",
+                 f"{prefix}_codebook_coeff",f"{prefix}_spectra_latents",
                  f"{prefix}_codebook_spectra",f"{prefix}_codebook_spectra_individ"]
         ):
             path = join(self.log_dir, cur_pname)
@@ -211,8 +211,8 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["optimize_spectra_for_each_redshift_bin"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
 
-        assert not self.codebook_pretrain_infer or (
-            self.apply_gt_redshift or self.neg_sup_wrong_redshift)
+        # assert not self.codebook_pretrain_infer or (
+        #     self.apply_gt_redshift or self.neg_sup_wrong_redshift)
         assert not self.neg_sup_wrong_redshift or (
             self.mode == "codebook_pretrain_infer" and self.classify_redshift and \
             self.calculate_binwise_spectra_loss)
@@ -282,7 +282,7 @@ class AstroInferrer(BaseInferrer):
         self.plot_codebook_coeff = "plot_codebook_coeff" in tasks
         self.plot_redshift_logits = "plot_redshift_logits" in tasks
         self.save_optimal_bin_ids = "save_optimal_bin_ids" in tasks
-        self.save_codebook_latents = "save_codebook_latents" in tasks
+        self.save_spectra_latents = "save_spectra_latents" in tasks
         self.plot_spectra_residual = "plot_spectra_residual" in tasks
         self.plot_redshift_residual = "plot_redshift_residual" in tasks
         self.recon_spectra_all_bins = "recon_spectra_all_bins" in tasks
@@ -297,7 +297,7 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["plot_codebook_coeff_under_optimal_wrong_bin"]
 
         assert not self.plot_codebook_coeff or self.qtz_spectra
-        assert not self.save_codebook_latents or self.qtz_spectra
+        assert not self.save_spectra_latents or self.qtz_spectra
         assert not self.plot_spectra_residual or self.recon_spectra
         assert not self.plot_redshift_logits or self.classify_redshift
         assert not self.plot_redshift_residual or (
@@ -555,7 +555,7 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             assert not self.infer_selected
             self.requested_fields.append("coords")
-            self.coords_source = "codebook_latents"
+            self.coords_source = "spectra_latents"
             self.dataset_length = self.qtz_n_embd
             # if self.extra_args["plot_clipped_spectrum"]:
             #     self.requested_fields.append("spectra_masks")
@@ -883,7 +883,7 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_qtz_weights: self.qtz_weights = []
         if self.save_pixel_values: self.spectra_trans = []
-        if self.save_codebook_latents: self.codebook_latents = []
+        if self.save_spectra_latents: self.spectra_latents = []
 
     def run_checkpoint_selected_coords_partial_model(self, model_id, checkpoint):
         if self.pretrain_infer:
@@ -907,7 +907,7 @@ class AstroInferrer(BaseInferrer):
                 self.plot_codebook_coeff, self.plot_codebook_coeff_all_bins,
                 self.plot_redshift_logits, self.plot_redshift_residual,
                 self.plot_binwise_spectra_loss, self.save_optimal_bin_ids,
-                self.save_qtz_weights, self.save_codebook_latents
+                self.save_qtz_weights, self.save_spectra_latents
         ],[
             partial(self._recon_spectra, self.num_spectra),
             partial(self._recon_spectra_all_bins, self.num_spectra),
@@ -916,7 +916,7 @@ class AstroInferrer(BaseInferrer):
             partial(self._plot_codebook_coeff_all_bins, self.num_spectra),
             self._plot_redshift_logits, self._plot_redshift_residual,
             self._plot_binwise_spectra_loss, self._save_optimal_bin_ids,
-            self._save_qtz_weights, self._save_codebook_latents
+            self._save_qtz_weights, self._save_spectra_latents
         ]):
             if task:
                 if self.infer_outlier_only:
@@ -1160,7 +1160,7 @@ class AstroInferrer(BaseInferrer):
                         save_codebook_logits=self.plot_codebook_coeff or \
                                              self.plot_codebook_coeff_all_bins,
                         save_redshift_logits=self.plot_redshift_logits,
-                        save_codebook_latents=self.save_codebook_latents,
+                        save_spectra_latents=self.save_spectra_latents,
                         save_spectra_all_bins=self.recon_spectra_all_bins or \
                                               self.plot_optimal_wrong_bin_spectra,
                         init_redshift_prob= None if "init_redshift_prob" not in data else \
@@ -1196,8 +1196,8 @@ class AstroInferrer(BaseInferrer):
                 if self.save_qtz_weights:
                     self.qtz_weights.extend(ret["qtz_weights"])
 
-                if self.save_codebook_latents:
-                    self.codebook_latents.extend(ret["codebook_latents"])
+                if self.save_spectra_latents:
+                    self.spectra_latents.extend(ret["spectra_latents"])
 
                 if self.save_optimal_bin_ids:
                     self.gt_bin_ids.extend(data["gt_redshift_bin_ids"][1])
@@ -1365,13 +1365,13 @@ class AstroInferrer(BaseInferrer):
     def _set_coords_from_checkpoint(self, checkpoint):
         """ Set dataset coords using saved model checkpoint.
         """
-        if self.coords_source == "codebook_latents":
+        if self.coords_source == "spectra_latents":
             # latent code in codebook
-            codebook_latents = load_layer_weights(
+            spectra_latents = load_layer_weights(
                 checkpoint["model_state_dict"], lambda n: "grid" not in n and "codebook" in n)
-            codebook_latents = codebook_latents[:,None] # [num_embd, 1, latent_dim]
-            codebook_latents = codebook_latents.detach().cpu().numpy()
-            self.dataset.set_hardcode_data(self.coords_source, codebook_latents)
+            spectra_latents = spectra_latents[:,None] # [num_embd, 1, latent_dim]
+            spectra_latents = spectra_latents.detach().cpu().numpy()
+            self.dataset.set_hardcode_data(self.coords_source, spectra_latents)
         else:
             raise ValueError()
 
@@ -1593,7 +1593,7 @@ class AstroInferrer(BaseInferrer):
                 gt_masks=self.gt_masks[lo:hi],
                 recon_masks=self.recon_masks[lo:hi],
                 calculate_metrics=not self.infer_outlier_only,
-                titles=titles
+                titles=titles[lo:hi]
             )
             if cur_metrics is not None:
                 cur_checkpoint_metrics.extend(cur_metrics)
@@ -1954,7 +1954,7 @@ class AstroInferrer(BaseInferrer):
             self.optimal_bin_ids = self.optimal_bin_ids[ids]
             self.optimal_wrong_bin_ids = self.optimal_wrong_bin_ids[ids]
 
-        fname = join(self.codebook_latents_dir, f"model-{model_id}_logits")
+        fname = join(self.spectra_latents_dir, f"model-{model_id}_logits")
         log_data(self, "optimal_bin_ids", gt_field="gt_bin_ids",
                  fname=fname, log_to_console=True)
         log_data(self, "optimal_wrong_bin_ids", fname=fname, log_to_console=True)
@@ -1963,10 +1963,10 @@ class AstroInferrer(BaseInferrer):
         fname = join(self.qtz_weights_dir, f"model-{model_id}.npy")
         log_data(self, "qtz_weights", fname=fname, log_to_console=False)
 
-    def _save_codebook_latents(self, model_id):
-        codebook_latents = torch.stack(self.codebook_latents).detach().cpu().numpy()
-        fname = join(self.codebook_latents_dir, f"model-{model_id}_logits")
-        np.save(fname, codebook_latents)
+    def _save_spectra_latents(self, model_id):
+        spectra_latents = torch.stack(self.spectra_latents).detach().cpu().numpy()
+        fname = join(self.spectra_latents_dir, f"model-{model_id}_logits")
+        np.save(fname, spectra_latents)
 
     # def _save_pixel_value(self, model_id):
     #     self.recon_pixels = self.trans_obj.integrate(recon_fluxes)

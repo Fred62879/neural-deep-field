@@ -319,7 +319,7 @@ def get_input_latent_dim(**kwargs):
         "redshift_pretrain_infer" in kwargs["tasks"] or \
         kwargs["main_train_with_pretrained_latents"]
        ):
-        latents_dim = kwargs["codebook_latent_dim"]
+        latents_dim = kwargs["spectra_latent_dim"]
     elif kwargs["coords_encode_method"] == "positional_encoding":
         latents_dim = kwargs["coords_embed_dim"]
     elif kwargs["coords_encode_method"] == "grid":
@@ -447,6 +447,7 @@ def forward(
         redshift_supervision_train=False,
         regularize_codebook_spectra=False,
         calculate_binwise_spectra_loss=False,
+        save_coords=False,
         save_scaler=False,
         save_spectra=False,
         save_latents=False,
@@ -459,7 +460,7 @@ def forward(
         save_optimal_bin_ids=False,
         save_codebook_logits=False,
         save_redshift_logits=False,
-        save_codebook_latents=False,
+        save_spectra_latents=False,
         save_codebook_spectra=False,
         save_spectra_all_bins=False,
         init_redshift_prob=None, # debug
@@ -477,6 +478,7 @@ def forward(
 
     elif space_dim == 3:
         requested_channels = ["intensity"]
+        if save_coords: requested_channels.append("coords")
         if save_scaler: requested_channels.append("scaler")
         if save_spectra: requested_channels.append("spectra")
         if save_latents: requested_channels.append("latents")
@@ -489,7 +491,7 @@ def forward(
         if save_optimal_bin_ids: requested_channels.append("optimal_bin_ids")
         if save_codebook_logits: requested_channels.append("codebook_logits")
         if save_redshift_logits: requested_channels.append("redshift_logits")
-        if save_codebook_latents: requested_channels.append("codebook_latents")
+        if save_spectra_latents: requested_channels.append("spectra_latents")
         if save_codebook_spectra: requested_channels.append("codebook_spectra")
         if save_spectra_all_bins: requested_channels.append("spectra_all_bins")
 

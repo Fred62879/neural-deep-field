@@ -125,21 +125,26 @@ def plot_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width, fnam
     )
     if residuals is None: return # residuals all 0
 
-    plt.plot(recall, precision)
-    plt.xlim(xmin=0,xmax=1.2);plt.ylim(ymin=0,ymax=1.2)
-    plt.xlabel("recall");plt.ylabel("precision")
-    plt.title(f"Precision Recall over {n} spectra")
-    plt.tight_layout(); plt.savefig(fname + ".png"); plt.close()
+    # plt.plot(recall, precision)
+    # plt.xlim(xmin=0,xmax=1.2);plt.ylim(ymin=0,ymax=1.2)
+    # plt.xlabel("recall");plt.ylabel("precision")
+    # plt.title(f"Precision Recall over {n} spectra")
+    # plt.tight_layout(); plt.savefig(fname + ".png"); plt.close()
 
-    plt.plot(residuals, precision)
-    plt.xlabel("residual"); plt.ylabel("precision")
-    plt.title(f"Precision under different residual levels")
-    plt.tight_layout(); plt.savefig(fname + "_precision.png"); plt.close()
+    # plt.plot(residuals, precision)
+    # plt.xlabel("residual"); plt.ylabel("precision")
+    # plt.title(f"Precision under different residual levels")
+    # plt.tight_layout(); plt.savefig(fname + "_precision.png"); plt.close()
+
+    # plt.plot(residuals, recall)
+    # plt.xlabel("residual"); plt.ylabel("recall")
+    # plt.title(f"Recall under different residual levels")
+    # plt.tight_layout(); plt.savefig(fname + "_recall.png"); plt.close()
 
     plt.plot(residuals, recall)
-    plt.xlabel("residual"); plt.ylabel("recall")
-    plt.title(f"Recall under different residual levels")
-    plt.tight_layout(); plt.savefig(fname + "_recall.png"); plt.close()
+    plt.xlabel("residual"); plt.ylabel("accuracy")
+    plt.title(f"Accuracy under different residual levels")
+    plt.tight_layout(); plt.savefig(fname + "_accuracy.png"); plt.close()
 
 def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):
     """ Plot latent variable distributions and each codebook embedding.
