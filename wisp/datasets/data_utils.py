@@ -40,6 +40,13 @@ def patch_exists(path, tract, patch):
     fname = join(path, fname)
     return exists(fname)
 
+def get_log_dir(**kwargs):
+    if kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
+        return kwargs["cedar_log_dir"]
+    if kwargs["on_sockeye"]:
+        return kwargs["sockeye_log_dir"]
+    return kwargs["log_dir"]
+
 def get_dataset_path(**kwargs):
     if kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
         dataset_path = kwargs["cedar_dataset_path"]
@@ -49,8 +56,12 @@ def get_dataset_path(**kwargs):
     return dataset_path
 
 def get_img_data_path(local_dataset_path, **kwargs):
-    if kwargs["on_cedar"] or kwargs["on_narval"]:
+    if kwargs["on_cedar"]:
         input_patch_path = kwargs["cedar_input_fits_path"]
+        _, img_data_path = set_input_path(
+            local_dataset_path, kwargs["sensor_collection_name"])
+    elif kwargs["on_narval"]:
+        input_patch_path = kwargs["narval_input_fits_path"]
         _, img_data_path = set_input_path(
             local_dataset_path, kwargs["sensor_collection_name"])
     elif kwargs["on_graham"]:

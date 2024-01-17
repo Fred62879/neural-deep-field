@@ -5,6 +5,7 @@ import logging as log
 
 from wisp.utils import PerfTimer
 from wisp.datasets.patch_data import PatchData
+from wisp.datasets.data_utils import get_log_dir
 from wisp.utils.common import create_patch_uid, get_bool_classify_redshift, query_GPU_mem
 
 from os.path import join
@@ -54,13 +55,14 @@ class BaseInferrer(ABC):
         self.reset_data_iterator()
 
         # set log dir
+        log_dir = get_log_dir(**extra_args)
         if extra_args["infer_log_dir"] is not None:
             infer_log_dir = extra_args["infer_log_dir"]
         else:
-            dnames = os.listdir(join(extra_args["log_dir"],extra_args["exp_name"]))
+            dnames = os.listdir(join(log_dir,extra_args["exp_name"]))
             dnames.sort()
             infer_log_dir = dnames[-1]
-        self.log_dir = join(extra_args["log_dir"], extra_args["exp_name"], infer_log_dir)
+        self.log_dir = join(log_dir, extra_args["exp_name"], infer_log_dir)
 
         # Default TensorBoard Logging
         self.writer = SummaryWriter(self.log_dir, purge_step=0)

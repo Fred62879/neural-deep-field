@@ -515,6 +515,7 @@ def define_cmd_line_args():
     data_group.add_argument("--cedar-dataset-path", type=str, help="Path to the dataset")
     data_group.add_argument("--sockeye-dataset-path", type=str, help="Path to the dataset")
     data_group.add_argument("--cedar-input-fits-path", type=str, help="Path to the dataset")
+    data_group.add_argument("--narval-input-fits-path", type=str, help="Path to the dataset")
     data_group.add_argument("--graham-input-fits-path", type=str, help="Path to the dataset")
     data_group.add_argument("--sockeye-input-fits-path", type=str, help="Path to the dataset")
 

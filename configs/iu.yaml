@@ -5,6 +5,7 @@ global:
     use_tqdm: False
     on_cedar: False
     on_graham: False
+    on_narval: True
     on_sockeye: False
     print_shape: False
     show_memory: True
@@ -400,6 +401,7 @@ dataset:
     cedar_input_fits_path: '/home/fred862/projects/rrg-kyi/astro/hsc/pdr3_dud'
     graham_input_fits_path: '/home/fred862/projects/rrg-kyi/astro/fred862/pdr3_dud'
     sockeye_input_fits_path: '/arc/project/pr-kmyi-1/fred/data/pdr3/input/pdr3_dud'
+    narval_input_fits_path: '/home/fred862/projects/def-kyi-ab/fred862/astro/hsc/pdr3_dud'
 
     wave_range_fname: 'wave_range0.npy'
     coords_type: "img"
