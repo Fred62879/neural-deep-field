@@ -116,10 +116,10 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["optimize_spectra_for_each_redshift_bin"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
 
-        # assert not self.mode == "codebook_pretrain" or (
-        #     self.apply_gt_redshift or self.neg_sup_wrong_redshift)
-        assert not self.apply_gt_redshift or \
-             not self.calculate_binwise_spectra_loss
+        assert not self.mode == "codebook_pretrain" or (
+            self.apply_gt_redshift or self.neg_sup_wrong_redshift)
+        # assert not self.apply_gt_redshift or \
+        #      not self.calculate_binwise_spectra_loss
         assert not self.neg_sup_wrong_redshift or (
             self.mode == "codebook_pretrain" and self.classify_redshift and \
             self.calculate_binwise_spectra_loss)

@@ -118,7 +118,6 @@ class HyperSpectralConverter(nn.Module):
             num_codes = spatial.shape[0]
         if spectral.ndim == 4: num_bins = spectral.shape[0]
 
-        # print(spatial.shape, spectral.shape)
         if spatial.ndim == 3:
             if spectral.ndim == 3:
                 spatial = spatial.tile(1,nsmpls,1)
