@@ -211,8 +211,8 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["optimize_spectra_for_each_redshift_bin"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
 
-        # assert not self.codebook_pretrain_infer or (
-        #     self.apply_gt_redshift or self.neg_sup_wrong_redshift)
+        assert not self.codebook_pretrain_infer or (
+            self.apply_gt_redshift or self.neg_sup_wrong_redshift)
         assert not self.neg_sup_wrong_redshift or (
             self.mode == "codebook_pretrain_infer" and self.classify_redshift and \
             self.calculate_binwise_spectra_loss)

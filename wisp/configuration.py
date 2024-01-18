@@ -21,7 +21,6 @@ def register_class(cls, name):
 
 def get_pretrain_pipelines(pipelines, tasks, args):
     if "codebook_pretrain" in tasks or "redshift_pretrain" in tasks:
-        # assert(args.quantize_latent or args.quantize_spectra)
         pretrain_nef = CodebookPretrainNerf(
             codebook_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
             **vars(args)

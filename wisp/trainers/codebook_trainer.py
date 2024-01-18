@@ -118,8 +118,8 @@ class CodebookTrainer(BaseTrainer):
 
         assert not self.mode == "codebook_pretrain" or (
             self.apply_gt_redshift or self.neg_sup_wrong_redshift)
-        # assert not self.apply_gt_redshift or \
-        #      not self.calculate_binwise_spectra_loss
+        assert not self.apply_gt_redshift or \
+             not self.calculate_binwise_spectra_loss
         assert not self.neg_sup_wrong_redshift or (
             self.mode == "codebook_pretrain" and self.classify_redshift and \
             self.calculate_binwise_spectra_loss)
@@ -135,6 +135,7 @@ class CodebookTrainer(BaseTrainer):
             (self.classify_redshift and not self.use_binwise_spectra_loss_as_redshift_logits), \
             "For the brute force method, we keep spectra under all bins without averaging. \
             During inferrence however, we can calculate logits for visualization purposes."
+        assert not self.extra_args["decode_spatial_embedding"] or self.qtz
 
         if self.classify_redshift:
             redshift_bins = init_redshift_bins(
