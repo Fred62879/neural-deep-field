@@ -50,6 +50,30 @@ class CodebookTrainer(BaseTrainer):
         self.init_optimizer()
 
     def train(self):
+        if self.extra_args["train_based_on_epochs"]:
+            self.ecpoh_based_train()
+        else:
+            self.step_based_train()
+
+    def step_based_train(self):
+        torch.autograd.set_detect_anomaly(True)
+        self.begin_train()
+
+        if self.use_tqdm: iter = tqdm(range(self.num_steps + 1))
+        else: iter = range(self.num_epochs + 1)
+
+        for step in iter:
+            idx = self.sample_data()
+            data = self.dataset.getitem()
+            ret = self.step(data)
+            self.post_step(data, ret)
+
+        self.end_train()
+
+    def sample_data(self):
+        assert 0
+
+    def epoch_based_train(self):
         torch.autograd.set_detect_anomaly(True)
         self.begin_train()
 

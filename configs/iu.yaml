@@ -17,8 +17,8 @@ global:
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
     #tasks: ['codebook_pretrain_infer','recon_spectra'] #'save_redshift'] #,'plot_redshift_residual','plot_redshift_logits'] #,'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
-    tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
-    tasks: ['redshift_pretrain_infer','recon_spectra'] #'save_redshift'] #,'plot_redshift_logits','plot_redshift_residuals'] #,'plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_spectra_latents','save_qtz_weights','recon_spectra_all_bins']
+    #tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
+    #tasks: ['redshift_pretrain_infer','recon_spectra'] #'save_redshift'] #,'plot_redshift_logits','plot_redshift_residuals'] #,'plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_spectra_latents','save_qtz_weights','recon_spectra_all_bins']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -115,7 +115,7 @@ pretrain:
     add_validation_spectra_not_in_supervision: False
     num_extra_validation_spectra: 20
 
-    pretrain_batch_size: 15
+    pretrain_batch_size: 4000
     pretrain_pixel_beta: 1
     pretrain_redshift_beta: 0.1
 
@@ -140,7 +140,7 @@ pretrain:
 
     zero_init_spectra_latents: True
     optimize_spectra_latents_as_logits: True
-    optimize_spectra_for_each_redshift_bin: True
+    optimize_spectra_for_each_redshift_bin: False
     optimize_spectra_latents: True
     load_pretrained_spectra_latents: False
     optimize_codebook_logits_mlp: False
@@ -262,7 +262,7 @@ trainer:
 
     train_based_on_epochs: True
     num_steps: 1000
-    num_epochs: 1000
+    num_epochs: 10000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
@@ -297,10 +297,10 @@ trainer:
     pixel_supervision: False
     spectra_supervision: True
 
-    apply_gt_redshift: False              # -
+    apply_gt_redshift: True               # -
     redshift_unsupervision: False         #  |_these options conflict each other 
     redshift_semi_supervision: False      #  |
-    calculate_binwise_spectra_loss: True  # -
+    calculate_binwise_spectra_loss: False # -
 
     correct_gt_redshift_based_on_redshift_bin: True
 
@@ -330,7 +330,7 @@ infer:
 
     # recon img
     to_HDU: False
-    infer_log_dir: '20240117-181412_sc_zero_init_181206'
+    # infer_log_dir: '20240117-181412_sc_zero_init_181206'
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
@@ -483,7 +483,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000 # spectra to load
-    num_supervision_spectra_upper_bound: 100
+    num_supervision_spectra_upper_bound: 6000
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 
