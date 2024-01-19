@@ -507,7 +507,7 @@ class AstroDataset(Dataset):
         masks = np.zeros((bsz,self.num_redshift_bins))
         ids = out["gt_redshift_bin_ids"]
         masks[ids[0],ids[1]] = 1
-        out["gt_redshift_bin_masks"] = masks.astype(bool)
+        out["gt_redshift_bin_masks"] = torch.tensor(masks.astype(bool))
 
     ############
     # Debug data

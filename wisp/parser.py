@@ -659,6 +659,8 @@ def define_cmd_line_args():
 
     train_group.add_argument("--plot-loss", action="store_true")
     train_group.add_argument("--using-wandb", action="store_true")
+    train_group.add_argument("--step-based-sample-w-replace", action="store_true")
+    train_group.add_argument("--step-based-sample-wo-replace", action="store_true")
 
     train_group.add_argument("--train_based_on_epochs", action="store_true")
     train_group.add_argument("--num-steps", type=int, default=250)

@@ -478,6 +478,7 @@ class AstroInferrer(BaseInferrer):
                 self.dataset_length = min(n, self.num_spectra)
                 self.requested_fields.append("selected_ids")
             else: self.dataset_length = self.num_spectra
+            self.num_spectra = self.dataset_length
 
         elif self.main_infer:
             self.requested_fields.append("coords")
@@ -900,6 +901,10 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_redshift:
             outlier_ids = self._save_redshift(model_id)
+        # if self.infer_selected:
+        #     ids = np.arange(self.num_spectra)
+        #     np.random.shuffle(ids)
+        #     selected_ids = ids[:self.extra_args["pretrain_num_infer_upper_bound"]]
 
         for task, func in zip([
                 self.recon_spectra, self.recon_spectra_all_bins,
@@ -922,6 +927,9 @@ class AstroInferrer(BaseInferrer):
                 if self.infer_outlier_only:
                     assert outlier_ids is not None
                     func(model_id, suffix="-outlier", ids=outlier_ids)
+                # elif self.infer_selected:
+                #     assert selected_ids is not None
+                #     func(model_id, ids=selected_ids)
                 else: func(model_id)
 
         log.info("== Spectra inferrence done for current checkpoint.")
@@ -1025,7 +1033,7 @@ class AstroInferrer(BaseInferrer):
               flat-trans image,
               pixel embedding map
         """
-        iterations = checkpoint["epoch_trained"]
+        iterations = checkpoint["total_steps"]
         model_state = checkpoint["model_state_dict"]
         load_model_weights(self.full_pipeline, model_state)
         self.full_pipeline.eval()
@@ -1102,7 +1110,7 @@ class AstroInferrer(BaseInferrer):
         log.info("== All coords forward done.")
 
     def infer_spectra(self, model_id, checkpoint):
-        iterations = checkpoint["epoch_trained"]
+        iterations = checkpoint["total_steps"]
         model_state = checkpoint["model_state_dict"]
 
         load_model_weights(self.spectra_infer_pipeline, model_state)
@@ -1258,7 +1266,7 @@ class AstroInferrer(BaseInferrer):
         """ Reconstruct codebook spectra.
             The logic is identical between normal inferrence and pretrain inferrence.
         """
-        iterations = checkpoint["epoch_trained"]
+        iterations = checkpoint["total_steps"]
         model_state = checkpoint["model_state_dict"]
         load_model_weights(self.codebook_spectra_infer_pipeline, model_state)
         self.codebook_spectra_infer_pipeline.eval()

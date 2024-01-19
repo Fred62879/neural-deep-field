@@ -1,6 +1,7 @@
 import os
 import time
 import torch
+import random
 import warnings
 import nvidia_smi
 import numpy as np
@@ -50,45 +51,29 @@ class CodebookTrainer(BaseTrainer):
         self.init_optimizer()
 
     def train(self):
-        if self.extra_args["train_based_on_epochs"]:
-            self.ecpoh_based_train()
-        else:
-            self.step_based_train()
-
-    def step_based_train(self):
         torch.autograd.set_detect_anomaly(True)
         self.begin_train()
 
-        if self.use_tqdm: iter = tqdm(range(self.num_steps + 1))
-        else: iter = range(self.num_epochs + 1)
+        n = self.num_epochs if self.train_based_on_epochs else self.num_steps
+        if self.use_tqdm: iter = tqdm(range(n + 1))
+        else: iter = range(n + 1)
 
-        for step in iter:
-            idx = self.sample_data()
-            data = self.dataset.getitem()
-            ret = self.step(data)
-            self.post_step(data, ret)
+        for self.cur_iter in iter:
+            self.cur_batch = 0
+            self.begin_iter()
 
-        self.end_train()
-
-    def sample_data(self):
-        assert 0
-
-    def epoch_based_train(self):
-        torch.autograd.set_detect_anomaly(True)
-        self.begin_train()
-
-        if self.use_tqdm: iter = tqdm(range(self.num_epochs + 1))
-        else: iter = range(self.num_epochs + 1)
-
-        for self.epoch in iter:
-            self.begin_epoch()
-
-            for batch in range(self.num_iterations_cur_epoch):
-                data = self.pre_step()
+            if self.train_based_on_epochs:
+                for self.cur_batch in range(self.num_batches_cur_epoch):
+                    data = self.next_batch()
+                    ret = self.step(data)
+                    self.post_step(data, ret)
+            else:
+                idx = self.sample_data()
+                data = self.dataset.__getitem__(idx)
                 ret = self.step(data)
                 self.post_step(data, ret)
 
-            self.end_epoch()
+            self.end_iter()
         self.end_train()
 
     #############
@@ -302,12 +287,13 @@ class CodebookTrainer(BaseTrainer):
 
     def init_data(self):
         self.save_data = False
-        self.shuffle_dataloader = True
-        self.dataloader_drop_last = False
-
         self.configure_dataset()
-        self.set_num_batches()
-        self.init_dataloader()
+        self.batch_size = min(self.extra_args["pretrain_batch_size"], len(self.dataset))
+
+        if self.train_based_on_epochs:
+            self.shuffle_dataloader = True
+            self.dataloader_drop_last = False
+            self.init_dataloader()
 
     def init_loss(self):
         if self.extra_args["spectra_loss_cho"] == "emd":
@@ -436,8 +422,8 @@ class CodebookTrainer(BaseTrainer):
     #############
 
     def begin_train(self):
-        self.total_steps = 0
-        self.codebook_pretrain_total_steps = 0
+        self.total_steps = 0 # record total steps for resume training
+        self.codebook_pretrain_total_steps = 0  # record total steps for pretrain
 
         if self.plot_loss:
             self.losses = []
@@ -445,14 +431,12 @@ class CodebookTrainer(BaseTrainer):
                 self.gt_bin_losses = []
                 self.wrong_bin_regus = []
                 self.wrong_bin_losses = []
-        if self.extra_args["plot_individ_spectra_loss"]:
-            self.spectra_individ_losses = []
         if self.extra_args["plot_logits_for_gt_bin"]:
             self.gt_bin_logits = []
+        if self.extra_args["plot_individ_spectra_loss"]:
+            self.spectra_individ_losses = []
         if self.extra_args["resume_train"]:
             self.resume_train()
-
-        log.info(f"{self.num_iterations_cur_epoch} batches per epoch.")
 
     def end_train(self):
         self.writer.close()
@@ -477,45 +461,47 @@ class CodebookTrainer(BaseTrainer):
             nvidia_smi.nvmlShutdown()
 
     #############
-    # Epoch begin and end
+    # begin and end
     #############
 
-    def begin_epoch(self):
-        self.iteration = 0
-        self.reset_data_iterator()
+    def begin_iter(self):
+        if self.train_based_on_epochs:
+            self.set_num_batches()
+            self.reset_data_iterator()
+
         self.init_log_dict()
-        self.pre_epoch()
+        self.configure_alternate_optimization()
+        self.train_pipeline.train()
 
         if self.extra_args["plot_logits_for_gt_bin"]:
             self.cur_gt_bin_logits = []
         if self.extra_args["plot_individ_spectra_loss"]:
             self.cur_spectra_individ_losses = []
+        if self.save_model_every > -1 and self.cur_iter % self.save_model_every == 0:
+            self.save_model()
+        if self.save_data_every > -1 and self.cur_iter % self.save_data_every == 0:
+            self.pre_save_data()
 
-        self._get_current_em_latents_target()
-        self._get_current_neg_sup_target()
-        self._toggle_grad(on_off="off")
+        self.timer.check("begun iteration")
 
-        # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
+    def end_iter(self):
+        self.train_pipeline.eval()
 
-        self.timer.check("begun epoch")
-
-    def end_epoch(self):
-        self.post_epoch()
-
-        if self.epoch < self.num_epochs:
-            self.iteration = 0
-            self.epoch += 1
-
-        if self.extra_args["plot_logits_for_gt_bin"]:
-            self.gt_bin_logits.append(self.cur_gt_bin_logits)
-        if self.extra_args["plot_individ_spectra_loss"]:
-            self.spectra_individ_losses.append(self.cur_spectra_individ_losses)
+        if self.plot_loss: self.add_loss()
+        if self.log_tb_every > -1 and self.cur_iter % self.log_tb_every == 0:
+            self.log_tb()
+        if self.log_cli_every > -1 and self.cur_iter % self.log_cli_every == 0:
+            self.log_cli()
+        if self.render_tb_every > -1 and self.cur_iter % self.render_tb_every == 0:
+            self.render_tb()
+        if self.save_data_every > -1 and self.cur_iter % self.save_data_every == 0:
+            self.post_save_data()
 
         self._toggle_grad(on_off="on")
         freeze_layers_incl( # always freeze pe
             self.train_pipeline, incls=["wave_encoder"])
 
-        self.timer.check("epoch ended")
+        self.timer.check("iter ended")
 
     def reset_data_iterator(self):
         """ Rewind the iterator for the new epoch.
@@ -536,99 +522,6 @@ class CodebookTrainer(BaseTrainer):
         self.log_dict["codebook_spectra_regu"] = 0.0
 
     #############
-    # One epoch
-    #############
-
-    def pre_epoch(self):
-        self.set_num_batches()
-
-        if self.save_model_every > -1 and self.epoch % self.save_model_every == 0:
-            self.save_model()
-
-        if self.save_data_every > -1 and self.epoch % self.save_data_every == 0:
-            self.save_data = True
-
-            if self.save_redshift:
-                self.gt_redshift = []
-                self.est_redshift = []
-
-                if self.classify_redshift:
-                    self.redshift_logits = []
-                    if self.calculate_binwise_spectra_loss:
-                        self.binwise_loss = []
-
-            if self.save_qtz_weights:
-                self.qtz_weights = []
-            if self.save_pixel_values:
-                self.gt_pixel_vals = []
-                self.recon_pixel_vals = []
-            if self.recon_gt_spectra:
-                self.gt_fluxes = []
-                self.recon_fluxes = []
-                self.spectra_wave = []
-                self.spectra_masks = []
-            if self.plot_codebook_logits:
-                self.codebook_logits = []
-            if self.recon_codebook_spectra_individ:
-                self.spectra_wave_c = []
-                self.spectra_masks_c = []
-                self.codebook_spectra = []
-
-            # re-init dataloader to make sure pixels are in order
-            self.use_all_pixels = True
-            self.shuffle_dataloader = False
-            self.sample_wave = not self.extra_args["pretrain_use_all_wave"]
-            self.dataset.toggle_wave_sampling(self.sample_wave)
-            self.set_num_batches()
-            self.init_dataloader()
-            self.reset_data_iterator()
-            warnings.warn("dataloader state is modified in codebook_trainer, ensure this is for validation purpose only!")
-
-        self.train_pipeline.train()
-
-    def post_epoch(self):
-        """ By default, this function logs to Tensorboard, renders images to Tensorboard,
-            saves the model, and resamples the dataset.
-        """
-        self.train_pipeline.eval()
-
-        total_loss = self.log_dict["total_loss"] / len(self.train_data_loader)
-
-        if self.plot_loss:
-            self.losses.append(total_loss)
-            if self.neg_sup_optimize_alternately:
-                self.gt_bin_losses.append(
-                    self.log_dict["gt_bin_losses"] / len(self.train_data_loader))
-                self.wrong_bin_losses.append(
-                    self.log_dict["wrong_bin_losses"] / len(self.train_data_loader))
-                if self.cur_neg_sup_target == "net":
-                    self.wrong_bin_regus.append(
-                        self.log_dict["wrong_bin_regus"] / len(self.train_data_loader))
-
-        if self.log_tb_every > -1 and self.epoch % self.log_tb_every == 0:
-            self.log_tb()
-
-        if self.log_cli_every > -1 and self.epoch % self.log_cli_every == 0:
-            self.log_cli()
-
-        if self.render_tb_every > -1 and self.epoch % self.render_tb_every == 0:
-            self.render_tb()
-
-        # save data locally and restore trainer state
-        if self.save_data:
-            self.save_local()
-            self.use_all_pixels = False
-            self.shuffle_dataloader = True
-            self.save_data = False
-            self.sample_wave = not self.extra_args["pretrain_use_all_wave"]
-            self.dataset.toggle_wave_sampling(self.sample_wave)
-            self.configure_dataset()
-            self.set_num_batches()
-            self.init_dataloader()
-            self.reset_data_iterator()
-            warnings.warn("dataloader state is modified in codebook_trainer, ensure this is for validation purpose only!")
-
-    #############
     # One step
     #############
 
@@ -638,7 +531,7 @@ class CodebookTrainer(BaseTrainer):
         # however since dataset receives a reference to the latents,
         # we don't need to update dataset with updated latents manually
         # self.dataset.set_hardcode_data("spectra_latents", self.latents.weight)
-        return self.next_batch()
+        pass
 
     def step(self, data):
         """ Advance the training by one step using the batched data supplied.
@@ -710,7 +603,6 @@ class CodebookTrainer(BaseTrainer):
                 self.spectra_wave_c.extend(data["spectra_source_data"][:,0])
                 self.spectra_masks_c.extend(data["spectra_masks"])
 
-        self.iteration += 1
         self.total_steps += 1
         self.timer.check("batch ended")
 
@@ -852,19 +744,20 @@ class CodebookTrainer(BaseTrainer):
         load_pretrained_model_weights(
             self.train_pipeline, checkpoint["model_state_dict"], excls=excls)
         if self.mode == "redshift_pretrain":
-            self.codebook_pretrain_total_steps = checkpoint["iterations"]
+            self.codebook_pretrain_total_steps = checkpoint["total_steps"]
         else: self.codebook_pretrain_total_steps = 0
         self.train_pipeline.train()
         return checkpoint
 
     def save_model(self):
-        fname = f"model-ep{self.epoch}-it{self.iteration}.pth"
+        if self.train_based_on_epochs:
+            fname = f"model-ep{self.cur_iter}-bch{self.cur_batch}.pth"
+        else: fname = f"model-step{self.cur_iter}.pth"
         model_fname = os.path.join(self.model_dir, fname)
         if self.verbose: log.info(f"Saving model checkpoint to: {model_fname}")
 
         checkpoint = {
-            "iterations": self.total_steps,
-            "epoch_trained": self.epoch,
+            "total_steps": self.total_steps,
             "model_state_dict": self.train_pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
         }
@@ -881,7 +774,7 @@ class CodebookTrainer(BaseTrainer):
             self.init_loss() # |  ommitted
             self.init_optimizer()
 
-            self.total_steps = checkpoint["iterations"]
+            self.total_steps = checkpoint["total_steps"]
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
             if self.plot_loss:
@@ -909,22 +802,97 @@ class CodebookTrainer(BaseTrainer):
     # Data Helpers
     #############
 
+    def sample_data(self):
+        n = len(self.dataset)
+        ids = np.arange(n)
+        random.shuffle(ids)
+        if self.extra_args["step_based_sample_w_replace"]:
+            assert 0
+        elif self.extra_args["step_based_sample_wo_replace"]:
+            ids = ids[:self.batch_size]
+        else: assert 0
+        return ids
+
     def set_num_batches(self):
         """ Set number of batches/iterations and batch size for each epoch.
             At certain epochs, we may not need all data and can break before
               iterating thru all data.
         """
         length = len(self.dataset)
-        self.batch_size = min(self.extra_args["pretrain_batch_size"], length)
-
         if self.dataloader_drop_last:
-            self.num_iterations_cur_epoch = int(length // self.batch_size)
+            self.num_batches_cur_epoch = int(length // self.batch_size)
         else:
-            self.num_iterations_cur_epoch = int(np.ceil(length / self.batch_size))
+            self.num_batches_cur_epoch = int(np.ceil(length / self.batch_size))
+
+    def add_loss(self):
+        m = len(self.train_data_loader) if self.train_based_on_epochs else 1
+        total_loss = self.log_dict["total_loss"] / m
+        self.losses.append(total_loss)
+        if self.neg_sup_optimize_alternately:
+            self.gt_bin_losses.append(self.log_dict["gt_bin_losses"] / m)
+            self.wrong_bin_losses.append(self.log_dict["wrong_bin_losses"] / m)
+            if self.cur_neg_sup_target == "net":
+                self.wrong_bin_regus.append(self.log_dict["wrong_bin_regus"] / m)
+        if self.extra_args["plot_logits_for_gt_bin"]:
+            self.gt_bin_logits.append(self.cur_gt_bin_logits)
+        if self.extra_args["plot_individ_spectra_loss"]:
+            self.spectra_individ_losses.append(self.cur_spectra_individ_losses)
+
+    def pre_save_data(self):
+        self.save_data = True
+
+        if self.save_redshift:
+            self.gt_redshift = []
+            self.est_redshift = []
+            if self.classify_redshift:
+                self.redshift_logits = []
+                if self.calculate_binwise_spectra_loss:
+                    self.binwise_loss = []
+        if self.save_qtz_weights:
+            self.qtz_weights = []
+        if self.save_pixel_values:
+            self.gt_pixel_vals = []
+            self.recon_pixel_vals = []
+        if self.recon_gt_spectra:
+            self.gt_fluxes = []
+            self.recon_fluxes = []
+            self.spectra_wave = []
+            self.spectra_masks = []
+        if self.plot_codebook_logits:
+            self.codebook_logits = []
+        if self.recon_codebook_spectra_individ:
+            self.spectra_wave_c = []
+            self.spectra_masks_c = []
+            self.codebook_spectra = []
+
+        # re-init dataloader to make sure pixels are in order
+        self.use_all_pixels = True
+        self.shuffle_dataloader = False
+        self.sample_wave = not self.extra_args["pretrain_use_all_wave"]
+        self.dataset.toggle_wave_sampling(self.sample_wave)
+        self.set_num_batches()
+        self.init_dataloader()
+        self.reset_data_iterator()
+        warnings.warn("dataloader state is modified in codebook_trainer, ensure this is for validation purpose only!")
+
+    def post_save_data(self):
+        """ Save data locally and restore trainer state.
+        """
+        self.save_local()
+        self.use_all_pixels = False
+        self.shuffle_dataloader = True
+        self.save_data = False
+        self.sample_wave = not self.extra_args["pretrain_use_all_wave"]
+        self.dataset.toggle_wave_sampling(self.sample_wave)
+        self.configure_dataset()
+        self.set_num_batches()
+        self.init_dataloader()
+        self.reset_data_iterator()
+        warnings.warn("dataloader state is modified in codebook_trainer, ensure this is for validation purpose only!")
 
     def _plot_grad_now(self):
         return self.plot_grad_every != -1 and \
-            (self.epoch == 0 or self.epoch % self.plot_grad_every == 0)
+            (self.cur_iter == 0 or self.cur_iter % self.plot_grad_every == 0)
 
     def save_local(self):
         if self.recon_gt_spectra:
@@ -958,8 +926,6 @@ class CodebookTrainer(BaseTrainer):
     def _save_pixel_values(self):
         gt_vals = torch.stack(self.gt_pixel_vals).detach().cpu().numpy()[self.selected_ids,0]
         recon_vals = torch.stack(self.recon_pixel_vals).detach().cpu().numpy()[self.selected_ids]
-        # fname = join(self.pixel_val_dir, f"model-ep{self.epoch}-it{self.iteration}.pth")
-        # np.save(fname, vals)
 
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
@@ -972,7 +938,7 @@ class CodebookTrainer(BaseTrainer):
 
     def _save_qtz_weights(self):
         weights = torch.stack(self.qtz_weights).detach().cpu().numpy()
-        fname = join(self.qtz_weight_dir, f"model-ep{self.epoch}-it{self.iteration}.pth")
+        fname = join(self.qtz_weight_dir, f"model-ep{self.cur_iter}-bch{self.cur_batch}.pth")
         np.save(fname, weights)
         np.set_printoptions(suppress=True)
         np.set_printoptions(precision=3)
@@ -1000,7 +966,7 @@ class CodebookTrainer(BaseTrainer):
         n_figs = int(np.ceil( n_spectrum / n_spectrum_per_fig ))
 
         for i in range(n_figs):
-            fname = f"ep{self.epoch}-it{self.iteration}-plot{i}"
+            fname = f"ep{self.cur_iter}-bch{self.cur_batch}-plot{i}"
             lo = i * n_spectrum_per_fig
             hi = min(lo + n_spectrum_per_fig, n_spectrum)
 
@@ -1037,7 +1003,7 @@ class CodebookTrainer(BaseTrainer):
             cur_dir = join(self.codebook_spectra_dir, f"spectra-{i}")
             Path(cur_dir).mkdir(parents=True, exist_ok=True)
 
-            fname = f"{prefix}ep{self.epoch}-it{self.iteration}"
+            fname = f"{prefix}ep{self.cur_iter}-bch{self.cur_batch}"
             wave = np.tile(wave, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
             masks = np.tile(masks, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
 
@@ -1058,7 +1024,7 @@ class CodebookTrainer(BaseTrainer):
 
     def _plot_codebook_logits(self):
         codebook_logits = torch.stack(self.codebook_logits).detach().cpu().numpy()
-        fname = join(self.codebook_logits_dir, f"ep{self.epoch}-it{self.iteration}_logits")
+        fname = join(self.codebook_logits_dir, f"ep{self.cur_iter}-bch{self.cur_batch}_logits")
         np.save(fname, codebook_logits)
 
         plot_multiple(
@@ -1082,7 +1048,7 @@ class CodebookTrainer(BaseTrainer):
     def _log_redshift_residual_outlier(self):
         self.redshift_residual = self.est_redshift - self.gt_redshift
         fname = join(self.redshift_dir,
-                     f"ep{self.epoch}-it{self.iteration}_redshift_residual.txt")
+                     f"ep{self.cur_iter}-bch{self.cur_batch}_redshift_residual.txt")
         log_data(self, "redshift_residual", fname=fname, log_to_console=False)
 
         ids = np.arange(len(self.redshift_residual))
@@ -1094,7 +1060,7 @@ class CodebookTrainer(BaseTrainer):
         log.info(f"gt_redshift: {outlier_gt}")
         log.info(f"argmax_redshift: {outlier_est}")
         fname = join(self.redshift_dir,
-                     f"ep{self.epoch}-it{self.iteration}_redshift_outlier.txt")
+                     f"ep{self.cur_iter}-bch{self.cur_batch}_redshift_outlier.txt")
         with open(fname, "w") as f: f.write(f"{to_save}")
 
     def _plot_binwise_spectra_loss(self):
@@ -1103,7 +1069,7 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
             self.extra_args["redshift_bin_width"])
 
-        fname = join(self.redshift_dir, f"ep{self.epoch}-it{self.iteration}_losses")
+        fname = join(self.redshift_dir, f"ep{self.cur_iter}-bch{self.cur_batch}_losses")
         np.save(fname, np.concatenate((bin_centers[None,:], losses), axis=0))
 
         plot_multiple(
@@ -1117,7 +1083,7 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
             self.extra_args["redshift_bin_width"])
 
-        fname = join(self.redshift_dir, f"ep{self.epoch}-it{self.iteration}_logits")
+        fname = join(self.redshift_dir, f"ep{self.cur_iter}-bch{self.cur_batch}_logits")
         np.save(fname, np.concatenate((bin_centers[None,:], redshift_logits), axis=0))
 
         plot_multiple(
@@ -1168,7 +1134,7 @@ class CodebookTrainer(BaseTrainer):
         #         data["spectra_masks"], data["spectra_source_data"])
         # if self.extra_args["add_redshift_logit_bias"]:
         #     init_redshift_prob = data["init_redshift_prob"]
-        #     if self.epoch != 0:
+        #     if self.cur_iter != 0:
         #         init_redshift_prob = torch.zeros(
         #             init_redshift_prob.shape, dtype=init_redshift_prob.dtype
         #         ).to(init_redshift_prob.device)
@@ -1349,40 +1315,47 @@ class CodebookTrainer(BaseTrainer):
             By default, this function only runs every epoch.
         """
         # Average over iterations
-        n = len(self.train_data_loader)
-        total_loss = self.log_dict["total_loss"] / n
-        log_text = "EPOCH {}/{}".format(self.epoch, self.num_epochs)
+        m = len(self.train_data_loader) if self.train_based_on_epochs else 1
+        n = self.num_epochs if self.train_based_on_epochs else self.num_steps
+        total_loss = self.log_dict["total_loss"] / m
+        name = "EPOCH" if self.train_based_on_epochs else "STEP"
+        log_text = f"{name} {self.cur_iter}/{n}" #.format(self.cur_iter, n)
 
-        log_text += " | total loss: {:>.3E}".format(total_loss)
-        log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / n)
+        log_text += f" | total loss: {total_loss:.3E}" #.format(total_loss)
+        log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / m)
         if self.pixel_supervision:
-            log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / n)
+            log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / m)
         # if self.neg_sup_wrong_redshift:
         #     log_text += " | gt bin loss: {:>.3E}".format(
-        #         self.log_dict["gt_bin_losses"] / n)
+        #         self.log_dict["gt_bin_losses"] / m)
         #     log_text += " | wrong bin regu: {:>.3E}".format(
-        #         self.log_dict["wrong_bin_regus"] / n)
+        #         self.log_dict["wrong_bin_regus"] / m)
         #     log_text += " | wrong bin loss: {:>.3E}".format(
-        #         self.log_dict["wrong_bin_losses"] / n)
+        #         self.log_dict["wrong_bin_losses"] / m)
 
         if self.regularize_redshift_logits:
             log_text += " | redshift logits regu: {:>.3E}".format(
-                self.log_dict["redshift_logits_regu"] / n)
+                self.log_dict["redshift_logits_regu"] / m)
         if self.regularize_codebook_logits:
             log_text += " | codebook logits regu: {:>.3E}".format(
-                self.log_dict["codebook_logits_regu"] / n)
+                self.log_dict["codebook_logits_regu"] / m)
         if self.regularize_spectra_latents:
             log_text += " | codebook latents regu: {:>.3E}".format(
-                self.log_dict["spectra_latents_regu"] / n)
+                self.log_dict["spectra_latents_regu"] / m)
         if self.regularize_codebook_spectra:
             log_text += " | codebook spectra regu: {:>.3E}".format(
-                self.log_dict["codebook_spectra_regu"] / n)
+                self.log_dict["codebook_spectra_regu"] / m)
 
         log.info(log_text)
 
     ###################
     # Optimizer Helpers
     ###################
+
+    def configure_alternate_optimization(self):
+        self._get_current_em_latents_target()
+        self._get_current_neg_sup_target()
+        self._toggle_grad(on_off="off")
 
     def _toggle_grad(self, on_off="on"):
         if self.optimize_latents_alternately:
@@ -1414,7 +1387,7 @@ class CodebookTrainer(BaseTrainer):
 
     def _get_current_em_latents_target(self):
         if not self.optimize_latents_alternately: return
-        residu = self.epoch % (sum(self.em_alternation_steps))
+        residu = self.cur_iter % (sum(self.em_alternation_steps))
         if self.em_alternation_starts_with == "spectra_latents":
            self.cur_optm_target = "spectra_latents" \
                if residu < self.em_alternation_steps[0] else "redshift_latents"
@@ -1425,7 +1398,7 @@ class CodebookTrainer(BaseTrainer):
 
     def _get_current_neg_sup_target(self):
         if not self.neg_sup_optimize_alternately: return
-        residu = self.epoch % (sum(self.neg_sup_alternation_steps))
+        residu = self.cur_iter % (sum(self.neg_sup_alternation_steps))
         if self.neg_sup_alternation_starts_with == "net":
             self.cur_neg_sup_target = "net" \
                 if residu < self.neg_sup_alternation_steps[0] else "latents"

@@ -88,8 +88,10 @@ class BaseTrainer(ABC):
 
         # Training params
         self.exp_name = extra_args["exp_name"]
+        self.num_steps = extra_args["num_steps"]
         self.num_epochs = extra_args["num_epochs"]
         self.batch_size = extra_args["batch_size"]
+        self.train_based_on_epochs = self.extra_args["train_based_on_epochs"]
 
         self.timer = PerfTimer(
             activate=extra_args["activate_trainer_timer"],

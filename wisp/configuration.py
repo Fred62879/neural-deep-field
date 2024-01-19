@@ -122,7 +122,7 @@ def get_dataset_from_config(args):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else: device = "cpu"
 
-    transform = None #AddToDevice(device)
+    transform = None #ToTensor() #AddToDevice(device)
     if args.dataset_type == 'astro':
         dataset = AstroDataset(device=device, transform=transform, **vars(args))
         dataset.init()

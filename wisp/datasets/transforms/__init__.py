@@ -7,4 +7,5 @@
 # license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
 
+from .to_tensor import *
 from .to_device import *
