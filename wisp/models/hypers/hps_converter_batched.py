@@ -94,7 +94,6 @@ class HyperSpectralConverter(nn.Module):
             num_bins = len(redshift)
             wave = wave[...,None].tile(1,1,1,num_bins)
         wave = wave / (1 + redshift) # dont use `/=` this will change wave object
-        #print(wave[:,0,1,0].T)
 
         if wave.ndim == 3:
             wave = wave.permute(2,0,1)

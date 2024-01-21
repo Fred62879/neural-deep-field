@@ -183,6 +183,7 @@ class AstroInferrer(BaseInferrer):
         # assert not self.redshift_pretrain_infer or not self.infer_selected
 
         # quantization setups
+        assert not self.extra_args["temped_qtz"]
         self.qtz_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
         self.qtz_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
         assert not (self.qtz_latent and self.qtz_spectra)
@@ -212,7 +213,18 @@ class AstroInferrer(BaseInferrer):
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
 
         assert not self.codebook_pretrain_infer or (
-            self.apply_gt_redshift or self.neg_sup_wrong_redshift)
+            self.apply_gt_redshift or self.optimize_spectra_for_each_redshift_bin)
+        # sanity check mandates brute force
+        assert not self.redshift_pretrain_infer or \
+            self.optimize_spectra_for_each_redshift_bin
+        # brute force mandates binwise loss calculation
+        assert not self.optimize_spectra_for_each_redshift_bin or \
+            self.calculate_binwise_spectra_loss
+        # if we brute force during pretrain, then we must do negative supervision
+        assert not(self.codebook_pretrain_infer and \
+                   self.optimize_spectra_for_each_redshift_bin) or \
+                   self.neg_sup_wrong_redshift
+
         assert not self.neg_sup_wrong_redshift or (
             self.mode == "codebook_pretrain_infer" and self.classify_redshift and \
             self.calculate_binwise_spectra_loss)
@@ -226,6 +238,11 @@ class AstroInferrer(BaseInferrer):
             (self.classify_redshift and not self.use_binwise_spectra_loss_as_redshift_logits), \
             "For the brute force method, we keep spectra under all bins without averaging. \
             During inferrence however, we can calculate logits for visualization purposes."
+
+        # we do epoch based training only in autodecoder setting
+        assert self.extra_args["train_based_on_epochs"] or self.qtz_spectra
+        # in codebook qtz setting, we only do step based training
+        assert not self.extra_args["train_based_on_epochs"] or not self.qtz_spectra
 
         if self.classify_redshift:
             redshift_bins = init_redshift_bins(
@@ -1111,6 +1128,7 @@ class AstroInferrer(BaseInferrer):
 
     def infer_spectra(self, model_id, checkpoint):
         iterations = checkpoint["total_steps"]
+        # iterations = checkpoint["iterations"]
         model_state = checkpoint["model_state_dict"]
 
         load_model_weights(self.spectra_infer_pipeline, model_state)

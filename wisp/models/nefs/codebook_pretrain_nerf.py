@@ -91,14 +91,14 @@ class CodebookPretrainNerf(BaseNeuralField):
             **self.kwargs)
 
         # init latent variables **** DELETE ****
-        if self.kwargs["debug_lbfgs"]:
-            self.num_spectra = self.kwargs["redshift_pretrain_num_spectra"]
-            if self.use_latents_as_coords:
-                self.latents = nn.Embedding(
-                    self.num_spectra, self.kwargs["qtz_num_embed"])
-            if not self.kwargs["apply_gt_redshift"] and self.kwargs["split_latent"]:
-                self.redshift_latents = nn.Embedding(
-                    self.num_spectra, self.kwargs["redshift_logit_latent_dim"])
+        # if self.kwargs["debug_lbfgs"]:
+        #     self.num_spectra = self.kwargs["redshift_pretrain_num_spectra"]
+        #     if self.use_latents_as_coords:
+        #         self.latents = nn.Embedding(
+        #             self.num_spectra, self.kwargs["qtz_num_embed"])
+        #     if not self.kwargs["apply_gt_redshift"] and self.kwargs["split_latent"]:
+        #         self.redshift_latents = nn.Embedding(
+        #             self.num_spectra, self.kwargs["redshift_logit_latent_dim"])
 
     def index_latents(self, data, selected_ids, idx):
         ret = data

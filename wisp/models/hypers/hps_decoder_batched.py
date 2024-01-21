@@ -234,9 +234,13 @@ class HyperSpectralDecoderB(nn.Module):
 
         if self.qtz_spectra:
             codes = codebook.weight[:,None,None].tile(1,bsz,1,1)
+            # [(num_bins,)num_embed,bsz,nsmpl,dim]
             latents = self.convert(wave, codes, redshift, wave_bound)
-                                                           # [...,num_embed,bsz,nsmpl,dim]
-            spectra = self.spectra_decoder(latents)[...,0] # [...,num_embed,bsz,nsmpl]
+
+            # each spectra has different lambda thus needs its own codebook spectra
+            # each redshift bin shift lambda differently thus needs its own codebook spectra
+            # codebook spectra [(num_bins,)num_embed,bsz,nsmpl]
+            spectra = self.spectra_decoder(latents)[...,0]
         else:
             latents = self.convert(wave, input, redshift, wave_bound) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
@@ -319,9 +323,11 @@ class HyperSpectralDecoderB(nn.Module):
 
         if full_emitted_wave is not None:
             self.forward_codebook_spectra(codebook, full_emitted_wave, full_wave_bound, ret)
+            timer.check("hps_decoder::codebook spectra reconstruced")
 
         redshift = None if ret["redshift"] is None else \
             ret["redshift"] if self.classify_redshift else ret["redshift"][:bsz]
+        timer.check("hps_decoder::got redshift")
 
         ret["spectra"] = self.reconstruct_spectra(
             latents, wave,

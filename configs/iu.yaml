@@ -8,7 +8,7 @@ global:
     on_narval: False
     on_sockeye: False
     print_shape: False
-    show_memory: True
+    show_memory: False
     activate_model_timer: False
     activate_trainer_timer: False
     exp_name: 'neg-sup' #'autodecoder'
@@ -16,9 +16,9 @@ global:
     seed: 80
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
-    #tasks: ['codebook_pretrain_infer','recon_spectra'] #'save_redshift'] #,'plot_redshift_residual','plot_redshift_logits'] #,'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
+    #tasks: ['codebook_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_residual','plot_redshift_logits'] #,'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
     #tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
-    #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_logits','plot_redshift_residuals'] #,'plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_spectra_latents','save_qtz_weights','recon_spectra_all_bins']
+    #tasks: ['redshift_pretrain_infer','save_redshift','recon_spectra','plot_redshift_logits','plot_redshift_residuals'] #,'plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_spectra_latents','save_qtz_weights','recon_spectra_all_bins']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -140,14 +140,14 @@ pretrain:
 
     zero_init_spectra_latents: True
     optimize_spectra_latents_as_logits: True
-    optimize_spectra_for_each_redshift_bin: True
     optimize_spectra_latents: True
     load_pretrained_spectra_latents: False
     optimize_codebook_logits_mlp: False
     load_pretrained_codebook_logits_mlp: False
 
-    use_binwise_spectra_loss_as_redshift_logits: False
+    calculate_binwise_spectra_loss: True
     binwise_loss_beta: 50
+    use_binwise_spectra_loss_as_redshift_logits: False
 
     zero_init_redshift_latents: True
     optimize_redshift_latents_as_logits: True
@@ -168,8 +168,9 @@ pretrain:
     regularize_across_codebook_spectra: False
     codebook_spectra_regu_beta: 1
 
-    pretrain_log_dir: '20240118-194243'
-    pretrained_model_name: 'model-step5000.pth'
+    pretrain_log_dir: ''
+    # pretrained_model_name: 'model-step20000.pth'
+    pretrained_model_name: 'model-ep20000-it0.pth'
 
     split_latent: True
     use_latents_as_coords: True
@@ -264,8 +265,8 @@ trainer:
     step_based_sample_w_replace: False
     step_based_sample_wo_replace: True
 
-    num_steps: 10000
-    num_epochs: 10000
+    num_steps: 5000
+    num_epochs: 5000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
@@ -303,7 +304,7 @@ trainer:
     apply_gt_redshift: False               # -
     redshift_unsupervision: False         #  |_these options conflict each other 
     redshift_semi_supervision: False      #  |
-    calculate_binwise_spectra_loss: True # -
+    optimize_spectra_for_each_redshift_bin: True
 
     correct_gt_redshift_based_on_redshift_bin: True
 
@@ -315,7 +316,7 @@ trainer:
 
     resume_train: False
     resume_log_dir: ''
-    resume_model_fname: 'model-ep1000-it0.pth'
+    resume_model_fname: 'model-step10000.pth'
     #### ***********************************
 
 infer:
@@ -351,10 +352,10 @@ infer:
 
     # recon spectra
     infer_selected: False
-    pretrain_num_infer_upper_bound: 35
+    pretrain_num_infer_upper_bound: 140
     test_num_infer_upper_bound: 10
     # spectra_inferrence_id_fname: '/scratch/projects/vision/data/pdr3/output/neg-sup/?/redshift/model-5_redshift_outlier_ids.npy'
-    infer_outlier_only: False
+    infer_outlier_only: True
 
     spectra_neighbour_size: 1
 
@@ -367,8 +368,8 @@ infer:
     plot_spectrum_with_recon: True
     plot_spectrum_with_trans: False
 
-    plot_spectrum_under_gt_bin: False
-    plot_spectrum_under_optimal_wrong_bin: False
+    plot_spectrum_under_gt_bin: True
+    plot_spectrum_under_optimal_wrong_bin: True
     plot_codebook_coeff_under_optimal_wrong_bin: False
 
     plot_spectrum_according_to_zncc: True
@@ -486,7 +487,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000 # spectra to load
-    num_supervision_spectra_upper_bound: 100
+    num_supervision_spectra_upper_bound: 25
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 

@@ -55,11 +55,9 @@ class CodebookTrainer(BaseTrainer):
         self.begin_train()
 
         n = self.num_epochs if self.train_based_on_epochs else self.num_steps
-        if self.use_tqdm: iter = tqdm(range(n + 1))
-        else: iter = range(n + 1)
+        iter = tqdm(range(n + 1)) if self.use_tqdm else range(n + 1)
 
         for self.cur_iter in iter:
-            self.cur_batch = 0
             self.begin_iter()
 
             if self.train_based_on_epochs:
@@ -107,10 +105,14 @@ class CodebookTrainer(BaseTrainer):
         # quantization setups
         self.qtz_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
         self.qtz_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
-        assert not (self.qtz_latent and self.qtz_spectra)
         self.qtz = self.qtz_latent or self.qtz_spectra
         self.qtz_n_embd = self.extra_args["qtz_num_embed"]
         self.qtz_strategy = self.extra_args["quantization_strategy"]
+
+        assert not self.extra_args["temped_qtz"]
+        assert not (self.qtz_latent and self.qtz_spectra)
+        # in autodecoder setting, we dont decode latents
+        assert not self.qtz_spectra or not self.extra_args["decode_spatial_embedding"]
 
         # redshift setup
         self.apply_gt_redshift = self.extra_args["model_redshift"] and \
@@ -125,10 +127,20 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["optimize_spectra_for_each_redshift_bin"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
 
+        # pretrain mandates either apply gt redshift directly or brute force
         assert not self.mode == "codebook_pretrain" or (
-            self.apply_gt_redshift or self.neg_sup_wrong_redshift)
-        assert not self.apply_gt_redshift or \
-             not self.calculate_binwise_spectra_loss
+            self.apply_gt_redshift or self.optimize_spectra_for_each_redshift_bin)
+        # sanity check mandates brute force
+        assert not self.mode == "redshift_pretrain" or \
+            self.optimize_spectra_for_each_redshift_bin
+        # brute force during pretrain mandates negative supervision
+        assert not(self.mode == "codebook_pretrain" and \
+                   self.optimize_spectra_for_each_redshift_bin) or \
+                   self.neg_sup_wrong_redshift
+
+        # brute force mandates binwise loss calculation
+        assert not self.optimize_spectra_for_each_redshift_bin or \
+            self.calculate_binwise_spectra_loss
         assert not self.neg_sup_wrong_redshift or (
             self.mode == "codebook_pretrain" and self.classify_redshift and \
             self.calculate_binwise_spectra_loss)
@@ -145,6 +157,11 @@ class CodebookTrainer(BaseTrainer):
             "For the brute force method, we keep spectra under all bins without averaging. \
             During inferrence however, we can calculate logits for visualization purposes."
         assert not self.extra_args["decode_spatial_embedding"] or self.qtz
+
+        # we do epoch based training only in autodecoder setting
+        # assert self.train_based_on_epochs or self.qtz_spectra
+        # in codebook qtz setting, we only do step based training
+        # assert not self.train_based_on_epochs or not self.qtz_spectra
 
         if self.classify_redshift:
             redshift_bins = init_redshift_bins(
@@ -269,6 +286,9 @@ class CodebookTrainer(BaseTrainer):
         self.train_pipeline.set_batch_reduction_order(
             self.extra_args["spectra_batch_reduction_order"])
 
+        # latetns here is used to EITHER
+        #  generate codebook coefficients (no softmax applied) in codebook qtz setting OR
+        #  concatenate with lambda to be directly decoded as spectra
         latents, redshift_latents = self.init_latents()
         self.train_pipeline.set_latents(latents)
         if redshift_latents is not None:
@@ -422,8 +442,11 @@ class CodebookTrainer(BaseTrainer):
     #############
 
     def begin_train(self):
-        self.total_steps = 0 # record total steps for resume training
-        self.codebook_pretrain_total_steps = 0  # record total steps for pretrain
+        self.total_steps = 0 # used for resume training purpose
+
+        # total steps of pretrain used only when we do temperaturized qtz
+        # this value should not change as we freeze codebook & qtz operation together
+        self.codebook_pretrain_total_steps = 0
 
         if self.plot_loss:
             self.losses = []
@@ -466,6 +489,7 @@ class CodebookTrainer(BaseTrainer):
 
     def begin_iter(self):
         if self.train_based_on_epochs:
+            self.cur_batch = 0
             self.set_num_batches()
             self.reset_data_iterator()
 
@@ -613,39 +637,38 @@ class CodebookTrainer(BaseTrainer):
     def init_latents(self):
         if self.mode == "codebook_pretrain":
             assert not self.split_latent
-            spectra_latents = self.init_codebook_pretrain_spectra_latents()
+            latents = self.init_codebook_pretrain_spectra_latents()
             redshift_latents = None
         elif self.mode == "redshift_pretrain":
-            spectra_latents = self.init_redshift_pretrain_spectra_latents()
+            latents = self.init_redshift_pretrain_spectra_latents()
             if not self.has_redshift_latents:
                 redshift_latents = None
             else: redshift_latents = self.init_redshift_pretrain_redshift_latents()
         else:
             raise ValueError("Invalid pretrainer mode.")
-        return spectra_latents, redshift_latents
+        return latents, redshift_latents
 
     def freeze_and_load(self):
         """ For redshift pretrain (sanity check), we load part of the pretrained
             model (from codebook pretrain) and freeze.
+            Note: if we also resume, then `resume_train` should overwrite model states
+                  i.e. `resume_train` called after this func
         """
         if self.mode == "codebook_pretrain":
             pass
         elif self.mode == "redshift_pretrain":
             load_excls, freeze_excls = [], []
 
-            # codebook coefficients (no softmax applied)
             if self.optimize_spectra_latents:
                 freeze_excls.append("nef.latents")
 
-            # when we want to load codebook latents, we do it during initialization
-            # if not self.extra_args["load_pretrained_spectra_latents"]:
+            # we load latents in `init_latents` only
             load_excls.append("nef.latents")
 
             if self.optimize_spectra_latents_as_logits:
-                # directly optimize latents as coefficients
-                pass
+                pass # directly optimize latents as coefficients
             else:
-                # optimize an autodecoder
+                # optimize a mlp to decode latents to coefficients
                 if self.extra_args["optimize_codebook_logits_mlp"]:
                     freeze_excls.append("spatial_decoder.decode")
                 if not self.extra_args["load_pretrained_codebook_logits_mlp"]:
@@ -743,8 +766,20 @@ class CodebookTrainer(BaseTrainer):
         checkpoint = torch.load(model_fname)
         load_pretrained_model_weights(
             self.train_pipeline, checkpoint["model_state_dict"], excls=excls)
+
         if self.mode == "redshift_pretrain":
-            self.codebook_pretrain_total_steps = checkpoint["total_steps"]
+            # total steps of pretrain used only when we do temperaturized qtz
+            # this value should not change as we freeze codebook & qtz operation together
+            # Note: in case where we resume during sanity check, it would be wrong if we
+            #       use `total_steps` here which is the steps of the previous sanity check
+            #       instead we want to use the `total_steps` of the pretrain from which we
+            #       perform the previous (very first) sanity check
+            if "codebook_pretrain_total_steps" not in checkpoint:
+                self.codebook_pretrain_total_steps = checkpoint["total_steps"]
+                # self.codebook_pretrain_total_steps = checkpoint["iterations"]
+            else:
+                self.codebook_pretrain_total_steps = checkpoint["codebook_pretrain_total_steps"]
+
         else: self.codebook_pretrain_total_steps = 0
         self.train_pipeline.train()
         return checkpoint
@@ -761,6 +796,8 @@ class CodebookTrainer(BaseTrainer):
             "model_state_dict": self.train_pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
         }
+        if self.mode == "redshift_pretrain":
+            checkpoint["codebook_pretrain_total_steps"] = self.codebook_pretrain_total_steps
         torch.save(checkpoint, model_fname)
         return checkpoint
 
