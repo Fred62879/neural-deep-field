@@ -73,6 +73,7 @@ class AstroDataset(Dataset):
         self.infer_selected = False
         self.perform_integration = True
         self.use_predefined_wave_range = False
+        self.recon_full_codebook_spectra = False
 
     ############
     # Setters
@@ -138,6 +139,9 @@ class AstroDataset(Dataset):
 
     def toggle_selected_inferrence(self, infer_selected: bool):
         self.infer_selected = infer_selected
+
+    def toggle_recon_full_codebook_spectra(self, recon_full: bool):
+        self.recon_full_codebook_spectra = recon_full
 
     ############
     # Getters
@@ -405,7 +409,11 @@ class AstroDataset(Dataset):
                 nsmpl[nsmpl == 0] = 1
                 out["nsmpl"] = nsmpl
 
-            out["wave"] = out["spectra_source_data"][:,0][...,None] # [bsz,nsmpl,1]
+            if self.recon_full_codebook_spectra:
+                assert 0
+                out["wave"] = None
+            else:
+                out["wave"] = out["spectra_source_data"][:,0][...,None] # [bsz,nsmpl,1]
 
             if self.mode == "codebook_pretrain" and (
                     self.kwargs["regularize_within_codebook_spectra"] or \

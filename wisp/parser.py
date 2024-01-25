@@ -691,6 +691,10 @@ def define_cmd_line_args():
     train_group.add_argument("--spectra-loss-cho",type=str, choices=["l1","l2"])
     train_group.add_argument("--redshift-loss-cho",type=str, choices=["l1","l2"])
 
+    train_group.add_argument("--recon-full-range-codebook-spectra", action="store_true",
+                             help="reconstruct codebook spectra under all lambda and \
+                             all redshift values, then recon spectra via indexing")
+
     train_group.add_argument("--split-latent", action="store_true",
                              help="use different latents for each decoder.")
 

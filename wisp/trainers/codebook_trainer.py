@@ -158,10 +158,14 @@ class CodebookTrainer(BaseTrainer):
             During inferrence however, we can calculate logits for visualization purposes."
         assert not self.extra_args["decode_spatial_embedding"] or self.qtz
 
+        self.recon_full_range_codebook_spectra = self.extra_args["recon_full_range_codebook_spectra"]
+        # during codebook qtz, accelerate via recon codebook spectra across full wave range
+        assert not self.recon_full_range_codebook_spectra or self.qtz_spectra
+
         # we do epoch based training only in autodecoder setting
-        # assert self.train_based_on_epochs or self.qtz_spectra
+        assert self.train_based_on_epochs or self.qtz_spectra
         # in codebook qtz setting, we only do step based training
-        # assert not self.train_based_on_epochs or not self.qtz_spectra
+        assert not self.train_based_on_epochs or not self.qtz_spectra
 
         if self.classify_redshift:
             redshift_bins = init_redshift_bins(
@@ -186,6 +190,8 @@ class CodebookTrainer(BaseTrainer):
 
         # all others
         self.plot_loss = self.extra_args["plot_loss"]
+        self.plot_gt_bin_loss = self.mode == "redshift_pretrain" and \
+            self.optimize_spectra_for_each_redshift_bin
         self.index_latent = True # index latents as coords in model
         self.split_latent = self.mode == "redshift_pretrain" and \
             self.extra_args["split_latent"]
@@ -215,6 +221,8 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["optimize_spectra_latents_as_logits"]
         self.optimize_redshift_latents_as_logits = self.mode == "redshift_pretrain" and \
             self.extra_args["optimize_redshift_latents_as_logits"]
+
+        assert not self.optimize_spectra_latents_as_logits or self.qtz_spectra
         # no pretrained latents to load
         assert not self.optimize_redshift_latents_as_logits or \
             self.mode == "redshift_pretrain" and self.optimize_redshift_latents
@@ -254,6 +262,8 @@ class CodebookTrainer(BaseTrainer):
 
         if self.plot_loss:
             self.loss_fname = join(self.loss_dir, "loss")
+            if self.plot_gt_bin_loss:
+                self.gt_bin_loss_fname = join(self.loss_dir, "gt_bin_loss")
             if self.neg_sup_wrong_redshift:
                 self.gt_bin_loss_fname = join(self.loss_dir, "gt_bin_loss")
                 self.wrong_bin_regu_fname = join(self.loss_dir, "wrong_bin_regu")
@@ -286,9 +296,9 @@ class CodebookTrainer(BaseTrainer):
         self.train_pipeline.set_batch_reduction_order(
             self.extra_args["spectra_batch_reduction_order"])
 
-        # latetns here is used to EITHER
+        # latents here are used to EITHER
         #  generate codebook coefficients (no softmax applied) in codebook qtz setting OR
-        #  concatenate with lambda to be directly decoded as spectra
+        #  concatenate with lambda to be directly decoded as spectra in autodecoder setting
         latents, redshift_latents = self.init_latents()
         self.train_pipeline.set_latents(latents)
         if redshift_latents is not None:
@@ -400,11 +410,14 @@ class CodebookTrainer(BaseTrainer):
         # todo, codebook pretrain "coords" not handled
         if self.pixel_supervision:
             fields.append("spectra_pixels")
-        if self.neg_sup_wrong_redshift:
+        if self.plot_gt_bin_loss or self.neg_sup_wrong_redshift:
             fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_masks"])
 
         # use original spectra wave
         self.dataset.set_wave_source("spectra")
+
+        self.dataset.toggle_recon_full_codebook_spectra(
+            self.recon_full_range_codebook_spectra)
 
         # set spectra data source
         # tmp: in sanity check mode, we manually change sup_id and val_id in spectra_data
@@ -450,6 +463,8 @@ class CodebookTrainer(BaseTrainer):
 
         if self.plot_loss:
             self.losses = []
+            if self.plot_gt_bin_loss:
+                self.gt_bin_losses = []
             if self.neg_sup_wrong_redshift:
                 self.gt_bin_losses = []
                 self.wrong_bin_regus = []
@@ -458,8 +473,18 @@ class CodebookTrainer(BaseTrainer):
             self.gt_bin_logits = []
         if self.extra_args["plot_individ_spectra_loss"]:
             self.spectra_individ_losses = []
+
+        # for n, p in self.train_pipeline.named_parameters():
+            # print(n, p.requires_grad)
+            # if n == 'nef.latents': # print(p.shape) print(p[:2,0])
+
         if self.extra_args["resume_train"]:
             self.resume_train()
+
+        # check model state (frozen or not)
+        # for n, p in self.train_pipeline.named_parameters():
+            # print(n, p.requires_grad)
+            # if n == 'nef.latents': #print(p.shape)print(p[:2,0])
 
     def end_train(self):
         self.writer.close()
@@ -473,6 +498,8 @@ class CodebookTrainer(BaseTrainer):
 
         if self.plot_loss:
             self._plot_loss(self.losses, self.loss_fname)
+            if self.plot_gt_bin_loss:
+                self._plot_loss(self.gt_bin_losses, self.gt_bin_loss_fname)
             if self.neg_sup_wrong_redshift:
                 self._plot_loss(self.gt_bin_losses, self.gt_bin_loss_fname)
                 self._plot_loss(self.wrong_bin_regus, self.wrong_bin_regu_fname)
@@ -817,6 +844,9 @@ class CodebookTrainer(BaseTrainer):
             if self.plot_loss:
                 if exists(self.resume_loss_fname):
                     self.losses = list(np.load(self.resume_loss_fname))
+                if self.plot_gt_bin_loss:
+                    if exists(self.resume_gt_bin_loss_fname):
+                        self.gt_bin_losses = list(np.load(self.resume_gt_bin_loss_fname))
                 if self.neg_sup_wrong_redshift:
                     if exists(self.resume_gt_bin_loss_fname):
                         self.gt_bin_losses = list(np.load(self.resume_gt_bin_loss_fname))
@@ -860,11 +890,15 @@ class CodebookTrainer(BaseTrainer):
             self.num_batches_cur_epoch = int(length // self.batch_size)
         else:
             self.num_batches_cur_epoch = int(np.ceil(length / self.batch_size))
+        # log.info(f"num of batches: {self.num_batches_cur_epoch}")
 
     def add_loss(self):
         m = len(self.train_data_loader) if self.train_based_on_epochs else 1
         total_loss = self.log_dict["total_loss"] / m
+
         self.losses.append(total_loss)
+        if self.plot_gt_bin_loss:
+            self.gt_bin_losses.append(self.log_dict["gt_bin_losses"] / m)
         if self.neg_sup_optimize_alternately:
             self.gt_bin_losses.append(self.log_dict["gt_bin_losses"] / m)
             self.wrong_bin_losses.append(self.log_dict["wrong_bin_losses"] / m)
@@ -1290,7 +1324,11 @@ class CodebookTrainer(BaseTrainer):
             if self.neg_sup_wrong_redshift:
                 spectra_loss = self._calculate_neg_sup_loss(ret, data)
             else:
-                spectra_loss = torch.mean(ret["spectra_binwise_loss"])
+                all_bin_losses = ret["spectra_binwise_loss"] # [bsz,n_bins]
+                spectra_loss = torch.mean(all_bin_losses)
+                if self.plot_gt_bin_loss:
+                    gt_bin_losses = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
+                    self.log_dict["gt_bin_losses"] += gt_bin_losses.item()
         else:
             recon_fluxes = ret["intensity"]
             spectra_masks = data["spectra_masks"]
@@ -1320,8 +1358,12 @@ class CodebookTrainer(BaseTrainer):
 
         if self.cur_neg_sup_target == "latents":
             spectra_loss = torch.mean(ret["spectra_binwise_loss"])
-            _, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(ret, data)
-            self.log_dict["wrong_bin_losses"] += torch.mean(optimal_wrong_bin_losses).item()
+            if self.extra_args["neg_sup_with_optimal_wrong_bin"]:
+                _, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(ret, data)
+                self.log_dict["wrong_bin_losses"] += torch.mean(optimal_wrong_bin_losses).item()
+            else:
+                wrong_bin_losses = all_bin_losses[~data["gt_redshift_bin_masks"]] # [n,]
+                self.log_dict["wrong_bin_losses"] += torch.mean(wrong_bin_losses).item()
 
         elif self.cur_neg_sup_target == "net":
             if self.extra_args["neg_sup_with_optimal_wrong_bin"]:
@@ -1362,13 +1404,13 @@ class CodebookTrainer(BaseTrainer):
         log_text += " | spectra loss: {:>.3E}".format(self.log_dict["spectra_loss"] / m)
         if self.pixel_supervision:
             log_text += " | pixel loss: {:>.3E}".format(self.log_dict["pixel_loss"] / m)
-        # if self.neg_sup_wrong_redshift:
-        #     log_text += " | gt bin loss: {:>.3E}".format(
-        #         self.log_dict["gt_bin_losses"] / m)
-        #     log_text += " | wrong bin regu: {:>.3E}".format(
-        #         self.log_dict["wrong_bin_regus"] / m)
-        #     log_text += " | wrong bin loss: {:>.3E}".format(
-        #         self.log_dict["wrong_bin_losses"] / m)
+        if self.neg_sup_wrong_redshift:
+            log_text += " | gt bin loss: {:>.3E}".format(
+                self.log_dict["gt_bin_losses"] / m)
+            log_text += " | wrong bin regu: {:>.3E}".format(
+                self.log_dict["wrong_bin_regus"] / m)
+            log_text += " | wrong bin loss: {:>.3E}".format(
+                self.log_dict["wrong_bin_losses"] / m)
 
         if self.regularize_redshift_logits:
             log_text += " | redshift logits regu: {:>.3E}".format(

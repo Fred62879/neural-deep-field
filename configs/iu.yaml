@@ -11,14 +11,14 @@ global:
     show_memory: False
     activate_model_timer: False
     activate_trainer_timer: False
-    exp_name: 'neg-sup' #'autodecoder'
+    exp_name: 'autodecoder'
     # log_fname:
     seed: 80
 
     tasks: ['codebook_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
-    #tasks: ['codebook_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_residual','plot_redshift_logits'] #,'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
+    #tasks: ['codebook_pretrain_infer','recon_spectra'] #'save_redshift'] #,'plot_redshift_residual','plot_redshift_logits'] #,'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
     #tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
-    #tasks: ['redshift_pretrain_infer','save_redshift','recon_spectra','plot_redshift_logits','plot_redshift_residuals'] #,'plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_spectra_latents','save_qtz_weights','recon_spectra_all_bins']
+    #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift','plot_redshift_logits','plot_redshift_residuals'] #,'plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_spectra_latents','save_qtz_weights','recon_spectra_all_bins']
 
     #tasks: ['main_infer','recon_img']
     #tasks: ['main_infer','plot_redshift']
@@ -115,7 +115,7 @@ pretrain:
     add_validation_spectra_not_in_supervision: False
     num_extra_validation_spectra: 20
 
-    pretrain_batch_size: 10 #4000
+    pretrain_batch_size: 7000
     pretrain_pixel_beta: 1
     pretrain_redshift_beta: 0.1
 
@@ -129,23 +129,23 @@ pretrain:
     em_alternation_starts_with: "spectra_latents"
     em_alternation_steps: [10,20]
 
-    negative_supervise_wrong_redshift: True
+    negative_supervise_wrong_redshift: False
     neg_sup_with_optimal_wrong_bin: False
     neg_sup_beta: 1
     neg_sup_constant: 0.01
 
-    neg_sup_optimize_alternately: True
+    neg_sup_optimize_alternately: False
     neg_sup_alternation_starts_with: "latents"
     neg_sup_alternation_steps: [1,1]
 
     zero_init_spectra_latents: True
-    optimize_spectra_latents_as_logits: True
+    optimize_spectra_latents_as_logits: False
     optimize_spectra_latents: True
     load_pretrained_spectra_latents: False
     optimize_codebook_logits_mlp: False
     load_pretrained_codebook_logits_mlp: False
 
-    calculate_binwise_spectra_loss: True
+    calculate_binwise_spectra_loss: False
     binwise_loss_beta: 50
     use_binwise_spectra_loss_as_redshift_logits: False
 
@@ -168,14 +168,14 @@ pretrain:
     regularize_across_codebook_spectra: False
     codebook_spectra_regu_beta: 1
 
-    pretrain_log_dir: ''
+    pretrain_log_dir: '20240124-181734_no_neg_sup_6k_spectra_latent_dim_16_20k_epochs_r'
     # pretrained_model_name: 'model-step20000.pth'
-    pretrained_model_name: 'model-ep20000-it0.pth'
+    pretrained_model_name: 'model-ep10000-bch0.pth'
 
     split_latent: True
     use_latents_as_coords: True
 
-    spectra_latent_dim: 32
+    spectra_latent_dim: 16
     scaler_latent_dim: 0
     redshift_logit_latent_dim: 330
 
@@ -203,7 +203,7 @@ decoder:
 
 qtz:
     quantize_latent: False
-    quantize_spectra: True
+    quantize_spectra: False
 
     quantization_strategy: 'soft'
     quantization_calculate_loss: False # only if hard qtz
@@ -261,12 +261,12 @@ trainer:
     spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
-    train_based_on_epochs: False
+    train_based_on_epochs: True
     step_based_sample_w_replace: False
     step_based_sample_wo_replace: True
 
-    num_steps: 5000
-    num_epochs: 5000
+    num_steps: 20000
+    num_epochs: 10000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
@@ -276,6 +276,8 @@ trainer:
     plot_grad_every: -1
     save_data_every: -1
     save_model_every: 1000
+
+    recon_full_range_codebook_spectra: False
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -301,10 +303,10 @@ trainer:
     pixel_supervision: False
     spectra_supervision: True
 
-    apply_gt_redshift: False               # -
-    redshift_unsupervision: False         #  |_these options conflict each other 
-    redshift_semi_supervision: False      #  |
-    optimize_spectra_for_each_redshift_bin: True
+    apply_gt_redshift: True                      # -
+    redshift_unsupervision: False                 #  |_these options conflict each other 
+    redshift_semi_supervision: False              #  |
+    optimize_spectra_for_each_redshift_bin: False  # -
 
     correct_gt_redshift_based_on_redshift_bin: True
 
@@ -314,9 +316,10 @@ trainer:
     train_num_wave_samples: 50
     spectra_supervision_num_wave_samples: 100
 
-    resume_train: False
-    resume_log_dir: ''
-    resume_model_fname: 'model-step10000.pth'
+    resume_train: True
+    resume_log_dir: '20240124-181734_no_neg_sup_6k_spectra_latent_dim_16_20k_epochs_r'
+    # resume_model_fname: 'model-step10000.pth'
+    resume_model_fname: 'model-ep10000-bch0.pth'
     #### ***********************************
 
 infer:
@@ -334,7 +337,7 @@ infer:
 
     # recon img
     to_HDU: False
-    # infer_log_dir: '20240117-181412_sc_zero_init_181206'
+    # infer_log_dir: ''
     metric_options: ['mse','ssim','psnr']
     spectra_metric_options: [] #['zncc']
     spectra_zncc_window_width: 500
@@ -487,7 +490,7 @@ spectra_data:
     max_spectra_len: 8191 # hardcoded
 
     num_gt_spectra_upper_bound: 7000 # spectra to load
-    num_supervision_spectra_upper_bound: 25
+    num_supervision_spectra_upper_bound: 6000
     val_spectra_ratio: 1 #0.8
     source_spectra_cho: "" #"6000_to_8000"
 
