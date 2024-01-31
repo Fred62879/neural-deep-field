@@ -286,8 +286,8 @@ def default_log_setup(level=logging.INFO):
         handlers=handlers
     )
 
-def select_inferrence_ids(n, m):
-    np.random.seed(20)
+def select_inferrence_ids(n, m, seed=20):
+    np.random.seed(seed)
     ids = np.arange(n)
     np.random.shuffle(ids)
     ids = ids[:m]

@@ -487,7 +487,8 @@ class AstroInferrer(BaseInferrer):
             if self.plot_gt_bin_spectra or self.plot_optimal_wrong_bin_spectra or \
                self.recon_spectra_all_bins:
                 self.requested_fields.append("gt_redshift_bin_ids")
-            if self.neg_sup_wrong_redshift or self.plot_optimal_wrong_bin_spectra:
+            if self.neg_sup_wrong_redshift or self.plot_gt_bin_spectra or \
+               self.plot_optimal_wrong_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_masks")
 
             if self.infer_selected:

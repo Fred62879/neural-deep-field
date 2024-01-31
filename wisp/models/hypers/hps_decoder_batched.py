@@ -139,7 +139,6 @@ class HyperSpectralDecoderB(nn.Module):
             @Return
               spectra [num_embed,bsz,nsmpl]
         """
-        assert self.kwargs["redshift_classification_method"] == "weighted_avg"
         num_embed = spectra.shape[1]
         spectra = torch.einsum("ij,jkim->kim", ret["redshift_logits"], spectra)
         return spectra
@@ -151,7 +150,6 @@ class HyperSpectralDecoderB(nn.Module):
             @Return
               spectra [bsz,nsmpl]
         """
-        assert self.kwargs["redshift_classification_method"] == "weighted_avg"
         if self.kwargs["optimize_spectra_for_each_redshift_bin"]:
             # index with argmax, this spectra is for visualization only
             #  optimization relies on spectra loss calculated for each bin

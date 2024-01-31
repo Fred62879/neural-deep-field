@@ -116,6 +116,7 @@ class HyperSpectralConverter(nn.Module):
         if spatial.ndim == 4 and self._qtz_spectra:
             num_codes = spatial.shape[0]
         if spectral.ndim == 4: num_bins = spectral.shape[0]
+        # print(spatial.shape, spectral.shape)
 
         if spatial.ndim == 3:
             if spectral.ndim == 3:

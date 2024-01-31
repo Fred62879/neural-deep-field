@@ -26,10 +26,10 @@ class SpatialDecoder(nn.Module):
         self.model_redshift = kwargs["model_redshift"]
 
         # we either quantize latents or spectra or none
-        self.quantize_z = kwargs["quantize_latent"]
+        self.quantize_latent = kwargs["quantize_latent"]
         self.quantize_spectra = kwargs["quantize_spectra"]
-        self.qtz = self.quantize_z or self.quantize_spectra
-        assert not (self.quantize_z and self.quantize_spectra)
+        self.qtz = self.quantize_latent or self.quantize_spectra
+        assert not (self.quantize_latent and self.quantize_spectra)
 
         self.qtz_calculate_loss = qtz_calculate_loss
         self.quantization_strategy = kwargs["quantization_strategy"]
@@ -45,7 +45,7 @@ class SpatialDecoder(nn.Module):
         elif self.decode_spatial_embedding or self.qtz:
             self.init_decoder()
 
-        if self.quantize_z:
+        if self.quantize_latent:
             self.qtz = Quantization(self.qtz_calculate_loss, **self.kwargs)
 
         if self.output_scaler or self.output_bias:
@@ -56,7 +56,7 @@ class SpatialDecoder(nn.Module):
             self.redshift_decoder = RedshiftDecoder(**self.kwargs)
 
     def init_decoder(self):
-        if self.quantize_z:
+        if self.quantize_latent:
             if self.quantization_strategy == "soft":
                 # decode into score corresponding to each code
                 output_dim = self.kwargs["qtz_num_embed"]
@@ -111,7 +111,7 @@ class SpatialDecoder(nn.Module):
         if self.quantize_spectra:
             coeff = z if self.kwargs["optimize_spectra_latents_as_logits"] else self.decode(z)
             ret["codebook_logits"] = coeff[:,0]
-        elif self.quantize_z:
+        elif self.quantize_latent:
             z, q_z = self.qtz(z, codebook.weight, ret, qtz_args)
         elif self.decode_spatial_embedding:
             z = self.decode(z)
@@ -119,5 +119,5 @@ class SpatialDecoder(nn.Module):
 
         ret["latents"] = z
         if self.quantize_spectra: return coeff
-        if self.quantize_z:       return q_z
+        elif self.quantize_latent: return q_z
         return z

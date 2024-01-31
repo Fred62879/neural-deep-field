@@ -29,7 +29,8 @@ from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     select_inferrence_ids, load_embed, load_model_weights, forward, \
     load_pretrained_model_weights, get_pretrained_model_fname, init_redshift_bins, \
     get_bool_classify_redshift, get_bool_has_redshift_latents, get_optimal_wrong_bin_ids, \
-    freeze_layers_incl, freeze_layers_excl, get_loss, create_latent_mask, set_seed, log_data
+    freeze_layers_incl, freeze_layers_excl, get_loss, create_latent_mask, set_seed, log_data, \
+    get_bin_ids
 
 
 class CodebookTrainer(BaseTrainer):
@@ -196,27 +197,27 @@ class CodebookTrainer(BaseTrainer):
         self.split_latent = self.mode == "redshift_pretrain" and \
             self.extra_args["split_latent"]
 
-        self.regularize_redshift_logits = self.classify_redshift and \
-            self.extra_args["regularize_redshift_logits"] and \
-            self.extra_args["redshift_classification_method"] == "weighted_avg"
+        self.regularize_redshift_logits = self.extra_args["regularize_redshift_logits"]
         self.redshift_logits_regu_method = self.extra_args["redshift_logits_regu_method"]
-
         self.regularize_codebook_logits = self.qtz_spectra and \
             self.extra_args["regularize_codebook_logits"]
         self.regularize_spectra_latents = self.extra_args["regularize_spectra_latents"]
-
         self.regularize_within_codebook_spectra = self.qtz_spectra and \
             self.extra_args["regularize_within_codebook_spectra"]
         self.regularize_across_codebook_spectra = self.qtz_spectra and \
             self.extra_args["regularize_across_codebook_spectra"]
         self.regularize_codebook_spectra = self.mode == "codebook_pretrain" and \
             (self.regularize_within_codebook_spectra or self.regularize_across_codebook_spectra)
+        assert not self.regularize_redshift_logits or \
+            (self.classify_redshift and \
+             self.extra_args["redshift_classification_method"] == "weighted_avg")
         assert self.regularize_within_codebook_spectra + \
             self.regularize_across_codebook_spectra <= 1
 
         self.optimize_spectra_latents = self.extra_args["optimize_spectra_latents"]
         self.optimize_redshift_latents = self.mode == "redshift_pretrain" and \
             self.extra_args["optimize_redshift_latents"]
+        # latents are optimized as codebook coefficients
         self.optimize_spectra_latents_as_logits = \
             self.extra_args["optimize_spectra_latents_as_logits"]
         self.optimize_redshift_latents_as_logits = self.mode == "redshift_pretrain" and \
@@ -760,8 +761,26 @@ class CodebookTrainer(BaseTrainer):
             # redshift pretrain use val spectra which is a permutation of sup spectra
             permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
             pretrained = checkpoint["model_state_dict"]["nef.latents"][permute_ids]
+
+            # in case of brute force, we init all bins with gt bin latents
             if self.optimize_spectra_for_each_redshift_bin:
                 if pretrained.ndim != 3:
+                    if self.extra_args["load_pretrained_spectra_latents_to_gt_bin_only"]:
+                        # only load pretrained latents to gt bin, all other bins are 0
+                        spectra_redshift = self.dataset.get_spectra_redshift()
+                        gt_bin_ids = get_bin_ids(
+                            self.extra_args["redshift_lo"],
+                            self.extra_args["redshift_bin_width"],
+                            spectra_redshift.numpy(), add_batched_dim=True
+                        )
+                        to_load = torch.zeros(
+                            len(pretrained), self.num_redshift_bins, pretrained.shape[-1],
+                            dtype=pretrained.dtype).to(pretrained.device)
+                        # print(gt_bin_ids.shape, pretrained.shape, to_load.shape, sp)
+                        to_load[gt_bin_ids[0],gt_bin_ids[1]] = pretrained
+                        pretrained = to_load
+                        # print(to_load[0,:80,0])
+                else:
                     pretrained = pretrained[:,None].tile(1, self.num_redshift_bins, 1)
                 assert pretrained.shape == sp
         else:
@@ -1218,6 +1237,8 @@ class CodebookTrainer(BaseTrainer):
         steps = self.codebook_pretrain_total_steps \
             if self.mode == "redshift_pretrain" else self.total_steps
 
+        # for n,p in self.train_pipeline.named_parameters(): print(n, p.requires_grad)
+
         ret = forward(
             data,
             self.train_pipeline,
@@ -1326,6 +1347,11 @@ class CodebookTrainer(BaseTrainer):
             else:
                 all_bin_losses = ret["spectra_binwise_loss"] # [bsz,n_bins]
                 spectra_loss = torch.mean(all_bin_losses)
+                # optimize gt bin only
+                # print(all_bin_losses[0])
+                # print(data["gt_redshift_bin_masks"][0])
+                # print(all_bin_losses[0][data["gt_redshift_bin_masks"][0]])
+                # spectra_loss = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
                 if self.plot_gt_bin_loss:
                     gt_bin_losses = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
                     self.log_dict["gt_bin_losses"] += gt_bin_losses.item()
@@ -1368,14 +1394,14 @@ class CodebookTrainer(BaseTrainer):
         elif self.cur_neg_sup_target == "net":
             if self.extra_args["neg_sup_with_optimal_wrong_bin"]:
                 _, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(ret, data)
-                self.log_dict["wrong_bin_losses"] += torch.mean(
-                    optimal_wrong_bin_losses).item()
+                self.log_dict["wrong_bin_losses"] += torch.mean(optimal_wrong_bin_losses).item()
                 wrong_bin_losses = self.extra_args["neg_sup_constant"] - optimal_wrong_bin_losses
                 wrong_bin_losses[wrong_bin_losses < 0] = 0
             else:
-                wrong_bin_losses = all_bin_losses[~data["gt_redshift_bin_masks"]] # [n,]
+                wrong_bin_losses = all_bin_losses[~data["gt_redshift_bin_masks"]] # [n,nbins-1]
                 self.log_dict["wrong_bin_losses"] += torch.mean(wrong_bin_losses).item()
-                wrong_bin_losses = self.extra_args["neg_sup_constant"] - wrong_bin_losses
+                # wrong_bin_losses = self.extra_args["neg_sup_constant"] - wrong_bin_losses
+                wrong_bin_losses = wrong_bin_losses - self.extra_args["neg_sup_constant"]
                 wrong_bin_losses[wrong_bin_losses < 0] = 0
                 wrong_bin_losses = torch.sum(wrong_bin_losses, dim=-1) / \
                     (self.num_redshift_bins-1)
@@ -1533,7 +1559,7 @@ class CodebookTrainer(BaseTrainer):
 
         # codebook latents
         if self.optimize_spectra_latents:
-            if self.optimize_latents_alternately:
+            if self.optimize_latents_alternately: # em
                 self._add_spectra_latents(spectra_latents, spectra_latents_group)
             else:
                 self._add_spectra_latents(spectra_latents, latents_group)
