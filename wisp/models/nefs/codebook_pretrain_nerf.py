@@ -144,7 +144,11 @@ class CodebookPretrainNerf(BaseNeuralField):
         if self.use_latents_as_coords:
             assert coords is None
             coords = self.latents
+            # print(idx)
             coords = self.index_latents(coords, selected_ids, idx)
+            # check gt bin id, useful only when we load pretrained latents to gt bin only
+            # _gt_bin_ids = torch.argmax( (coords[...,0] != 0).to(torch.long), dim=-1)
+            # print('nef', _gt_bin_ids)
 
         coords = coords[:,None]
         ret["coords"] = coords

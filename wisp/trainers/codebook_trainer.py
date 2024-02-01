@@ -609,9 +609,11 @@ class CodebookTrainer(BaseTrainer):
         if self._plot_grad_now():
             plot_grad_flow(self.params_dict.items(), self.grad_fname)
 
+        # print(self.train_pipeline.nef.latents[0,74:77])
         if not self.use_lbfgs:
             self.optimizer.step(target=self._get_optm_target())
             self.timer.check("stepped")
+        # print(self.train_pipeline.nef.latents[0,74:77])
 
         return ret
 
@@ -760,6 +762,7 @@ class CodebookTrainer(BaseTrainer):
 
             # redshift pretrain use val spectra which is a permutation of sup spectra
             permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
+            # print(permute_ids)
             pretrained = checkpoint["model_state_dict"]["nef.latents"][permute_ids]
 
             # in case of brute force, we init all bins with gt bin latents
@@ -776,12 +779,11 @@ class CodebookTrainer(BaseTrainer):
                         to_load = torch.zeros(
                             len(pretrained), self.num_redshift_bins, pretrained.shape[-1],
                             dtype=pretrained.dtype).to(pretrained.device)
-                        # print(gt_bin_ids.shape, pretrained.shape, to_load.shape, sp)
                         to_load[gt_bin_ids[0],gt_bin_ids[1]] = pretrained
                         pretrained = to_load
                         # print(to_load[0,:80,0])
-                else:
-                    pretrained = pretrained[:,None].tile(1, self.num_redshift_bins, 1)
+                    else:
+                        pretrained = pretrained[:,None].detach().tile(1, self.num_redshift_bins, 1)
                 assert pretrained.shape == sp
         else:
             pretrained = None
@@ -1345,13 +1347,25 @@ class CodebookTrainer(BaseTrainer):
             if self.neg_sup_wrong_redshift:
                 spectra_loss = self._calculate_neg_sup_loss(ret, data)
             else:
+                # check gt bin id
+                # _gt_bin_ids = torch.argmax(
+                #     data["gt_redshift_bin_masks"].to(torch.long), dim=-1)
+                # print('spectra loss: ', _gt_bin_ids)
                 all_bin_losses = ret["spectra_binwise_loss"] # [bsz,n_bins]
-                spectra_loss = torch.mean(all_bin_losses)
-                # optimize gt bin only
-                # print(all_bin_losses[0])
-                # print(data["gt_redshift_bin_masks"][0])
-                # print(all_bin_losses[0][data["gt_redshift_bin_masks"][0]])
-                # spectra_loss = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
+
+                if self.extra_args["optimize_gt_bin_only"]:
+                    _masks = data["gt_redshift_bin_masks"].to(torch.long).to(
+                        all_bin_losses.device)
+                    spectra_loss = torch.mean(all_bin_losses * _masks)
+                elif self.extra_args["dont_optimize_gt_bin"]:
+                    # spectra_loss = torch.mean(all_bin_losses[~data["gt_redshift_bin_masks"]])
+                    inv_mask = 1 - data["gt_redshift_bin_masks"].to(torch.long).to(
+                        all_bin_losses.device)
+                    # print(all_bin_losses[0], inv_mask[0])
+                    spectra_loss = torch.mean(all_bin_losses * inv_mask)
+                else: # optimize all bins equally
+                    spectra_loss = torch.mean(all_bin_losses)
+
                 if self.plot_gt_bin_loss:
                     gt_bin_losses = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
                     self.log_dict["gt_bin_losses"] += gt_bin_losses.item()

@@ -23,13 +23,24 @@ def plot_line(x, y, fname, xlabel=None, ylabel=None, x_range=None):
     plt.savefig(fname)
     plt.close()
 
+def _debug(n, grad):
+    print(n, grad[0,74:77])
+    # permute ids is the order spectra is indexed
+    # obtained from nerf::pretrain::idx
+    # _permute_ids = torch.tensor([76, 16, 95, 62, 51, 69, 2, 81, 22, 37, 88, 38, 44, 24, 11, 14, 15, 27, 70, 45, 65, 30, 58, 68, 36, 78, 49, 6, 4, 32, 40, 8, 26, 75, 79, 83, 92, 98, 57, 82, 50, 77, 71, 54, 85, 21, 87, 34, 66, 94, 56, 72, 90, 86, 74, 84, 42, 53, 63, 73, 13, 47, 97, 55, 41, 48, 33, 1, 91, 96, 80, 7, 3, 60, 10, 31, 23, 46, 67, 29, 35, 52, 28, 93, 17, 64, 39, 20, 43, 12, 9, 59, 99, 18, 25, 0, 19, 89, 5, 61])
+
+    # gt bin ids is ordered for each spectra
+    _gt_bin_ids = torch.argmax( (grad[...,0] != 0).to(torch.long), dim=-1)
+    # print('grad_plot:',  _gt_bin_ids[_permute_ids])
+    # print('grad_plot:',  _gt_bin_ids)
+
 def plot_grad_flow(named_parameters, gradFileName=None):
     layers, ave_grads = [], []
     for n, p in named_parameters:
         if "grid" not in n and (p.requires_grad) and ("bias" not in n):
             layers.append(n[-32:])
             grad = p.grad.detach().cpu()
-            # print(n, grad.shape)
+            # _debug(n, grad)
             ave_grads.append(p.grad.detach().cpu().abs().mean())
 
     plt.plot(ave_grads, alpha=0.3, color="b")

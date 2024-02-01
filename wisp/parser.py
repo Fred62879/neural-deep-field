@@ -388,6 +388,10 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--optimize-spectra-latents", action="store_true")
     pretrain_group.add_argument("--load-pretrained-spectra-latents", action="store_true")
     pretrain_group.add_argument("--load-pretrained-spectra-latents-to-gt-bin-only", action="store_true")
+
+    pretrain_group.add_argument("--optimize-gt-bin-only", action="store_true")
+    pretrain_group.add_argument("--dont-optimize-gt-bin", action="store_true")
+
     pretrain_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
     pretrain_group.add_argument("--load-pretrained-codebook-logits-mlp", action="store_true")
 
