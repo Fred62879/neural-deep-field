@@ -444,6 +444,7 @@ def forward(
         spectra_supervision=False,
         perform_integration=False,
         trans_sample_method="none",
+        optimize_bins_separately=False,
         redshift_supervision_train=False,
         regularize_codebook_spectra=False,
         calculate_binwise_spectra_loss=False,
@@ -538,8 +539,10 @@ def forward(
             net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.extend(
                 ["spectra_binwise_loss","redshift_logits"])
-        if save_gt_bin_spectra:
+        if save_gt_bin_spectra or optimize_bins_separately:
             net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
+        if optimize_bins_separately:
+            net_args["gt_redshift_bin_masks"] = data["gt_redshift_bin_masks"]
     else:
         raise ValueError("Unsupported space dimension.")
 

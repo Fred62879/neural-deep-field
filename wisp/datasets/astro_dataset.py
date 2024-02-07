@@ -310,8 +310,8 @@ class AstroDataset(Dataset):
         elif field == "spectra_source_data":
             data = self.get_spectra_source_data()
 
-        elif field == "masks":
-            data = self.mask_dataset.get_mask(idx)
+        # elif field == "masks":
+        #     data = self.mask_dataset.get_mask()
         elif field in self.data:
             data = self.data[field]
         else:

@@ -58,7 +58,9 @@ class CodebookPretrainNerf(BaseNeuralField):
                 channels.append("redshift_logits")
                 if self.kwargs["calculate_binwise_spectra_loss"]:
                     channels.extend([
-                        "spectra_binwise_loss","spectra_all_bins","optimal_bin_ids"])
+                        "spectra_binwise_loss","spectra_all_bins","optimal_bin_ids",\
+                        "gt_redshift_bin_ids","gt_redshift_bin_masks"
+                    ])
                     if self.kwargs["plot_spectrum_under_gt_bin"]:
                         channels.append("gt_bin_spectra")
 
@@ -117,7 +119,8 @@ class CodebookPretrainNerf(BaseNeuralField):
                  spectra_masks=None,
                  spectra_loss_func=None,
                  spectra_source_data=None,
-                 gt_redshift_bin_ids=None
+                 gt_redshift_bin_ids=None,
+                 gt_redshift_bin_masks=None
     ):
         """ Pretrain codebook.
             @Param
@@ -134,6 +137,9 @@ class CodebookPretrainNerf(BaseNeuralField):
               qtz_args: quantization arguments
 
               specz: gt redshift
+
+              gt_redshift_bin_ids: [bsz,nbins]
+              gt_redshift_bin_masks: [bsz,nbins]
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
                           show_memory=self.kwargs["show_memory"])
@@ -144,11 +150,18 @@ class CodebookPretrainNerf(BaseNeuralField):
         if self.use_latents_as_coords:
             assert coords is None
             coords = self.latents
-            # print(idx)
             coords = self.index_latents(coords, selected_ids, idx)
-            # check gt bin id, useful only when we load pretrained latents to gt bin only
-            # _gt_bin_ids = torch.argmax( (coords[...,0] != 0).to(torch.long), dim=-1)
-            # print('nef', _gt_bin_ids)
+
+            if gt_redshift_bin_masks is not None:
+                # check gt bin id, useful only when we load pretrained latents to gt bin only
+                if self.kwargs["dont_optimize_gt_bin"]:
+                    gt_redshift_bin_masks = ~gt_redshift_bin_masks
+                #_gt_bin_ids = torch.argmin(
+                #    torch.tensor(gt_redshift_bin_masks).to(torch.long), dim=-1)
+                gt_redshift_bin_masks = gt_redshift_bin_masks[...,None]
+                print(coords[0,74:77])
+                coords = coords * gt_redshift_bin_masks \
+                    + (coords * (~gt_redshift_bin_masks)).detach()
 
         coords = coords[:,None]
         ret["coords"] = coords
