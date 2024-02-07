@@ -39,6 +39,12 @@ class AstroPipeline(nn.Module):
     def set_latents(self, latents):
         self.nef.set_latents(latents)
 
+    def set_gt_bin_latents(self, latents):
+        self.nef.set_gt_bin_latents(latents)
+
+    def set_wrong_bin_latents(self, latents):
+        self.nef.set_wrong_bin_latents(latents)
+
     def set_redshift_latents(self, redshift_latents):
         self.nef.set_redshift_latents(redshift_latents)
 
@@ -47,6 +53,9 @@ class AstroPipeline(nn.Module):
 
     def set_bayesian_redshift_logits_calculation(self, loss, mask, gt_spectra):
         self.nef.set_bayesian_redshift_logits_calculation(loss, mask, gt_spectra)
+
+    def combine_latents_all_bins(self, gt_bin_masks):
+        self.nef.combine_latents_all_bins(gt_bin_masks)
 
     def forward(self, *args, **kwargs):
         return self.nef(*args, **kwargs)

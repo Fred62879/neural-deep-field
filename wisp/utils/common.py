@@ -125,6 +125,16 @@ def get_loss(cho, cuda):
     if cuda: loss = loss.cuda()
     return loss
 
+def create_gt_redshift_bin_masks(gt_redshift_bin_ids, num_bins):
+    """ Create binary mask where 1 corresponds to gt bin and 0 for wrong bins.
+        @Params:
+          gt_redshift_bin_ids: [2,bsz]
+    """
+    bsz = gt_redshift_bin_ids.shape[-1]
+    masks = np.zeros((bsz, num_bins))
+    masks[gt_redshift_bin_ids[0],gt_redshift_bin_ids[1]] = 1
+    return masks
+
 def create_batch_ids(ids):
     """ Add batch dim id to a given list of ids.
         @Param

@@ -6,11 +6,13 @@ from os.path import exists
 
 from typing import Callable
 from torch.utils.data import Dataset
-from wisp.utils.common import print_shape, get_bin_ids
+
 from wisp.datasets.fits_data import FitsData
 from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
+from wisp.utils.common import print_shape, get_bin_ids, \
+    create_gt_redshift_bin_masks
 from wisp.datasets.data_utils import clip_data_to_ref_wave_range, \
     get_wave_range_fname, batch_sample_torch, get_bound_id
 
@@ -147,9 +149,6 @@ class AstroDataset(Dataset):
     # Getters
     ############
 
-    def get_redshift_pretrain_spectra_ids(self):
-        return self.spectra_dataset.get_redshift_pretrain_spectra_ids()
-
     def get_trans_data_obj(self):
         return self.trans_dataset
 
@@ -259,6 +258,9 @@ class AstroDataset(Dataset):
         """
         # return self.trans_dataset.get_full_wave_bound()
         return self.data["wave_range"]
+
+    def get_redshift_pretrain_spectra_ids(self):
+        return self.spectra_dataset.get_redshift_pretrain_spectra_ids()
 
     def __len__(self):
         """ Length of the dataset in number of coords.
@@ -504,18 +506,10 @@ class AstroDataset(Dataset):
         del out["spectra_id_map"]
 
     def get_gt_redshift_bin_ids(self, out):
-        out["gt_redshift_bin_ids"] = get_bin_ids(
-            self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"],
-            out["spectra_redshift"].numpy(), add_batched_dim=True)
+        out["gt_redshift_bin_ids"] = self.create_gt_redshift_bin_ids()
 
     def get_gt_redshift_bin_masks(self, out):
-        """ Get mask with 0 in indices of wrong bins
-        """
-        bsz = len(out["spectra_redshift"])
-        masks = np.zeros((bsz,self.num_redshift_bins))
-        ids = out["gt_redshift_bin_ids"]
-        masks[ids[0],ids[1]] = 1
-        out["gt_redshift_bin_masks"] = torch.tensor(masks.astype(bool))
+        out["gt_redshift_bin_masks"] = self.create_gt_redshift_bin_masks(self.num_redshift_bins)
 
     ############
     # Debug data
@@ -544,6 +538,23 @@ class AstroDataset(Dataset):
     ############
     # Utilities
     ############
+
+    def create_gt_redshift_bin_ids(self):
+        spectra_redshift = self.get_spectra_redshift()
+        gt_bin_ids = get_bin_ids(
+            self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"],
+            spectra_redshift.numpy(), add_batched_dim=True)
+        return gt_bin_ids
+
+    def create_gt_redshift_bin_masks(self, num_bins, to_bool=True):
+        """ Get mask with 0 in indices of wrong bins
+        """
+        gt_bin_ids = self.create_gt_redshift_bin_ids()
+        gt_bin_masks = create_gt_redshift_bin_masks(gt_bin_ids, num_bins)
+        if to_bool: gt_bin_masks = gt_bin_masks.astype(bool)
+        else: gt_bin_masks = gt_bin_masks.astype(np.long)
+        gt_bin_masks = torch.tensor(gt_bin_masks)
+        return gt_bin_masks
 
     def get_pixel_ids_one_patch(self, r, c, neighbour_size=1):
         return self.fits_dataset.get_pixel_ids_one_patch(r, c, neighbour_size)

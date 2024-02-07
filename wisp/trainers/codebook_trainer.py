@@ -238,6 +238,11 @@ class CodebookTrainer(BaseTrainer):
             self.load_pretrained_spectra_latents
         assert sum([self.optimize_gt_bin_only, self.dont_optimize_gt_bin]) <= 1
 
+        if self.optimize_bins_separately:
+            self.gt_redshift_bin_masks = self.dataset.create_gt_redshift_bin_masks(
+                self.num_redshift_bins)[...,None].tile(
+                    1,1,self.extra_args["spectra_latent_dim"])
+
         assert not self.optimize_spectra_latents_as_logits or self.qtz_spectra
         # no pretrained latents to load
         assert not self.optimize_redshift_latents_as_logits or \
@@ -316,7 +321,15 @@ class CodebookTrainer(BaseTrainer):
         #  generate codebook coefficients (no softmax applied) in codebook qtz setting OR
         #  concatenate with lambda to be directly decoded as spectra in autodecoder setting
         latents, redshift_latents = self.init_latents()
-        self.train_pipeline.set_latents(latents)
+
+        if self.optimize_bins_separately:
+            gt_bin_latents, wrong_bin_latents = latents
+            self.train_pipeline.set_gt_bin_latents(gt_bin_latents)
+            self.train_pipeline.set_wrong_bin_latents(wrong_bin_latents)
+            self.train_pipeline.combine_latents_all_bins(self.gt_redshift_bin_masks)
+        else:
+            self.train_pipeline.set_latents(latents)
+
         if redshift_latents is not None:
             self.train_pipeline.set_redshift_latents(redshift_latents)
         self.freeze_and_load()
@@ -411,6 +424,9 @@ class CodebookTrainer(BaseTrainer):
                 optms = { "latents_optimizer": torch.optim.LBFGS(latents, **params) }
             else:
                 net_params.extend(latents)
+                print(type(latents[0]))
+                print(net_params)
+                assert 0
                 optms = { "all_params": self.optim_cls(net_params, **self.optim_params) }
 
         self.optimizer = multi_optimizer(**optms)
@@ -768,39 +784,26 @@ class CodebookTrainer(BaseTrainer):
             sp = (self.num_spectra, self.num_redshift_bins, sp_z_dim)
         else: sp = (self.num_spectra, sp_z_dim)
 
-        if self.load_pretrained_spectra_latents:
+        if not self.load_pretrained_spectra_latents:
+            pretrained = None
+        else:
             assert self.extra_args["sample_from_codebook_pretrain_spectra"]
             # checkpoint comes from codebook pretrain (use sup spectra)
             checkpoint = torch.load(self.pretrained_model_fname)
             assert checkpoint["model_state_dict"]["nef.latents"].shape[-1] == sp_z_dim
 
-            # redshift pretrain use val spectra which is a permutation of sup spectra
+            # sanity check use permuted sup spectra
             permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
-            pretrained = checkpoint["model_state_dict"]["nef.latents"][permute_ids]
+            pretrained = checkpoint["model_state_dict"]["nef.latents"][permute_ids].detach()
 
-            # in case of brute force, we init all bins with gt bin latents
             if self.optimize_spectra_for_each_redshift_bin:
-                if pretrained.ndim != 3:
-                    if self.load_pretrained_spectra_latents_to_gt_bin_only:
-                        # only load pretrained latents to gt bin, all other bins are 0
-                        spectra_redshift = self.dataset.get_spectra_redshift()
-                        gt_bin_ids = get_bin_ids(
-                            self.extra_args["redshift_lo"],
-                            self.extra_args["redshift_bin_width"],
-                            spectra_redshift.numpy(), add_batched_dim=True
-                        )
-                        to_load = torch.ones(
-                            len(pretrained), self.num_redshift_bins, pretrained.shape[-1],
-                            dtype=pretrained.dtype).to(pretrained.device)
-                        to_load[gt_bin_ids[0],gt_bin_ids[1]] = pretrained.detach()
-                        pretrained = to_load
-                    else:
-                        pretrained = pretrained[:,None].detach().tile(
-                            1, self.num_redshift_bins, 1)
+                if pretrained.ndim == 3:
+                    # when we pretrain with brute force
+                    raise NotImplementedError()
+                else:
+                    pretrained = self.load_pretrained_latents_all_bins(pretrained)
 
-                assert pretrained.shape == sp
-        else:
-            pretrained = None
+        assert pretrained == None or type(pretrained) == list or pretrained.shape == sp
 
         latents = self.create_latents(
             sp, seed=self.extra_args["seed"], pretrained=pretrained,
@@ -809,9 +812,45 @@ class CodebookTrainer(BaseTrainer):
 
         return latents
 
+    def load_pretrained_latents_all_bins(self, pretrained):
+        """ This is only called when we pretrain via applying GT redshift directly;
+              and sanity check with brute force method.
+        """
+        if self.load_pretrained_spectra_latents_to_gt_bin_only:
+            # only load pretrained latents to gt bin, all other bins are 0
+            spectra_redshift = self.dataset.get_spectra_redshift()
+            gt_bin_ids = get_bin_ids(
+                self.extra_args["redshift_lo"],
+                self.extra_args["redshift_bin_width"],
+                spectra_redshift.numpy(), add_batched_dim=True)
+
+            if self.optimize_bins_separately:
+                wrong_bin_latents = torch.ones(
+                    len(pretrained), self.num_redshift_bins-1, pretrained.shape[-1],
+                    dtype=pretrained.dtype)
+                pretrained = [pretrained[:,None], wrong_bin_latents]
+            else:
+                to_load = torch.ones(
+                    len(pretrained), self.num_redshift_bins, pretrained.shape[-1],
+                    dtype=pretrained.dtype)
+                to_load[gt_bin_ids[0],gt_bin_ids[1]] = pretrained
+                pretrained = to_load
+        else:
+            if self.optimize_bins_separately:
+                pretrained = [
+                    pretrained[:,None],
+                    pretrained[:,None].tile(1, self.num_redshift_bins-1, 1)]
+            else:
+                pretrained = pretrained[:,None].detach().tile(
+                    1, self.num_redshift_bins, 1)
+        return pretrained
+
     def create_latents(self, sp, pretrained=None, zero_init=False, freeze=False, seed=0):
         if pretrained is not None:
-            latents = pretrained.to(self.device)
+            if type(pretrained) == list:
+                latents = [cur_latents.to(self.device) for cur_latents in pretrained]
+            else:
+                latents = pretrained.to(self.device)
         elif zero_init:
             latents = torch.zeros(sp).to(self.device)
             # latents = 0.01 * torch.ones(n,m)
@@ -819,7 +858,10 @@ class CodebookTrainer(BaseTrainer):
             torch.manual_seed(seed)
             latents = torch.rand(sp).to(self.device)
 
-        latents = nn.Parameter(latents, requires_grad=not freeze)
+        if type(latents) == list:
+            latents = [nn.Parameter(cur_latents, requires_grad=not freeze)
+                       for cur_latents in latents]
+        else: latents = nn.Parameter(latents, requires_grad=not freeze)
         return latents
 
     def load_model(self, model_fname, excls=[]):
@@ -1564,6 +1606,10 @@ class CodebookTrainer(BaseTrainer):
         for name in self.params_dict:
             if name == "nef.latents":
                 spectra_latents = self.params_dict[name]
+            elif name == "nef.gt_bin_latents":
+                spectra_latents = self.params_dict[name]
+            elif name == "nef.wrong_bin_latents":
+                spectra_latents = self.params_dict[name]
             elif name == "nef.redshift_latents":
                 redshift_latents = self.params_dict[name]
             elif "redshift_decoder" in name:
@@ -1587,14 +1633,20 @@ class CodebookTrainer(BaseTrainer):
                     redshift_latents, redshift_logit_params,
                     latents_group, net_params_group)
 
-        # codebook latents
+        # spectra latents
         if self.optimize_spectra_latents:
+            # optimize only part of the spectra latents
+            # if self.optimize_gt_bin_only:
+            #     spectra_latents = spectra_latents[gt_bin_masks] # gt bin latents
+            # elif self.dont_optimize_gt_bin:
+            #     spectra_latents = spectra_latents[~gt_bin_masks] # wrong bin latents
+
             if self.optimize_latents_alternately: # em
                 self._add_spectra_latents(spectra_latents, spectra_latents_group)
             else:
                 self._add_spectra_latents(spectra_latents, latents_group)
 
-        # codebook logits parameters
+        # codebook coefficients parameters
         if self.optimize_spectra_latents_as_logits:
             pass
         else:
