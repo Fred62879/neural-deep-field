@@ -13,6 +13,19 @@ from wisp.utils.numerical import calculate_sam_spectrum, \
     calculate_precision_recall, calculate_precision_recall_together
 
 
+def plot_latents(latents, fname):
+    """
+    @Param: latents [bsz,dim]
+    """
+    assert latents.shape[-1] <= 3
+    if latents.shape[-1] == 2:
+        plt.scatter(latents[:,0], latents[:,1])
+        plt.savefig(fname)
+        plt.close()
+    elif latents.shape[-1] == 3:
+        raise NotImplementedError()
+    else: raise ValueError()
+
 def plot_line(x, y, fname, xlabel=None, ylabel=None, x_range=None):
     plt.scatter(x, y)
     if xlabel is not None: plt.xlabel(xlabel)

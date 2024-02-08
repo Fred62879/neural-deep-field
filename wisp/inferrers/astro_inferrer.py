@@ -17,8 +17,9 @@ from wisp.loss import spectra_supervision_loss
 from wisp.datasets.data_utils import get_bound_id
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
+from wisp.utils.numerical import reduce_latents_dim_pca
 from wisp.utils.plot import plot_horizontally, plot_embed_map, \
-    plot_latent_embed, annotated_heat, plot_simple, plot_multiple, \
+    plot_latent_embed, annotated_heat, plot_simple, plot_multiple, plot_latents, \
     plot_precision_recall_individually, plot_precision_recall_together, plot_line
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
     sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, to_numpy, \
@@ -78,7 +79,7 @@ class AstroInferrer(BaseInferrer):
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","recon_synthetic_dir","metric_dir",
                  "zoomed_recon_dir","scaler_dir","pixel_distrib_dir","qtz_weights_dir",
-                 "embed_map_dir","latent_dir","redshift_dir","latent_embed_dir","spectra_dir",
+                 "embed_map_dir","latents_dir","redshift_dir","latent_embed_dir","spectra_dir",
                  "codebook_coeff_dir","spectra_latents_dir",
                  "codebook_spectra_dir", "codebook_spectra_individ_dir"],
                 ["models","recons","recon_synthetic","metrics",
@@ -345,6 +346,7 @@ class AstroInferrer(BaseInferrer):
         self.plot_img_residual = "plot_img_residual" in tasks
         self.integrate_gt_spectra = "integrate_gt_spectra" in tasks
         self.plot_gt_pixel_distrib = "plot_gt_pixel_distrib" in tasks
+        self.plot_spectra_latents_pca = "plot_spectra_latents_pca" in tasks
 
         # *) keep only tasks required
         self.group_tasks = []
@@ -359,7 +361,8 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
             self.group_tasks.append("infer_hardcode_coords_modified_model")
 
-        if self.plot_img_residual or self.integrate_gt_spectra or self.plot_gt_pixel_distrib:
+        if self.plot_img_residual or self.integrate_gt_spectra or \
+           self.plot_gt_pixel_distrib or self.plot_spectra_latents_pca:
             self.group_tasks.append("infer_no_model_run")
 
         self.infer_selected = self.extra_args["infer_selected"]
@@ -655,6 +658,22 @@ class AstroInferrer(BaseInferrer):
                 self.recon_pixels.append( np.einsum("j,kj->k", wave, interp_trans) / nsmpl )
 
             log_data(self, "recon_pixels", gt_field="gt_pixels", log_ratio=True)
+
+        if self.plot_spectra_latents_pca:
+            all_latents = []
+            for model_id, model_fname in enumerate(self.selected_model_fnames):
+                model_fname = join(self.model_dir, model_fname)
+                checkpoint = torch.load(model_fname)
+                latents = checkpoint["model_state_dict"]["nef.latents"]
+                all_latents.append(latents.detach().cpu().numpy())
+
+            low_dim_latents = reduce_latents_dim_pca(
+                np.array(all_latents),
+                self.extra_args["spectra_latents_plot_pca_dim"])
+
+            for model_id, cur_latents in enumerate(low_dim_latents):
+                fname = join(self.latents_dir, f"{model_id}.png")
+                plot_latents(cur_latents, fname)
 
     #############
     # Infer with checkpoint

@@ -4,11 +4,37 @@ import numpy as np
 import logging as log
 
 from collections import defaultdict
+from sklearn.decomposition import PCA
 from scipy.interpolate import interp1d
 from astropy.visualization import ZScaleInterval
 from skimage.metrics import structural_similarity
 from wisp.utils.common import to_numpy, init_redshift_bins, get_bin_id
 
+
+def reduce_latents_dim_pca(all_latents, n):
+    """
+    Cast high-dim latetns to low dim and plot.
+    @Params
+       all_latents: [n_models,bsz,dim]
+    """
+    assert n <= 3
+    selected_axes = get_major_pca_axes(all_latents[-1], n)
+    # print(all_latents.shape, selected_axes)
+    latents_dim_reduced = all_latents[...,selected_axes]
+    return latents_dim_reduced
+
+def get_major_pca_axes(latents, n):
+    """
+    Get the axis that contributes the most to each principal component.
+    """
+    selected_axes = []
+    pca = PCA(n_components=n)
+    data_pca = pca.fit_transform(latents)
+    for i in range(n):
+        axis = np.argmax(abs(pca.components_[i]))
+        selected_axes.append(axis)
+    selected_axes = np.array(selected_axes)
+    return selected_axes
 
 def calculate_emd(distrib1, distrib2, norm="l2", mask=None, weight=None, precision=None):
     """ Calculate (masked) earth mover's distance between two distributions.

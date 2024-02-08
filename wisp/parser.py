@@ -885,6 +885,8 @@ def define_cmd_line_args():
     infer_group.add_argument("--plot-colors", nargs="+", type=str)
     infer_group.add_argument("--plot-styles", nargs="+", type=str)
 
+    infer_group.add_argument("--spectra-latents-plot-pca-dim", type=int)
+
     ###################
     # Argument for unit test
     ###################

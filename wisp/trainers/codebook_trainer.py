@@ -428,9 +428,6 @@ class CodebookTrainer(BaseTrainer):
                 optms = { "latents_optimizer": torch.optim.LBFGS(latents, **params) }
             else:
                 net_params.extend(latents)
-                print(type(latents[0]))
-                print(net_params)
-                assert 0
                 optms = { "all_params": self.optim_cls(net_params, **self.optim_params) }
 
         self.optimizer = multi_optimizer(**optms)
