@@ -239,9 +239,10 @@ class CodebookTrainer(BaseTrainer):
         assert sum([self.optimize_gt_bin_only, self.dont_optimize_gt_bin]) <= 1
 
         if self.optimize_bins_separately:
-            self.gt_redshift_bin_masks = self.dataset.create_gt_redshift_bin_masks(
-                self.num_redshift_bins)[...,None].tile(
-                    1,1,self.extra_args["spectra_latent_dim"])
+            self.gt_redshift_bin_ids, self.gt_redshift_bin_masks = \
+                self.dataset.create_gt_redshift_bin_masks(self.num_redshift_bins)
+            self.wrong_redshift_bin_ids = \
+                self.dataset.create_wrong_redshift_bin_ids(self.gt_redshift_bin_masks)
 
         assert not self.optimize_spectra_latents_as_logits or self.qtz_spectra
         # no pretrained latents to load
@@ -326,7 +327,10 @@ class CodebookTrainer(BaseTrainer):
             gt_bin_latents, wrong_bin_latents = latents
             self.train_pipeline.set_gt_bin_latents(gt_bin_latents)
             self.train_pipeline.set_wrong_bin_latents(wrong_bin_latents)
-            self.train_pipeline.combine_latents_all_bins(self.gt_redshift_bin_masks)
+            self.train_pipeline.combine_latents_all_bins(
+                self.gt_redshift_bin_ids,
+                self.wrong_redshift_bin_ids,
+                self.gt_redshift_bin_masks)
         else:
             self.train_pipeline.set_latents(latents)
 
@@ -822,7 +826,8 @@ class CodebookTrainer(BaseTrainer):
             gt_bin_ids = get_bin_ids(
                 self.extra_args["redshift_lo"],
                 self.extra_args["redshift_bin_width"],
-                spectra_redshift.numpy(), add_batched_dim=True)
+                spectra_redshift.numpy(), add_batched_dim=True
+            )
 
             if self.optimize_bins_separately:
                 wrong_bin_latents = torch.ones(

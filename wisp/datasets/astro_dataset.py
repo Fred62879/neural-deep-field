@@ -5,6 +5,7 @@ import numpy as np
 from os.path import exists
 
 from typing import Callable
+from itertools import product
 from torch.utils.data import Dataset
 
 from wisp.datasets.fits_data import FitsData
@@ -509,7 +510,8 @@ class AstroDataset(Dataset):
         out["gt_redshift_bin_ids"] = self.create_gt_redshift_bin_ids()
 
     def get_gt_redshift_bin_masks(self, out):
-        out["gt_redshift_bin_masks"] = self.create_gt_redshift_bin_masks(self.num_redshift_bins)
+        _, out["gt_redshift_bin_masks"] = \
+            self.create_gt_redshift_bin_masks(self.num_redshift_bins)
 
     ############
     # Debug data
@@ -544,7 +546,20 @@ class AstroDataset(Dataset):
         gt_bin_ids = get_bin_ids(
             self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"],
             spectra_redshift.numpy(), add_batched_dim=True)
-        return gt_bin_ids
+        return torch.tensor(gt_bin_ids)
+
+    def create_wrong_redshift_bin_ids(self, gt_bin_masks):
+        """
+        @Param: gt bin masks [bsz,nbins]
+        @Return: wrong bin ids [2,bsz,nbins-1]
+        """
+        bsz, nbins = gt_bin_masks.shape
+        wrong_bin_ids = torch.tensor(
+            list(product(range(bsz), range(nbins))), dtype=gt_bin_masks.dtype
+        ).view(bsz,nbins,2)
+        gt_bin_masks = gt_bin_masks[...,None].tile(1,1,2)
+        wrong_bin_ids = wrong_bin_ids[~gt_bin_masks].view(bsz,nbins-1,2).permute(2,0,1)
+        return wrong_bin_ids
 
     def create_gt_redshift_bin_masks(self, num_bins, to_bool=True):
         """ Get mask with 0 in indices of wrong bins
@@ -554,7 +569,7 @@ class AstroDataset(Dataset):
         if to_bool: gt_bin_masks = gt_bin_masks.astype(bool)
         else: gt_bin_masks = gt_bin_masks.astype(np.long)
         gt_bin_masks = torch.tensor(gt_bin_masks)
-        return gt_bin_masks
+        return gt_bin_ids, gt_bin_masks
 
     def get_pixel_ids_one_patch(self, r, c, neighbour_size=1):
         return self.fits_dataset.get_pixel_ids_one_patch(r, c, neighbour_size)

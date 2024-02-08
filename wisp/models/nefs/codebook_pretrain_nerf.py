@@ -36,15 +36,28 @@ class CodebookPretrainNerf(BaseNeuralField):
     def set_latents(self, latents):
         self.latents = latents
 
-    def combine_latents_all_bins(self, gt_bin_masks):
-        bsz, nbins, dim = self.wrong_bin_latents.shape
-        print(torch.argmax(gt_bin_masks[...,0].to(torch.long), dim=-1))
-        self.latents = torch.zeros((bsz,nbins+1,dim))
-        print(self.latents.shape, gt_bin_masks.shape, self.gt_bin_latents.shape)
-        # here we assume wrong bin latetns are inited to all the same
-        self.latents[gt_bin_masks] = self.gt_bin_latents
-        self.latents[~gt_bin_masks] = self.wrong_bin_latents
-        print(self.latents.shape)
+    def combine_latents_all_bins(self, gt_bin_ids, wrong_bin_ids, gt_bin_masks):
+        """
+        @Params
+           gt_bin_ids: [2,bsz]
+           wrong_bin_ids: [2,bsz,nbins-1]
+           gt_bin_masks: [bsz,nbins]
+
+           gt_bin_latents: [bsz,1,dim]
+           wrong_bin_latents: [bsz,nbins-1,dim]
+        """
+        raise NotImplementedError()
+        bsz, nbins = gt_bin_masks.shape
+        gt_bin_ids = gt_bin_ids[...,None]
+        print(torch.argmax(gt_bin_masks.to(torch.long), dim=-1))
+
+        self.latents = torch.zeros((
+            bsz,nbins,self.kwargs["spectra_latent_dim"])).to(self.gt_bin_latents.device)
+
+        print(gt_bin_ids.shape)
+        self.latents[gt_bin_ids[0],gt_bin_ids[1],:] = self.gt_bin_latents
+        print(self.latents.shape, wrong_bin_ids.shape, self.wrong_bin_latents.shape)
+        self.latents[wrong_bin_ids[0],wrong_bin_ids[1],:] = self.wrong_bin_latents
         print(torch.argmax( (self.latents[...,0] != 1).to(torch.long), dim=-1 ))
         assert 0
 
