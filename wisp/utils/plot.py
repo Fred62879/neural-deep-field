@@ -20,11 +20,13 @@ def plot_latents(latents, fname):
     assert latents.shape[-1] <= 3
     if latents.shape[-1] == 2:
         plt.scatter(latents[:,0], latents[:,1])
-        plt.savefig(fname)
-        plt.close()
     elif latents.shape[-1] == 3:
-        raise NotImplementedError()
+        fig = plt.figure(figsize=(12, 12))
+        ax = fig.add_subplot(projection='3d')
+        ax.scatter(latents[:,0], latents[:,1], latents[:,2])
     else: raise ValueError()
+    plt.savefig(fname)
+    plt.close()
 
 def plot_line(x, y, fname, xlabel=None, ylabel=None, x_range=None):
     plt.scatter(x, y)

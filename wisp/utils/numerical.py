@@ -19,7 +19,6 @@ def reduce_latents_dim_pca(all_latents, n):
     """
     assert n <= 3
     selected_axes = get_major_pca_axes(all_latents[-1], n)
-    # print(all_latents.shape, selected_axes)
     latents_dim_reduced = all_latents[...,selected_axes]
     return latents_dim_reduced
 
@@ -27,13 +26,15 @@ def get_major_pca_axes(latents, n):
     """
     Get the axis that contributes the most to each principal component.
     """
-    selected_axes = []
+    selected_axes = set()
     pca = PCA(n_components=n)
     data_pca = pca.fit_transform(latents)
     for i in range(n):
-        axis = np.argmax(abs(pca.components_[i]))
-        selected_axes.append(axis)
-    selected_axes = np.array(selected_axes)
+        order = np.argsort(abs(pca.components_[i]))[::-1]
+        j = 0
+        while order[j] in selected_axes: j += 1
+        selected_axes.add(order[j])
+    selected_axes = np.array(list(selected_axes))
     return selected_axes
 
 def calculate_emd(distrib1, distrib2, norm="l2", mask=None, weight=None, precision=None):

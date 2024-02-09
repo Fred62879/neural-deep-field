@@ -184,6 +184,7 @@ class CodebookPretrainNerf(BaseNeuralField):
             coords = self.index_latents(coords, selected_ids, idx)
 
             if gt_redshift_bin_masks is not None:
+                assert 0
                 # check gt bin id, useful only when we load pretrained latents to gt bin only
                 if self.kwargs["dont_optimize_gt_bin"]:
                     gt_redshift_bin_masks = ~gt_redshift_bin_masks

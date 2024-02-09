@@ -507,11 +507,14 @@ class AstroDataset(Dataset):
         del out["spectra_id_map"]
 
     def get_gt_redshift_bin_ids(self, out):
-        out["gt_redshift_bin_ids"] = self.create_gt_redshift_bin_ids()
+        out["gt_redshift_bin_ids"] = self.create_gt_redshift_bin_ids(
+            spectra_redshift=out["spectra_redshift"])
 
     def get_gt_redshift_bin_masks(self, out):
         _, out["gt_redshift_bin_masks"] = \
-            self.create_gt_redshift_bin_masks(self.num_redshift_bins)
+            self.create_gt_redshift_bin_masks(
+                self.num_redshift_bins,
+                spectra_redshift=out["spectra_redshift"])
 
     ############
     # Debug data
@@ -541,8 +544,9 @@ class AstroDataset(Dataset):
     # Utilities
     ############
 
-    def create_gt_redshift_bin_ids(self):
-        spectra_redshift = self.get_spectra_redshift()
+    def create_gt_redshift_bin_ids(self, spectra_redshift=None):
+        if spectra_redshift is None:
+            spectra_redshift = self.get_spectra_redshift()
         gt_bin_ids = get_bin_ids(
             self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"],
             spectra_redshift.numpy(), add_batched_dim=True)
@@ -561,10 +565,10 @@ class AstroDataset(Dataset):
         wrong_bin_ids = wrong_bin_ids[~gt_bin_masks].view(bsz,nbins-1,2).permute(2,0,1)
         return wrong_bin_ids
 
-    def create_gt_redshift_bin_masks(self, num_bins, to_bool=True):
+    def create_gt_redshift_bin_masks(self, num_bins, spectra_redshift=None, to_bool=True):
         """ Get mask with 0 in indices of wrong bins
         """
-        gt_bin_ids = self.create_gt_redshift_bin_ids()
+        gt_bin_ids = self.create_gt_redshift_bin_ids(spectra_redshift=spectra_redshift)
         gt_bin_masks = create_gt_redshift_bin_masks(gt_bin_ids, num_bins)
         if to_bool: gt_bin_masks = gt_bin_masks.astype(bool)
         else: gt_bin_masks = gt_bin_masks.astype(np.long)

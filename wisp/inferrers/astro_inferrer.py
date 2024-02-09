@@ -666,13 +666,20 @@ class AstroInferrer(BaseInferrer):
                 checkpoint = torch.load(model_fname)
                 latents = checkpoint["model_state_dict"]["nef.latents"]
                 all_latents.append(latents.detach().cpu().numpy())
+            all_latents = np.array(all_latents)
+
+            if self.mode == "redshift_pretrain_infer":
+                gt_bin_ids = self.dataset.create_gt_redshift_bin_ids()
+                all_latents = all_latents[:,gt_bin_ids[0],gt_bin_ids[1],:]
 
             low_dim_latents = reduce_latents_dim_pca(
-                np.array(all_latents),
-                self.extra_args["spectra_latents_plot_pca_dim"])
+                all_latents, self.extra_args["spectra_latents_plot_pca_dim"])
 
+            n = self.extra_args["spectra_latents_plot_pca_dim"]
+            latents_path = join(self.latents_dir, f"{n}-dim")
+            Path(latents_path).mkdir(parents=True, exist_ok=True)
             for model_id, cur_latents in enumerate(low_dim_latents):
-                fname = join(self.latents_dir, f"{model_id}.png")
+                fname = join(latents_path, f"{model_id}.png")
                 plot_latents(cur_latents, fname)
 
     #############

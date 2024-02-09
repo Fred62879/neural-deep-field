@@ -834,7 +834,7 @@ class CodebookTrainer(BaseTrainer):
             else:
                 to_load = torch.ones(
                     len(pretrained), self.num_redshift_bins, pretrained.shape[-1],
-                    dtype=pretrained.dtype)
+                    dtype=pretrained.dtype).to(pretrained.device)
                 to_load[gt_bin_ids[0],gt_bin_ids[1]] = pretrained
                 pretrained = to_load
         else:
@@ -1603,15 +1603,16 @@ class CodebookTrainer(BaseTrainer):
 
     def _assign_redshift_pretrain_optimization_params(self):
         spectra_latents, redshift_latents = None, None
+        gt_bin_spectra_latents, wrong_bin_spectra_latents  = None, None
         codebook_logit_params, redshift_logit_params = [], []
 
         for name in self.params_dict:
             if name == "nef.latents":
                 spectra_latents = self.params_dict[name]
             elif name == "nef.gt_bin_latents":
-                spectra_latents = self.params_dict[name]
+                gt_bin_spectra_latents = self.params_dict[name]
             elif name == "nef.wrong_bin_latents":
-                spectra_latents = self.params_dict[name]
+                wrong_bin_spectra_latents = self.params_dict[name]
             elif name == "nef.redshift_latents":
                 redshift_latents = self.params_dict[name]
             elif "redshift_decoder" in name:
@@ -1645,6 +1646,9 @@ class CodebookTrainer(BaseTrainer):
 
             if self.optimize_latents_alternately: # em
                 self._add_spectra_latents(spectra_latents, spectra_latents_group)
+            elif self.optimize_bins_separately:
+                self._add_spectra_latents(gt_bin_spectra_latents, latents_group)
+                self._add_spectra_latents(wrong_bin_spectra_latents, latents_group)
             else:
                 self._add_spectra_latents(spectra_latents, latents_group)
 
