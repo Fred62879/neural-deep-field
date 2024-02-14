@@ -652,6 +652,8 @@ def define_cmd_line_args():
     optim_group.add_argument("--b1",type=float, default=0.5)
     optim_group.add_argument("--b2",type=float, default=0.999)
 
+    optim_group.add_argument("--sgd-momentum", type=float, default=0)
+
     ###################
     # Arguments for training
     ###################

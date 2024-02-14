@@ -105,11 +105,13 @@ def get_optimizer_from_config(args):
     """
     optim_cls = str2optim[args.optimizer_type]
     if args.optimizer_type == 'adam':
-        #optim_params = {'eps': 1e-15}
+        optim_params = {'lr': 1e-5, 'eps': 1e-8, 'betas': (args.b1, args.b2),
+                        'weight_decay':  args.weight_decay}
+    elif args.optimizer_type == 'adamw':
         optim_params = {'lr': 1e-5, 'eps': 1e-8, 'betas': (args.b1, args.b2),
                         'weight_decay':  args.weight_decay}
     elif args.optimizer_type == 'sgd':
-        optim_params = {'momentum': 0.8}
+        optim_params = {'momentum': args.sgd_momentum}
     else:
         optim_params = {}
 

@@ -1197,6 +1197,7 @@ class SpectraData:
                 flux_norm_cho, None, recon_flux3)
             sub_dir += 'with_wrong_bin_'
 
+        plot_recon_spectrum = self.kwargs["plot_spectrum_with_recon"]
         pargs = (sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux,
                  recon_flux2, recon_loss2, recon_flux3, recon_loss3,
                  plot_gt_spectrum, plot_recon_spectrum)
