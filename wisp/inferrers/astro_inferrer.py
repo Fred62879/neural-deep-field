@@ -1410,9 +1410,9 @@ class AstroInferrer(BaseInferrer):
 
     @lru_cache
     def _select_inferrence_ids(self):
-        if self.extra_args["spectra_inferrence_id_fname"] is not None and \
-           exists(self.extra_args["spectra_inferrence_id_fname"]):
-            ids = np.load(self.extra_args["spectra_inferrence_id_fname"])
+        fname = join(self.log_dir, "..", self.extra_args["spectra_inferrence_id_fname"])
+        if exists(fname) and fname[-3:] == "npy":
+            ids = np.load(fname)
             self.num_spectra = len(ids)
             log.info(f"infer with given ids, totally {self.num_spectra}")
         else:
