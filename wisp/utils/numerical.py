@@ -11,16 +11,17 @@ from skimage.metrics import structural_similarity
 from wisp.utils.common import to_numpy, init_redshift_bins, get_bin_id
 
 
-def reduce_latents_dim_pca(all_latents, n):
+def reduce_latents_dim_pca(all_latents, n, selected_axes=None):
     """
     Cast high-dim latetns to low dim and plot.
     @Params
        all_latents: [n_models,bsz,dim]
     """
     assert n <= 3
-    selected_axes = get_major_pca_axes(all_latents[-1], n)
+    if selected_axes is None:
+        selected_axes = get_major_pca_axes(all_latents[-1], n)
     latents_dim_reduced = all_latents[...,selected_axes]
-    return latents_dim_reduced
+    return selected_axes, latents_dim_reduced
 
 def get_major_pca_axes(latents, n):
     """

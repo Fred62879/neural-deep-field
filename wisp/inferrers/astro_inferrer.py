@@ -660,6 +660,8 @@ class AstroInferrer(BaseInferrer):
             log_data(self, "recon_pixels", gt_field="gt_pixels", log_ratio=True)
 
         if self.plot_spectra_latents_pca:
+            ndim = self.extra_args["spectra_latents_plot_pca_dim"]
+
             all_latents = []
             for model_id, model_fname in enumerate(self.selected_model_fnames):
                 model_fname = join(self.model_dir, model_fname)
@@ -672,11 +674,22 @@ class AstroInferrer(BaseInferrer):
                 gt_bin_ids = self.dataset.create_gt_redshift_bin_ids()
                 all_latents = all_latents[:,gt_bin_ids[0],gt_bin_ids[1],:]
 
-            low_dim_latents = reduce_latents_dim_pca(
-                all_latents, self.extra_args["spectra_latents_plot_pca_dim"])
+            if self.extra_args["sanity_check_plot_same_pca_dim_as_pretrain"] and \
+               self.mode == "redshift_pretrain_infer":
+                fname = join(self.log_dir, "..", self.extra_args["pretrain_pca_dim_fname"])
+                assert exists(fname)
+                selected_axes = np.load(fname)
+            else: selected_axes = None
 
-            n = self.extra_args["spectra_latents_plot_pca_dim"]
-            latents_path = join(self.latents_dir, f"{n}-dim")
+            selected_axes, low_dim_latents = reduce_latents_dim_pca(
+                all_latents, self.extra_args["spectra_latents_plot_pca_dim"],
+                selected_axes=selected_axes)
+
+            if self.mode == "codebook_pretrain_infer":
+                fname = join(self.latents_dir, f"{ndim}-dim", "selected_axes.npy")
+                np.save(fname, selected_axes)
+
+            latents_path = join(self.latents_dir, f"{ndim}-dim")
             Path(latents_path).mkdir(parents=True, exist_ok=True)
             for model_id, cur_latents in enumerate(low_dim_latents):
                 fname = join(latents_path, f"{model_id}.png")
