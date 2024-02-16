@@ -1,5 +1,6 @@
 
 import torch
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -98,13 +99,18 @@ class HyperSpectralDecoderB(nn.Module):
     def init_decoder(self):
         input_dim = self.get_input_dim()
         output_dim = self.get_output_dim()
+
+        # skip_layers = np.arange(self.kwargs["decoder_num_hidden_layers"]) + 1
+        skip_layers = self.kwargs["decoder_skip_layers"]
+
         self.spectra_decoder = BasicDecoder(
             input_dim, output_dim,
             get_activation_class(self.kwargs["decoder_activation_type"]),
             bias=True, layer=get_layer_class(self.kwargs["decoder_layer_type"]),
             num_layers=self.kwargs["decoder_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["decoder_hidden_dim"],
-            skip=self.kwargs["decoder_skip_layers"]
+            skip=skip_layers,
+            skip_with_same_dim=self.kwargs["decoder_latents_skip_map_to_same_dim"]
         )
 
     ##################

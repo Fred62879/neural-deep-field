@@ -38,15 +38,12 @@ class MLP(nn.Module):
 class BasicDecoder(nn.Module):
     """Super basic but super useful MLP class.
     """
-    def __init__(self,
-        input_dim,
-        output_dim,
-        activation,
-        bias,
-        layer = nn.Linear,
-        num_layers = 1,
-        hidden_dim = 128,
-        skip       = []
+    def __init__(self, input_dim, output_dim, activation,
+                 bias, layer = nn.Linear,
+                 num_layers = 1,
+                 hidden_dim = 128,
+                 skip       = [],
+                 skip_with_same_dim=False
     ):
         """Initialize the BasicDecoder.
 
@@ -59,6 +56,7 @@ class BasicDecoder(nn.Module):
             num_layers (int): The number of hidden layers in the MLP.
             hidden_dim (int): The hidden dimension of the MLP.
             skip (List[int]): List of layer indices where the input dimension is concatenated.
+            skip_same_dim:    Convert skip input to be of same dim as hidden layer latents.
 
         Returns:
             (void): Initializes the class.
@@ -73,8 +71,8 @@ class BasicDecoder(nn.Module):
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
         self.skip = skip
-        if self.skip is None:
-            self.skip = []
+        self.skip_with_same_dim = skip_with_same_dim
+        if self.skip is None: self.skip = []
 
         self.make()
 
@@ -82,17 +80,28 @@ class BasicDecoder(nn.Module):
         """ Builds the actual MLP.
         """
         layers = []
+
         for i in range(self.num_layers):
             if i == 0:
-                layers.append(self.layer(self.input_dim, self.hidden_dim, bias=self.bias))
+                layer = self.layer(self.input_dim, self.hidden_dim, bias=self.bias)
             elif i in self.skip:
-                layers.append(
-                    self.layer(self.hidden_dim + self.input_dim, self.hidden_dim, bias=self.bias)
-                )
+                in_dim = self.hidden_dim if self.skip_with_same_dim else self.hidden_dim + self.input_dim
+                layer = self.layer(in_dim, self.hidden_dim, bias=self.bias)
             else:
-                layers.append(self.layer(self.hidden_dim, self.hidden_dim, bias=self.bias))
+                layer = self.layer(self.hidden_dim, self.hidden_dim, bias=self.bias)
+            layers.append(layer)
+
         self.layers = nn.ModuleList(layers)
+        if self.skip_with_same_dim:
+            self.convert_layer = self.layer(self.input_dim, self.hidden_dim, bias=self.bias)
         self.lout = self.layer(self.hidden_dim, self.output_dim, bias=self.bias)
+
+    def skip_current_layer(self, x_skip, x, h, l):
+        if self.skip_with_same_dim:
+            h = x_skip + h
+        else: h = torch.cat([x, h], dim=-1)
+        h = self.activation(l(h))
+        return h
 
     def forward(self, x, return_h=False):
         """ Run the MLP!
@@ -105,12 +114,17 @@ class BasicDecoder(nn.Module):
                 - The last hidden layer of shape [batch, ..., hidden_dim]
         """
         N = x.shape[0]
+
+        if self.skip_with_same_dim:
+            x_skip = self.convert_layer(x)
+        else: x_skip = None
+
         for i, l in enumerate(self.layers):
+            # print(i, '-th layer')
             if i == 0:
                 h = self.activation(l(x))
             elif i in self.skip:
-                h = torch.cat([x, h], dim=-1)
-                h = self.activation(l(h))
+                h = self.skip_current_layer(x_skip, x, h, l)
             else:
                 h = self.activation(l(h))
 

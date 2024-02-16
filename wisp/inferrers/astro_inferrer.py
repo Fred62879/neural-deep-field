@@ -685,12 +685,13 @@ class AstroInferrer(BaseInferrer):
                 all_latents, self.extra_args["spectra_latents_plot_pca_dim"],
                 selected_axes=selected_axes)
 
+            latents_path = join(self.latents_dir, f"{ndim}-dim")
+            Path(latents_path).mkdir(parents=True, exist_ok=True)
+
             if self.mode == "codebook_pretrain_infer":
                 fname = join(self.latents_dir, f"{ndim}-dim", "selected_axes.npy")
                 np.save(fname, selected_axes)
 
-            latents_path = join(self.latents_dir, f"{ndim}-dim")
-            Path(latents_path).mkdir(parents=True, exist_ok=True)
             for model_id, cur_latents in enumerate(low_dim_latents):
                 fname = join(latents_path, f"{model_id}.png")
                 plot_latents(cur_latents, fname)
@@ -1976,12 +1977,13 @@ class AstroInferrer(BaseInferrer):
         est_redshift = est_redshift[ids]
         redshift_residual = np.abs(redshift_residual[ids])
 
-        fname = join(self.redshift_dir, f"model-{model_id}_residual")
+        suffix = "_outlier" if self.extra_args["infer_outlier_only"] else ""
+        fname = join(self.redshift_dir, f"model-{model_id}_residual{suffix}")
         plot_line(gt_redshift, redshift_residual, fname,
                   xlabel="gt_redshift", ylabel="residual",
                   x_range=[self.extra_args["redshift_lo"], self.extra_args["redshift_hi"]])
 
-        fname = join(self.redshift_dir, f"model-{model_id}_est")
+        fname = join(self.redshift_dir, f"model-{model_id}_est{suffix}")
         plot_line(gt_redshift, est_redshift, fname,
                   xlabel="gt redshift", ylabel="est redshift",
                   x_range=[self.extra_args["redshift_lo"], self.extra_args["redshift_hi"]])

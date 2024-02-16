@@ -70,13 +70,15 @@ class SpatialDecoder(nn.Module):
             output_dim = self.kwargs["spatial_decod_output_dim"]
         else: return
 
+        skip_layers = self.kwargs["spatial_decod_skip_layers"]
+
         self.decode = BasicDecoder(
             self.input_dim, output_dim,
             get_activation_class(self.kwargs["spatial_decod_activation_type"]),
             bias=True, layer=get_layer_class(self.kwargs["spatial_decod_layer_type"]),
             num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["spatial_decod_hidden_dim"],
-            skip=self.kwargs["spatial_decod_skip_layers"]
+            skip=skip_layers
         )
 
     def forward(self, z, codebook, qtz_args, ret,
