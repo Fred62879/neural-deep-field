@@ -43,7 +43,8 @@ class BasicDecoder(nn.Module):
                  num_layers = 1,
                  hidden_dim = 128,
                  skip       = [],
-                 skip_with_same_dim=False
+                 skip_with_same_dim=False,
+                 skip_with_same_dim_sep_layers=False
     ):
         """Initialize the BasicDecoder.
 
@@ -70,37 +71,56 @@ class BasicDecoder(nn.Module):
         self.layer = layer
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
+
         self.skip = skip
-        self.skip_with_same_dim = skip_with_same_dim
         if self.skip is None: self.skip = []
+        self.skip_with_same_dim = skip_with_same_dim and len(self.skip) != 0
+        self.skip_with_same_dim_sep_layers = \
+            skip_with_same_dim_sep_layers and self.skip_with_same_dim
 
-        self.make()
+        self.init()
 
-    def make(self):
+    def init(self):
         """ Builds the actual MLP.
         """
         layers = []
-
         for i in range(self.num_layers):
             if i == 0:
                 layer = self.layer(self.input_dim, self.hidden_dim, bias=self.bias)
             elif i in self.skip:
-                in_dim = self.hidden_dim if self.skip_with_same_dim else self.hidden_dim + self.input_dim
+                if self.skip_with_same_dim:
+                    in_dim = self.hidden_dim
+                else: in_dim = self.hidden_dim + self.input_dim
                 layer = self.layer(in_dim, self.hidden_dim, bias=self.bias)
             else:
                 layer = self.layer(self.hidden_dim, self.hidden_dim, bias=self.bias)
             layers.append(layer)
-
         self.layers = nn.ModuleList(layers)
+
         if self.skip_with_same_dim:
-            self.convert_layer = self.layer(self.input_dim, self.hidden_dim, bias=self.bias)
+            if self.skip_with_same_dim_sep_layers:
+                convert_layers = []
+                for i in range(self.num_layers):
+                    if i in self.skip:
+                        convert_layers.append(
+                            self.layer(self.input_dim, self.hidden_dim, bias=self.bias))
+                self.convert_layers = nn.ModuleList(convert_layers)
+            else:
+                self.convert_layer = self.layer(self.input_dim, self.hidden_dim, bias=self.bias)
+
         self.lout = self.layer(self.hidden_dim, self.output_dim, bias=self.bias)
 
-    def skip_current_layer(self, x_skip, x, h, l):
+    def skip_current_layer(self, x, h, l, i, x_skip=None):
         if self.skip_with_same_dim:
+            h = l(h)
+            if self.skip_with_same_dim_sep_layers:
+                x_skip = self.convert_layers[i-1](x)
+            else: assert x_skip is not None
             h = x_skip + h
-        else: h = torch.cat([x, h], dim=-1)
-        h = self.activation(l(h))
+            h = self.activation(h)
+        else:
+            h = torch.cat([x, h], dim=-1)
+            h = self.activation(l(h))
         return h
 
     def forward(self, x, return_h=False):
@@ -115,16 +135,15 @@ class BasicDecoder(nn.Module):
         """
         N = x.shape[0]
 
-        if self.skip_with_same_dim:
+        if self.skip_with_same_dim and not self.skip_with_same_dim_sep_layers:
             x_skip = self.convert_layer(x)
         else: x_skip = None
 
         for i, l in enumerate(self.layers):
-            # print(i, '-th layer')
             if i == 0:
                 h = self.activation(l(x))
             elif i in self.skip:
-                h = self.skip_current_layer(x_skip, x, h, l)
+                h = self.skip_current_layer(x, h, l, i, x_skip=x_skip)
             else:
                 h = self.activation(l(h))
 

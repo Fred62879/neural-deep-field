@@ -322,7 +322,9 @@ def define_cmd_line_args():
 
     decoder_group.add_argument("--decoder-latents-skip", action="store_true",
                                help="pass latents as skip to each decoder layer.")
-    decoder_group.add_argument("--decoder-latents-skip-map-to-same-dim", action="store_true")
+    decoder_group.add_argument("--decoder-latents-skip-with-same-dim", action="store_true")
+    decoder_group.add_argument("--decoder-latents-skip-with-same-dim-sep-layers",
+                               action="store_true")
 
     decoder_group.add_argument("--siren-seed", type=int, default=1)
     decoder_group.add_argument("--siren-first-w0", type=int, default=30)
