@@ -1,9 +1,9 @@
-parent: base.yaml
+parent: base_narval.yaml
 
 global:
-    use_tqdm: True
-    exp_name: 'autodecoder-400-spectra-skip'
-    log_fname: '_16_dim_regu_beta_16_skip_50k_epochs'
+    use_tqdm: False
+    exp_name: 'autodecoder-800-spectra'
+    log_fname: '3_layers_16_dim_16_regu_beta_no_skip' #'800_spectra_2k_epochs_234131'
 
     tasks: ['codebook_pretrain']
     #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
@@ -26,6 +26,8 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
+    pretrain_batch_size: 400
+
     spectra_latent_dim: 16
     redshift_pretrain_num_spectra: 800
 
@@ -36,18 +38,19 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240215-181907_16_dim_regu_beta_16_skip_same_dim_50k_epochs'
+    pretrain_log_dir: ''
     pretrained_model_name: 'model-ep50000-bch0.pth'
 
     regularize_spectra_latents: True
     spectra_latents_regu_beta: 16
 
 decoder:
-    decoder_num_hidden_layers: 1
+    decoder_num_hidden_layers: 3
     decoder_hidden_dim: 128
-    decoder_skip_layers: [1]
+    decoder_skip_layers: []
 
-    decoder_latents_skip_map_to_same_dim: False
+    decoder_latents_skip_with_same_dim: False
+    decoder_latents_skip_with_same_dim_sep_layers: False
 
 trainer:
     num_epochs: 50000
