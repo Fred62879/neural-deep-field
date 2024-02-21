@@ -26,8 +26,6 @@ def parse_args():
     logging.info(f"set seed as {args.seed}")
 
     if args.perform_ablation:
-        # param, val = get_current_ablate_param_and_val(args)
-        # logging.info(f"ablate {param} with val: {val}")
         params, vals = get_current_ablate_params_and_vals(args)
         for param, val in zip(params, vals):
             logging.info(f"ablate {param} with val: {val}")
@@ -77,9 +75,17 @@ def setup_ablation(args):
         params, vals = get_current_ablate_params_and_vals(args)
         for param, val in zip(params, vals):
             config[param] = val
+            print(param, val)
             if "log_fname" in config and config["log_fname"] is not None:
                 config["log_fname"] += f"_{param}_{val}"
             else: config["log_fname"] = f"{param}_{val}"
+
+        if args.ablat_hardcode_params is not None:
+            id = args.ablat_id
+            for i, param in enumerate(args.ablat_hardcode_params):
+                config[param] = args.ablat_hardcode_vals[i][id]
+                print(param, args.ablat_hardcode_vals[i][id])
+
     return config
 
 def parse_yaml_config(config_path, parser):
@@ -184,6 +190,9 @@ def define_cmd_line_args():
     ablat_group.add_argument("--ablat-params", nargs="+")
     ablat_group.add_argument("--ablat-vals", nargs="+")
     ablat_group.add_argument("--ablat-num-vals", nargs="+")
+
+    ablat_group.add_argument("--ablat-hardcode-params", nargs="+")
+    ablat_group.add_argument("--ablat-hardcode-vals", nargs="+")
 
     ###################
     # Debug options

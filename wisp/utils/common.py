@@ -61,7 +61,6 @@ def get_current_ablate_params_and_vals(args):
     # print(params, final_vals)
     return params, final_vals
 
-
 def get_bool_encode_coords(**kwargs):
     return kwargs["encode_coords"] and not \
         ( kwargs["pretrain_codebook"] and \
