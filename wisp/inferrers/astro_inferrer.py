@@ -1593,9 +1593,11 @@ class AstroInferrer(BaseInferrer):
         outlier_gt = self.gt_redshift[outlier]
         outlier_est = self.argmax_redshift[outlier]
         to_save = np.array(list(outlier) + list(outlier_gt) + list(outlier_est)).reshape(3,-1)
+        n_outliers = len(outlier)
+        log.info(f"NO. outliers: {n_outliers}")
         log.info(f"outlier spectra: {outlier}")
         log.info(f"gt_redshift: {outlier_gt}")
-        log.info(f"self.argmax_redshift: {outlier_est}")
+        # log.info(f"argmax_redshift: {outlier_est}")
         fname = join(self.redshift_dir, f"model-{model_id}_redshift_outlier.txt")
         with open(fname, "w") as f: f.write(f"{to_save}")
 

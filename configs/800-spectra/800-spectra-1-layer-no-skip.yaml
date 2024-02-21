@@ -1,9 +1,9 @@
 parent: base_narval.yaml
 
 global:
-    use_tqdm: False
-    exp_name: 'autodecoder-800-spectra'
-    log_fname: 'sc_800_spectra_2k_epochs_233918'
+    use_tqdm: True
+    exp_name: 'autodecoder-400-spectra-skip'
+    # log_fname: ''
 
     tasks: ['codebook_pretrain']
     #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
