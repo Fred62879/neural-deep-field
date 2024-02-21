@@ -43,6 +43,7 @@ class BasicDecoder(nn.Module):
                  num_layers = 1,
                  hidden_dim = 128,
                  skip       = [],
+                 skip_all_layers=False,
                  skip_with_same_dim=False,
                  skip_with_same_dim_sep_layers=False
     ):
@@ -74,6 +75,7 @@ class BasicDecoder(nn.Module):
 
         self.skip = skip
         if self.skip is None: self.skip = []
+        if skip_all_layers: self.skip = np.arange(num_layers - 1) + 1
         self.skip_with_same_dim = skip_with_same_dim and len(self.skip) != 0
         self.skip_with_same_dim_sep_layers = \
             skip_with_same_dim_sep_layers and self.skip_with_same_dim

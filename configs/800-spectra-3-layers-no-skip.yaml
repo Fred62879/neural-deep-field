@@ -2,12 +2,12 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-400-spectra-skip'
-    log_fname: '_3_layers_16_dim_regu_beta_16_no_skip_50k_epochs'
+    exp_name: 'autodecoder-800-spectra'
+    log_fname: 'sc_800_spectra_1k_epochs_202511'
 
     tasks: ['codebook_pretrain']
     #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
-    #tasks: ['redshift_pretrain']
+    tasks: ['redshift_pretrain']
     #tasks: ['redshift_pretrain_infer','save_redshift','recon_spectra'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
 
 optimizer:
@@ -26,6 +26,8 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
+    pretrain_batch_size: 400
+
     spectra_latent_dim: 16
     redshift_pretrain_num_spectra: 800
 
@@ -36,7 +38,7 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240215-181907_16_dim_regu_beta_16_skip_same_dim_50k_epochs'
+    pretrain_log_dir: '20240219-202511_3_layers_16_dim_16_regu_beta_no_skip'
     pretrained_model_name: 'model-ep50000-bch0.pth'
 
     regularize_spectra_latents: True
@@ -47,18 +49,19 @@ decoder:
     decoder_hidden_dim: 128
     decoder_skip_layers: []
 
-    decoder_latents_skip_map_to_same_dim: False
+    decoder_latents_skip_with_same_dim: False
+    decoder_latents_skip_with_same_dim_sep_layers: False
 
 trainer:
-    num_epochs: 50000
+    num_epochs: 1000
     batch_size: 5500
-    log_cli_every: 5000
+    log_cli_every: 100
     plot_grad_every: -1
-    save_model_every: 5000
+    save_model_every: 100
 
-    apply_gt_redshift: True                       # |_these options conflict each other
-    optimize_spectra_for_each_redshift_bin: False # |
-    calculate_binwise_spectra_loss: False         # | these two should True or False together
+    apply_gt_redshift: False                       # |_these options conflict each other
+    optimize_spectra_for_each_redshift_bin: True # |
+    calculate_binwise_spectra_loss: True         # | these two should True or False together
 
     resume_train: False
     resume_log_dir: ''

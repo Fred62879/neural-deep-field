@@ -3,7 +3,7 @@ parent: base.yaml
 global:
     use_tqdm: True
     exp_name: 'autodecoder-400-spectra-skip'
-    log_fname: '_16_dim_regu_beta_16_no_skip_50k_epochs'
+    # log_fname: ''
 
     tasks: ['codebook_pretrain']
     #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
