@@ -42,8 +42,10 @@ class BasicDecoder(nn.Module):
                  bias, layer = nn.Linear,
                  num_layers = 1,
                  hidden_dim = 128,
+                 batch_norm = False,
                  skip       = [],
                  skip_all_layers=False,
+                 activation_before_skip=False,
                  skip_with_same_dim=False,
                  skip_with_same_dim_sep_layers=False
     ):
@@ -73,91 +75,131 @@ class BasicDecoder(nn.Module):
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
 
+        self.batch_norm = batch_norm
+        self.activation_before_skip = activation_before_skip
+        assert self.activation_before_skip
+
         self.skip = skip
-        if self.skip is None: self.skip = []
-        if skip_all_layers: self.skip = np.arange(num_layers - 1) + 1
+        if skip_all_layers:
+            self.skip = np.arange(num_layers)
+
         self.skip_with_same_dim = skip_with_same_dim and len(self.skip) != 0
         self.skip_with_same_dim_sep_layers = \
             skip_with_same_dim_sep_layers and self.skip_with_same_dim
 
         self.init()
 
+    def get_first_layer_input_dim(self):
+        if self.skip_with_same_dim and not self.skip_with_same_dim_sep_layers:
+            # if we perform skip with single conversion layer, we convert input to
+            #  same dim as hidden latents and then pass it to following layers
+            in_dim = self.hidden_dim
+        else: in_dim = self.input_dim
+        return in_dim
+
+    def get_input_dim(self, i):
+        if i == 0:
+            in_dim = self.get_first_layer_input_dim()
+        elif i in self.skip:
+            if self.skip_with_same_dim: in_dim = self.hidden_dim
+            else: in_dim = self.hidden_dim + self.input_dim
+        else:
+            in_dim = self.hidden_dim
+        return in_dim
+
     def init(self):
         """ Builds the actual MLP.
         """
+        # initializes mlp layers
         layers = []
         for i in range(self.num_layers):
-            if i == 0:
-                layer = self.layer(self.input_dim, self.hidden_dim, bias=self.bias)
-            elif i in self.skip:
-                if self.skip_with_same_dim:
-                    in_dim = self.hidden_dim
-                else: in_dim = self.hidden_dim + self.input_dim
-                layer = self.layer(in_dim, self.hidden_dim, bias=self.bias)
-            else:
-                layer = self.layer(self.hidden_dim, self.hidden_dim, bias=self.bias)
+            in_dim = self.get_input_dim(i)
+            layer = self.layer(in_dim, self.hidden_dim, bias=self.bias)
             layers.append(layer)
         self.layers = nn.ModuleList(layers)
+        self.lout = self.layer(self.hidden_dim, self.output_dim, bias=self.bias)
 
+        # initializes batch normalization layers
+        if self.batch_norm:
+            self.bns = []
+            for i in range(self.num_layers):
+                self.bns.append(nn.BatchNorm1d(self.hidden_dim))
+            self.bns = nn.ModuleList(self.bns)
+
+        # initializes conversion layers for skip
         if self.skip_with_same_dim:
             if self.skip_with_same_dim_sep_layers:
                 convert_layers = []
                 for i in range(self.num_layers):
                     if i in self.skip:
-                        convert_layers.append(
-                            self.layer(self.input_dim, self.hidden_dim, bias=self.bias))
+                        layer = self.layer(self.input_dim, self.hidden_dim, bias=self.bias)
+                        convert_layers.append(layer)
                 self.convert_layers = nn.ModuleList(convert_layers)
             else:
                 self.convert_layer = self.layer(self.input_dim, self.hidden_dim, bias=self.bias)
 
-        self.lout = self.layer(self.hidden_dim, self.output_dim, bias=self.bias)
-
-    def skip_current_layer(self, x, h, l, i, x_skip=None):
-        if self.skip_with_same_dim:
-            h = l(h)
-            if self.skip_with_same_dim_sep_layers:
-                x_skip = self.convert_layers[i-1](x)
-            else: assert x_skip is not None
-            h = x_skip + h
-            h = self.activation(h)
-        else:
-            h = torch.cat([x, h], dim=-1)
-            h = self.activation(l(h))
-        return h
-
     def forward(self, x, return_h=False):
-        """ Run the MLP!
-            @Params
-              x (torch.FloatTensor): Some tensor of shape [batch, ..., input_dim]
-              return_h (bool): If True, also returns the last hidden layer.
-            @Return
-              (torch.FloatTensor, (optional) torch.FloatTensor):
-                - The output tensor of shape [batch, ..., output_dim]
-                - The last hidden layer of shape [batch, ..., hidden_dim]
         """
-        N = x.shape[0]
-
+        @Params
+          x (torch.FloatTensor): Some tensor of shape [batch, ..., input_dim]
+          return_h (bool): If True, also returns the last hidden layer.
+        @Return
+          (torch.FloatTensor, (optional) torch.FloatTensor):
+            - The output tensor of shape [batch, ..., output_dim]
+            - The last hidden layer of shape [batch, ..., hidden_dim]
+        """
         if self.skip_with_same_dim and not self.skip_with_same_dim_sep_layers:
-            x_skip = self.convert_layer(x)
-        else: x_skip = None
+            x = self.convert_layer(x)
 
-        for i, l in enumerate(self.layers):
-            if i == 0:
-                h = self.activation(l(x))
-            elif i in self.skip:
-                h = self.skip_current_layer(x, h, l, i, x_skip=x_skip)
-            else:
-                h = self.activation(l(h))
-
+        h = self.forward_one_layer(0, x, x)
+        for i in range(1, self.num_layers):
+            h = self.forward_one_layer(i, x, h)
         out = self.lout(h)
 
-        if return_h:
-            return out, h
+        if return_h: return out, h
+        return out
+
+    def forward_one_layer(self, i, x, h):
+        """
+        Forward through one layer considering batch norm and skip.
+        @Param
+          i: i-th layer
+          x: original input (x0)
+          h: output from previous layer (x_{i-1})
+        """
+        if i in self.skip:
+            if self.skip_with_same_dim:
+                if self.skip_with_same_dim_sep_layers:
+                    assert i == 0 or h.shape != x.shape
+                    x_skip = self.convert_layers[i](x)
+                else:
+                    assert h.shape == x.shape
+                    x_skip = x
+
+                # if self.activation_before_skip:
+                h = x_skip + self.forward_mlp(i, h)
+                # else:
+                #     h = x_skip + h
+                #     h = self.forward_mlp(i, h)
+            else:
+                h = torch.cat([x, h], dim=-1)
+                h = self.forward_mlp(i, h)
         else:
-            return out
+            h = self.forward_mlp(i, h)
+        return h
+
+    def forward_mlp(self, i, h):
+        l = self.layers[i]
+        h = l(h) # [bsz,nsmpl,dim]
+        if self.batch_norm:
+            h = h.permute(0,2,1)
+            h = self.bns[i](h)
+            h = h.permute(0,2,1)
+        h = self.activation(h)
+        return h
 
     def initialize_last_layer_equal(self):
-        """ Initialize last layer (w and bias) such that outputs are the same.
+        """ Initializes the last layer (w and bias) such that outputs are the same.
         """
         w = self.lout.weight
         w_sp = list(w.shape)

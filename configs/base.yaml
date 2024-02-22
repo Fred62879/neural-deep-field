@@ -195,6 +195,7 @@ pretrain:
     debug_lbfgs: False
 
 decoder:
+    decoder_batch_norm: False
     decoder_num_hidden_layers: 1
     decoder_hidden_dim: 128
     decoder_layer_type: 'none'

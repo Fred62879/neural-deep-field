@@ -326,11 +326,13 @@ def define_cmd_line_args():
                                help="Number of layers for the decoder")
     decoder_group.add_argument("--decoder-hidden-dim", type=int, default=128,
                                help="Network width")
+    decoder_group.add_argument("--decoder-batch-norm", action="store_true")
     decoder_group.add_argument("--decoder-skip-layers", nargs="+", type=int,
                                help="Layer to have skip connection.")
 
     decoder_group.add_argument("--decoder-latents-skip-all-layers", action="store_true",
                                help="pass latents as skip to each decoder layer.")
+    decoder_group.add_argument("--decoder-activate-before-latents-skip", action="store_true")
     decoder_group.add_argument("--decoder-latents-skip-with-same-dim", action="store_true")
     decoder_group.add_argument("--decoder-latents-skip-with-same-dim-sep-layers",
                                action="store_true")
