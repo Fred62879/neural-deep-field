@@ -11,11 +11,11 @@ global:
     #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
 
 ablation:
-    perform_ablation: False
+    perform_ablation: True
     ablat_id: 0
-    ablat_params: ["spectra_latents_regu_beta"] #["decoder_num_hidden_layers","decoder_hidden_dim"]
-    ablat_vals: [[1,2,4,8]] #[[3,5],[128,256,512]]
-    ablat_num_vals: [4] #[2,3]
+    ablat_params: ["decoder_batch_norm"] #["decoder_num_hidden_layers","decoder_hidden_dim"]
+    ablat_vals: [[True,False]] #[[3,5],[128,256,512]]
+    ablat_num_vals: [2] #[2,3]
 
     #ablat_hardcode_params: ["pretrain_log_dir"]
     #ablat_hardcode_vals: [["20240220-172817_3_layers_16_dim_1_regu_beta_skip_same_dim_sep_layers","20240220-172817_3_layers_16_dim_4_regu_beta_skip_same_dim_sep_layers","20240220-172819_3_layers_16_dim_2_regu_beta_skip_same_dim_sep_layers","20240220-173442_3_layers_16_dim_8_regu_beta_skip_same_dim_sep_layers"]]
