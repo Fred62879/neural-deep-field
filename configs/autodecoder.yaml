@@ -11,7 +11,7 @@ global:
     #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
 
 ablation:
-    perform_ablation: True
+    perform_ablation: False
     ablat_id: 0
     ablat_params: ["spectra_latents_regu_beta"] #["decoder_num_hidden_layers","decoder_hidden_dim"]
     ablat_vals: [[1,2,4,8]] #[[3,5],[128,256,512]]
@@ -55,15 +55,15 @@ pretrain:
     spectra_latents_regu_beta: 8
 
 decoder:
-    decoder_batch_norm: True
+    decoder_batch_norm: False
     decoder_num_hidden_layers: 3
     decoder_hidden_dim: 128
-    decoder_skip_layers: [0,1,2,3]
+    decoder_skip_layers: [] #[0,1,2,3]
 
     decoder_activate_before_latents_skip: True
     decoder_latents_skip_all_layers: True
-    decoder_latents_skip_with_same_dim: True
-    decoder_latents_skip_with_same_dim_sep_layers: True
+    decoder_latents_skip_with_same_dim: False
+    decoder_latents_skip_with_same_dim_sep_layers: False
 
 trainer:
     num_epochs: 1000

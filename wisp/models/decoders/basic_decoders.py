@@ -182,7 +182,8 @@ class BasicDecoder(nn.Module):
                 #     h = x_skip + h
                 #     h = self.forward_mlp(i, h)
             else:
-                h = torch.cat([x, h], dim=-1)
+                if i != 0:
+                    h = torch.cat([x, h], dim=-1)
                 h = self.forward_mlp(i, h)
         else:
             h = self.forward_mlp(i, h)
@@ -190,6 +191,7 @@ class BasicDecoder(nn.Module):
 
     def forward_mlp(self, i, h):
         l = self.layers[i]
+        print(i, h.shape)
         h = l(h) # [bsz,nsmpl,dim]
         if self.batch_norm:
             h = h.permute(0,2,1)
