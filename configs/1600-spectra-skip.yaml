@@ -2,8 +2,8 @@ parent: base_narval.yaml
 
 global:
     use_tqdm: False
-    exp_name: 'autodecoder-3200-spectra'
-    # log_fname: ''
+    exp_name: 'autodecoder-1600-spectra'
+    log_fname: '1600-spectra-skip'
 
     tasks: ['codebook_pretrain']
     #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
@@ -13,9 +13,9 @@ global:
 ablation:
     perform_ablation: True
     ablat_id: 0
-    ablat_params: ["decoder_num_hidden_layers","decoder_hidden_dim"]
-    ablat_vals: [[3,5],[128,256,512]]
-    ablat_num_vals: [2,3]
+    ablat_params: ["decoder_batch_norm"]
+    ablat_vals: [[True,False]]
+    ablat_num_vals: [2]
 
     #ablat_hardcode_params: ["pretrain_log_dir"]
     #ablat_hardcode_vals: [["20240220-172817_3_layers_16_dim_1_regu_beta_skip_same_dim_sep_layers","20240220-172817_3_layers_16_dim_4_regu_beta_skip_same_dim_sep_layers","20240220-172819_3_layers_16_dim_2_regu_beta_skip_same_dim_sep_layers","20240220-173442_3_layers_16_dim_8_regu_beta_skip_same_dim_sep_layers"]]
@@ -39,7 +39,7 @@ pretrain:
     pretrain_batch_size: 400
 
     spectra_latent_dim: 16
-    redshift_pretrain_num_spectra: 3200
+    redshift_pretrain_num_spectra: 1600
 
     negative_supervise_wrong_redshift: False
 
@@ -52,15 +52,19 @@ pretrain:
     pretrained_model_name: 'model-ep50000-bch0.pth'
 
     regularize_spectra_latents: True
-    spectra_latents_regu_beta: 1
+    spectra_latents_regu_beta: 16
 
 decoder:
+    decoder_batch_norm: True
     decoder_num_hidden_layers: 3
     decoder_hidden_dim: 128
-    decoder_skip_layers: [1,2,3]
+    decoder_skip_layers: [] #[0,1,2,3]
 
-    decoder_latents_skip_with_same_dim: True
-    decoder_latents_skip_with_same_dim_sep_layers: True
+    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_with_same_dim: False
+    decoder_latents_skip_with_same_dim_sep_layers: False
+
+    decoder_activate_before_latents_skip: True # OBSOLETE
 
 trainer:
     num_epochs: 50000
@@ -104,4 +108,4 @@ infer:
     num_precision_recall_threshes: 10
 
 spectra_data:
-    num_supervision_spectra_upper_bound: 3200
+    num_supervision_spectra_upper_bound: 1600

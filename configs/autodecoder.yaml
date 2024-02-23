@@ -38,7 +38,7 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    pretrain_batch_size: 200
+    pretrain_batch_size: 300
 
     spectra_latent_dim: 16
     redshift_pretrain_num_spectra: 1600
