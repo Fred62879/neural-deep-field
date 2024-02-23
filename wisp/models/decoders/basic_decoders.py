@@ -191,7 +191,6 @@ class BasicDecoder(nn.Module):
 
     def forward_mlp(self, i, h):
         l = self.layers[i]
-        print(i, h.shape)
         h = l(h)
         if self.batch_norm:
             if h.ndim == 3: # [bsz,nsmpl,dim]
