@@ -75,7 +75,6 @@ def setup_ablation(args):
         params, vals = get_current_ablate_params_and_vals(args)
         for param, val in zip(params, vals):
             config[param] = val
-            print(param, val)
             if "log_fname" in config and config["log_fname"] is not None:
                 config["log_fname"] += f"_{param}_{val}"
             else: config["log_fname"] = f"{param}_{val}"

@@ -54,13 +54,10 @@ def get_current_ablate_params_and_vals(args):
         acc.append(acc[i-1]*num_vals[n-1-i])
     acc = acc[::-1]
     acc.append(1)
-    print(acc)
     final_vals = []
     for i in range(n):
-        print(id // acc[i])
         final_vals.append(vals[i][id // acc[i]])
         id = id % acc[i]
-    print(params, final_vals)
     return params, final_vals
 
 def get_bool_encode_coords(**kwargs):

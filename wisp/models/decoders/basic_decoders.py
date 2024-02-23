@@ -191,11 +191,20 @@ class BasicDecoder(nn.Module):
 
     def forward_mlp(self, i, h):
         l = self.layers[i]
-        h = l(h) # [bsz,nsmpl,dim]
+        print(i, h.shape)
+        h = l(h)
         if self.batch_norm:
-            h = h.permute(0,2,1)
-            h = self.bns[i](h)
-            h = h.permute(0,2,1)
+            if h.ndim == 3: # [bsz,nsmpl,dim]
+                h = h.permute(0,2,1)
+                h = self.bns[i](h)
+                h = h.permute(0,2,1)
+            elif h.ndim == 4: # [nbins,bsz,nsmpl,dim]
+                nbins,bsz,nsmpl,dim = h.shape
+                h = h.permute(0,1,3,2).view(nbins*bsz,dim,nsmpl)
+                h = self.bns[i](h)
+                h = h.view(nbins,bsz,dim,nsmpl).permute(0,1,3,2)
+            else:
+                raise ValueError()
         h = self.activation(h)
         return h
 
