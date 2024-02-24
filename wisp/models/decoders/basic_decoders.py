@@ -45,9 +45,9 @@ class BasicDecoder(nn.Module):
                  batch_norm = False,
                  skip       = [],
                  skip_all_layers=False,
-                 activation_before_skip=False,
-                 skip_with_same_dim=False,
-                 skip_with_same_dim_sep_layers=False
+                 activate_before_skip=False,
+                 skip_method="add",
+                 skip_add_conversion_method="convert_input"
     ):
         """Initialize the BasicDecoder.
 
@@ -60,7 +60,11 @@ class BasicDecoder(nn.Module):
             num_layers (int): The number of hidden layers in the MLP.
             hidden_dim (int): The hidden dimension of the MLP.
             skip (List[int]): List of layer indices where the input dimension is concatenated.
-            skip_same_dim:    Convert skip input to be of same dim as hidden layer latents.
+            skip_method:      add or concat
+            skip_add_conversion_method:
+                convert_input
+                single_conversion
+                multi_conversion
 
         Returns:
             (void): Initializes the class.
@@ -76,23 +80,29 @@ class BasicDecoder(nn.Module):
         self.hidden_dim = hidden_dim
 
         self.batch_norm = batch_norm
-        self.activation_before_skip = activation_before_skip
-        assert self.activation_before_skip
+        self.activate_before_skip = activate_before_skip
 
         self.skip = skip
-        if skip_all_layers:
-            self.skip = np.arange(num_layers)
+        self.skip_method = skip_method
+        assert self.skip_method == "add" or self.skip_method == "concat"
+        self.skip_add_conversion_method = skip_add_conversion_method
+        assert self.skip_add_conversion_method == "convert_input" or \
+            self.skip_add_conversion_method == "single_conversion" or \
+            self.skip_add_conversion_method == "multi_conversion"
 
-        self.skip_with_same_dim = skip_with_same_dim and len(self.skip) != 0
-        self.skip_with_same_dim_sep_layers = \
-            skip_with_same_dim_sep_layers and self.skip_with_same_dim
+        if skip_all_layers:
+            #if self.skip_method == "add":
+            self.skip = np.arange(num_layers)
+            #else: self.skip = np.arange(1, num_layers)
+
+        self.perform_skip = len(self.skip) > 0
 
         self.init()
 
     def get_first_layer_input_dim(self):
-        if self.skip_with_same_dim and not self.skip_with_same_dim_sep_layers:
-            # if we perform skip with single conversion layer, we convert input to
-            #  same dim as hidden latents and then pass it to following layers
+        if self.skip_method == "add" and \
+           self.skip_add_conversion_method == "convert_input":
+            # we convert input to same dim as hidden latents before input layer
             in_dim = self.hidden_dim
         else: in_dim = self.input_dim
         return in_dim
@@ -101,7 +111,8 @@ class BasicDecoder(nn.Module):
         if i == 0:
             in_dim = self.get_first_layer_input_dim()
         elif i in self.skip:
-            if self.skip_with_same_dim: in_dim = self.hidden_dim
+            if self.skip_method == "add":
+                in_dim = self.hidden_dim
             else: in_dim = self.hidden_dim + self.input_dim
         else:
             in_dim = self.hidden_dim
@@ -117,7 +128,11 @@ class BasicDecoder(nn.Module):
             layer = self.layer(in_dim, self.hidden_dim, bias=self.bias)
             layers.append(layer)
         self.layers = nn.ModuleList(layers)
-        self.lout = self.layer(self.hidden_dim, self.output_dim, bias=self.bias)
+
+        if self.perform_skip and self.skip_method == "concat":
+            out_dim = self.hidden_dim + self.input_dim
+        else: out_dim = self.hidden_dim
+        self.lout = self.layer(out_dim, self.output_dim, bias=self.bias)
 
         # initializes batch normalization layers
         if self.batch_norm:
@@ -127,8 +142,8 @@ class BasicDecoder(nn.Module):
             self.bns = nn.ModuleList(self.bns)
 
         # initializes conversion layers for skip
-        if self.skip_with_same_dim:
-            if self.skip_with_same_dim_sep_layers:
+        if self.skip_method == "add":
+            if self.skip_add_conversion_method == "multi_conversion":
                 convert_layers = []
                 for i in range(self.num_layers):
                     if i in self.skip:
@@ -148,50 +163,36 @@ class BasicDecoder(nn.Module):
             - The output tensor of shape [batch, ..., output_dim]
             - The last hidden layer of shape [batch, ..., hidden_dim]
         """
-        if self.skip_with_same_dim and not self.skip_with_same_dim_sep_layers:
-            x = self.convert_layer(x)
+        x, x_skip = self.prepare_skip(x)
 
-        h = self.forward_one_layer(0, x, x)
+        h = self.forward_one_layer(0, x, x, x_skip)
         for i in range(1, self.num_layers):
-            h = self.forward_one_layer(i, x, h)
+            h = self.forward_one_layer(i, h, x, x_skip)
         out = self.lout(h)
 
         if return_h: return out, h
         return out
 
-    def forward_one_layer(self, i, x, h):
+    ## forward helpers
+    def forward_one_layer(self, i, h, x, x_skip=None):
         """
         Forward through one layer considering batch norm and skip.
         @Param
           i: i-th layer
-          x: original input (x0)
           h: output from previous layer (x_{i-1})
+          x: original input (x0)
+          x_skip: x used for skip in case of add/single conversion
         """
-        if i in self.skip:
-            if self.skip_with_same_dim:
-                if self.skip_with_same_dim_sep_layers:
-                    assert i == 0 or h.shape != x.shape
-                    x_skip = self.convert_layers[i](x)
-                else:
-                    assert h.shape == x.shape
-                    x_skip = x
+        self.skip_current_layer = i in self.skip
+        if self.skip_current_layer:
+            x_skip = self.get_skip(i, h, x, x_skip)
+        else: x_skip = None
 
-                # if self.activation_before_skip:
-                h = x_skip + self.forward_mlp(i, h)
-                # else:
-                #     h = x_skip + h
-                #     h = self.forward_mlp(i, h)
-            else:
-                if i != 0:
-                    h = torch.cat([x, h], dim=-1)
-                h = self.forward_mlp(i, h)
-        else:
-            h = self.forward_mlp(i, h)
-        return h
+        h = self.layers[i](h)
 
-    def forward_mlp(self, i, h):
-        l = self.layers[i]
-        h = l(h)
+        if self.skip_current_layer and not self.activate_before_skip:
+            h = self.skip_current(h, x_skip)
+
         if self.batch_norm:
             if h.ndim == 3: # [bsz,nsmpl,dim]
                 h = h.permute(0,2,1)
@@ -204,38 +205,71 @@ class BasicDecoder(nn.Module):
                 h = h.view(nbins,bsz,dim,nsmpl).permute(0,1,3,2)
             else:
                 raise ValueError()
+
         h = self.activation(h)
+        if self.skip_current_layer and self.activate_before_skip:
+            h = self.skip_current(h, x_skip)
         return h
 
-    def initialize_last_layer_equal(self):
-        """ Initializes the last layer (w and bias) such that outputs are the same.
-        """
-        w = self.lout.weight
-        w_sp = list(w.shape)
-        nsmpl = w.shape[0]
-        w_ = torch.mean(w, dim=0)
-        w_new = w_[None:,].tile(nsmpl,1)
-        self.lout.weight = nn.Parameter( torch.full(w_sp, torch.mean(w).item()) )
-        if self.bias:
-            bias = self.lout.bias
-            b_sp = list(bias.shape)
-            self.lout.bias = nn.Parameter( torch.full(b_sp, torch.mean(bias).item()) )
+    def skip_current(self, h, x_skip):
+        if self.skip_method == "add":
+            h = h + x_skip
+        else:
+            h = torch.cat([h, x_skip], dim=-1)
+        return h
 
-    def initialize(self, get_weight):
-        """ Initializes the MLP layers with some initialization functions.
-            @Params
-              get_weight (function): A function which returns a matrix given a matrix.
-            @Return:
-              (void): Initializes the layer weights.
-        """
-        ms = []
-        for i, w in enumerate(self.layers):
-            m = get_weight(w.weight)
-            ms.append(m)
-        for i in range(len(self.layers)):
-            self.layers[i].weight = nn.Parameter(ms[i])
-        m = get_weight(self.lout.weight)
-        self.lout.weight = nn.Parameter(m)
+    def get_skip(self, i, h, x, x_skip=None):
+        if self.skip_method == "add":
+            if self.skip_add_conversion_method == "convert_input":
+                assert h.shape == x.shape
+                x_skip = x
+            elif self.skip_add_conversion_method == "multi_conversion":
+                assert i == 0 or h.shape != x.shape
+                x_skip = self.convert_layers[i](x)
+            else: # self.skip_add_conversion_method == "single_conversion":
+                assert x_skip is not None
+        else:
+            x_skip = x
+        return x_skip
+
+    def prepare_skip(self, x):
+        x_skip = None
+        if self.perform_skip and self.skip_method == "add":
+           if self.skip_add_conversion_method == "convert_input":
+               x = self.convert_layer(x)
+           elif self.skip_add_conversion_method == "single_conversion":
+               x_skip = self.convert_layer(x)
+        return x, x_skip
+
+    # def initialize_last_layer_equal(self):
+    #     """ Initializes the last layer (w and bias) such that outputs are the same.
+    #     """
+    #     w = self.lout.weight
+    #     w_sp = list(w.shape)
+    #     nsmpl = w.shape[0]
+    #     w_ = torch.mean(w, dim=0)
+    #     w_new = w_[None:,].tile(nsmpl,1)
+    #     self.lout.weight = nn.Parameter( torch.full(w_sp, torch.mean(w).item()) )
+    #     if self.bias:
+    #         bias = self.lout.bias
+    #         b_sp = list(bias.shape)
+    #         self.lout.bias = nn.Parameter( torch.full(b_sp, torch.mean(bias).item()) )
+
+    # def initialize(self, get_weight):
+    #     """ Initializes the MLP layers with some initialization functions.
+    #         @Params
+    #           get_weight (function): A function which returns a matrix given a matrix.
+    #         @Return:
+    #           (void): Initializes the layer weights.
+    #     """
+    #     ms = []
+    #     for i, w in enumerate(self.layers):
+    #         m = get_weight(w.weight)
+    #         ms.append(m)
+    #     for i in range(len(self.layers)):
+    #         self.layers[i].weight = nn.Parameter(ms[i])
+    #     m = get_weight(self.lout.weight)
+    #     self.lout.weight = nn.Parameter(m)
 
 def orthonormal(weight):
     """ Initialize the layer as a random orthonormal matrix.

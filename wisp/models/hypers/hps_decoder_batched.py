@@ -111,10 +111,11 @@ class HyperSpectralDecoderB(nn.Module):
             hidden_dim=self.kwargs["decoder_hidden_dim"],
             batch_norm=self.kwargs["decoder_batch_norm"],
             skip=skip_layers,
-            activation_before_skip=self.kwargs["decoder_activate_before_latents_skip"],
+            activate_before_skip=self.kwargs["decoder_activate_before_latents_skip"],
             skip_all_layers=self.kwargs["decoder_latents_skip_all_layers"],
-            skip_with_same_dim=self.kwargs["decoder_latents_skip_with_same_dim"],
-            skip_with_same_dim_sep_layers=self.kwargs["decoder_latents_skip_with_same_dim_sep_layers"])
+            skip_method=self.kwargs["decoder_latents_skip_method"],
+            skip_add_conversion_method=self.kwargs["decoder_latents_skip_add_conversion_method"]
+        )
 
     ##################
     # Setters
