@@ -2,8 +2,8 @@ parent: base_narval.yaml
 
 global:
     use_tqdm: False
-    exp_name: 'autodecoder-1600-spectra'
-    log_fname: 'sc-1600-spectra-skip'
+    exp_name: 'autodecoder-1600-spectra-skip-v3'
+    log_fname: 'sc-1600-spectra-skip-add-single-conversion'
 
     tasks: ['codebook_pretrain']
     #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
@@ -13,12 +13,12 @@ global:
 ablation:
     perform_ablation: True
     ablat_id: 0
-    ablat_params: ["decoder_batch_norm"]
+    ablat_params: ["decoder_activate_before_latents_skip"] #["decoder_batch_norm"]
     ablat_vals: [[True,False]]
     ablat_num_vals: [2]
 
     ablat_hardcode_params: ["pretrain_log_dir"]
-    ablat_hardcode_vals: [['20240222-165402_1600-spectra-skip_decoder_batch_norm_True','20240222-165402_1600-spectra-skip_decoder_batch_norm_False']]
+    ablat_hardcode_vals: [['20240224-030449_skip-add-single-conversion_decoder_activate_before_latents_skip_True','20240224-030448_skip-add-single-conversion_decoder_activate_before_latents_skip_False']]
 
 optimizer:
     optimizer_type: 'adam'
@@ -55,16 +55,15 @@ pretrain:
     spectra_latents_regu_beta: 16
 
 decoder:
-    decoder_batch_norm: True
+    decoder_batch_norm: False
     decoder_num_hidden_layers: 3
     decoder_hidden_dim: 128
     decoder_skip_layers: [] #[0,1,2,3]
 
+    decoder_activate_before_latents_skip: False
     decoder_latents_skip_all_layers: True
-    decoder_latents_skip_with_same_dim: False
-    decoder_latents_skip_with_same_dim_sep_layers: False
-
-    decoder_activate_before_latents_skip: True # OBSOLETE
+    decoder_latents_skip_method: 'add'
+    decoder_latents_skip_add_conversion_method: 'single_conversion'
 
 trainer:
     num_epochs: 1000
