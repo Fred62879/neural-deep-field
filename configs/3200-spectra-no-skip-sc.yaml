@@ -1,4 +1,4 @@
-parent: base_narval.yaml
+parent: base.yaml
 
 global:
     use_tqdm: False
@@ -8,7 +8,7 @@ global:
     tasks: ['codebook_pretrain']
     #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
     tasks: ['redshift_pretrain']
-    #tasks: ['redshift_pretrain_infer','save_redshift','recon_spectra'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','save_redshift'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
 
 ablation:
     perform_ablation: True
@@ -60,9 +60,9 @@ decoder:
     decoder_hidden_dim: -1
     decoder_skip_layers: [] #[0,1,2,3]
 
-    decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: False
-    decoder_latents_skip_method: 'concat'
+    decoder_activate_before_latents_skip: True
+    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'convert_input'
 
 trainer:
@@ -83,8 +83,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: ''
-
+    infer_log_dir: ''
     infer_selected: False
     pretrain_num_infer_upper_bound: 70
     spectra_inferrence_id_fname: '' #'20240214-133751_sc_400_spectra_2k_epochs_131239/redshift/model-0_redshift_outlier_ids.npy'

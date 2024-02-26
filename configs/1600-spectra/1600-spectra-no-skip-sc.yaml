@@ -3,12 +3,12 @@ parent: base_narval.yaml
 global:
     use_tqdm: False
     exp_name: 'autodecoder-1600-spectra-skip-v3'
-    log_fname: 'sc-1600-spectra-skip-concat'
+    log_fname: 'sc-1600-spectra-no-skip'
 
     tasks: ['codebook_pretrain']
     #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
     tasks: ['redshift_pretrain']
-    #tasks: ['redshift_pretrain_infer','save_redshift','recon_spectra'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','save_redshift'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
 
 ablation:
     perform_ablation: True
@@ -18,7 +18,7 @@ ablation:
     ablat_num_vals: [2]
 
     ablat_hardcode_params: ["pretrain_log_dir"]
-    ablat_hardcode_vals: [['20240224-010308_skip-concat_decoder_activate_before_latents_skip_True','20240224-010853_skip-concat_decoder_activate_before_latents_skip_False']]
+    ablat_hardcode_vals: [['20240224-010308_no-skip_decoder_activate_before_latents_skip_True','20240224-010308_no-skip_decoder_activate_before_latents_skip_False']]
 
 optimizer:
     optimizer_type: 'adam'
@@ -61,7 +61,7 @@ decoder:
     decoder_skip_layers: [] #[0,1,2,3]
 
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_all_layers: False
     decoder_latents_skip_method: 'concat'
     decoder_latents_skip_add_conversion_method: 'convert_input'
 
@@ -83,7 +83,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: ''
+    infer_log_dir: '20240224-033241_sc-1600-spectra-no-skip_decoder_activate_before_latents_skip_True' #325 #'20240224-035052_sc-1600-spectra-no-skip_decoder_activate_before_latents_skip_False' #325
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 70

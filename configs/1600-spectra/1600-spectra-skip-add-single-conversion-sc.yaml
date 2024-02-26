@@ -1,14 +1,14 @@
-parent: base_narval.yaml
+parent: base.yaml
 
 global:
     use_tqdm: False
     exp_name: 'autodecoder-1600-spectra-skip-v3'
-    log_fname: 'sc-1600-spectra-skip-add-multi-conversion'
+    log_fname: 'sc-1600-spectra-skip-add-single-conversion'
 
     tasks: ['codebook_pretrain']
     #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
     tasks: ['redshift_pretrain']
-    #tasks: ['redshift_pretrain_infer','save_redshift','recon_spectra'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','save_redshift'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
 
 ablation:
     perform_ablation: True
@@ -18,7 +18,7 @@ ablation:
     ablat_num_vals: [2]
 
     ablat_hardcode_params: ["pretrain_log_dir"]
-    ablat_hardcode_vals: [['20240224-030448_skip-add-multi-conversion_decoder_activate_before_latents_skip_True','20240224-030546_skip-add-multi-conversion_decoder_activate_before_latents_skip_False']]
+    ablat_hardcode_vals: [['20240224-030449_skip-add-single-conversion_decoder_activate_before_latents_skip_True','20240224-030448_skip-add-single-conversion_decoder_activate_before_latents_skip_False']]
 
 optimizer:
     optimizer_type: 'adam'
@@ -63,7 +63,7 @@ decoder:
     decoder_activate_before_latents_skip: False
     decoder_latents_skip_all_layers: True
     decoder_latents_skip_method: 'add'
-    decoder_latents_skip_add_conversion_method: 'multi_conversion'
+    decoder_latents_skip_add_conversion_method: 'single_conversion'
 
 trainer:
     num_epochs: 1000
@@ -83,7 +83,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: ''
+    infer_log_dir: '20240224-071918_sc-1600-spectra-skip-add-single-conversion_decoder_activate_before_latents_skip_False' #154 #'20240224-065354_sc-1600-spectra-skip-add-single-conversion_decoder_activate_before_latents_skip_True' #282
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 70

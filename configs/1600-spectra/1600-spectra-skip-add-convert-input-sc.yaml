@@ -8,7 +8,7 @@ global:
     tasks: ['codebook_pretrain']
     #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
     tasks: ['redshift_pretrain']
-    #tasks: ['redshift_pretrain_infer','save_redshift','recon_spectra'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','save_redshift'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
 
 ablation:
     perform_ablation: True
@@ -83,7 +83,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: ''
+    infer_log_dir: '20240224-052852_sc-1600-spectra-skip-add-convert-input_decoder_activate_before_latents_skip_False' #234 '20240224-050134_sc-1600-spectra-skip-add-convert-input_decoder_activate_before_latents_skip_True' #447
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 70
