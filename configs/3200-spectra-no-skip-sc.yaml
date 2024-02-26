@@ -1,9 +1,9 @@
 parent: base_narval.yaml
 
 global:
-    use_tqdm: True
-    exp_name: 'autodecoder-3200-spectra'
-    log_fname: 'sc-3200-spectra-skip-same-dim'
+    use_tqdm: False
+    exp_name: 'autodecoder-3200-spectra-no-skip'
+    log_fname: 'sc'
 
     tasks: ['codebook_pretrain']
     #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
@@ -18,7 +18,7 @@ ablation:
     ablat_num_vals: [3,2,3]
 
     ablat_hardcode_params: ["pretrain_log_dir"]
-    ablat_hardcode_vals: [['20240223-010632_3200-spectra-skip-same-dim_spectra_latent_dim_8_decoder_num_hidden_layers_3_decoder_hidden_dim_128','20240223-010632_3200-spectra-skip-same-dim_spectra_latent_dim_8_decoder_num_hidden_layers_3_decoder_hidden_dim_256','20240223-010632_3200-spectra-skip-same-dim_spectra_latent_dim_8_decoder_num_hidden_layers_3_decoder_hidden_dim_512','20240223-010632_3200-spectra-skip-same-dim_spectra_latent_dim_8_decoder_num_hidden_layers_5_decoder_hidden_dim_128','20240223-010632_3200-spectra-skip-same-dim_spectra_latent_dim_8_decoder_num_hidden_layers_5_decoder_hidden_dim_256','20240223-011102_3200-spectra-skip-same-dim_spectra_latent_dim_8_decoder_num_hidden_layers_5_decoder_hidden_dim_512','20240223-011135_3200-spectra-skip-same-dim_spectra_latent_dim_16_decoder_num_hidden_layers_3_decoder_hidden_dim_128','20240223-011400_3200-spectra-skip-same-dim_spectra_latent_dim_16_decoder_num_hidden_layers_3_decoder_hidden_dim_256','20240223-011913_3200-spectra-skip-same-dim_spectra_latent_dim_16_decoder_num_hidden_layers_3_decoder_hidden_dim_512','20240223-011959_3200-spectra-skip-same-dim_spectra_latent_dim_16_decoder_num_hidden_layers_5_decoder_hidden_dim_128','20240223-011959_3200-spectra-skip-same-dim_spectra_latent_dim_16_decoder_num_hidden_layers_5_decoder_hidden_dim_256','20240223-012048_3200-spectra-skip-same-dim_spectra_latent_dim_16_decoder_num_hidden_layers_5_decoder_hidden_dim_512','20240223-012148_3200-spectra-skip-same-dim_spectra_latent_dim_32_decoder_num_hidden_layers_3_decoder_hidden_dim_128','20240223-012337_3200-spectra-skip-same-dim_spectra_latent_dim_32_decoder_num_hidden_layers_3_decoder_hidden_dim_256','20240223-012445_3200-spectra-skip-same-dim_spectra_latent_dim_32_decoder_num_hidden_layers_3_decoder_hidden_dim_512','20240223-012454_3200-spectra-skip-same-dim_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_128','20240223-012454_3200-spectra-skip-same-dim_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_256','20240223-012937_3200-spectra-skip-same-dim_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_512']]
+    ablat_hardcode_vals: [['20240225-001406_spectra_latent_dim_8_decoder_num_hidden_layers_3_decoder_hidden_dim_128','20240225-001406_spectra_latent_dim_8_decoder_num_hidden_layers_3_decoder_hidden_dim_256','20240225-001406_spectra_latent_dim_8_decoder_num_hidden_layers_3_decoder_hidden_dim_512','20240225-001419_spectra_latent_dim_8_decoder_num_hidden_layers_5_decoder_hidden_dim_128','20240225-001541_spectra_latent_dim_8_decoder_num_hidden_layers_5_decoder_hidden_dim_256','20240225-001542_spectra_latent_dim_8_decoder_num_hidden_layers_5_decoder_hidden_dim_512','20240225-001545_spectra_latent_dim_16_decoder_num_hidden_layers_3_decoder_hidden_dim_128','20240225-001554_spectra_latent_dim_16_decoder_num_hidden_layers_3_decoder_hidden_dim_256','20240225-001604_spectra_latent_dim_16_decoder_num_hidden_layers_3_decoder_hidden_dim_512','20240225-001634_spectra_latent_dim_16_decoder_num_hidden_layers_5_decoder_hidden_dim_128','20240225-001649_spectra_latent_dim_16_decoder_num_hidden_layers_5_decoder_hidden_dim_256','20240225-001725_spectra_latent_dim_16_decoder_num_hidden_layers_5_decoder_hidden_dim_512','20240225-001731_spectra_latent_dim_32_decoder_num_hidden_layers_3_decoder_hidden_dim_128','20240225-001841_spectra_latent_dim_32_decoder_num_hidden_layers_3_decoder_hidden_dim_256','20240225-001758_spectra_latent_dim_32_decoder_num_hidden_layers_3_decoder_hidden_dim_512','20240225-001809_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_128','20240225-001829_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_256','20240225-001829_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_512']]
 
 optimizer:
     optimizer_type: 'adam'
@@ -60,11 +60,10 @@ decoder:
     decoder_hidden_dim: -1
     decoder_skip_layers: [] #[0,1,2,3]
 
-    decoder_latents_skip_all_layers: True
-    decoder_latents_skip_with_same_dim: True
-    decoder_latents_skip_with_same_dim_sep_layers: False
-
-    decoder_activate_before_latents_skip: True # OBSOLETE
+    decoder_activate_before_latents_skip: False
+    decoder_latents_skip_all_layers: False
+    decoder_latents_skip_method: 'concat'
+    decoder_latents_skip_add_conversion_method: 'convert_input'
 
 trainer:
     num_epochs: 1000

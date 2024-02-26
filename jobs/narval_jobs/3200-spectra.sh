@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --array=2,8,14
-#SBATCH --time=7:00:00
+#SBATCH --array=0-17
+#SBATCH --time=9:00:00
 #SBATCH --gres=gpu:a100:1
 #SBATCH --nodes=1
 #SBATCH --account=def-kyi-ab
-#SBATCH --job-name=3200_spectra_latents_mlp_capacity_sc_7hrs
+#SBATCH --job-name=3200-spectra-no-skip-latents-mlp-capacity
 #SBATCH --output=./outputs/%x-%j.out
 #SBATCH --ntasks=3
 #SBATCH --mem-per-cpu=40000
