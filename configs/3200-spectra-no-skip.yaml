@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['codebook_pretrain']
-    tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
+    # tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
 
 optimizer:
     optimizer_type: 'adam'
@@ -104,5 +104,5 @@ ablation:
     ablat_vals: [[8,16,32],[3,5],[128,256,512]]
     ablat_num_vals: [3,2,3]
 
-    ablat_hardcode_params: ['infer_log_dir']
-    ablat_hardcode_vals: [[]]
+    # ablat_hardcode_params: ['infer_log_dir']
+    # ablat_hardcode_vals: [[]]
