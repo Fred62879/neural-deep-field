@@ -100,7 +100,7 @@ class BasicDecoder(nn.Module):
         self.init()
 
     def get_first_layer_input_dim(self):
-        if self.skip_method == "add" and \
+        if self.perform_skip and self.skip_method == "add" and \
            self.skip_add_conversion_method == "convert_input":
             # we convert input to same dim as hidden latents before input layer
             in_dim = self.hidden_dim
@@ -142,7 +142,7 @@ class BasicDecoder(nn.Module):
             self.bns = nn.ModuleList(self.bns)
 
         # initializes conversion layers for skip
-        if self.skip_method == "add":
+        if self.perform_skip and self.skip_method == "add":
             if self.skip_add_conversion_method == "multi_conversion":
                 convert_layers = []
                 for i in range(self.num_layers):
