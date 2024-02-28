@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --array=4,10,16
+#SBATCH --array=4
 #SBATCH --time=4:00:00
 #SBATCH --gres=gpu:v100l:1
 #SBATCH --nodes=1
@@ -13,3 +13,5 @@ source ~/envs/wisp_env/bin/activate
 cd ../../
 
 python app/main_astro.py --config configs/3200-spectra-no-skip-sc.yaml --ablat-id $SLURM_ARRAY_TASK_ID
+
+# 10,16

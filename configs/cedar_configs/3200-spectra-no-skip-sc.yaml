@@ -6,7 +6,7 @@ global:
     log_fname: 'sc'
 
     tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','save_redshift'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
+    #tasks: ['redshift_pretrain_infer','save_redshift'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -46,7 +46,7 @@ decoder:
     decoder_batch_norm: False
     decoder_num_hidden_layers: -1
     decoder_hidden_dim: -1
-    decoder_skip_layers: [] #[0,1,2,3]
+    decoder_skip_layers: []
 
     decoder_activate_before_latents_skip: False
     decoder_latents_skip_all_layers: False
@@ -103,8 +103,8 @@ ablation:
     ablat_vals: [[8,16,32],[3,5],[128,256,512]]
     ablat_num_vals: [3,2,3]
 
-    #ablat_hardcode_params: ['pretrain_log_dir']
-    #ablat_hardcode_vals: [[]]
+    ablat_hardcode_params: ['pretrain_log_dir']
+    ablat_hardcode_vals: [['20240227-193653_spectra_latent_dim_8_decoder_num_hidden_layers_3_decoder_hidden_dim_128','20240227-195714_spectra_latent_dim_8_decoder_num_hidden_layers_3_decoder_hidden_dim_256','20240227-195713_spectra_latent_dim_8_decoder_num_hidden_layers_3_decoder_hidden_dim_512','20240227-200006_spectra_latent_dim_8_decoder_num_hidden_layers_5_decoder_hidden_dim_128','20240227-195717_spectra_latent_dim_8_decoder_num_hidden_layers_5_decoder_hidden_dim_256','20240227-195713_spectra_latent_dim_8_decoder_num_hidden_layers_5_decoder_hidden_dim_512','20240227-195713_spectra_latent_dim_16_decoder_num_hidden_layers_3_decoder_hidden_dim_128','20240227-200225_spectra_latent_dim_16_decoder_num_hidden_layers_3_decoder_hidden_dim_256','20240227-200226_spectra_latent_dim_16_decoder_num_hidden_layers_3_decoder_hidden_dim_512','20240227-200226_spectra_latent_dim_16_decoder_num_hidden_layers_5_decoder_hidden_dim_128','','20240227-200227_spectra_latent_dim_16_decoder_num_hidden_layers_5_decoder_hidden_dim_512','20240227-200225_spectra_latent_dim_32_decoder_num_hidden_layers_3_decoder_hidden_dim_128','20240227-200226_spectra_latent_dim_32_decoder_num_hidden_layers_3_decoder_hidden_dim_256','20240227-200745_spectra_latent_dim_32_decoder_num_hidden_layers_3_decoder_hidden_dim_512','20240227-201151_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_128','','20240227-200743_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_512']]
 
     #ablat_hardcode_params: ['infer_log_dir']
     #ablat_hardcode_vals: [[]]
