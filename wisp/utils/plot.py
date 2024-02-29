@@ -13,13 +13,13 @@ from wisp.utils.numerical import calculate_sam_spectrum, \
     calculate_precision_recall, calculate_precision_recall_together
 
 
-def plot_latents(latents, fname):
+def plot_latents(latents, fname, color="blue"):
     """
     @Param: latents [bsz,dim]
     """
     assert latents.shape[-1] <= 3
     if latents.shape[-1] == 2:
-        plt.scatter(latents[:,0], latents[:,1])
+        plt.scatter(latents[:,0], latents[:,1], color=color)
     elif latents.shape[-1] == 3:
         fig = plt.figure(figsize=(12, 12))
         ax = fig.add_subplot(projection='3d')

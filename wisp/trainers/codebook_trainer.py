@@ -446,6 +446,9 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_gt_bin_loss or self.neg_sup_wrong_redshift:
             fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_masks"])
 
+        if self.mode == "redshift_pretrain":
+            self.dataset.save_spectra_split_ids(self.log_dir)
+
         # use original spectra wave
         self.dataset.set_wave_source("spectra")
 

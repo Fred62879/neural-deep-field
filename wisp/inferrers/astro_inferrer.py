@@ -306,6 +306,8 @@ class AstroInferrer(BaseInferrer):
         self.recon_spectra_all_bins = "recon_spectra_all_bins" in tasks
         self.plot_binwise_spectra_loss = "plot_binwise_spectra_loss" in tasks
         self.plot_codebook_coeff_all_bins = "plot_codebook_coeff_all_bins" in tasks
+        self.plot_outlier_spectra_latents_pca = "plot_spectra_latents_pca" in tasks and \
+            self.extra_args["infer_outlier_only"]
 
         self.plot_gt_bin_spectra = not self.recon_spectra_all_bins and \
             self.extra_args["plot_spectrum_under_gt_bin"]
@@ -329,9 +331,11 @@ class AstroInferrer(BaseInferrer):
             self.qtz_spectra and self.calculate_binwise_spectra_loss)
         assert sum([self.recon_spectra, self.recon_spectra_all_bins]) <= 1
 
-        self.recon_redshift = self.save_redshift or self.save_optimal_bin_ids or \
-            self.plot_redshift_logits or self.plot_redshift_residual or \
+        self.recon_redshift = self.save_redshift or \
+            self.save_optimal_bin_ids or \
             self.plot_binwise_spectra_loss or \
+            self.plot_outlier_spectra_latents_pca or \
+            self.plot_redshift_logits or self.plot_redshift_residual or \
             self.plot_codebook_coeff or self.plot_codebook_coeff_all_bins
 
         # iii) infer all coords using modified model (recon codebook spectra)
@@ -346,7 +350,8 @@ class AstroInferrer(BaseInferrer):
         self.plot_img_residual = "plot_img_residual" in tasks
         self.integrate_gt_spectra = "integrate_gt_spectra" in tasks
         self.plot_gt_pixel_distrib = "plot_gt_pixel_distrib" in tasks
-        self.plot_spectra_latents_pca = "plot_spectra_latents_pca" in tasks
+        self.plot_spectra_latents_pca = "plot_spectra_latents_pca" in tasks and \
+            not self.extra_args["infer_outlier_only"]
 
         # *) keep only tasks required
         self.group_tasks = []
@@ -355,7 +360,7 @@ class AstroInferrer(BaseInferrer):
            self.save_scaler or self.plot_embed_map or self.plot_latent_embed:
             self.group_tasks.append("infer_all_coords_full_model")
 
-        if self.recon_redshift or self.recon_spectra or self.recon_spectra_all_bins:
+        if self.recon_spectra or self.recon_redshift or self.recon_spectra_all_bins:
            self.group_tasks.append("infer_selected_coords_partial_model")
 
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
@@ -660,41 +665,7 @@ class AstroInferrer(BaseInferrer):
             log_data(self, "recon_pixels", gt_field="gt_pixels", log_ratio=True)
 
         if self.plot_spectra_latents_pca:
-            ndim = self.extra_args["spectra_latents_plot_pca_dim"]
-
-            all_latents = []
-            for model_id, model_fname in enumerate(self.selected_model_fnames):
-                model_fname = join(self.model_dir, model_fname)
-                checkpoint = torch.load(model_fname)
-                latents = checkpoint["model_state_dict"]["nef.latents"]
-                all_latents.append(latents.detach().cpu().numpy())
-            all_latents = np.array(all_latents)
-
-            if self.mode == "redshift_pretrain_infer":
-                gt_bin_ids = self.dataset.create_gt_redshift_bin_ids()
-                all_latents = all_latents[:,gt_bin_ids[0],gt_bin_ids[1],:]
-
-            if self.extra_args["sanity_check_plot_same_pca_dim_as_pretrain"] and \
-               self.mode == "redshift_pretrain_infer":
-                fname = join(self.log_dir, "..", self.extra_args["pretrain_pca_dim_fname"])
-                assert exists(fname)
-                selected_axes = np.load(fname)
-            else: selected_axes = None
-
-            selected_axes, low_dim_latents = reduce_latents_dim_pca(
-                all_latents, self.extra_args["spectra_latents_plot_pca_dim"],
-                selected_axes=selected_axes)
-
-            latents_path = join(self.latents_dir, f"{ndim}-dim")
-            Path(latents_path).mkdir(parents=True, exist_ok=True)
-
-            if self.mode == "codebook_pretrain_infer":
-                fname = join(self.latents_dir, f"{ndim}-dim", "selected_axes.npy")
-                np.save(fname, selected_axes)
-
-            for model_id, cur_latents in enumerate(low_dim_latents):
-                fname = join(latents_path, f"{model_id}.png")
-                plot_latents(cur_latents, fname)
+            self._plot_spectra_latents_pca(-1, all_models_together=True)
 
     #############
     # Infer with checkpoint
@@ -970,7 +941,8 @@ class AstroInferrer(BaseInferrer):
                 self.plot_codebook_coeff, self.plot_codebook_coeff_all_bins,
                 self.plot_redshift_logits, self.plot_redshift_residual,
                 self.plot_binwise_spectra_loss, self.save_optimal_bin_ids,
-                self.save_qtz_weights, self.save_spectra_latents
+                self.save_qtz_weights, self.save_spectra_latents,
+                self.plot_outlier_spectra_latents_pca
         ],[
             partial(self._recon_spectra, self.num_spectra),
             partial(self._recon_spectra_all_bins, self.num_spectra),
@@ -979,7 +951,8 @@ class AstroInferrer(BaseInferrer):
             partial(self._plot_codebook_coeff_all_bins, self.num_spectra),
             self._plot_redshift_logits, self._plot_redshift_residual,
             self._plot_binwise_spectra_loss, self._save_optimal_bin_ids,
-            self._save_qtz_weights, self._save_spectra_latents
+            self._save_qtz_weights, self._save_spectra_latents,
+            self._plot_spectra_latents_pca
         ]):
             if task:
                 if self.infer_outlier_only:
@@ -1456,6 +1429,69 @@ class AstroInferrer(BaseInferrer):
             coords = coords[:,pixel_id:pixel_id+1] # [bsz,1,2/3]
         self.dataset.set_hardcode_data(self.coords_source, coords)
         self.dataset_length = len(coords)
+
+    #######################
+    # no model run helpers
+    #######################
+
+    def _plot_spectra_latents_pca(self, model_id, suffix="", ids=None, all_models_together=False):
+        ndim = self.extra_args["spectra_latents_plot_pca_dim"]
+
+        if all_models_together:
+            assert self.plot_spectra_latents_pca
+            all_latents = []
+            for model_id, model_fname in enumerate(self.selected_model_fnames):
+                model_fname = join(self.model_dir, model_fname)
+                checkpoint = torch.load(model_fname)
+                latents = checkpoint["model_state_dict"]["nef.latents"]
+                all_latents.append(latents.detach().cpu().numpy())
+            all_latents = np.array(all_latents)
+        else:
+            assert self.plot_outlier_spectra_latents_pca
+            model_fname = self.selected_model_fnames[model_id]
+            model_fname = join(self.model_dir, model_fname)
+            checkpoint = torch.load(model_fname)
+            latents = checkpoint["model_state_dict"]["nef.latents"]
+            all_latents = latents.detach().cpu().numpy() # [bsz,nbins,dim]
+
+        if self.mode == "redshift_pretrain_infer":
+            gt_bin_ids = self.dataset.create_gt_redshift_bin_ids()
+            if all_models_together:
+                all_latents = all_latents[:,gt_bin_ids[0],gt_bin_ids[1],:]
+            else:
+                all_latents = all_latents[gt_bin_ids[0],gt_bin_ids[1],:]
+
+        if not all_models_together:
+            all_latents = all_latents[ids]
+
+        if self.extra_args["sanity_check_plot_same_pca_dim_as_pretrain"] and \
+           self.mode == "redshift_pretrain_infer":
+            fname = join(self.log_dir, "..", self.extra_args["pretrain_pca_dim_fname"])
+            assert exists(fname)
+            selected_axes = np.load(fname)
+        else: selected_axes = None
+
+        selected_axes, low_dim_latents = reduce_latents_dim_pca(
+            all_latents, self.extra_args["spectra_latents_plot_pca_dim"],
+            selected_axes=selected_axes)
+
+        latents_path = join(self.latents_dir, f"{ndim}-dim")
+        Path(latents_path).mkdir(parents=True, exist_ok=True)
+
+        if self.mode == "codebook_pretrain_infer":
+            fname = join(self.latents_dir, f"{ndim}-dim", "selected_axes.npy")
+            np.save(fname, selected_axes)
+
+        suffix = ""
+        if self.extra_args["infer_outlier_only"]: suffix = "_outlier"
+        if all_models_together:
+            for model_id, cur_latents in enumerate(low_dim_latents):
+                fname = join(latents_path, f"{model_id}{suffix}.png")
+                plot_latents(cur_latents, fname)
+        else:
+            fname = join(latents_path, f"{model_id}{suffix}.png")
+            print(low_dim_latents.shape)
+            plot_latents(low_dim_latents, fname, color="orange")
 
     ######################
     # all coords helpers

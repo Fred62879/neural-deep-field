@@ -167,6 +167,12 @@ class SpectraData:
     # Getters
     #############
 
+    def save_spectra_split_ids(self, path):
+        # print(len(test_ids), len(validation_ids), len(supervision_ids))
+        np.save(join(path, "supervision_spectra_ids.npy"), self.sup_ids)
+        np.save(join(path, "validation_spectra_ids.npy"), self.val_ids)
+        np.save(join(path, "test_spectra_ids.npy"), self.test_ids)
+
     def get_redshift_pretrain_spectra_ids(self):
         return self.redshift_pretrain_ids
 
@@ -329,6 +335,9 @@ class SpectraData:
 
     def train_valid_split(self):
         test_ids, val_ids, sup_ids = self.split_spectra()
+        self.sup_ids = sup_ids
+        self.val_ids = val_ids
+        self.test_ids = test_ids
         log.info(f"spectra train/valid/test: {len(sup_ids)}/{len(val_ids)}/{len(test_ids)}")
 
         # supervision spectra data (used during pretrain)
