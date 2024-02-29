@@ -61,7 +61,7 @@ class SpectraData:
                   kwargs["spectra_supervision_wave_hi"]]
         self.trans_range = self.trans_obj.get_wave_range()
         self.gt_convolved = kwargs["convolve_spectra"]
-        self.process_ivar = kwargs["process_ivar"]
+        self.process_ivar = kwargs["process_ivar"] and not self.kwargs["convolve_spectra"]
 
         self.dataset_path = get_dataset_path(**kwargs)
         self.set_path(self.dataset_path)
@@ -87,7 +87,8 @@ class SpectraData:
         self.coords_norm_range_fname = get_coords_norm_range_fname(**self.kwargs)
         spectra_cho = self.kwargs["processed_spectra_cho"]
         if self.kwargs["convolve_spectra"]:
-            spectra_cho += "_convolved"
+            sigma = self.kwargs["spectra_smooth_sigma"]
+            spectra_cho += f"_convolved_sigma_{sigma}"
 
         if self.spectra_data_source == "manual":
             assert 0
@@ -1418,14 +1419,14 @@ def create_spectra_mask(spectra, max_spectra_len):
     return mask
 
 def wave_based_sort(spectra):
-    """ Sort spectra and mask based on wave.
+    """ Sort spectra based on wave.
     """
     ids = np.argsort(spectra[0])
     return spectra[:,ids]
 
 def pad_spectra(spectra, mask, max_len):
     """ Pad spectra if shorter than max_len.
-        Update mask to ignore values in padded region.
+        Update mask to 1 for un-padded region.
     """
     m, n = spectra.shape
     offset = max_len - n

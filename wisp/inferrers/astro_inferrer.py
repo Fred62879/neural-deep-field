@@ -1490,7 +1490,6 @@ class AstroInferrer(BaseInferrer):
                 plot_latents(cur_latents, fname)
         else:
             fname = join(latents_path, f"{model_id}{suffix}.png")
-            print(low_dim_latents.shape)
             plot_latents(low_dim_latents, fname, color="orange")
 
     ######################

@@ -512,7 +512,7 @@ spectra_data:
 
     process_ivar: True
     convolve_spectra: True
-    spectra_smooth_sigma: 50
+    spectra_smooth_sigma: 25
     processed_spectra_cho: "v7_table"
     # **************************************************
 

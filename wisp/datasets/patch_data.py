@@ -79,7 +79,6 @@ class PatchData:
     def verify_patch_exists(self, tract, patch):
         fname = create_patch_fname(tract, patch, "HSC-G")
         fname = join(self.input_patch_path, fname)
-        print(fname)
         self.patch_file_exists = exists(fname)
 
     def compile_patch_fnames(self):
