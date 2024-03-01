@@ -2,25 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-400-spectra-skip-v2'
+    exp_name: 'autodecoder-400-spectra-skip-v3'
     # log_fname: ''
 
-    tasks: ['codebook_pretrain']
-    #tasks: ['codebook_pretrain_infer','recon_spectra']
     tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','save_redshift'] #,'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
-
-ablation:
-    perform_ablation: False
-    ablat_id: 0
-    ablat_params: ["decoder_batch_norm"] #["decoder_num_hidden_layers","decoder_hidden_dim"]
-    ablat_vals: [[True,False]] #[[3,5],[128,256,512]]
-    ablat_num_vals: [2] #[2,3]
-
-    ablat_hardcode_params: ["pretrain_log_dir"]
-    ablat_hardcode_vals: [["20240222-015410_1600-spectra-skip-same-dim_decoder_batch_norm_True","20240222-165434_1600-spectra-skip-same-dim_decoder_batch_norm_False"]]
-
-    #"20240222-165402_1600-spectra-skip_decoder_batch_norm_True","20240222-165402_1600-spectra-skip_decoder_batch_norm_False"]]
+    tasks: ['redshift_pretrain_infer','save_redshift','plot_redshift_est_stats','plot_redshift_est_residuals'] #'plot_est_redshift_logits'] # 'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -50,7 +36,7 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240223-175830_skip_same_dim_sep_layers_20k_epochs'
+    pretrain_log_dir: '20240229-141644'
     pretrained_model_name: 'model-ep20000-bch0.pth'
 
     regularize_spectra_latents: True
@@ -60,15 +46,15 @@ decoder:
     decoder_batch_norm: False
     decoder_num_hidden_layers: 3
     decoder_hidden_dim: 128
-    decoder_skip_layers: [] #[0,1,2,3]
+    decoder_skip_layers: []
 
-    decoder_activate_before_latents_skip: True
+    decoder_activate_before_latents_skip: False
     decoder_latents_skip_all_layers: True
     decoder_latents_skip_method: 'add'
-    decoder_latents_skip_add_conversion_method: 'convert_input'
+    decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 1000
+    num_epochs: 500
     batch_size: 5500
     log_cli_every: 100
     plot_grad_every: -1
@@ -85,7 +71,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: ''
+    infer_log_dir: '20240229-142658_sc_500_epochs_141644'
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 140
@@ -94,7 +80,7 @@ infer:
 
     plot_spectrum_with_recon: False
     plot_spectrum_under_gt_bin: True
-    plot_spectrum_under_optimal_wrong_bin: False
+    plot_spectrum_under_optimal_wrong_bin: True
 
     num_spectrum_per_fig: 35
     num_spectrum_per_row: 7
@@ -103,10 +89,23 @@ infer:
     pretrain_pca_dim_fname: '' #/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
-    plot_redshift_precision_recall: False
-    plot_redshift_precision_recall_together: True
-    use_logits_as_precision_recall_threshes: False
-    num_precision_recall_threshes: 10
+    log_redshift_est_stats: True
+    log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:
+    convolve_spectra: True
+    spectra_smooth_sigma: 25
+
     num_supervision_spectra_upper_bound: 400
+
+ablation:
+    perform_ablation: False
+    ablat_id: 0
+    ablat_params: ["decoder_batch_norm"] #["decoder_num_hidden_layers","decoder_hidden_dim"]
+    ablat_vals: [[True,False]] #[[3,5],[128,256,512]]
+    ablat_num_vals: [2] #[2,3]
+
+    ablat_hardcode_params: ["pretrain_log_dir"]
+    ablat_hardcode_vals: [["20240222-015410_1600-spectra-skip-same-dim_decoder_batch_norm_True","20240222-165434_1600-spectra-skip-same-dim_decoder_batch_norm_False"]]
+
+    #"20240222-165402_1600-spectra-skip_decoder_batch_norm_True","20240222-165402_1600-spectra-skip_decoder_batch_norm_False"]]

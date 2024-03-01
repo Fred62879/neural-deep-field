@@ -61,7 +61,7 @@ class SpectraData:
                   kwargs["spectra_supervision_wave_hi"]]
         self.trans_range = self.trans_obj.get_wave_range()
         self.gt_convolved = kwargs["convolve_spectra"]
-        self.process_ivar = kwargs["process_ivar"] and not self.kwargs["convolve_spectra"]
+        self.process_ivar = kwargs["process_ivar"] and self.kwargs["convolve_spectra"]
 
         self.dataset_path = get_dataset_path(**kwargs)
         self.set_path(self.dataset_path)
@@ -1503,6 +1503,8 @@ def mask_spectra_range(spectra, mask, bound, trans_range, trusted_range):
     return spectra, mask, bound
 
 def normalize_spectra(spectra, bound, process_ivar=False):
+    """ Normalize flux to be in 0-1 within supervision range (defined by bound).
+    """
     (id_lo, id_hi) = bound
     flux = spectra[1][id_lo:id_hi+1]
     lo, hi = min(flux), max(flux)

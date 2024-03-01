@@ -412,5 +412,7 @@ def calculate_redshift_logits(loss, masks, gt_spectra, recon_fluxes, ret, gt_bin
         recon_fluxes, kwargs["weight_by_wave_coverage"]
     ).T # [bsz,n_bins]
     ret["spectra_binwise_loss"] = spectra_binwise_loss
+
+    # calculate logits for each bin as softmax of negative loss
     logits = -spectra_binwise_loss * kwargs["binwise_loss_beta"]
     ret["redshift_logits"] = F.softmax(logits, dim=-1)

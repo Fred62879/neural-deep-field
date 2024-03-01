@@ -22,7 +22,8 @@ from wisp.utils import PerfTimer
 from wisp.trainers import BaseTrainer
 from wisp.optimizers import multi_optimizer
 from wisp.utils.plot import plot_grad_flow, plot_multiple, \
-    plot_precision_recall_individually, plot_precision_recall_together
+    plot_redshift_estimation_stats_together, \
+    plot_redshift_estimation_stats_individually
 from wisp.loss import spectra_supervision_loss, \
     spectra_supervision_emd_loss, pretrain_pixel_loss
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
@@ -446,7 +447,7 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_gt_bin_loss or self.neg_sup_wrong_redshift:
             fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_masks"])
 
-        if self.mode == "redshift_pretrain":
+        if self.mode == "codebook_pretrain" or self.mode == "redshift_pretrain":
             self.dataset.save_spectra_split_ids(self.log_dir)
 
         # use original spectra wave
@@ -1246,17 +1247,22 @@ class CodebookTrainer(BaseTrainer):
             redshift_logits, fname, x=bin_centers,vertical_xs=self.gt_redshift
         )
 
-        if self.extra_args["plot_redshift_precision_recall"]:
-            plot_precision_recall_all(
-                redshift_logits, self.gt_redshift, self.extra_args["redshift_lo"],
+    def _plot_redshift_est_stats(self):
+        raise NotImplementedError()
+        if self.extra_args["plot_redshift_est_stats_individually"]:
+            plot_redshift_estimation_stats_individually(
+                self.gt_bin_ids, self.gt_redshift, self.extra_args["redshift_lo"],
                 self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
-                self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png")
-
-        if self.extra_args["plot_redshift_precision_recall_together"]:
-            plot_precision_recall_single(
-                redshift_logits, self.gt_redshift, self.extra_args["redshift_lo"],
+                self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png",
+                self.extra_args["num_redshfit_est_stats_residual_levels"],
+                cho=self.extra_args["redshift_est_stats_cho"])
+        else:
+            plot_redshift_estimation_stats_together(
+                self.gt_bin_ids, self.gt_redshift, self.extra_args["redshift_lo"],
                 self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
-                f"{fname}_precision_recall.png")
+                f"{fname}_precision_recall",
+                self.extra_args["num_redshfit_est_stats_residual_levels"],
+                cho=self.extra_args["redshift_est_stats_cho"])
 
         log.info("redshift logits plotting done")
 

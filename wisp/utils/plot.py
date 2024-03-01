@@ -10,7 +10,7 @@ from pathlib import Path
 from os.path import join
 from astropy.visualization import ZScaleInterval
 from wisp.utils.numerical import calculate_sam_spectrum, \
-    calculate_precision_recall, calculate_precision_recall_together
+    calculate_redshift_estimation_stats_based_on_residuals
 
 
 def plot_latents(latents, fname, color="blue"):
@@ -113,60 +113,71 @@ def plot_save(fname, x, y):
     plt.savefig(fname)
     plt.close()
 
-def plot_precision_recall_individually(logits, gt_redshift, lo, hi, bin_width, n_per_row, fname):
-    """ Plot precision recall for each spectra individually.
+def plot_redshift_estimation_stats_individually(
+        redshift_residuals, num_bins, n_per_row, fname, num_residual_levels, cho="accuracy"
+):
+    """ Plot redshift estimation statistics for each spectra individually.
     """
-    n = len(logits)
-    ncols = min(n, n_per_row)
-    nrows = int(np.ceil(n / ncols))
+    ncols = min(num_bins, n_per_row)
+    nrows = int(np.ceil(num_bins / ncols))
     fig, axs = plt.subplots(nrows, ncols, figsize=(5*ncols,5*nrows))
-    for i, (cur_logits, cur_gt_redshift) in enumerate(zip(logits, gt_redshift)):
-        precision, recall = calculate_precision_recall(
-            cur_logits, cur_gt_redshift, lo, hi, bin_width
+    for i, redshift_residual in enumerate(redshift_residuals):
+        residual_levels, stats = calculate_redshift_estimation_stats_based_on_residuals(
+            [redshift_residual], num_residual_levels, cho=cho
         )
+        if cho == "accuracy":
+            x, y = residual_levels, stats
+        elif cho == "precision_recall":
+            x, y = stats # recall, precision
+            x_label, ylabel = "recall", "precision"
+
         if nrows == 1: axis = axs if ncols == 1 else axs[i%ncols]
         else:          axis = axs[i//ncols,i%ncols]
-        axis.plot(recall, precision)
+        axis.plot(x, y)
+        axis.set_xlabel(xlabel); axis.set_ylabel(ylabel)
         axis.set_xlim(xmin=0,xmax=1.2); axis.set_ylim(ymin=-0.05,ymax=1)
-        axis.set_xlabel("recall");axis.set_ylabel("precision")
+
     fig.tight_layout(); plt.savefig(fname); plt.close()
 
-def plot_precision_recall_together(logits, gt_redshifts, lo, hi, bin_width, fname,
-                                   num_precision_recall_residuals
+def plot_redshift_estimation_stats_together(
+        redshift_residuals, fname, num_residual_levels, cho="accuracy", residual_levels=None
 ):
-    """ Plot precision recall combining all spectra together.
+    """ Plot redshfit estimation statistics combining all spectra together.
         @param
-          logits: estimated redshift logits for each spectra [num_spectra,num_bins]
-          gt_redshifts: gt redshift value for each spectra [num_spectra,]
-          num_precision_recall_residuals: num residual levels to calculate the two stats
+          redshift_residuals: estimated redshift residual for each spectra [num_spectra,]
+          num_residual_levels: num residual levels for which we calculate the stats.
     """
-    n = len(logits)
-    residuals, precision, recall = calculate_precision_recall_together(
-        logits, gt_redshifts, lo, hi, bin_width,
-        num_precision_recall_residuals
+    residual_levels, stats = calculate_redshift_estimation_stats_based_on_residuals(
+        redshift_residuals, num_residual_levels, cho=cho, residual_levels=residual_levels
     )
-    if residuals is None: return # residuals all 0
+    if residual_levels is None: return # residuals all 0
 
-    # plt.plot(recall, precision)
-    # plt.xlim(xmin=0,xmax=1.2);plt.ylim(ymin=0,ymax=1.2)
-    # plt.xlabel("recall");plt.ylabel("precision")
-    # plt.title(f"Precision Recall over {n} spectra")
-    # plt.tight_layout(); plt.savefig(fname + ".png"); plt.close()
+    if cho == "accuracy":
+        plt.plot(residual_levels, stats)
+        plt.xlabel("residual"); plt.ylabel("accuracy")
+        plt.title(f"Accuracy under different residual levels")
+        plt.tight_layout(); plt.savefig(fname + "_accuracy.png"); plt.close()
 
-    # plt.plot(residuals, precision)
-    # plt.xlabel("residual"); plt.ylabel("precision")
-    # plt.title(f"Precision under different residual levels")
-    # plt.tight_layout(); plt.savefig(fname + "_precision.png"); plt.close()
+    elif cho == "precision_recall":
+        recall, precision = stats
+        plt.plot(recall, precision)
+        plt.xlabel("recall"); plt.ylabel("precision")
+        plt.title(f"Precision Recall over {n} spectra")
+        plt.xlim(xmin=0,xmax=1.2); plt.ylim(ymin=0,ymax=1.2)
+        plt.tight_layout(); plt.savefig(fname + ".png"); plt.close()
 
-    # plt.plot(residuals, recall)
-    # plt.xlabel("residual"); plt.ylabel("recall")
-    # plt.title(f"Recall under different residual levels")
-    # plt.tight_layout(); plt.savefig(fname + "_recall.png"); plt.close()
+        plt.plot(residual_levels, precision)
+        plt.xlabel("residual"); plt.ylabel("precision")
+        plt.title(f"Precision under different residual levels")
+        plt.tight_layout(); plt.savefig(fname + "_precision.png"); plt.close()
 
-    plt.plot(residuals, recall)
-    plt.xlabel("residual"); plt.ylabel("accuracy")
-    plt.title(f"Accuracy under different residual levels")
-    plt.tight_layout(); plt.savefig(fname + "_accuracy.png"); plt.close()
+        plt.plot(residual_levels, recall)
+        plt.xlabel("residual"); plt.ylabel("recall")
+        plt.title(f"Recall under different residual levels")
+        plt.tight_layout(); plt.savefig(fname + "_recall.png"); plt.close()
+    else:
+        raise ValueError()
+    return stats
 
 def plot_latent_embed(latents, embed, fname, out_dir, plot_latent_only=False):
     """ Plot latent variable distributions and each codebook embedding.

@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-3200-spectra-generalize'
+    exp_name: 'autodecoder-400-spectra-skip-v3'
     # log_fname: ''
 
     tasks: ['codebook_pretrain']
-    # tasks: ['codebook_pretrain_infer','save_redshift'] #,'plot_redshift_residual'] #'plot_redshift_logits'] #'recon_spectra']
+    tasks: ['codebook_pretrain_infer','recon_spectra'] #'save_redshift']
 
 optimizer:
     optimizer_type: 'adam'
@@ -26,8 +26,8 @@ embedder:
 pretrain:
     pretrain_batch_size: 800
 
-    spectra_latent_dim: 32
-    redshift_pretrain_num_spectra: 3200
+    spectra_latent_dim: 16
+    redshift_pretrain_num_spectra: 400
 
     negative_supervise_wrong_redshift: False
 
@@ -44,8 +44,8 @@ pretrain:
 
 decoder:
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 5
-    decoder_hidden_dim: 512
+    decoder_num_hidden_layers: 3
+    decoder_hidden_dim: 128
     decoder_skip_layers: []
 
     decoder_activate_before_latents_skip: False
@@ -71,10 +71,10 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240225-013832_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_512'
-    infer_selected: False
+    infer_log_dir: '20240229-141644_convolve_sigma_25_20k_epochs'
+    infer_selected: True
     pretrain_num_infer_upper_bound: 140
-    spectra_inferrence_id_fname: '' #'20240227-152126_genlz_90_spectra/redshift/model-0_redshift_outlier_ids.npy'
+    spectra_inferrence_id_fname: '20240229-142658_sc_500_epochs_141644/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
     plot_spectrum_with_recon: True
@@ -88,13 +88,11 @@ infer:
     pretrain_pca_dim_fname: '' #/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
-    plot_redshift_precision_recall: False
-    plot_redshift_precision_recall_together: True
-    use_logits_as_precision_recall_threshes: False
-    num_precision_recall_threshes: 10
-
 spectra_data:
-    num_supervision_spectra_upper_bound: 3200
+    convolve_spectra: True
+    spectra_smooth_sigma: 25
+
+    num_supervision_spectra_upper_bound: 400
 
 ablation:
     perform_ablation: False
