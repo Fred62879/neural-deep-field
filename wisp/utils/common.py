@@ -105,24 +105,6 @@ def get_bin_ids(lo, bin_width, vals, add_batched_dim=False):
         ids = np.concatenate((indices, ids[None,:]), axis=0)
     return ids
 
-def get_loss(cho, cuda):
-    if cho == "l1_mean":
-        loss = nn.L1Loss()
-    elif cho == "l1_sum":
-        loss = nn.L1Loss(reduction="sum")
-    elif cho == "l1_none":
-        loss = nn.L1Loss(reduction="none")
-    elif cho == "l2_mean":
-        loss = nn.MSELoss()
-    elif cho == "l2_sum":
-        loss = nn.MSELoss(reduction="sum")
-    elif cho == "l2_none":
-        loss = nn.MSELoss(reduction="none")
-    else:
-        raise Exception("Unsupported loss choice")
-    if cuda: loss = loss.cuda()
-    return loss
-
 def create_gt_redshift_bin_masks(gt_redshift_bin_ids, num_bins):
     """ Create binary mask where 1 corresponds to gt bin and 0 for wrong bins.
         @Params:

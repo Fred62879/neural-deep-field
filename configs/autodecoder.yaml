@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['codebook_pretrain']
-    tasks: ['codebook_pretrain_infer','recon_spectra'] #'save_redshift']
+    # tasks: ['codebook_pretrain_infer','recon_spectra'] #'save_redshift']
 
 optimizer:
     optimizer_type: 'adam'

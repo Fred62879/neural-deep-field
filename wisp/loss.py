@@ -1,8 +1,29 @@
 import torch
+import torch.nn as nn
 import numpy as np
 
 from wisp.utils.numerical import calculate_emd
 
+
+def get_loss(cho, cuda):
+    if cho == "l1_mean":
+        loss = nn.L1Loss()
+    elif cho == "l1_sum":
+        loss = nn.L1Loss(reduction="sum")
+    elif cho == "l1_none":
+        loss = nn.L1Loss(reduction="none")
+    elif cho == "l2_mean":
+        loss = nn.MSELoss()
+    elif cho == "l2_sum":
+        loss = nn.MSELoss(reduction="sum")
+    elif cho == "l2_none":
+        loss = nn.MSELoss(reduction="none")
+    elif cho == "l4":
+        loss = lpnormloss(p=4)
+    else:
+        raise Exception("Unsupported loss choice")
+    if cuda: loss = loss.cuda()
+    return loss
 
 def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     gt_pixels = gt_pixels / (torch.sum(gt_pixels, dim=-1)[...,None])
@@ -49,7 +70,9 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_fluxes, weight_by_wav
         else: raise ValueError()
 
     # ret = torch.mean(torch.sum(ret, dim=-1), dim=-1)
-    ret = torch.sum(ret, dim=-1) # debug
+    if ret.ndim == 2: # [bsz,nsmpl]
+        ret = torch.sum(ret, dim=-1) # [bsz]
+    else: assert ret.ndim == 1 # [bsz]
     return ret
 
 def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):
@@ -118,6 +141,17 @@ def spectral_masking_loss(loss, relative_train_bands, relative_inpaint_bands,
     masked_recon = torch.cat((masked_recon, b))
     error = loss(masked_gt, masked_recon)
     return error
+
+class lpnormloss(nn.Module):
+    def __init__(self, p, dim=-1):
+        super(lpnormloss, self).__init__()
+        self.p = p
+        self.dim = dim
+
+    def forward(self, input, target):
+        loss = torch.linalg.norm(
+            input - target, ord=self.p, dim=self.dim)
+        return loss
 
 class sigmoid_denorm:
 

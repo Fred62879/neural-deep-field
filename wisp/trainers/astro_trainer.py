@@ -21,9 +21,10 @@ from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     load_pretrained_model_weights, forward, print_shape, create_patch_uid, \
-    get_bool_classify_redshift, get_pretrained_model_fname, get_loss
+    get_bool_classify_redshift, get_pretrained_model_fname
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
-from wisp.loss import spectra_supervision_loss, spectral_masking_loss, redshift_supervision_loss
+from wisp.loss import get_loss, spectra_supervision_loss, \
+    spectral_masking_loss, redshift_supervision_loss
 
 
 class AstroTrainer(BaseTrainer):

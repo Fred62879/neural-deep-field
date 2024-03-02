@@ -24,14 +24,13 @@ from wisp.optimizers import multi_optimizer
 from wisp.utils.plot import plot_grad_flow, plot_multiple, \
     plot_redshift_estimation_stats_together, \
     plot_redshift_estimation_stats_individually
-from wisp.loss import spectra_supervision_loss, \
+from wisp.loss import get_loss, spectra_supervision_loss, \
     spectra_supervision_emd_loss, pretrain_pixel_loss
 from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     select_inferrence_ids, load_embed, load_model_weights, forward, \
     load_pretrained_model_weights, get_pretrained_model_fname, init_redshift_bins, \
     get_bool_classify_redshift, get_bool_has_redshift_latents, get_optimal_wrong_bin_ids, \
-    freeze_layers_incl, freeze_layers_excl, get_loss, create_latent_mask, set_seed, log_data, \
-    get_bin_ids
+    freeze_layers_incl, freeze_layers_excl, create_latent_mask, set_seed, log_data, get_bin_ids
 
 
 class CodebookTrainer(BaseTrainer):
@@ -360,6 +359,12 @@ class CodebookTrainer(BaseTrainer):
             self.init_dataloader()
 
     def init_loss(self):
+        if self.extra_args["plot_individ_spectra_loss"]:
+            # if we need loss for each spectra in a batch
+            #   we don't do mean when calculating spectra loss
+            assert self.extra_args["spectra_loss_cho"][-4:] == "none"
+            raise NotImplementedError()
+
         if self.extra_args["spectra_loss_cho"] == "emd":
             self.spectra_loss = spectra_supervision_emd_loss
         else:
@@ -1447,8 +1452,13 @@ class CodebookTrainer(BaseTrainer):
                 weight_by_wave_coverage=self.extra_args["weight_by_wave_coverage"]
             )
             if self.extra_args["plot_individ_spectra_loss"]:
+                assert spectra_loss.ndim == 1
                 self.cur_spectra_individ_losses.extend(spectra_loss.detach().cpu().numpy())
-            spectra_loss = torch.mean(spectra_loss, dim=-1)
+            if spectra_loss.ndim != 0:
+                assert spectra_loss.ndim == 1
+                # print(spectra_loss.shape)
+                spectra_loss = torch.mean(spectra_loss, dim=-1)
+                # print(spectra_loss.shape)
 
         # if spectra_loss.__class__.__name__ == "Tensor":
         #     self.log_dict["spectra_loss"] += spectra_loss.item()

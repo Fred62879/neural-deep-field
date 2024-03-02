@@ -13,7 +13,7 @@ from os.path import exists, join
 from functools import partial, lru_cache
 
 from wisp.inferrers import BaseInferrer
-from wisp.loss import spectra_supervision_loss
+from wisp.loss import get_loss, spectra_supervision_loss
 from wisp.datasets.data_utils import get_bound_id
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
@@ -24,7 +24,7 @@ from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_line, \
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
     sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, to_numpy, \
     load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, \
-    get_loss, get_bin_ids, get_optimal_wrong_bin_ids, log_data, get_bool_has_redshift_latents, create_batch_ids
+    get_bin_ids, get_optimal_wrong_bin_ids, log_data, get_bool_has_redshift_latents, create_batch_ids
 
 
 class AstroInferrer(BaseInferrer):

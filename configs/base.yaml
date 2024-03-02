@@ -265,7 +265,7 @@ trainer:
 
     plot_loss: True
     pixel_loss_cho: l1_mean
-    spectra_loss_cho: l2_none #emd
+    spectra_loss_cho: l4 #emd
     redshift_loss_cho: l2_mean
 
     train_based_on_epochs: True
