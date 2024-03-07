@@ -55,10 +55,10 @@ class PatchData:
         self.verbose = kwargs["verbose"]
         self.num_bands = kwargs["num_bands"]
         self.u_band_scale = kwargs["u_band_scale"]
-        self.process_ivar = kwargs["process_ivar"]
         self.sensors_full_name = kwargs["sensors_full_name"]
         self.load_patch_data_cache = kwargs["load_patch_data_cache"]
         self.qtz = kwargs["quantize_latent"] or kwargs["quantize_spectra"]
+        self.process_ivar = kwargs["process_ivar"] and kwargs["convolve_spectra"]
 
         self.patch_uid = create_patch_uid(tract, patch)
 

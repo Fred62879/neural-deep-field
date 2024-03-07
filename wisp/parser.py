@@ -499,12 +499,6 @@ def define_cmd_line_args():
     spatial_decod_group.add_argument("--redshift-decod-skip-layers", nargs="+", type=int,
                                      help="Layer to have skip connection.")
 
-    spatial_decod_group.add_argument("--redshift-lo", type=float,
-                                     help="Min value of redshift interval.")
-    spatial_decod_group.add_argument("--redshift-hi", type=float)
-    spatial_decod_group.add_argument("--redshift-bin-width", type=float,
-                                     help="Width of each bin to divide the interval.")
-
     ###################
     # Hyperspectral arguments
     ###################
@@ -644,6 +638,17 @@ def define_cmd_line_args():
     data_group.add_argument("--codebook-spectra-plot-wave-lo", type=int)
     data_group.add_argument("--codebook-spectra-plot-wave-hi", type=int)
     data_group.add_argument("--load-spectra-data-from-cache", action="store_true")
+
+    data_group.add_argument("--redshift-lo", type=float,
+                            help="Min value of redshift interval.")
+    data_group.add_argument("--redshift-hi", type=float)
+    data_group.add_argument("--redshift-bin-width", type=float,
+                            help="Width of each bin to divide the interval.")
+
+    data_group.add_argument("--filter-redshift", action="store_true")
+    data_group.add_argument("--filter-redshift-lo", type=float,
+                            help="Min value of redshift interval.")
+    data_group.add_argument("--filter-redshift-hi", type=float)
 
     ###################
     # Arguments for optimizer

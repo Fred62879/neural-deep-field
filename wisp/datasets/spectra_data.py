@@ -430,6 +430,11 @@ class SpectraData:
             # data for all spectra are saved together (small amount of spectra)
             self.load_cached_spectra_data()
 
+        print(len(self.data["gt_spectra"]))
+        if self.kwargs["filter_redshift"]:
+            self.filter_spectra_based_on_redshift()
+        print(len(self.data["gt_spectra"]))
+
         if self.kwargs["correct_gt_redshift_based_on_redshift_bin"]:
             self.correct_redshift_based_on_bins()
 
@@ -564,6 +569,18 @@ class SpectraData:
         self.data["gt_spectra_redshift"] = num_bins * self.kwargs["redshift_bin_width"] + \
             self.kwargs["redshift_lo"] + self.kwargs["redshift_bin_width"] / 2
         # print(self.data["gt_spectra_redshift"][:20])
+
+    def filter_spectra_based_on_redshift(self):
+        valid_ids = np.arange(len(self.data["gt_spectra_redshift"]))
+        if self.kwargs["filter_redshift_lo"] >= 0:
+            valid_ids = valid_ids[
+                self.data["gt_spectra_redshift"] > self.kwargs["filter_redshift_lo"]]
+        if self.kwargs["filter_redshift_hi"] >= self.kwargs["filter_redshift_lo"]:
+            valid_ids = valid_ids[
+                self.data["gt_spectra_redshift"] < self.kwargs["filter_redshift_hi"]]
+        for field in ["gt_spectra","gt_spectra_masks","gt_spectra_pixels",
+                      "gt_spectra_redshift","gt_spectra_img_coords","gt_spectra_world_coords"]:
+            self.data[field] = self.data[field][valid_ids]
 
     def load_cached_spectra_data(self):
         """ Load spectra data (which are saved together).

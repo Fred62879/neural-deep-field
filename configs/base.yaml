@@ -245,10 +245,6 @@ spatial_decod:
     redshift_decod_activation_type: 'relu'
     redshift_decod_skip_layers: []
 
-    redshift_lo: -0.09
-    redshift_hi: 6.5
-    redshift_bin_width: 0.02
-
 hyperspectral:
     use_batched_hps_model: True
     hps_combine_method: 'concat'
@@ -265,7 +261,7 @@ trainer:
 
     plot_loss: True
     pixel_loss_cho: l1_mean
-    spectra_loss_cho: l4 #emd
+    spectra_loss_cho: l2_none #emd
     redshift_loss_cho: l2_mean
 
     train_based_on_epochs: True
@@ -401,6 +397,9 @@ infer:
     calculate_redshift_est_stats_based_on: 'residuals'
     num_redshift_est_stats_residual_levels: 10
 
+    log_redshift_est_stats: False
+    log_redshift_est_stats_residual_levels: []
+
     # plot pca latents scatter plot
     sanity_check_plot_same_pca_dim_as_pretrain: False
     pretrain_pca_dim_fname: ''
@@ -524,6 +523,14 @@ spectra_data:
     load_spectra_data_from_cache: True
     # debug1: 300 spectra [9812][0,1][0-8] normed
     # debug2: 30 spectra [9812][0][0,1,2] normed
+
+    redshift_lo: -0.09
+    redshift_hi: 6.5
+    redshift_bin_width: 0.02
+
+    filter_redshift: False
+    filter_redshift_lo: -1
+    filter_redshift_hi: -1
 
 inpaint:
     inpaint_cho: 'spectral_inpaint' #'no_inpaint'

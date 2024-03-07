@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','save_redshift','plot_spectra_latents_pca'] #'plot_redshift_logits','plot_redshift_residual'] #
+    tasks: ['redshift_pretrain_infer','recon_spectra'] #'save_redshift','plot_redshift_est_stats'] #,'plot_spectra_latents_pca'] #'plot_redshift_logits','plot_redshift_residual'] #
 
 optimizer:
     optimizer_type: 'adam'
@@ -40,7 +40,7 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240225-013832_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_512'
+    pretrain_log_dir: '20240301-204609_no-convolve-l4'
     pretrained_model_name: 'model-ep50000-bch0.pth'
 
     regularize_spectra_latents: True
@@ -75,12 +75,12 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240227-152126_genlz_90_spectra'
+    # infer_log_dir: '20240229-211138-convolve-sigma-25'
 
-    infer_selected: False
-    pretrain_num_infer_upper_bound: 140
+    infer_selected: True
+    pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: True
+    infer_outlier_only: False
 
     plot_spectrum_with_recon: False
     plot_spectrum_under_gt_bin: True
@@ -93,13 +93,18 @@ infer:
     pretrain_pca_dim_fname: '20240225-013832_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_512/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
-    plot_redshift_precision_recall: False
-    plot_redshift_precision_recall_together: True
-    use_logits_as_precision_recall_threshes: False
-    num_precision_recall_threshes: 10
+    log_redshift_est_stats: True
+    log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:
+    convolve_spectra: True
+    spectra_smooth_sigma: 25
+
     num_supervision_spectra_upper_bound: 3200
+
+    filter_redshift: True
+    filter_redshift_lo: 0.02
+    filter_redshift_hi: -1
 
 ablation:
     perform_ablation: False

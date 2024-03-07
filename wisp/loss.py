@@ -70,9 +70,9 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_fluxes, weight_by_wav
         else: raise ValueError()
 
     # ret = torch.mean(torch.sum(ret, dim=-1), dim=-1)
-    if ret.ndim == 2: # [bsz,nsmpl]
-        ret = torch.sum(ret, dim=-1) # [bsz]
-    else: assert ret.ndim == 1 # [bsz]
+    assert ret.ndim <= 3
+    if ret.ndim != 1: # [bsz,nsmpl] or [nbins,bsz,nsmpl]
+        ret = torch.sum(ret, dim=-1) # [bsz] or [nbins,bsz]
     return ret
 
 def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):
