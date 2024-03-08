@@ -312,7 +312,7 @@ trainer:
     apply_gt_redshift: False                      # -
     redshift_unsupervision: False                 #  |_these options conflict each other 
     redshift_semi_supervision: False              #  |
-    optimize_spectra_for_each_redshift_bin: True  # -
+    optimize_latents_for_each_redshift_bin: True  # -
 
     correct_gt_redshift_based_on_redshift_bin: True
 

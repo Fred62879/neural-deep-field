@@ -209,22 +209,21 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["calculate_binwise_spectra_loss"]
         self.use_binwise_spectra_loss_as_redshift_logits = \
             self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
-        self.optimize_spectra_for_each_redshift_bin = \
-            self.extra_args["optimize_spectra_for_each_redshift_bin"]
+        self.optimize_latents_for_each_redshift_bin = \
+            self.extra_args["optimize_latents_for_each_redshift_bin"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
 
         assert not self.codebook_pretrain_infer or (
-            self.apply_gt_redshift or self.optimize_spectra_for_each_redshift_bin)
+            self.apply_gt_redshift or self.calculate_binwise_spectra_loss)
         # sanity check mandates brute force
-        assert not self.redshift_pretrain_infer or \
-            self.optimize_spectra_for_each_redshift_bin
+        # assert not self.redshift_pretrain_infer or \
+        #     self.optimize_latents_for_each_redshift_bin
         # brute force mandates binwise loss calculation
-        assert not self.optimize_spectra_for_each_redshift_bin or \
+        assert not self.optimize_latents_for_each_redshift_bin or \
             self.calculate_binwise_spectra_loss
         # if we brute force during pretrain, then we must do negative supervision
-        assert not(self.codebook_pretrain_infer and \
-                   self.optimize_spectra_for_each_redshift_bin) or \
-                   self.neg_sup_wrong_redshift
+        assert not(self.codebook_pretrain_infer and self.calculate_binwise_spectra_loss) or \
+            self.neg_sup_wrong_redshift
 
         assert not self.neg_sup_wrong_redshift or (
             self.mode == "codebook_pretrain_infer" and self.classify_redshift and \
@@ -235,9 +234,7 @@ class AstroInferrer(BaseInferrer):
             (not self.qtz or self.extra_args["spectra_batch_reduction_order"] == "qtz_first")
         assert not self.use_binwise_spectra_loss_as_redshift_logits or \
             (self.classify_redshift and self.calculate_binwise_spectra_loss)
-        assert not self.optimize_spectra_for_each_redshift_bin or \
-            self.calculate_binwise_spectra_loss
-        assert not self.optimize_spectra_for_each_redshift_bin or \
+        assert not self.optimize_latents_for_each_redshift_bin or \
             (self.classify_redshift and not self.use_binwise_spectra_loss_as_redshift_logits), \
             "For the brute force method, we keep spectra under all bins without averaging. \
             During inferrence however, we can calculate logits for visualization purposes."
@@ -1885,7 +1882,8 @@ class AstroInferrer(BaseInferrer):
         np.save(fname, codebook_coeff)
 
         y, y2 = codebook_coeff, None
-        if self.optimize_spectra_for_each_redshift_bin:
+        if self.calculate_binwise_spectra_loss:
+            # if self.optimize_latents_for_each_redshift_bin:
             # if each bin has its own set of codebook coeff, we plot that for gt bin only
             gt_redshift = torch.stack(self.gt_redshift_cl).detach().cpu().numpy()
             if ids is not None: gt_redshift = gt_redshift[ids]

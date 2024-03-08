@@ -22,6 +22,9 @@ class HyperSpectralConverter(nn.Module):
         self._qtz_spectra = _qtz_spectra
         self._model_redshift = _model_redshift
         self.wave_multiplier = kwargs["wave_multiplier"]
+        self.optimize_one_latent_for_all_redshift_bins = \
+            kwargs["calculate_binwise_spectra_loss"] and \
+            not kwargs["optimize_latents_for_each_redshift_bin"]
 
         self.encode_wave = kwargs["encode_wave"]
         self.quantize_spectra = kwargs["quantize_spectra"]
@@ -122,7 +125,7 @@ class HyperSpectralConverter(nn.Module):
             if spectral.ndim == 3:
                 spatial = spatial.tile(1,nsmpls,1)
             elif spectral.ndim == 4:
-                assert self._qtz_spectra
+                assert self._qtz_spectra or self.optimize_one_latent_for_all_redshift_bins
                 spatial = spatial[None,...].tile(num_bins,1,nsmpls,1)
             else: raise ValueError()
 

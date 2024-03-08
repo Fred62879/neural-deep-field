@@ -61,7 +61,7 @@ trainer:
     save_model_every: 5000
 
     apply_gt_redshift: True                       # |_these options conflict each other
-    optimize_spectra_for_each_redshift_bin: False # |
+    optimize_latents_for_each_redshift_bin: False # |
     calculate_binwise_spectra_loss: False         # | these two should True or False together
 
     resume_train: False

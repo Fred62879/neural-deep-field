@@ -160,7 +160,7 @@ class HyperSpectralDecoderB(nn.Module):
             @Return
               spectra [bsz,nsmpl]
         """
-        if self.kwargs["optimize_spectra_for_each_redshift_bin"]:
+        if self.kwargs["calculate_binwise_spectra_loss"]:
             # index with argmax, this spectra is for visualization only
             #  optimization relies on spectra loss calculated for each bin
             ret["redshift_logits"] = ret["redshift_logits"].detach()

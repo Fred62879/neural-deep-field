@@ -124,36 +124,41 @@ class CodebookTrainer(BaseTrainer):
         self.calculate_binwise_spectra_loss = self.extra_args["calculate_binwise_spectra_loss"]
         self.use_binwise_spectra_loss_as_redshift_logits =  \
             self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
-        self.optimize_spectra_for_each_redshift_bin = \
-            self.extra_args["optimize_spectra_for_each_redshift_bin"]
+        self.regularize_binwise_spectra_latents = \
+            self.extra_args["regularize_binwise_spectra_latents"]
+        self.optimize_latents_for_each_redshift_bin = \
+            self.extra_args["optimize_latents_for_each_redshift_bin"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
 
         # pretrain mandates either apply gt redshift directly or brute force
         assert not self.mode == "codebook_pretrain" or (
-            self.apply_gt_redshift or self.optimize_spectra_for_each_redshift_bin)
-        # sanity check mandates brute force
-        assert not self.mode == "redshift_pretrain" or \
-            self.optimize_spectra_for_each_redshift_bin
+            self.apply_gt_redshift or self.calculate_binwise_spectra_loss)
+
         # brute force during pretrain mandates negative supervision
         assert not(self.mode == "codebook_pretrain" and \
-                   self.optimize_spectra_for_each_redshift_bin) or \
+                   self.calculate_binwise_spectra_loss) or \
                    self.neg_sup_wrong_redshift
-
-        # brute force mandates binwise loss calculation
-        assert not self.optimize_spectra_for_each_redshift_bin or \
-            self.calculate_binwise_spectra_loss
         assert not self.neg_sup_wrong_redshift or (
             self.mode == "codebook_pretrain" and self.classify_redshift and \
             self.calculate_binwise_spectra_loss)
+
+        # brute force during sanity check or testing mandates only one choice
+        assert not(self.mode == "redshift_pretrain" and \
+                   self.calculate_binwise_spectra_loss) or \
+                   (self.regularize_binwise_spectra_latents or \
+                    self.optimize_latents_for_each_redshift_bin)
+        assert not self.regularize_binwise_spectra_latents or \
+            (self.mode == "redshift_pretrain" and self.calculate_binwise_spectra_loss)
+        assert not self.optimize_latents_for_each_redshift_bin or \
+            (self.mode == "redshift_pretrain" and self.calculate_binwise_spectra_loss)
+
         assert not self.neg_sup_optimize_alternately or \
             self.neg_sup_wrong_redshift
         assert not self.calculate_binwise_spectra_loss or \
             self.extra_args["spectra_batch_reduction_order"] == "qtz_first"
         assert not self.use_binwise_spectra_loss_as_redshift_logits or \
             (self.classify_redshift and self.calculate_binwise_spectra_loss)
-        assert not self.optimize_spectra_for_each_redshift_bin or \
-            self.calculate_binwise_spectra_loss
-        assert not self.optimize_spectra_for_each_redshift_bin or \
+        assert not self.optimize_latents_for_each_redshift_bin or \
             (self.classify_redshift and not self.use_binwise_spectra_loss_as_redshift_logits), \
             "For the brute force method, we keep spectra under all bins without averaging. \
             During inferrence however, we can calculate logits for visualization purposes."
@@ -192,7 +197,7 @@ class CodebookTrainer(BaseTrainer):
         # all others
         self.plot_loss = self.extra_args["plot_loss"]
         self.plot_gt_bin_loss = self.mode == "redshift_pretrain" and \
-            self.optimize_spectra_for_each_redshift_bin
+            self.calculate_binwise_spectra_loss
         self.index_latent = True # index latents as coords in model
         self.split_latent = self.mode == "redshift_pretrain" and \
             self.extra_args["split_latent"]
@@ -324,6 +329,7 @@ class CodebookTrainer(BaseTrainer):
         latents, redshift_latents = self.init_latents()
 
         if self.optimize_bins_separately:
+            raise NotImplementedError()
             gt_bin_latents, wrong_bin_latents = latents
             self.train_pipeline.set_gt_bin_latents(gt_bin_latents)
             self.train_pipeline.set_wrong_bin_latents(wrong_bin_latents)
@@ -331,6 +337,11 @@ class CodebookTrainer(BaseTrainer):
                 self.gt_redshift_bin_ids,
                 self.wrong_redshift_bin_ids,
                 self.gt_redshift_bin_masks)
+        elif self.regularize_binwise_spectra_latents:
+            base_latents, addup_latents = latents
+            self.train_pipeline.set_base_latents(base_latents)
+            self.train_pipeline.set_addup_latents(addup_latents)
+            self.train_pipeline.add_latents()
         else:
             self.train_pipeline.set_latents(latents)
 
@@ -764,7 +775,7 @@ class CodebookTrainer(BaseTrainer):
         if self.optimize_spectra_latents_as_logits:
             dim = self.extra_args["qtz_num_embed"]
         else: dim = self.extra_args["spectra_latent_dim"]
-        if self.optimize_spectra_for_each_redshift_bin:
+        if self.optimize_latents_for_each_redshift_bin:
             sp = (self.num_spectra, self.num_redshift_bins, dim)
         else: sp = (self.num_spectra, dim)
         latents = self.create_latents(
@@ -785,12 +796,17 @@ class CodebookTrainer(BaseTrainer):
         return latents
 
     def init_redshift_pretrain_spectra_latents(self):
+        """ Initialize latents for spectra generation during sanity.
+        """
         latents = None
         if self.optimize_spectra_latents_as_logits:
             sp_z_dim = self.extra_args["qtz_num_embed"]
         else: sp_z_dim = self.extra_args["spectra_latent_dim"]
 
-        if self.optimize_spectra_for_each_redshift_bin:
+        if self.regularize_binwise_spectra_latents:
+            sp = [(self.num_spectra, sp_z_dim),
+                  (self.num_spectra, self.num_redshift_bins, sp_z_dim)]
+        elif self.optimize_latents_for_each_redshift_bin:
             sp = (self.num_spectra, self.num_redshift_bins, sp_z_dim)
         else: sp = (self.num_spectra, sp_z_dim)
 
@@ -806,7 +822,7 @@ class CodebookTrainer(BaseTrainer):
             permute_ids = self.dataset.get_redshift_pretrain_spectra_ids()
             pretrained = checkpoint["model_state_dict"]["nef.latents"][permute_ids].detach()
 
-            if self.optimize_spectra_for_each_redshift_bin:
+            if self.optimize_latents_for_each_redshift_bin:
                 if pretrained.ndim == 3:
                     # when we pretrain with brute force
                     raise NotImplementedError()
@@ -863,11 +879,15 @@ class CodebookTrainer(BaseTrainer):
             else:
                 latents = pretrained.to(self.device)
         elif zero_init:
-            latents = torch.zeros(sp).to(self.device)
+            if type(sp) == list:
+                latents = [torch.zeros(cur_sp).to(self.device) for cur_sp in sp]
+            else: latents = torch.zeros(sp).to(self.device)
             # latents = 0.01 * torch.ones(n,m)
         else:
             torch.manual_seed(seed)
-            latents = torch.rand(sp).to(self.device)
+            if type(sp) == list:
+                latents = [torch.rand(cur_sp).to(self.device) for cur_sp in sp]
+            else: latents = torch.rand(sp).to(self.device)
 
         if type(latents) == list:
             latents = [nn.Parameter(cur_latents, requires_grad=not freeze)
@@ -1387,6 +1407,14 @@ class CodebookTrainer(BaseTrainer):
             spectra_latents_regu *= self.extra_args["spectra_latents_regu_beta"]
             self.log_dict["spectra_latents_regu"] += spectra_latents_regu.item()
 
+        binwise_spectra_latents_regu = 0
+        if self.regularize_binwise_spectra_latents:
+            binwise_spectra_latents_regu = torch.mean(ret["coords"]**2)
+            binwise_spectra_latents_regu *= self.extra_args["spectra_latents_regu_beta"]
+            self.log_dict["binwise_spectra_latents_regu"] += \
+                binwise_spectra_latents_regu.item()
+            assert 0
+
         # vi)
         codebook_spectra_regu = 0
         if self.regularize_codebook_spectra:
@@ -1415,7 +1443,7 @@ class CodebookTrainer(BaseTrainer):
         return total_loss, ret
 
     def _calculate_spectra_loss(self, ret, data):
-        if self.optimize_spectra_for_each_redshift_bin:
+        if self.calculate_binwise_spectra_loss:
             if self.neg_sup_wrong_redshift:
                 spectra_loss = self._calculate_neg_sup_loss(ret, data)
             else:
@@ -1622,12 +1650,17 @@ class CodebookTrainer(BaseTrainer):
 
     def _assign_redshift_pretrain_optimization_params(self):
         spectra_latents, redshift_latents = None, None
+        base_spectra_latents, addup_spectra_latents = None, None
         gt_bin_spectra_latents, wrong_bin_spectra_latents  = None, None
         codebook_logit_params, redshift_logit_params = [], []
 
         for name in self.params_dict:
             if name == "nef.latents":
                 spectra_latents = self.params_dict[name]
+            elif name == "nef.base_latents":
+                base_spectra_latents = self.params_dict[name]
+            elif name == "nef.addup_latents":
+                addup_spectra_latents = self.params_dict[name]
             elif name == "nef.gt_bin_latents":
                 gt_bin_spectra_latents = self.params_dict[name]
             elif name == "nef.wrong_bin_latents":
@@ -1662,9 +1695,11 @@ class CodebookTrainer(BaseTrainer):
             #     spectra_latents = spectra_latents[gt_bin_masks] # gt bin latents
             # elif self.dont_optimize_gt_bin:
             #     spectra_latents = spectra_latents[~gt_bin_masks] # wrong bin latents
-
             if self.optimize_latents_alternately: # em
                 self._add_spectra_latents(spectra_latents, spectra_latents_group)
+            elif self.regularize_binwise_spectra_latents:
+                self._add_spectra_latents(base_spectra_latents, latents_group)
+                self._add_spectra_latents(addup_spectra_latents, latents_group)
             elif self.optimize_bins_separately:
                 self._add_spectra_latents(gt_bin_spectra_latents, latents_group)
                 self._add_spectra_latents(wrong_bin_spectra_latents, latents_group)

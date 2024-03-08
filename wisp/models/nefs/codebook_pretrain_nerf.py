@@ -36,6 +36,16 @@ class CodebookPretrainNerf(BaseNeuralField):
     def set_latents(self, latents):
         self.latents = latents
 
+    def add_latents(self):
+        """
+        Add `addup_latents` to `base_latents`
+        @Param
+          base_latents: [bsz,dim]
+          addup_latents: [bsz,nbins,dim]
+        """
+        nbins = self.addup_latents.shape[1]
+        self.latents = self.base_latents[:,None].tile(1,nbins,1) + self.addup_latents
+
     def combine_latents_all_bins(self, gt_bin_ids, wrong_bin_ids, gt_bin_masks):
         """
         @Params
@@ -60,6 +70,12 @@ class CodebookPretrainNerf(BaseNeuralField):
         self.latents[wrong_bin_ids[0],wrong_bin_ids[1],:] = self.wrong_bin_latents
         print(torch.argmax( (self.latents[...,0] != 1).to(torch.long), dim=-1 ))
         assert 0
+
+    def set_base_latents(self, latents):
+        self.base_latents = latents
+
+    def set_addup_latents(self, latents):
+        self.addup_latents = latents
 
     def set_gt_bin_latents(self, latents):
         self.gt_bin_latents = latents

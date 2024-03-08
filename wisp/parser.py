@@ -201,7 +201,7 @@ def define_cmd_line_args():
     debug_group.add_argument("--add-redshift-logit-bias", action="store_true")
     debug_group.add_argument("--plot-logits-for-gt-bin", action="store_true")
     debug_group.add_argument("--plot-individ-spectra-loss", action="store_true")
-    debug_group.add_argument("--calculate-bin-wise-spectra-loss", action="store_true")
+    # debug_group.add_argument("--calculate-bin-wise-spectra-loss", action="store_true")
 
     debug_group.add_argument("--sample-from-codebook-pretrain-spectra", action="store_true",
                              help="sample spectra for redshift pretrain from spectra \
@@ -380,6 +380,14 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--em-alternation-steps", nargs="+", type=int,
                                 help="alternately optimize each for given steps.")
 
+    # redshift generation strategy
+    pretrain_group.add_argument("--apply-gt-redshift", action="store_true",
+                                help="apply gt redshift instead of generating redshift.")
+    pretrain_group.add_argument("--calculate-binwise-spectra-loss", action="store_true",
+                                help="brute force, generate spectra for each bin individually.")
+    pretrain_group.add_argument("--optimize-latents-for-each-redshift-bin", action="store_true",
+                                help="if brute force, we may assign each bin with a latent.")
+
     pretrain_group.add_argument("--negative-supervise-wrong-redshift", action="store_true",
                                 help="discourage wrong redshift from generating high \
                                 quality spectra during codebook pretrain.")
@@ -400,7 +408,6 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--zero-init-spectra-latents", action="store_true")
     pretrain_group.add_argument("--optimize-spectra-latents-as-logits", action="store_true",
                                 help="optimize latents directly as logits without autodecoder.")
-    pretrain_group.add_argument("--optimize-spectra-for-each-redshift-bin", action="store_true")
     pretrain_group.add_argument("--optimize-spectra-latents", action="store_true")
     pretrain_group.add_argument("--load-pretrained-spectra-latents", action="store_true")
     pretrain_group.add_argument("--load-pretrained-spectra-latents-to-gt-bin-only", action="store_true")
@@ -411,7 +418,6 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--optimize-codebook-logits-mlp", action="store_true")
     pretrain_group.add_argument("--load-pretrained-codebook-logits-mlp", action="store_true")
 
-    pretrain_group.add_argument("--calculate-binwise-spectra-loss", action="store_true")
     pretrain_group.add_argument("--use-binwise-spectra-loss-as-redshift-logits",
                                 action="store_true", help="calculate redshift logits based \
                                 on recon loss for spectra corresponding to each redshift bin.")
@@ -432,9 +438,13 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--codebook-logits-regu-beta", type=float)
 
     pretrain_group.add_argument("--regularize-spectra-latents", action="store_true",
-                                help="Regularize codebook latents using L2 loss s.t. the \
-                                the latents are close to the manifold surface.")
+                                help="Regularize spectra latents using L2 loss s.t. the \
+                                the latents are close to the manifold surface (close to 0).")
     pretrain_group.add_argument("--spectra-latents-regu-beta", type=float)
+    pretrain_group.add_argument("--regularize-binwise-spectra-latents", action="store_true",
+                                help="Regularize latents for each bin of the same spectra s.t. \
+                                they are close in value.")
+    pretrain_group.add_argument("--binwise-spectra-latents-regu-beta", type=float)
 
     pretrain_group.add_argument("--regularize-within-codebook-spectra", action="store_true")
     pretrain_group.add_argument("--regularize-across-codebook-spectra", action="store_true")
@@ -751,8 +761,6 @@ def define_cmd_line_args():
     train_group.add_argument("--spectra-supervision", action="store_true",
                              help="whether main training supervised by spectra.")
 
-    train_group.add_argument("--apply-gt-redshift", action="store_true",
-                             help="apply gt redshift instead of generating redshift.")
     train_group.add_argument("--redshift-unsupervision", action="store_true",
                              help="generate redshift w/o supervision.")
     train_group.add_argument("--redshift-semi-supervision", action="store_true",
