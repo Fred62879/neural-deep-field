@@ -36,6 +36,9 @@ class AstroPipeline(nn.Module):
 
         self.nef: BaseNeuralField = nef
 
+    def get_addup_latents(self):
+        return self.nef.get_addup_latents()
+
     def set_latents(self, latents):
         self.nef.set_latents(latents)
 

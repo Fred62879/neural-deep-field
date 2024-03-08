@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['redshift_pretrain']
-    #tasks: ['redshift_pretrain_infer','save_redshift','recon_spectra'] #'plot_redshift_est_stats','plot_redshift_est_residuals'] #'plot_est_redshift_logits'] # 'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','save_redshift','recon_spectra'] #'plot_redshift_est_stats','plot_redshift_est_residuals'] #'plot_est_redshift_logits'] # 'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -27,7 +27,7 @@ pretrain:
     pretrain_batch_size: 300
 
     spectra_latent_dim: 16
-    redshift_pretrain_num_spectra: 100
+    redshift_pretrain_num_spectra: 10
 
     negative_supervise_wrong_redshift: False
 

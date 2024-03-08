@@ -142,11 +142,11 @@ class CodebookTrainer(BaseTrainer):
             self.mode == "codebook_pretrain" and self.classify_redshift and \
             self.calculate_binwise_spectra_loss)
 
-        # brute force during sanity check or testing mandates only one choice
+        # brute force during sanity check or testing mandates at most one choice
         assert not(self.mode == "redshift_pretrain" and \
                    self.calculate_binwise_spectra_loss) or \
-                   (self.regularize_binwise_spectra_latents or \
-                    self.optimize_latents_for_each_redshift_bin)
+                   not (self.regularize_binwise_spectra_latents and \
+                        self.optimize_latents_for_each_redshift_bin)
         assert not self.regularize_binwise_spectra_latents or \
             (self.mode == "redshift_pretrain" and self.calculate_binwise_spectra_loss)
         assert not self.optimize_latents_for_each_redshift_bin or \
@@ -624,6 +624,7 @@ class CodebookTrainer(BaseTrainer):
         self.log_dict["redshift_logits_regu"] = 0.0
         self.log_dict["spectra_latents_regu"] = 0.0
         self.log_dict["codebook_spectra_regu"] = 0.0
+        self.log_dict["binwise_spectra_latents_regu"] = 0.0
 
     #############
     # One step
@@ -742,7 +743,10 @@ class CodebookTrainer(BaseTrainer):
             load_excls, freeze_excls = [], []
 
             if self.optimize_spectra_latents:
-                freeze_excls.append("nef.latents")
+                if self.regularize_binwise_spectra_latents:
+                    freeze_excls.extend(["nef.base_latents","nef.addup_latents"])
+                else:
+                    freeze_excls.append("nef.latents")
 
             # we load latents in `init_latents` only
             load_excls.append("nef.latents")
@@ -1408,12 +1412,12 @@ class CodebookTrainer(BaseTrainer):
             self.log_dict["spectra_latents_regu"] += spectra_latents_regu.item()
 
         binwise_spectra_latents_regu = 0
-        if self.regularize_binwise_spectra_latents:
-            binwise_spectra_latents_regu = torch.mean(ret["coords"]**2)
-            binwise_spectra_latents_regu *= self.extra_args["spectra_latents_regu_beta"]
-            self.log_dict["binwise_spectra_latents_regu"] += \
-                binwise_spectra_latents_regu.item()
-            assert 0
+        # if self.regularize_binwise_spectra_latents:
+        #     addup_latents = self.train_pipeline.get_addup_latents() # [bsz,nbins,dim]
+        #     binwise_spectra_latents_regu = torch.sum(torch.abs(addup_latents))
+        #     binwise_spectra_latents_regu *= self.extra_args["spectra_latents_regu_beta"]
+        #     self.log_dict["binwise_spectra_latents_regu"] += \
+        #         binwise_spectra_latents_regu.item()
 
         # vi)
         codebook_spectra_regu = 0
@@ -1435,8 +1439,8 @@ class CodebookTrainer(BaseTrainer):
             codebook_spectra_regu *= self.extra_args["codebook_spectra_regu_beta"]
             self.log_dict["codebook_spectra_regu"] += codebook_spectra_regu
 
-        total_loss = spectra_loss + recon_loss + \
-            spectra_latents_regu + redshift_logits_regu + codebook_spectra_regu
+        total_loss = spectra_loss + recon_loss + spectra_latents_regu + \
+            redshift_logits_regu + codebook_spectra_regu + binwise_spectra_latents_regu
 
         self.log_dict["total_loss"] += total_loss.item()
         self.timer.check("loss calculated")
@@ -1566,8 +1570,11 @@ class CodebookTrainer(BaseTrainer):
             log_text += " | codebook logits regu: {:>.3E}".format(
                 self.log_dict["codebook_logits_regu"] / m)
         if self.regularize_spectra_latents:
-            log_text += " | codebook latents regu: {:>.3E}".format(
+            log_text += " | spectra latents regu: {:>.3E}".format(
                 self.log_dict["spectra_latents_regu"] / m)
+        if self.regularize_binwise_spectra_latents:
+            log_text += " | binwise spectra latents regu: {:>.3E}".format(
+                self.log_dict["binwise_spectra_latents_regu"] / m)
         if self.regularize_codebook_spectra:
             log_text += " | codebook spectra regu: {:>.3E}".format(
                 self.log_dict["codebook_spectra_regu"] / m)

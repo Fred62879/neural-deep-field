@@ -33,6 +33,9 @@ class CodebookPretrainNerf(BaseNeuralField):
     def get_nef_type(self):
         return "codebook_pretrain"
 
+    def get_addup_latents(self):
+        return self.addup_latents
+
     def set_latents(self, latents):
         self.latents = latents
 
@@ -43,8 +46,9 @@ class CodebookPretrainNerf(BaseNeuralField):
           base_latents: [bsz,dim]
           addup_latents: [bsz,nbins,dim]
         """
-        nbins = self.addup_latents.shape[1]
-        self.latents = self.base_latents[:,None].tile(1,nbins,1) + self.addup_latents
+        #nbins = self.addup_latents.shape[1]
+        #self.latents = self.base_latents[:,None].tile(1,nbins,1) + self.addup_latents
+        self.latents = self.addup_latents
 
     def combine_latents_all_bins(self, gt_bin_ids, wrong_bin_ids, gt_bin_masks):
         """
@@ -193,6 +197,7 @@ class CodebookPretrainNerf(BaseNeuralField):
         timer.check("forward starts")
 
         ret = defaultdict(lambda: None)
+        # print(self.latents[0,0])
 
         if self.use_latents_as_coords:
             assert coords is None
