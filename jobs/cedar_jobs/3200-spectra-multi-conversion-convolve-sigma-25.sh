@@ -1,10 +1,9 @@
 #!/bin/bash
-#SBATCH --array=11
 #SBATCH --time=10:00:00
 #SBATCH --gres=gpu:v100l:1
 #SBATCH --nodes=1
 #SBATCH --account=def-kyi-ab
-#SBATCH --job-name=3200-spectra-no-skip-latents-mlp-capacity-sc-10hrs
+#SBATCH --job-name=3200-spectra-multi-conversion-convolve-sigma-25
 #SBATCH --output=./outputs/%x-%j.out
 #SBATCH --ntasks=3
 #SBATCH --mem-per-cpu=4000
@@ -12,6 +11,4 @@
 source ~/envs/wisp_env/bin/activate
 cd ../../
 
-python app/main_astro.py --config configs/cedar_configs/3200-spectra-no-skip-sc.yaml --ablat-id $SLURM_ARRAY_TASK_ID
-
-# 5,11,17
+python app/main_astro.py --config configs/cedar_configs/3200-spectra-multi-conversion-convolve-sigma-25.yaml
