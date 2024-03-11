@@ -1,0 +1,117 @@
+parent: base_narval.yaml
+
+global:
+    use_tqdm: False
+    exp_name: 'autodecoder-3200-spectra-skip-multi-conversion'
+    log_fname: 'sc-spectra-convolve-sigma-50'
+
+    # tasks: ['codebook_pretrain']
+    # tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
+    tasks: ['redshift_pretrain']
+
+optimizer:
+    optimizer_type: 'adam'
+
+    b1: 0.5
+    b2: 0.999
+    lr: 1e-4
+    spectra_latents_lr: 1e-3
+    codebook_pretrain_lr: 1e-3
+    weight_decay: 1e-5
+
+    sgd_momentum: 0.9
+
+embedder:
+    wave_embed_dim: 16
+
+pretrain:
+    pretrain_batch_size: 100 #800
+
+    spectra_latent_dim: 16
+    redshift_pretrain_num_spectra: 3200
+
+    negative_supervise_wrong_redshift: False
+
+    load_pretrained_spectra_latents: False
+    load_pretrained_spectra_latents_to_gt_bin_only: False
+    optimize_gt_bin_only: False
+    dont_optimize_gt_bin: False
+
+    pretrain_log_dir: '20240310-172318_spectra-convolve-sigma-50'
+    pretrained_model_name: 'model-ep10000-bch0.pth'
+
+    regularize_spectra_latents: True
+    spectra_latents_regu_beta: 16
+
+decoder:
+    decoder_batch_norm: False
+    decoder_num_hidden_layers: 3
+    decoder_hidden_dim: 512
+    decoder_skip_layers: []
+
+    decoder_activate_before_latents_skip: False
+    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_method: 'add'
+    decoder_latents_skip_add_conversion_method: 'multi_conversion'
+
+trainer:
+    num_epochs: 500
+    batch_size: 5500
+    log_cli_every: 100
+    plot_grad_every: -1
+    save_model_every: 100
+
+    apply_gt_redshift: False
+    calculate_binwise_spectra_loss: True # brute force, each bin has its own spectra
+
+    # if brute force, we have three choices
+    regularize_binwise_spectra_latents: False     # conflicts each other
+    optimize_latents_for_each_redshift_bin: True  #
+
+    resume_train: False
+    resume_log_dir: ''
+    resume_model_fname: 'model-ep10000-bch0.pth'
+
+infer:
+    infer_last_model_only: True
+
+    infer_log_dir: ''
+
+    infer_selected: False
+    pretrain_num_infer_upper_bound: 70
+    spectra_inferrence_id_fname: ''
+    infer_outlier_only: False
+
+    plot_spectrum_with_recon: True
+    plot_spectrum_under_gt_bin: False
+    plot_spectrum_under_optimal_wrong_bin: False
+
+    num_spectrum_per_fig: 35
+    num_spectrum_per_row: 7
+
+    sanity_check_plot_same_pca_dim_as_pretrain: True
+    pretrain_pca_dim_fname: ''
+    spectra_latents_plot_pca_dim: 2
+
+    log_redshift_est_stats: True
+    log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
+
+spectra_data:
+    convolve_spectra: True
+    spectra_smooth_sigma: 50
+
+    num_supervision_spectra_upper_bound: 3200
+
+    filter_redshift: False
+    filter_redshift_lo: 0.02
+    filter_redshift_hi: -1
+
+ablation:
+    perform_ablation: False
+    ablat_id: 0
+    ablat_params: ["spectra_latent_dim","decoder_num_hidden_layers","decoder_hidden_dim"]
+    ablat_vals: [[8,16,32],[3,5],[128,256,512]]
+    ablat_num_vals: [3,2,3]
+
+    # ablat_hardcode_params: ['infer_log_dir']
+    # ablat_hardcode_vals: [[]]

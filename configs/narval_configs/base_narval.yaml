@@ -2,7 +2,7 @@
 global:
     verbose: False
     use_gpu: True
-    use_tqdm: False
+    use_tqdm: True
     on_cedar: False
     on_graham: False
     on_narval: True
@@ -195,6 +195,7 @@ pretrain:
     debug_lbfgs: False
 
 decoder:
+    decoder_batch_norm: False
     decoder_num_hidden_layers: 1
     decoder_hidden_dim: 128
     decoder_layer_type: 'none'
@@ -243,10 +244,6 @@ spatial_decod:
     redshift_decod_layer_type: 'none'
     redshift_decod_activation_type: 'relu'
     redshift_decod_skip_layers: []
-
-    redshift_lo: -0.09
-    redshift_hi: 6.5
-    redshift_bin_width: 0.02
 
 hyperspectral:
     use_batched_hps_model: True
@@ -312,7 +309,7 @@ trainer:
     apply_gt_redshift: False                      # -
     redshift_unsupervision: False                 #  |_these options conflict each other 
     redshift_semi_supervision: False              #  |
-    optimize_spectra_for_each_redshift_bin: True  # -
+    optimize_latents_for_each_redshift_bin: True  # -
 
     correct_gt_redshift_based_on_redshift_bin: True
 
@@ -360,15 +357,20 @@ infer:
     recon_cutout_start_pos: [ [[256,256]], [[86,188]] ]
 
     # recon spectra
+    spectra_neighbour_size: 1
+    flux_norm_cho: "identity"
+    average_neighbour_spectra: True
+    infer_spectra_individually: False
+
+    num_spectrum_per_fig: 35
+    num_spectrum_per_row: 4
+
     infer_selected: False
     pretrain_num_infer_upper_bound: 70
     test_num_infer_upper_bound: 10
     spectra_inferrence_id_fname: ''
     infer_outlier_only: False
 
-    spectra_neighbour_size: 1
-
-    flux_norm_cho: "identity"
     spectra_markers: [".",",","o","v","^","<",">","1","2","3","4","8","s","p","P","*","h","H","+","x","X","D","d","|","_"]
     mark_spectra: True
     plot_clipped_spectrum: True
@@ -389,17 +391,16 @@ infer:
     plot_residual_times_ivar: False # exclusive
     plot_ivar_region: True          #
 
-    average_neighbour_spectra: True
-    infer_spectra_individually: False
+    # plot redshift estimation statistics
+    plot_redshift_est_stats_individually: False
+    redshift_est_stats_cho: 'accuracy'
+    calculate_redshift_est_stats_based_on: 'residuals'
+    num_redshift_est_stats_residual_levels: 10
 
-    plot_redshift_precision_recall: False
-    plot_redshift_precision_recall_together: False
-    use_logits_as_precision_recall_threshes: False
-    num_precision_recall_threshes: 10
+    log_redshift_est_stats: False
+    log_redshift_est_stats_residual_levels: []
 
-    num_spectrum_per_fig: 35
-    num_spectrum_per_row: 4
-
+    # plot pca latents scatter plot
     sanity_check_plot_same_pca_dim_as_pretrain: False
     pretrain_pca_dim_fname: ''
     spectra_latents_plot_pca_dim: -1
@@ -509,9 +510,9 @@ spectra_data:
     spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
 
-    process_ivar: True
+    process_ivar: False
     convolve_spectra: True
-    spectra_smooth_sigma: 50
+    spectra_smooth_sigma: -1
     processed_spectra_cho: "v7_table"
     # **************************************************
 
@@ -522,6 +523,14 @@ spectra_data:
     load_spectra_data_from_cache: True
     # debug1: 300 spectra [9812][0,1][0-8] normed
     # debug2: 30 spectra [9812][0][0,1,2] normed
+
+    redshift_lo: -0.09
+    redshift_hi: 6.5
+    redshift_bin_width: 0.02
+
+    filter_redshift: False
+    filter_redshift_lo: -1
+    filter_redshift_hi: -1
 
 inpaint:
     inpaint_cho: 'spectral_inpaint' #'no_inpaint'
