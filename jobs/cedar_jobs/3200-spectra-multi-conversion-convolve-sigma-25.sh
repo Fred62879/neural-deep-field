@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=10:00:00
+#SBATCH --time=2:00:00
 #SBATCH --gres=gpu:v100l:1
 #SBATCH --nodes=1
 #SBATCH --account=def-kyi-ab

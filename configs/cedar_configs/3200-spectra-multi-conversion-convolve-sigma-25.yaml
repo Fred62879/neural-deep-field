@@ -3,10 +3,10 @@ parent: base_cedar.yaml
 global:
     use_tqdm: False
     exp_name: 'autodecoder-3200-spectra-multi-conversion'
-    # log_fname: ''
+    log_fname: 'convolve-sigma-25'
 
     tasks: ['codebook_pretrain']
-    # tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
+    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
 
 optimizer:
     optimizer_type: 'adam'
@@ -26,7 +26,7 @@ embedder:
 pretrain:
     pretrain_batch_size: 800
 
-    spectra_latent_dim: 32
+    spectra_latent_dim: 16
     redshift_pretrain_num_spectra: 3200
 
     negative_supervise_wrong_redshift: False
@@ -44,7 +44,7 @@ pretrain:
 
 decoder:
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 5
+    decoder_num_hidden_layers: 3
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
@@ -54,29 +54,32 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 50000
+    num_epochs: 5000
     batch_size: 5500
-    log_cli_every: 5000
+    log_cli_every: 500
     plot_grad_every: -1
-    save_model_every: 5000
+    save_model_every: 500
 
-    apply_gt_redshift: True                       # |_these options conflict each other
-    optimize_spectra_for_each_redshift_bin: False # |
-    calculate_binwise_spectra_loss: False         # | these two should True or False together
+    apply_gt_redshift: True
+    calculate_binwise_spectra_loss: False # brute force, each bin has its own spectra
+
+    # if brute force, we have three choices
+    regularize_binwise_spectra_latents: False     # conflicts each other
+    optimize_latents_for_each_redshift_bin: False #
 
     resume_train: False
     resume_log_dir: ''
     resume_model_fname: 'model-ep10000-bch0.pth'
 
 infer:
-    infer_last_model_only: True
+    infer_last_model_only: False
 
-    # infer_log_dir: ''
+    infer_log_dir: '20240311-134127_convolve-sigma-25'
 
-    infer_selected: False
+    infer_selected: True
     pretrain_num_infer_upper_bound: 70
     spectra_inferrence_id_fname: '' #redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: True
+    infer_outlier_only: False
 
     plot_spectrum_with_recon: True
     plot_spectrum_under_gt_bin: False

@@ -3,7 +3,7 @@ parent: base_cedar.yaml
 global:
     use_tqdm: False
     exp_name: 'autodecoder-3200-spectra-multi-conversion'
-    log_fname: 'no-convolve'
+    log_fname: 'convolve-sigma-50'
 
     tasks: ['codebook_pretrain']
     tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
@@ -74,7 +74,7 @@ trainer:
 infer:
     infer_last_model_only: False
 
-    infer_log_dir: '20240311-141123_no-convolve'
+    infer_log_dir: '20240311-141124_convolve-sigma-50'
 
     infer_selected: True
     pretrain_num_infer_upper_bound: 70
@@ -95,7 +95,7 @@ infer:
 spectra_data:
     num_supervision_spectra_upper_bound: 3200
 
-    convolve_spectra: False
+    convolve_spectra: True
     spectra_smooth_sigma: 50
 
 ablation:

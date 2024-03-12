@@ -128,23 +128,28 @@ class BaseInferrer(ABC):
     def infer(self):
         """ Perform each inferrence task (one at a time) using all selected models.
         """
-        for i, (tract, patch) in enumerate(zip(
-                self.extra_args["tracts"], self.extra_args["patches"]
-        )):
-            self.get_cur_patch_data(i, tract, patch)
+        if self.mode == "codebook_pretrain_infer" or self.mode == "redshift_pretrain_infer":
+            self.infer_all_models()
+        else:
+            for i, (tract, patch) in enumerate(zip(
+                    self.extra_args["tracts"], self.extra_args["patches"]
+            )):
+                self.get_cur_patch_data(i, tract, patch)
+                self.infer_all_models()
 
-            for group_task in self.group_tasks:
-                self._toggle(group_task)
-                self._register_inferrence_func(group_task)
+    def infer_all_models(self):
+        for group_task in self.group_tasks:
+            self._toggle(group_task)
+            self._register_inferrence_func(group_task)
 
-                if self.verbose:
-                    log.info(f"inferring for {group_task}")
-                if self.run_model:
-                    self.pre_inferrence()
-                    self.inferrence_run_model()
-                    self.post_inferrence()
-                else:
-                    self.inferrence_no_model_run()
+            if self.verbose:
+                log.info(f"inferring for {group_task}")
+            if self.run_model:
+                self.pre_inferrence()
+                self.inferrence_run_model()
+                self.post_inferrence()
+            else:
+                self.inferrence_no_model_run()
 
     def pre_inferrence(self):
         pass
