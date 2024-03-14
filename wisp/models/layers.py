@@ -409,7 +409,7 @@ def calculate_redshift_logits(loss, masks, gt_spectra, recon_fluxes, ret, gt_bin
     spectra_binwise_loss = loss(
         masks[None,:].tile(n_bins,1,1),
         gt_spectra[None,:].tile(n_bins,1,1,1),
-        recon_fluxes, kwargs["weight_by_wave_coverage"]
+        recon_fluxes
     ).T # [bsz,n_bins]
     ret["spectra_binwise_loss"] = spectra_binwise_loss
 

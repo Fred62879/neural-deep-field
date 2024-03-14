@@ -218,6 +218,7 @@ class AstroInferrer(BaseInferrer):
         # pretrain infer mandates either apply gt redshift directly or brute force
         assert not self.codebook_pretrain_infer or (
             self.apply_gt_redshift or self.calculate_binwise_spectra_loss)
+        assert not (self.apply_gt_redshift and self.calculate_binwise_spectra_loss)
 
         # brute force during pretrain mandates negative supervision
         assert not(self.codebook_pretrain_infer and \
@@ -934,7 +935,7 @@ class AstroInferrer(BaseInferrer):
                     checkpoint["model_state_dict"]["nef.base_latents"])
                 self.spectra_infer_pipeline.set_addup_latents(
                     checkpoint["model_state_dict"]["nef.addup_latents"])
-                self.spectra_infer_pipeline.add_latents()
+                # self.spectra_infer_pipeline.add_latents()
             else:
                 self.spectra_infer_pipeline.set_latents(
                     checkpoint["model_state_dict"]["nef.latents"])
@@ -1401,6 +1402,9 @@ class AstroInferrer(BaseInferrer):
         if self.classify_redshift:
             self.dataset.set_num_redshift_bins(self.num_redshift_bins)
 
+        if self.mode == "codebook_pretrain_infer" or self.mode == "redshift_pretrain_infer":
+            self.dataset.save_spectra_split_ids(self.log_dir)
+
     @lru_cache
     def _select_inferrence_ids(self):
         fname = join(self.log_dir, "..", self.extra_args["spectra_inferrence_id_fname"])
@@ -1415,10 +1419,13 @@ class AstroInferrer(BaseInferrer):
 
     def _get_spectra_loss_func(self, data):
         if self.extra_args["spectra_loss_cho"] == "emd":
+            raise ValueError()
             loss = spectra_supervision_emd_loss
         else:
-            loss = partial(spectra_supervision_loss,
-                           get_loss(self.extra_args["spectra_loss_cho"], self.cuda))
+            loss = get_loss(self.extra_args["spectra_loss_cho"], self.cuda)
+            loss = partial(
+                spectra_supervision_loss, loss,
+                self.extra_args["weight_by_wave_coverage"], True)
         return loss
 
     def _set_coords_from_checkpoint(self, checkpoint):

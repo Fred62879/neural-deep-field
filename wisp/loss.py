@@ -50,14 +50,18 @@ def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
 #     return spectra_supervision_loss(
 #         loss, mask, gt_spectra, recon_fluxes, weight_by_wave_coverage=True)
 
-def spectra_supervision_loss(loss, mask, gt_spectra, recon_fluxes, weight_by_wave_coverage=True):
-    """ Loss function for spectra supervision
-        @Param
-          loss: l1/l2 as specified in config
-          mask:       [...,bsz,num_smpls]
-          gt_spectra: [...,bsz,4+2*nbanbds,num_smpls]
-                      (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
-          recon_fluxes: [...,bsz,num_smpls]
+def spectra_supervision_loss(
+        loss, weight_by_wave_coverage, keepdim, mask, gt_spectra, recon_fluxes):
+    """
+    Loss function for spectra supervision
+    @Param
+      loss: l1/l2 as specified in config
+      mask:       [...,bsz,num_smpls]
+      gt_spectra: [...,bsz,4+2*nbanbds,num_smpls]
+                  (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
+      recon_fluxes: [...,bsz,num_smpls]
+    @Return
+
     """
     if weight_by_wave_coverage:
         weight = gt_spectra[:,3]
@@ -65,14 +69,19 @@ def spectra_supervision_loss(loss, mask, gt_spectra, recon_fluxes, weight_by_wav
     else:
         if gt_spectra.ndim == 3:
             ret = loss(gt_spectra[:,1]*mask, recon_fluxes*mask)
-        elif gt_spectra.ndim == 4:
+        elif gt_spectra.ndim == 4: # binwise spectra loss
             ret = loss(gt_spectra[:,:,1]*mask, recon_fluxes*mask)
         else: raise ValueError()
 
     # ret = torch.mean(torch.sum(ret, dim=-1), dim=-1)
     assert ret.ndim <= 3
-    if ret.ndim != 1: # [bsz,nsmpl] or [nbins,bsz,nsmpl]
-        ret = torch.sum(ret, dim=-1) # [bsz] or [nbins,bsz]
+
+    if ret.ndim == 2: # [bsz,nsmpl]/[nbins,bsz]
+        if not keepdim:
+            ret = torch.sum(ret, dim=-1) # [bsz]
+    elif ret.ndim == 3: # [nbins,bsz,nsmpl]
+        ret = torch.sum(ret, dim=-1) # [nbins,bsz]
+    else: raise ValueError()
     return ret
 
 def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):

@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['redshift_pretrain']
-    #tasks: ['redshift_pretrain_infer','recon_spectra'] #'save_redshift','plot_redshift_est_stats'] #,'plot_spectra_latents_pca'] #'plot_redshift_logits','plot_redshift_residual'] #
+    tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_stats'] #,'plot_spectra_latents_pca'] #'plot_redshift_logits','plot_redshift_residual'] #
 
 optimizer:
     optimizer_type: 'adam'
@@ -28,7 +28,7 @@ pretrain:
     add_validation_spectra_not_in_supervision: True
     num_extra_validation_spectra: 71 #481 #71
 
-    pretrain_batch_size: 50
+    pretrain_batch_size: 100
 
     spectra_latent_dim: 16
     redshift_pretrain_num_spectra: 10
@@ -40,8 +40,8 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240307-141408-3200-spectra-16-3-512-multi-conversion-convolve-sigma-25'
-    pretrained_model_name: 'model-ep1000-bch0.pth'
+    pretrain_log_dir: '20240312-221007_spectra-no-convolve-l4'
+    pretrained_model_name: 'model-ep5000-bch0.pth'
 
     regularize_spectra_latents: True
     spectra_latents_regu_beta: 16
@@ -66,21 +66,26 @@ trainer:
 
     apply_gt_redshift: False
     calculate_binwise_spectra_loss: True # brute force, each bin has its own spectra
-    optimize_latents_for_each_redshift_bin: False
+
+    # if brute force, we have three choices
+    regularize_binwise_spectra_latents: False     # conflicts each other
+    optimize_latents_for_each_redshift_bin: True  #
 
     resume_train: False
     resume_log_dir: ''
     resume_model_fname: 'model-ep10000-bch0.pth'
 
+    spectra_loss_cho: 'l4'
+
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: '20240229-211138-convolve-sigma-25'
+    infer_log_dir: '20240313-161336_genlz-spectra-convolve-sigma-25-l4-223706'
 
-    infer_selected: True
+    infer_selected: False
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: False
+    infer_outlier_only: True
 
     plot_spectrum_with_recon: False
     plot_spectrum_under_gt_bin: True
@@ -93,7 +98,7 @@ infer:
     pretrain_pca_dim_fname: '20240225-013832_spectra_latent_dim_32_decoder_num_hidden_layers_5_decoder_hidden_dim_512/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
-    log_redshift_est_stats: True
+    log_redshift_est_stats: False
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:

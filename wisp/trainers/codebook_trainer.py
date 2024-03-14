@@ -133,6 +133,7 @@ class CodebookTrainer(BaseTrainer):
         # pretrain mandates either apply gt redshift directly or brute force
         assert not self.mode == "codebook_pretrain" or (
             self.apply_gt_redshift or self.calculate_binwise_spectra_loss)
+        assert not (self.apply_gt_redshift and self.calculate_binwise_spectra_loss)
 
         # brute force during pretrain mandates negative supervision
         assert not(self.mode == "codebook_pretrain" and \
@@ -341,7 +342,7 @@ class CodebookTrainer(BaseTrainer):
             base_latents, addup_latents = latents
             self.train_pipeline.set_base_latents(base_latents)
             self.train_pipeline.set_addup_latents(addup_latents)
-            self.train_pipeline.add_latents()
+            # self.train_pipeline.add_latents()
         else:
             self.train_pipeline.set_latents(latents)
 
@@ -376,11 +377,18 @@ class CodebookTrainer(BaseTrainer):
             assert self.extra_args["spectra_loss_cho"][-4:] == "none"
             raise NotImplementedError()
 
-        if self.extra_args["spectra_loss_cho"] == "emd":
-            self.spectra_loss = spectra_supervision_emd_loss
-        else:
-            loss = get_loss(self.extra_args["spectra_loss_cho"], self.cuda)
-            self.spectra_loss = partial(spectra_supervision_loss, loss)
+        # if self.extra_args["spectra_loss_cho"] == "emd":
+        #     self.spectra_loss = spectra_supervision_emd_loss
+        # else:
+        loss = get_loss(self.extra_args["spectra_loss_cho"], self.cuda)
+        self.spectra_loss = partial(
+            spectra_supervision_loss, loss,
+            self.extra_args["weight_by_wave_coverage"], False)
+
+        if self.calculate_binwise_spectra_loss:
+            self.binwise_spectra_loss = partial(
+                spectra_supervision_loss, loss,
+                self.extra_args["weight_by_wave_coverage"], True)
 
         if self.pixel_supervision:
             loss = get_loss(self.extra_args["pixel_loss_cho"], self.cuda)
@@ -1330,7 +1338,7 @@ class CodebookTrainer(BaseTrainer):
         # else: init_redshift_prob = None
 
         if self.calculate_binwise_spectra_loss:
-            spectra_loss_func = self.spectra_loss
+            spectra_loss_func = self.binwise_spectra_loss
         else: spectra_loss_func=None
 
         steps = self.codebook_pretrain_total_steps \
@@ -1412,12 +1420,12 @@ class CodebookTrainer(BaseTrainer):
             self.log_dict["spectra_latents_regu"] += spectra_latents_regu.item()
 
         binwise_spectra_latents_regu = 0
-        # if self.regularize_binwise_spectra_latents:
-        #     addup_latents = self.train_pipeline.get_addup_latents() # [bsz,nbins,dim]
-        #     binwise_spectra_latents_regu = torch.sum(torch.abs(addup_latents))
-        #     binwise_spectra_latents_regu *= self.extra_args["spectra_latents_regu_beta"]
-        #     self.log_dict["binwise_spectra_latents_regu"] += \
-        #         binwise_spectra_latents_regu.item()
+        if self.regularize_binwise_spectra_latents:
+            addup_latents = self.train_pipeline.get_addup_latents() # [bsz,nbins,dim]
+            binwise_spectra_latents_regu = torch.sum(torch.abs(addup_latents))
+            binwise_spectra_latents_regu *= self.extra_args["spectra_latents_regu_beta"]
+            self.log_dict["binwise_spectra_latents_regu"] += \
+                binwise_spectra_latents_regu.item()
 
         # vi)
         codebook_spectra_regu = 0

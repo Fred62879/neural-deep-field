@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','save_redshift','recon_spectra'] #'plot_redshift_est_stats','plot_redshift_est_residuals'] #'plot_est_redshift_logits'] # 'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','save_redshift','plot_redshift_est_stats'] #,'plot_redshift_est_residuals'] #'plot_est_redshift_logits'] # 'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -27,7 +27,7 @@ pretrain:
     pretrain_batch_size: 300
 
     spectra_latent_dim: 16
-    redshift_pretrain_num_spectra: 10
+    redshift_pretrain_num_spectra: 3200
 
     negative_supervise_wrong_redshift: False
 
@@ -42,7 +42,7 @@ pretrain:
     regularize_spectra_latents: True
     spectra_latents_regu_beta: 16
     
-    binwise_spectra_latents_regu_beta: 1
+    binwise_spectra_latents_regu_beta: 4
 
 decoder:
     decoder_batch_norm: False
@@ -56,18 +56,18 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 500
+    num_epochs: 10000
     batch_size: 5500
-    log_cli_every: 100
+    log_cli_every: 1000
     plot_grad_every: -1
-    save_model_every: 100
+    save_model_every: 1000
 
     apply_gt_redshift: False
     calculate_binwise_spectra_loss: True # brute force, each bin has its own spectra
 
     # if brute force, we have three choices
-    regularize_binwise_spectra_latents: True      # conflicts each other
-    optimize_latents_for_each_redshift_bin: False #
+    regularize_binwise_spectra_latents: False      # conflicts each other
+    optimize_latents_for_each_redshift_bin: True #
 
     resume_train: False
     resume_log_dir: ''
@@ -79,7 +79,7 @@ infer:
     # infer_log_dir: ''
 
     infer_selected: False
-    pretrain_num_infer_upper_bound: 140
+    pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: True
 
@@ -101,7 +101,7 @@ spectra_data:
     convolve_spectra: True
     spectra_smooth_sigma: 25
 
-    num_supervision_spectra_upper_bound: 400
+    num_supervision_spectra_upper_bound: 3200
 
     filter_redshift: False
     filter_redshift_lo: 0.02

@@ -46,9 +46,10 @@ class CodebookPretrainNerf(BaseNeuralField):
           base_latents: [bsz,dim]
           addup_latents: [bsz,nbins,dim]
         """
-        #nbins = self.addup_latents.shape[1]
-        #self.latents = self.base_latents[:,None].tile(1,nbins,1) + self.addup_latents
-        self.latents = self.addup_latents
+        raise NotImplementedError()
+        # nbins = self.addup_latents.shape[1]
+        # self.latents = self.base_latents[:,None].tile(1,nbins,1) + self.addup_latents
+        # self.latents = self.addup_latents + torch.zeros(self.addup_latents.shape).to("cuda:0")
 
     def combine_latents_all_bins(self, gt_bin_ids, wrong_bin_ids, gt_bin_masks):
         """
@@ -197,12 +198,18 @@ class CodebookPretrainNerf(BaseNeuralField):
         timer.check("forward starts")
 
         ret = defaultdict(lambda: None)
-        # print(self.latents[0,0])
 
         if self.use_latents_as_coords:
             assert coords is None
-            coords = self.latents
-            coords = self.index_latents(coords, selected_ids, idx)
+            if self.kwargs["regularize_binwise_spectra_latents"]:
+                nbins = self.addup_latents.shape[1]
+                addup_latents = self.index_latents(self.addup_latents, selected_ids, idx)
+                base_latents = self.index_latents(
+                    self.base_latents, selected_ids, idx)[:,None].tile(1,nbins,1)
+                coords = base_latents + addup_latents
+            else:
+                coords = self.latents
+                coords = self.index_latents(coords, selected_ids, idx)
 
             if gt_redshift_bin_masks is not None:
                 assert 0
