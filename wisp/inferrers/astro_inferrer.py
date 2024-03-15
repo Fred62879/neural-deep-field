@@ -22,9 +22,10 @@ from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_line, \
     plot_latent_embed, annotated_heat, plot_simple, plot_multiple, plot_latents, \
     plot_redshift_estimation_stats_together, plot_redshift_estimation_stats_individually
 from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
-    sort_alphanumeric, get_bool_classify_redshift, init_redshift_bins, to_numpy, \
+    create_batch_ids, get_bin_ids, get_optimal_wrong_bin_ids, init_redshift_bins, \
+    get_bool_regress_redshift, get_bool_classify_redshift, get_bool_has_redshift_latents, \
     load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, \
-    get_bin_ids, get_optimal_wrong_bin_ids, log_data, get_bool_has_redshift_latents, create_batch_ids
+    log_data, to_numpy, sort_alphanumeric
 
 
 class AstroInferrer(BaseInferrer):
@@ -193,66 +194,72 @@ class AstroInferrer(BaseInferrer):
         self.qtz_strategy = self.extra_args["quantization_strategy"]
         self.generate_scaler = self.qtz and self.extra_args["decode_scaler"]
 
-        # redshift setups
-        self.model_redshift = self.extra_args["model_redshift"]
-        self.apply_gt_redshift = self.model_redshift and \
-            self.extra_args["apply_gt_redshift"]
-        self.redshift_unsupervision = self.model_redshift and \
-            self.extra_args["redshift_unsupervision"]
-        self.redshift_semi_supervision = self.model_redshift and \
-            self.extra_args["redshift_semi_supervision"]
-
-        self.classify_redshift = get_bool_classify_redshift(**self.extra_args)
-        self.neg_sup_wrong_redshift = \
-            self.extra_args["negative_supervise_wrong_redshift"]
-        self.calculate_binwise_spectra_loss = \
-            self.extra_args["calculate_binwise_spectra_loss"]
-        self.use_binwise_spectra_loss_as_redshift_logits = \
-            self.extra_args["use_binwise_spectra_loss_as_redshift_logits"]
-        self.regularize_binwise_spectra_latents = \
-            self.extra_args["regularize_binwise_spectra_latents"]
-        self.optimize_latents_for_each_redshift_bin = \
-            self.extra_args["optimize_latents_for_each_redshift_bin"]
-        self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
-
-        # pretrain infer mandates either apply gt redshift directly or brute force
-        assert not self.codebook_pretrain_infer or (
-            self.apply_gt_redshift or self.calculate_binwise_spectra_loss)
-        assert not (self.apply_gt_redshift and self.calculate_binwise_spectra_loss)
-
-        # brute force during pretrain mandates negative supervision
-        assert not(self.codebook_pretrain_infer and \
-                   self.calculate_binwise_spectra_loss) or \
-            self.neg_sup_wrong_redshift
-        assert not self.neg_sup_wrong_redshift or (
-            self.mode == "codebook_pretrain_infer" and self.classify_redshift and \
-            self.calculate_binwise_spectra_loss)
-
-        # brute force during sanity check or testing mandates at most one choice
-        assert not(self.mode == "redshift_pretrain_infer" and \
-                   self.calculate_binwise_spectra_loss) or \
-                   not (self.regularize_binwise_spectra_latents and \
-                        self.optimize_latents_for_each_redshift_bin)
-        assert not self.regularize_binwise_spectra_latents or \
-            (self.mode == "redshift_pretrain_infer" and self.calculate_binwise_spectra_loss)
-        assert not self.optimize_latents_for_each_redshift_bin or \
-            (self.mode == "redshift_pretrain_infer" and self.calculate_binwise_spectra_loss)
-
-        # if we want to calculate binwise spectra loss when we do quantization
-        #  we need to perform qtz first in hyperspectral_decoder::dim_reduction
-        assert not self.calculate_binwise_spectra_loss or \
-            (not self.qtz or self.extra_args["spectra_batch_reduction_order"] == "qtz_first")
-        assert not self.use_binwise_spectra_loss_as_redshift_logits or \
-            (self.classify_redshift and self.calculate_binwise_spectra_loss)
-        assert not self.optimize_latents_for_each_redshift_bin or \
-            (self.classify_redshift and not self.use_binwise_spectra_loss_as_redshift_logits), \
-            "For the brute force method, we keep spectra under all bins without averaging. \
-            During inferrence however, we can calculate logits for visualization purposes."
-
         # we do epoch based training only in autodecoder setting
         assert self.extra_args["train_based_on_epochs"] or self.qtz_spectra
         # in codebook qtz setting, we only do step based training
         assert not self.extra_args["train_based_on_epochs"] or not self.qtz_spectra
+
+        """
+        model_redshift
+          |_apply_gt_redshift
+          |_regress_redshift
+          |_classify_redshift
+                |_brute_force (calculate_binwise_spectra_loss)
+                    |_neg_sup_wrong_redshift                            |-pretrain
+                    |_regularize_binwise_spectra_latents               -
+                    |_optimize_latents_for_each_redshift_bin            |- sanity check OR
+                    |_optimize_one_latent_for_all_redshift_bins         |  generalization
+                         |_calculate_spectra_loss_based_on_optimal_bin -
+        """
+        self.model_redshift = self.extra_args["model_redshift"]
+        self.regress_redshift = get_bool_regress_redshift(**self.extra_args)
+        self.classify_redshift = get_bool_classify_redshift(**self.extra_args)
+        self.apply_gt_redshift = self.model_redshift and self.extra_args["apply_gt_redshift"]
+        assert not self.model_redshift or \
+            sum([self.regress_redshift, self.classify_redshift, self.apply_gt_redshift]) == 1
+        # regress redshift
+        self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
+        # classify redshift
+        self.calculate_binwise_spectra_loss = self.model_redshift and \
+            self.classify_redshift and self.extra_args["calculate_binwise_spectra_loss"]
+        # if we want to calculate binwise spectra loss when we do quantization
+        #  we need to perform qtz first in hyperspectral_decoder::dim_reduction
+        assert not self.calculate_binwise_spectra_loss or \
+            (not self.qtz or self.extra_args["spectra_batch_reduction_order"] == "qtz_first")
+
+        self.neg_sup_wrong_redshift = \
+            self.mode == "codebook_pretrain" and \
+            self.calculate_binwise_spectra_loss and \
+            self.extra_args["negative_supervise_wrong_redshift"]
+
+        # pretrain infer mandates either apply gt redshift directly or brute force
+        assert not self.codebook_pretrain_infer or (
+            self.apply_gt_redshift or self.calculate_binwise_spectra_loss)
+        # brute force during pretrain mandates negative supervision
+        assert not(self.codebook_pretrain_infer and \
+                   self.calculate_binwise_spectra_loss) or \
+                   self.neg_sup_wrong_redshift
+
+        # sanity check & generalization mandates brute force
+        assert not self.mode == "redshift_pretrain_infer" or \
+            self.calculate_binwise_spectra_loss
+        # three different brute force strategies during sc & generalization
+        self.regularize_binwise_spectra_latents = \
+            self.mode == "redshift_pretrain" and \
+            self.calculate_binwise_spectra_loss and \
+            self.extra_args["regularize_binwise_spectra_latents"]
+        self.optimize_latents_for_each_redshift_bin = \
+            self.mode == "redshift_pretrain" and \
+            self.calculate_binwise_spectra_loss and \
+            self.extra_args["optimize_latents_for_each_redshift_bin"]
+        self.optimize_one_latent_for_all_redshift_bins = \
+            self.mode == "redshift_pretrain" and \
+            self.calculate_binwise_spectra_loss and \
+            not self.regularize_binwise_spectra_latents and \
+            not self.extra_args["optimize_latents_for_each_redshift_bin"]
+        self.calculate_spectra_loss_based_on_optimal_bin = \
+            self.optimize_one_latent_for_all_redshift_bins and \
+            self.extra_args["calculate_spectra_loss_based_on_optimal_bin"]
 
         if self.classify_redshift:
             redshift_bins = init_redshift_bins(
@@ -459,8 +466,6 @@ class AstroInferrer(BaseInferrer):
                     # self.requested_fields.append("redshift_data")
                     self.requested_fields.extend([
                         "spectra_id_map","spectra_bin_map","redshift_data"])
-            # if self.redshift_semi_supervision:
-            #     self.requested_fields.extend(["spectra_id_map","spectra_bin_map"])
 
         elif self.test:
             assert 0

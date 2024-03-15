@@ -362,7 +362,6 @@ class SpectraData:
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
         self.data["validation_masks"] = self.data["gt_spectra_masks"][val_ids]
         self.data["validation_pixels"] = self.data["gt_spectra_pixels"][val_ids]
-        # if self.kwargs["redshift_semi_supervision"]:
         self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
 
         self.data["validation_coords"] = self.data["gt_spectra_coords"][val_ids] # [n_valid,n_neighbr**2,2/3]

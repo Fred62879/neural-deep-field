@@ -388,6 +388,10 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--optimize-latents-for-each-redshift-bin", action="store_true",
                                 help="if brute force, we may assign each bin with a latent.")
 
+    pretrain_group.add_argument("--calculate-spectra-loss-based-on-optimal-bin",
+                                action="store_true", help="when use single latent, calculate \
+                                loss use best bin spectra loss.")
+
     pretrain_group.add_argument("--negative-supervise-wrong-redshift", action="store_true",
                                 help="discourage wrong redshift from generating high \
                                 quality spectra during codebook pretrain.")
@@ -729,9 +733,9 @@ def define_cmd_line_args():
     train_group.add_argument("--spectra-loss-cho",type=str, choices=["l1","l2"])
     train_group.add_argument("--redshift-loss-cho",type=str, choices=["l1","l2"])
 
-    train_group.add_argument("--recon-full-range-codebook-spectra", action="store_true",
-                             help="reconstruct codebook spectra under all lambda and \
-                             all redshift values, then recon spectra via indexing")
+    # train_group.add_argument("--recon-full-range-codebook-spectra", action="store_true",
+    #                          help="reconstruct codebook spectra under all lambda and \
+    #                          all redshift values, then recon spectra via indexing")
 
     train_group.add_argument("--split-latent", action="store_true",
                              help="use different latents for each decoder.")

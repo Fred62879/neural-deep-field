@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_stats'] #,'plot_spectra_latents_pca'] #'plot_redshift_logits','plot_redshift_residual'] #
+    # tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_stats'] #,'plot_spectra_latents_pca'] #'plot_redshift_logits','plot_redshift_residual'] #
 
 optimizer:
     optimizer_type: 'adam'
@@ -69,7 +69,7 @@ trainer:
 
     # if brute force, we have three choices
     regularize_binwise_spectra_latents: False     # conflicts each other
-    optimize_latents_for_each_redshift_bin: True  #
+    optimize_latents_for_each_redshift_bin: False #
 
     resume_train: False
     resume_log_dir: ''
@@ -103,7 +103,7 @@ infer:
 
 spectra_data:
     convolve_spectra: True
-    spectra_smooth_sigma: 25
+    spectra_smooth_sigma: 50
 
     num_supervision_spectra_upper_bound: 3200
 

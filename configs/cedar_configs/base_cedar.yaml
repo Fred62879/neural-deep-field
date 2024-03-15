@@ -284,8 +284,6 @@ trainer:
     save_data_every: -1
     save_model_every: 2000
 
-    recon_full_range_codebook_spectra: False
-
     train_with_all_pixels: True
     train_pixel_ratio: 1
     gpu_data: ['coords','pixels','weights','full_wave','full_emitted_wave','wave','trans','nsmpl','spectra_source_data','spectra_masks','spectra_pixels','spectra_redshift','spectra_wave','spectra_redshift','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift','sup_spectra_wave','sup_spectra_masks','sup_spectra_data','init_redshift_prob','scaler_latents','redshift_latents','gt_redshift_bin_ids','gt_redshift_bin_masks']

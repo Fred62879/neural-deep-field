@@ -71,15 +71,16 @@ def get_bool_classify_redshift(**kwargs):
         not kwargs["apply_gt_redshift"] and \
         kwargs["redshift_model_method"] == "classification"
 
+def get_bool_regress_redshift(**kwargs):
+    return kwargs["space_dim"] == 3 and \
+        kwargs["model_redshift"] and \
+        not kwargs["apply_gt_redshift"] and \
+        kwargs["redshift_model_method"] == "regress"
+
 def get_bool_has_redshift_latents(**kwargs):
     """ Check whether we need an independent redshift latents.
     """
-    return kwargs["space_dim"] == 3 and \
-        kwargs["model_redshift"] and \
-        kwargs["split_latent"] and \
-        not kwargs["apply_gt_redshift"] and \
-        not kwargs["use_binwise_spectra_loss_as_redshift_logits"] and \
-        not kwargs["calculate_binwise_spectra_loss"] # brute force
+    return get_bool_regress_redshift(**kwargs) and kwargs["split_latent"]
 
 def get_optimal_wrong_bin_ids(ret, data):
     """ Get id of the non-GT redshift bin that achieves the lowest spectra loss.

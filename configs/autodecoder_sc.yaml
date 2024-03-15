@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-3200-spectra-generalize'
+    exp_name: 'autodecoder-3200-spectra-single-latent'
     # log_fname: ''
 
     tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','save_redshift','plot_redshift_est_stats'] #,'plot_redshift_est_residuals'] #'plot_est_redshift_logits'] # 'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift','plot_redshift_est_stats'] #,'plot_redshift_est_residuals'] #'plot_est_redshift_logits'] # 'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -24,10 +24,10 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    pretrain_batch_size: 300
+    pretrain_batch_size: 100
 
     spectra_latent_dim: 16
-    redshift_pretrain_num_spectra: 3200
+    redshift_pretrain_num_spectra: 100
 
     negative_supervise_wrong_redshift: False
 
@@ -56,22 +56,25 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 10000
+    num_epochs: 500
     batch_size: 5500
-    log_cli_every: 1000
+    log_cli_every: 100
     plot_grad_every: -1
-    save_model_every: 1000
+    save_model_every: 100
 
     apply_gt_redshift: False
     calculate_binwise_spectra_loss: True # brute force, each bin has its own spectra
 
     # if brute force, we have three choices
-    regularize_binwise_spectra_latents: False      # conflicts each other
-    optimize_latents_for_each_redshift_bin: True #
+    regularize_binwise_spectra_latents: False     # conflicts each other
+    optimize_latents_for_each_redshift_bin: False #
+    # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
+
+    calculate_spectra_loss_based_on_optimal_bin: True # only if we use single latent
 
     resume_train: False
     resume_log_dir: ''
-    resume_model_fname: 'model-ep10000-bch0.pth'
+    resume_model_fname: 'model-ep500-bch0.pth'
 
 infer:
     infer_last_model_only: True
@@ -81,8 +84,9 @@ infer:
     infer_selected: False
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: True
+    infer_outlier_only: False
 
+    plot_clipped_spectrum: True
     plot_spectrum_with_recon: False
     plot_spectrum_under_gt_bin: True
     plot_spectrum_under_optimal_wrong_bin: True

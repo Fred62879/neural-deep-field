@@ -109,7 +109,7 @@ class SpatialDecoder(nn.Module):
             self.redshift_decoder(
                 z, ret, specz, redshift_latents, init_redshift_prob)
 
-        # decode/quantize
+        # quantize/decode/nothing
         if self.quantize_spectra:
             coeff = z if self.kwargs["optimize_spectra_latents_as_logits"] else self.decode(z)
             ret["codebook_logits"] = coeff[:,0]

@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-3200-spectra-generalize'
+    exp_name: 'autodecoder-3200-spectra-single-latent'
     # log_fname: ''
 
     tasks: ['codebook_pretrain']
-    tasks: ['codebook_pretrain_infer','recon_spectra'] #'save_redshift']
+    # tasks: ['codebook_pretrain_infer','recon_spectra'] #'save_redshift']
 
 optimizer:
     optimizer_type: 'adam'
@@ -66,6 +66,7 @@ trainer:
     # if brute force, we have three choices
     regularize_binwise_spectra_latents: False      # conflicts each other
     optimize_latents_for_each_redshift_bin: False  #
+    # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
 
     resume_train: False
     resume_log_dir: ''

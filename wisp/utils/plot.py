@@ -13,6 +13,29 @@ from wisp.utils.numerical import calculate_sam_spectrum, \
     calculate_redshift_estimation_stats_based_on_residuals
 
 
+def plot_emission_lines():
+    from linetools.lists.linelist import LineList
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(14, 6))
+    plt.plot(wavelength, flux, lw=1)
+    linelist = LineList('Galaxy')
+
+    z = 1.5  # adjust this based on your target's redshift
+    wv_range = (wavelength.min(), wavelength.max())  # Wavelength range of your spectrum
+
+    for line in linelist.all_transitions():
+        line_wavelength = line['wrest'] * (1 + z)
+        if wv_range[0] <= line_wavelength  <= wv_range[1]:
+            plt.axvline(x=line_wavelength, color='r', linestyle='--', alpha=0.5)
+            plt.text(line_wavelength, plt.ylim()[1]*0.9,
+                     line['name'], rotation=90, fontsize=8, alpha=0.7, ha='center')
+
+    plt.xlabel('Wavelength')
+    plt.ylabel('Flux')
+    plt.tight_layout()
+    plt.show()
+
 def plot_latents(latents, fname, color="blue"):
     """
     @Param: latents [bsz,dim]
