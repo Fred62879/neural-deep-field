@@ -10,6 +10,7 @@ import logging as log
 import matplotlib.pyplot as plt
 
 from wisp.datasets.patch_data import PatchData
+from wisp.utils.plot import plot_progressive
 from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
@@ -1094,7 +1095,8 @@ class SpectraData:
         """ Plot one spectrum and save as required.
         """
         sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux, recon_flux2, recon_loss2, \
-            recon_flux3, recon_loss3, plot_gt_spectrum, plot_recon_spectrum = pargs
+            recon_flux3, recon_loss3, lambdawise_losses, \
+            plot_gt_spectrum, plot_recon_spectrum = pargs
 
         if self.kwargs["plot_spectrum_together"]:
             if nrows == 1: axis = axs if ncols == 1 else axs[idx%ncols]
@@ -1118,19 +1120,25 @@ class SpectraData:
         else: gt_color, recon_color, flux2_color, flux3_color = "gray","blue","green","red"
 
         if plot_gt_spectrum:
-            axis.plot(gt_wave, gt_flux, color=gt_color, label="gt", linestyle="dotted")
+            plot_progressive(fig, axis, gt_wave, gt_flux, gt_color, "gt", "solid", None)
         if plot_recon_spectrum:
             if above_threshold is not None: # plot recon flux according to zncc
-                axis.plot(recon_wave, recon_flux, color=recon_color, label="recon")
+                plot_progressive(fig, axis, recon_wave, recon_flux, recon_color,
+                                 "recon", "solid", lambdawise_losses)
                 segments = segment_bool_array(above_threshold)
                 for (lo, hi) in segments:
-                    axis.plot(recon_wave[lo:hi], recon_flux[lo:hi], color="purple")
-            else: axis.plot(recon_wave, recon_flux, color=recon_color, label="recon")
+                    plot_progressive(fig, axis, recon_wave[lo:hi], recon_flux[lo:hi],
+                                     "purple", "recon", "solid", lambdawise_losses)
+            else:
+                plot_progressive(fig, axis, recon_wave, recon_flux, recon_color,
+                                 "recon", "solid", lambdawise_losses)
         if recon_flux2 is not None:
-            axis.plot(recon_wave, recon_flux2, color=flux2_color, label="gt bin")
+            plot_progressive(fig, axis, recon_wave, recon_flux2, flux2_color,
+                             "gt bin", "solid", lambdawise_losses[0])
             if recon_loss2 is not None: title += f": {recon_loss2:.{3}f}"
         if recon_flux3 is not None:
-            axis.plot(recon_wave, recon_flux3, color=flux3_color, label="wrong bin")
+            plot_progressive(fig, axis, recon_wave, recon_flux3, flux3_color,
+                             "wrong bin", "solid", lambdawise_losses[-1])
             if recon_loss3 is not None: title += f"/{recon_loss3:.{3}f}"
 
         axis.set_title(title)
@@ -1152,7 +1160,10 @@ class SpectraData:
 
         return sub_dir, metrics
 
-    def process_recon_flux(self, recon_flux, recon_mask, clip, spectra_clipped, recon_wave):
+    def process_recon_flux(
+            self, recon_flux, recon_mask, clip, spectra_clipped, recon_wave, lambdawise_losses
+    ):
+        # Process reconstructed spectra with local averageing (flux) and clipping.
         if recon_flux.ndim == 2:
             if self.kwargs["average_neighbour_spectra"]:
                 recon_flux = np.mean(recon_flux, axis=0)
@@ -1161,14 +1172,23 @@ class SpectraData:
         if clip and not spectra_clipped:
             recon_wave = recon_wave[recon_mask]
             recon_flux = recon_flux[recon_mask]
-        return recon_wave, recon_flux
+            if lambdawise_losses is not None:
+                # print(lambdawise_losses.shape, recon_mask.shape, sum(recon_mask))
+                lambdawise_losses = lambdawise_losses[recon_mask]
+                # print('*', lambdawise_losses.shape, lambdawise_losses)
+        return recon_wave, recon_flux, lambdawise_losses
 
     def process_spectrum_plot_data(self, flux_norm_cho, is_codebook, clip,
                                    spectra_clipped, calculate_metrics, data):
         """ Collect data for spectrum plotting for the given spectra.
         """
         (title, gt_wave, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux,
-         recon_flux2, recon_loss2, recon_flux3, recon_loss3) = data
+         recon_flux2, recon_loss2, recon_flux3, recon_loss3, lambdawise_losses) = data
+        """
+        lambdawise_losses
+          apply_gt_redshift: [nsmpl]
+          brute_force:   [1/2,nsmpl] gt_bin_lambdawise_losses,wrong_bin_lambdawise_losses
+        """
 
         sub_dir = str(self.kwargs["spectra_neighbour_size"]) + "_neighbours_"
         if self.gt_convolved:       sub_dir += "convolved_"
@@ -1183,14 +1203,19 @@ class SpectraData:
             gt_flux = gt_flux[gt_mask]
 
         if plot_recon_spectrum:
-            recon_wave_p, recon_flux = self.process_recon_flux(
-                recon_flux, recon_mask, clip, spectra_clipped, recon_wave)
-        if recon_flux2 is not None:
-            recon_wave_p, recon_flux2 = self.process_recon_flux(
-                recon_flux2, recon_mask, clip, spectra_clipped, recon_wave)
-        if recon_flux3 is not None:
-            recon_wave_p, recon_flux3 = self.process_recon_flux(
-                recon_flux3, recon_mask, clip, spectra_clipped, recon_wave)
+            recon_wave_p, recon_flux, lambdawise_losses = self.process_recon_flux(
+                recon_flux, recon_mask, clip, spectra_clipped, recon_wave, lambdawise_losses)
+        else:
+            lambdawise_losses = list(lambdawise_losses)
+            if recon_flux2 is not None: # gt bin spectra
+                recon_wave_p, recon_flux2, lambdawise_losses[0] = self.process_recon_flux(
+                    recon_flux2, recon_mask, clip, spectra_clipped,
+                    recon_wave, lambdawise_losses[0])
+            if recon_flux3 is not None: # wrong bin spectra
+                recon_wave_p, recon_flux3, lambdawise_losses[-1] = self.process_recon_flux(
+                    recon_flux3, recon_mask, clip, spectra_clipped,
+                    recon_wave, lambdawise_losses[-1])
+            lambdawise_losses = np.array(lambdawise_losses)
 
         plot_recon_spectrum = plot_recon_spectrum or recon_flux2 is not None or \
             recon_flux3 is not None
@@ -1225,7 +1250,7 @@ class SpectraData:
 
         plot_recon_spectrum = self.kwargs["plot_spectrum_with_recon"]
         pargs = (sub_dir, title, gt_wave, gt_flux, recon_wave, recon_flux,
-                 recon_flux2, recon_loss2, recon_flux3, recon_loss3,
+                 recon_flux2, recon_loss2, recon_flux3, recon_loss3, lambdawise_losses,
                  plot_gt_spectrum, plot_recon_spectrum)
         return pargs
 
@@ -1236,6 +1261,7 @@ class SpectraData:
                       recon_losses2=None,
                       recon_fluxes3=None,
                       recon_losses3=None,
+                      lambdawise_losses=None,
                       colors=None,
                       titles=None,
                       is_codebook=False,
@@ -1276,6 +1302,7 @@ class SpectraData:
         if recon_losses2 is None: recon_losses2 = [None]*n
         if recon_fluxes3 is None: recon_fluxes3 = [None]*n
         if recon_losses3 is None: recon_losses3 = [None]*n
+        if lambdawise_losses is None: lambdawise_losses3 = [None]*n
 
         assert gt_fluxes[0] is None or \
             (len(gt_wave) == n and len(gt_fluxes) == n and len(gt_masks) == n)
@@ -1302,7 +1329,7 @@ class SpectraData:
         metrics = []
         for idx, cur_plot_data in enumerate(
             zip(titles, gt_wave, gt_masks, gt_fluxes, recon_wave, recon_masks, recon_fluxes,
-                recon_fluxes2, recon_losses2, recon_fluxes3, recon_losses3)
+                recon_fluxes2, recon_losses2, recon_fluxes3, recon_losses3, lambdawise_losses)
         ):
             pargs = process_data(cur_plot_data)
             sub_dir, cur_metrics = plot_and_save(idx, pargs)

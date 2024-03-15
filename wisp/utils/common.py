@@ -532,6 +532,9 @@ def forward(
             requested_channels.extend(
                 ["spectra_binwise_loss","redshift_logits"])
         if calculate_lambdawise_spectra_loss:
+            net_args["spectra_masks"] = data["spectra_masks"]
+            net_args["spectra_loss_func"] = spectra_loss_func
+            net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.append("spectra_lambdawise_loss")
         if save_gt_bin_spectra or optimize_bins_separately:
             net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]

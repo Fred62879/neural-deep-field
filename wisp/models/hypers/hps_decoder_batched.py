@@ -235,7 +235,7 @@ class HyperSpectralDecoderB(nn.Module):
                     raise NotImplementedError(
                         "only support brute force in case of redshift classification")
 
-            elif self.apply_gt_redshift and self.calculate_lambdawise_spectra_loss:
+            elif self.kwargs["apply_gt_redshift"] and self.calculate_lambdawise_spectra_loss:
                 assert spectra.ndim == 2
                 calculate_spectra_loss(
                     spectra_loss_func, spectra_masks, gt_spectra,

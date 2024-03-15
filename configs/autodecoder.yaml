@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['codebook_pretrain']
-    # tasks: ['codebook_pretrain_infer','recon_spectra'] #'save_redshift']
+    tasks: ['codebook_pretrain_infer','recon_spectra'] #'save_redshift']
 
 optimizer:
     optimizer_type: 'adam'
@@ -68,24 +68,26 @@ trainer:
     optimize_latents_for_each_redshift_bin: False  #
     # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
 
+    calculate_spectra_loss_based_on_optimal_bin: True # only if we use single latent
+
     resume_train: False
     resume_log_dir: ''
     resume_model_fname: 'model-ep10000-bch0.pth'
 
-    spectra_loss_cho: l4
+    spectra_loss_cho: l2
     spectra_loss_reduction: none
 
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240312-221007_spectra-no-convolve-l4'
+    infer_log_dir: '20240307-141408-3200-spectra-16-3-512-multi-conversion-convolve-sigma-25'
     infer_selected: True
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
     plot_clipped_spectrum: True
-    plot_spectrum_with_recon: False
+    plot_spectrum_with_recon: True
     plot_spectrum_color_based_on_loss: True
     plot_spectrum_under_gt_bin: False
     plot_spectrum_under_optimal_wrong_bin: False
@@ -98,8 +100,8 @@ infer:
     spectra_latents_plot_pca_dim: 2
 
 spectra_data:
-    convolve_spectra: False
-    spectra_smooth_sigma: 50
+    convolve_spectra: True
+    spectra_smooth_sigma: 25
 
     num_supervision_spectra_upper_bound: 3200
 

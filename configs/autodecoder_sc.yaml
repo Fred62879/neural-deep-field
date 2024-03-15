@@ -84,6 +84,8 @@ infer:
 
     # infer_log_dir: ''
 
+    pretrain_infer_batch_size: 5
+
     infer_selected: False
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'

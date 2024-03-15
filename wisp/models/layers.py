@@ -418,7 +418,7 @@ def calculate_spectra_loss(
             masks[None,:].tile(n_bins,1,1),
             gt_spectra[None,:].tile(n_bins,1,1,1),
             recon_fluxes
-        ) # [n_bins,bsz,nsmpls]
+        ).permute(1,0,2) # [bsz,n_bins,nsmpls]
         assert spectra_loss.ndim == 3
     else: raise ValueError()
 
@@ -427,7 +427,7 @@ def calculate_spectra_loss(
 
     if recon_fluxes.ndim == 3:
         spectra_loss = torch.mean(spectra_loss, dim=-1)
-        ret["spectra_binwise_loss"] = spectra_loss.T
+        ret["spectra_binwise_loss"] = spectra_loss
 
 def calculate_redshift_logits(beta, ret):
     """ Calculate logits for redshift bins.

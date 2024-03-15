@@ -9,9 +9,29 @@ import scipy.interpolate as interpolate
 from pathlib import Path
 from os.path import join
 from astropy.visualization import ZScaleInterval
+from matplotlib.collections import LineCollection
 from wisp.utils.numerical import calculate_sam_spectrum, \
     calculate_redshift_estimation_stats_based_on_residuals
 
+
+def plot_progressive(fig, axis, x, y, color, label, linestyle, progressive_val=None):
+    """
+    plot line with either given color or gradient color
+      (calculated based on progressive val)
+    """
+    if progressive_val is not None:
+        points = np.array([x, y]).T.reshape(-1, 1, 2)
+        segments = np.concatenate([points[:-1], points[1:]], axis=1)
+
+        norm = plt.Normalize(progressive_val.min(), progressive_val.max())
+        lc = LineCollection(segments, cmap='viridis', norm=norm)
+        # Set the values used for colormapping
+        lc.set_array(progressive_val)
+        lc.set_linewidth(2)
+        line = axis.add_collection(lc)
+        fig.colorbar(line)
+    else:
+        axis.plot(x, y, color=color, label=label, linestyle=linestyle)
 
 def plot_emission_lines():
     from linetools.lists.linelist import LineList

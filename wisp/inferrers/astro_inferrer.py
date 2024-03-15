@@ -1209,6 +1209,8 @@ class AstroInferrer(BaseInferrer):
                 if self.calculate_binwise_spectra_loss:
                     self.spectra_infer_pipeline.set_batch_reduction_order("qtz_first")
                     loss_func = self._get_spectra_loss_func(data)
+                elif self.apply_gt_redshift and self.plot_spectra_color_based_on_loss:
+                    loss_func = self._get_spectra_loss_func(data)
                 else: loss_func = None
 
                 with torch.no_grad():
@@ -1262,7 +1264,25 @@ class AstroInferrer(BaseInferrer):
                         self.optimal_wrong_bin_spectra_losses.extend(losses)
                     if self.plot_spectra_color_based_on_loss:
                         losses = ret["spectra_lambdawise_loss"]
-                        self.spectra_lambdawise_losses.extend(losses)
+                        if self.apply_gt_redshift:
+                            self.spectra_lambdawise_losses.extend(losses)
+                        else:
+                            lambdawise_losses = []
+                            if self.plot_gt_bin_spectra:
+                                gt_bin_lambadwise_losses = losses[
+                                    data["gt_redshift_bin_masks"]] # [bsz,nsmpl]
+                                lambdawise_losses.extend(gt_bin_lambadwise_losses[None,...])
+                            if self.plot_optimal_wrong_bin_spectra:
+                                ids, optimal_wrong_bin_losses = \
+                                    get_optimal_wrong_bin_ids(ret, data)
+                                # [bin_id,batch_id]
+                                ids = create_batch_ids(ids.detach().cpu().numpy())
+                                wrong_bin_lambadwise_losses = losses[ids[0],ids[1]]
+                                lambdawise_losses.extend(wrong_bin_lambadwise_losses[None,...])
+
+                            lambdawise_losses = torch.stack(
+                                lambdawise_losses).permute(1,0,2) # [bsz,2,nsmpl]
+                            self.spectra_lambdawise_losses.extend(lambdawise_losses)
 
                 if self.recon_spectra_all_bins:
                     self.recon_fluxes_all.extend(
@@ -1729,9 +1749,7 @@ class AstroInferrer(BaseInferrer):
                 recon_losses3 = self.optimal_wrong_bin_spectra_losses[lo:hi]
             else: recon_fluxes3, recon_losses3 = None, None
             if self.plot_spectra_color_based_on_loss:
-                print(self.spectra_lambdawise_losses.shape)
                 lambdawise_losses = self.spectra_lambdawise_losses[lo:hi]
-                assert 0
 
             if self.infer_selected:
                 n = len(self._select_inferrence_ids())
@@ -1746,6 +1764,7 @@ class AstroInferrer(BaseInferrer):
                 self.recon_wave[lo:hi], self.recon_fluxes[lo:hi],
                 recon_fluxes2=recon_fluxes2, recon_losses2=recon_losses2,
                 recon_fluxes3=recon_fluxes3, recon_losses3=recon_losses3,
+                lambdawise_losses=lambdawise_losses,
                 clip=self.extra_args["plot_clipped_spectrum"],
                 gt_masks=self.gt_masks[lo:hi],
                 recon_masks=self.recon_masks[lo:hi],
