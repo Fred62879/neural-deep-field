@@ -14,7 +14,7 @@ from wisp.models.activations import get_activation_class
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
 from wisp.models.hypers.hps_converter_batched import HyperSpectralConverter
 from wisp.models.layers import Intensifier, Quantization, get_layer_class, ArgMax, \
-    calculate_redshift_logits
+    calculate_spectra_loss, calculate_redshift_logits
 
 class HyperSpectralDecoderB(nn.Module):
 
@@ -44,6 +44,11 @@ class HyperSpectralDecoderB(nn.Module):
             _qtz_spectra=qtz_spectra,
             _model_redshift=_model_redshift, **kwargs
         )
+
+        self.calculate_lambdawise_spectra_loss = \
+            kwargs["plot_spectrum_color_based_on_loss"] and \
+            "codebook_pretrain_infer" in kwargs["tasks"] or \
+            "redshift_pretrain_infer" in kwargs["tasks"]
 
         self.init_decoder()
         if self.qtz_spectra:
@@ -193,7 +198,7 @@ class HyperSpectralDecoderB(nn.Module):
         return spectra
 
     def spectra_dim_reduction(self, input, spectra, ret, qtz_args,
-                              spectra_masks, loss_func, gt_spectra,
+                              spectra_masks, spectra_loss_func, gt_spectra,
                               gt_redshift_bin_ids
     ):
         if self.qtz_spectra:
@@ -203,7 +208,9 @@ class HyperSpectralDecoderB(nn.Module):
                     ret["spectra_all_bins"] = spectra
                     if self.kwargs["calculate_binwise_spectra_loss"]:
                         calculate_redshift_logits(
-                            loss_func, spectra_masks, gt_spectra, spectra, ret, **self.kwargs)
+                            spectra_loss_func, spectra_masks, gt_spectra,
+                            spectra, ret, **self.kwargs)
+
                     spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
 
             elif self.reduction_order == "bin_avg_first":
@@ -215,15 +222,30 @@ class HyperSpectralDecoderB(nn.Module):
                 raise ValueError()
         else:
             if self.classify_redshift:
-                ret["spectra_all_bins"] = spectra
-                calculate_redshift_logits(
-                    loss_func, spectra_masks, gt_spectra, spectra, ret, **self.kwargs)
-                spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
+                if self.kwargs["calculate_binwise_spectra_loss"]:
+                    assert spectra.ndim == 3
+                    ret["spectra_all_bins"] = spectra
+                    calculate_spectra_loss(
+                        spectra_loss_func, spectra_masks, gt_spectra,
+                        spectra, ret, self.calculate_lambdawise_spectra_loss, **self.kwargs
+                    )
+                    calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret)
+                    spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
+                else:
+                    raise NotImplementedError(
+                        "only support brute force in case of redshift classification")
+
+            elif self.apply_gt_redshift and self.calculate_lambdawise_spectra_loss:
+                assert spectra.ndim == 2
+                calculate_spectra_loss(
+                    spectra_loss_func, spectra_masks, gt_spectra,
+                    spectra, ret, True, **self.kwargs)
+
         return spectra
 
     def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
                             wave_bound, ret, codebook, qtz_args,
-                            spectra_masks, loss_func, gt_spectra,
+                            spectra_masks, spectra_loss_func, gt_spectra,
                             gt_redshift_bin_ids
     ):
         """ Reconstruct emitted (under possibly multiple redshift values) spectra
@@ -256,7 +278,7 @@ class HyperSpectralDecoderB(nn.Module):
 
         spectra = self.spectra_dim_reduction(
             input, spectra, ret, qtz_args,
-            spectra_masks, loss_func, gt_spectra,
+            spectra_masks, spectra_loss_func, gt_spectra,
             gt_redshift_bin_ids) # [bsz,nsmpl]
 
         if self.scale:

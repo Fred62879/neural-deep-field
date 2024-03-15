@@ -389,18 +389,18 @@ class CodebookTrainer(BaseTrainer):
             assert self.extra_args["spectra_loss_cho"][-4:] == "none"
             raise NotImplementedError()
 
-        # if self.extra_args["spectra_loss_cho"] == "emd":
-        #     self.spectra_loss = spectra_supervision_emd_loss
-        # else:
-        loss = get_loss(self.extra_args["spectra_loss_cho"], self.cuda)
-        self.spectra_loss = partial(
-            spectra_supervision_loss, loss,
-            self.extra_args["weight_by_wave_coverage"], False)
-
+        loss_func = get_loss(
+            self.extra_args["spectra_loss_cho"],
+            self.extra_args["spectra_loss_reduction"], self.cuda
+        )
         if self.calculate_binwise_spectra_loss:
-            self.binwise_spectra_loss = partial(
-                spectra_supervision_loss, loss,
-                self.extra_args["weight_by_wave_coverage"], True)
+            self.spectra_loss_func = partial(
+                spectra_supervision_loss, loss_func,
+                self.extra_args["weight_by_wave_coverage"], None)
+        else:
+            self.spectra_loss_func = partial(
+                spectra_supervision_loss, loss_func,
+                self.extra_args["weight_by_wave_coverage"], torch.mean)
 
         if self.pixel_supervision:
             loss = get_loss(self.extra_args["pixel_loss_cho"], self.cuda)
@@ -1347,7 +1347,7 @@ class CodebookTrainer(BaseTrainer):
         # else: init_redshift_prob = None
 
         if self.calculate_binwise_spectra_loss:
-            spectra_loss_func = self.binwise_spectra_loss
+            spectra_loss_func = self.spectra_loss_func
         else: spectra_loss_func=None
 
         steps = self.codebook_pretrain_total_steps \
@@ -1500,10 +1500,8 @@ class CodebookTrainer(BaseTrainer):
             gt_spectra = data["spectra_source_data"]
 
             assert len(recon_fluxes) != 0
-            spectra_loss = self.spectra_loss(
-                spectra_masks, gt_spectra, recon_fluxes,
-                weight_by_wave_coverage=self.extra_args["weight_by_wave_coverage"]
-            )
+            spectra_loss = self.spectra_loss_func(
+                spectra_masks, gt_spectra, recon_fluxes)
             if self.extra_args["plot_individ_spectra_loss"]:
                 assert spectra_loss.ndim == 1
                 self.cur_spectra_individ_losses.extend(spectra_loss.detach().cpu().numpy())

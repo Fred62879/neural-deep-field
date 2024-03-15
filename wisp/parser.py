@@ -730,8 +730,11 @@ def define_cmd_line_args():
     train_group.add_argument("--main-train-frozen-layer", nargs="+", type=str)
 
     train_group.add_argument("--pixel-loss-cho",type=str, choices=["l1","l2"])
+    train_group.add_argument("--pixel-loss-reduction",type=str, choices=["none","sum","mean"])
     train_group.add_argument("--spectra-loss-cho",type=str, choices=["l1","l2"])
+    train_group.add_argument("--spectra-loss-reduction",type=str, choices=["none","sum","mean"])
     train_group.add_argument("--redshift-loss-cho",type=str, choices=["l1","l2"])
+    train_group.add_argument("--redshift-loss-reduction",type=str, choices=["none","sum","mean"])
 
     # train_group.add_argument("--recon-full-range-codebook-spectra", action="store_true",
     #                          help="reconstruct codebook spectra under all lambda and \
@@ -886,6 +889,7 @@ def define_cmd_line_args():
     infer_group.add_argument("--plot-spectrum-with-recon", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-trans", action="store_true")
     infer_group.add_argument("--plot-spectrum-under-gt-bin", action="store_true")
+    infer_group.add_argument("--plot-spectrum-color-based-on-loss", action="store_true")
     infer_group.add_argument("--plot-spectrum-under-optimal-wrong-bin", action="store_true")
     infer_group.add_argument("--plot-codebook-coeff-under-optimal-wrong-bin", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-sliding-zncc", action="store_true")

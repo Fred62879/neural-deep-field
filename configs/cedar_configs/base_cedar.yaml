@@ -264,9 +264,12 @@ trainer:
     sockeye_log_dir: '/arc/project/pr-kmyi-1/fred/data/pdr3/output'
 
     plot_loss: True
-    pixel_loss_cho: l1_mean
-    spectra_loss_cho: l2_none #emd
-    redshift_loss_cho: l2_mean
+    pixel_loss_cho: l1
+    pixel_loss_reduction: none
+    spectra_loss_cho: l2 #emd
+    spectra_loss_reduction: none
+    redshift_loss_cho: l2
+    redshift_loss_reduction: none
 
     train_based_on_epochs: True
     step_based_sample_w_replace: False

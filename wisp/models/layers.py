@@ -395,24 +395,43 @@ def calculate_bayesian_redshift_logits(loss, mask, gt_spectra, recon_fluxes, red
 
     return logits
 
-def calculate_redshift_logits(loss, masks, gt_spectra, recon_fluxes, ret, gt_bin_ids=None, **kwargs):
-    """ Calculate bayesian logits for redshfit classification.
-        @Param
-          mask:       [bsz,num_smpls]
-          gt_spectra: [bsz,4+2*nbanbds,num_smpls]
-                      (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
-          recon_fluxes: [num_bins,bsz,num_smpls]
-        @Return
-          logits: [bsz,n_bins]
+def calculate_spectra_loss(
+        loss_func, masks, gt_spectra, recon_fluxes, ret, lambdawise=False, **kwargs
+):
+    """
+    Calculate spectra loss.
+    @Param
+      mask:       [bsz,num_smpls]
+      gt_spectra: [bsz,4+2*nbanbds,num_smpls]
+                  (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
+      recon_fluxes: [num_bins,bsz,num_smpls]
+    @Return
+      logits: [bsz,n_bins]
     """
     n_bins = recon_fluxes.shape[0]
-    spectra_binwise_loss = loss(
-        masks[None,:].tile(n_bins,1,1),
-        gt_spectra[None,:].tile(n_bins,1,1,1),
-        recon_fluxes
-    ).T # [bsz,n_bins]
-    ret["spectra_binwise_loss"] = spectra_binwise_loss
 
+    if recon_fluxes.ndim == 2: # apply_gt_redshift
+        spectra_loss = loss_func(masks, gt_spectra, recon_fluxes) # [bsz,nsmpls]
+        assert spectra_loss.ndim == 2
+    elif recon_fluxes.ndim == 3: # brute force
+        spectra_loss = loss_func(
+            masks[None,:].tile(n_bins,1,1),
+            gt_spectra[None,:].tile(n_bins,1,1,1),
+            recon_fluxes
+        ) # [n_bins,bsz,nsmpls]
+        assert spectra_loss.ndim == 3
+    else: raise ValueError()
+
+    if lambdawise:
+        ret["spectra_lambdawise_loss"] = spectra_loss
+
+    if recon_fluxes.ndim == 3:
+        spectra_loss = torch.mean(spectra_loss, dim=-1)
+        ret["spectra_binwise_loss"] = spectra_loss.T
+
+def calculate_redshift_logits(beta, ret):
+    """ Calculate logits for redshift bins.
+    """
     # calculate logits for each bin as softmax of negative loss
-    logits = -spectra_binwise_loss * kwargs["binwise_loss_beta"]
+    logits = -ret["spectra_binwise_loss"] * beta
     ret["redshift_logits"] = F.softmax(logits, dim=-1)

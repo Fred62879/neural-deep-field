@@ -5,21 +5,13 @@ import numpy as np
 from wisp.utils.numerical import calculate_emd
 
 
-def get_loss(cho, cuda):
-    if cho == "l1_mean":
-        loss = nn.L1Loss()
-    elif cho == "l1_sum":
-        loss = nn.L1Loss(reduction="sum")
-    elif cho == "l1_none":
-        loss = nn.L1Loss(reduction="none")
-    elif cho == "l2_mean":
-        loss = nn.MSELoss()
-    elif cho == "l2_sum":
-        loss = nn.MSELoss(reduction="sum")
-    elif cho == "l2_none":
-        loss = nn.MSELoss(reduction="none")
+def get_loss(cho, reduction, cuda):
+    if cho == "l1":
+        loss = nn.L1Loss(reduction=reduction)
+    elif cho == "l2":
+        loss = nn.MSELoss(reduction=reduction)
     elif cho == "l4":
-        loss = lpnormloss(p=4)
+        loss = lpnormloss(p=4, reduction=reduction)
     else:
         raise Exception("Unsupported loss choice")
     if cuda: loss = loss.cuda()
@@ -51,7 +43,7 @@ def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
 #         loss, mask, gt_spectra, recon_fluxes, weight_by_wave_coverage=True)
 
 def spectra_supervision_loss(
-        loss, weight_by_wave_coverage, keepdim, mask, gt_spectra, recon_fluxes):
+        loss, weight_by_wave_coverage, reduce_func, mask, gt_spectra, recon_fluxes):
     """
     Loss function for spectra supervision
     @Param
@@ -76,12 +68,9 @@ def spectra_supervision_loss(
     # ret = torch.mean(torch.sum(ret, dim=-1), dim=-1)
     assert ret.ndim <= 3
 
-    if ret.ndim == 2: # [bsz,nsmpl]/[nbins,bsz]
-        if not keepdim:
-            ret = torch.sum(ret, dim=-1) # [bsz]
-    elif ret.ndim == 3: # [nbins,bsz,nsmpl]
-        ret = torch.sum(ret, dim=-1) # [nbins,bsz]
-    else: raise ValueError()
+    if reduce_func is not None:
+        # ret [bsz,nsmpl]/[nbins,bsz]/[nbins,bsz,nsmpl]
+        ret = reduce_func(ret, dim=-1) # [bsz]/[nbins,bsz]
     return ret
 
 def spectra_supervision_emd_loss(mask, gt_spectra, recon_flux, weight_by_wave_coverage=True):
@@ -152,14 +141,23 @@ def spectral_masking_loss(loss, relative_train_bands, relative_inpaint_bands,
     return error
 
 class lpnormloss(nn.Module):
-    def __init__(self, p, dim=-1):
+    def __init__(self, p, dim=-1, reduction="none"):
         super(lpnormloss, self).__init__()
         self.p = p
         self.dim = dim
+        self.reduction = reduction
 
     def forward(self, input, target):
-        loss = torch.linalg.norm(
-            input - target, ord=self.p, dim=self.dim)
+        if self.reduction == "none":
+            loss = torch.pow(input - target, self.p)
+        else:
+            loss = torch.linalg.norm(
+                input - target, ord=self.p, dim=self.dim)
+            if self.reduction == "sum":
+                loss = loss
+            elif self.reduction == "mean":
+                loss = loss / input.shape[self.dim]
+            else: raise ValueError("invalid reduction method")
         return loss
 
 class sigmoid_denorm:

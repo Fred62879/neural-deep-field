@@ -72,6 +72,9 @@ trainer:
     resume_log_dir: ''
     resume_model_fname: 'model-ep10000-bch0.pth'
 
+    spectra_loss_cho: l4
+    spectra_loss_reduction: none
+
 infer:
     infer_last_model_only: True
 
@@ -81,7 +84,9 @@ infer:
     spectra_inferrence_id_fname: '' #'redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
-    plot_spectrum_with_recon: True
+    plot_clipped_spectrum: True
+    plot_spectrum_with_recon: False
+    plot_spectrum_color_based_on_loss: True
     plot_spectrum_under_gt_bin: False
     plot_spectrum_under_optimal_wrong_bin: False
 

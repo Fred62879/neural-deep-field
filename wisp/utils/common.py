@@ -439,6 +439,7 @@ def forward(
         redshift_supervision_train=False,
         regularize_codebook_spectra=False,
         calculate_binwise_spectra_loss=False,
+        calculate_lambdawise_spectra_loss=False,
         save_coords=False,
         save_scaler=False,
         save_spectra=False,
@@ -530,6 +531,8 @@ def forward(
             net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.extend(
                 ["spectra_binwise_loss","redshift_logits"])
+        if calculate_lambdawise_spectra_loss:
+            requested_channels.append("spectra_lambdawise_loss")
         if save_gt_bin_spectra or optimize_bins_separately:
             net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
         if optimize_bins_separately:

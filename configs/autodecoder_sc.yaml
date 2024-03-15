@@ -76,6 +76,9 @@ trainer:
     resume_log_dir: ''
     resume_model_fname: 'model-ep500-bch0.pth'
 
+    spectra_loss_cho: l4
+    spectra_loss_reduction: none
+
 infer:
     infer_last_model_only: True
 
@@ -88,6 +91,7 @@ infer:
 
     plot_clipped_spectrum: True
     plot_spectrum_with_recon: False
+    plot_spectrum_color_based_on_loss: True
     plot_spectrum_under_gt_bin: True
     plot_spectrum_under_optimal_wrong_bin: True
 
