@@ -1133,14 +1133,20 @@ class SpectraData:
                                  "purple", "recon", "solid", linelist, lambdawise_losses)
             else:
                 plot_spectra(fig, axis, z, recon_wave, recon_flux, recon_color,
-                             "recon", "solid", linelist, lambdawise_losses)
+                             "recon", "solid", linelist, lambdawise_losses,
+                             self.kwargs["plot_spectrum_with_loss"],
+                             self.kwargs["plot_spectrum_color_based_on_loss"])
         if recon_flux2 is not None:
             plot_spectra(fig, axis, z, recon_wave, recon_flux2, flux2_color,
-                         "gt bin", "solid", linelist, lambdawise_losses[0])
+                         "gt bin", "solid", linelist, lambdawise_losses[0],
+                         self.kwargs["plot_spectrum_with_loss"],
+                         self.kwargs["plot_spectrum_color_based_on_loss"])
             if recon_loss2 is not None: title += f": {recon_loss2:.{3}f}"
         if recon_flux3 is not None:
             plot_spectra(fig, axis, z, recon_wave, recon_flux3, flux3_color,
-                         "wrong bin", "solid", linelist, lambdawise_losses[-1])
+                         "wrong bin", "solid", linelist, lambdawise_losses[-1],
+                         self.kwargs["plot_spectrum_with_loss"],
+                         self.kwargs["plot_spectrum_color_based_on_loss"])
             if recon_loss3 is not None: title += f"/{recon_loss3:.{3}f}"
 
         axis.set_title(title)

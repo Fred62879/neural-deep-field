@@ -46,9 +46,10 @@ class HyperSpectralDecoderB(nn.Module):
         )
 
         self.calculate_lambdawise_spectra_loss = \
-            kwargs["plot_spectrum_color_based_on_loss"] and \
-            "codebook_pretrain_infer" in kwargs["tasks"] or \
-            "redshift_pretrain_infer" in kwargs["tasks"]
+            (kwargs["plot_spectrum_color_based_on_loss"] or \
+             kwargs["plot_spectrum_with_loss"]) and \
+             ("codebook_pretrain_infer" in kwargs["tasks"] or \
+              "redshift_pretrain_infer" in kwargs["tasks"])
 
         self.init_decoder()
         if self.qtz_spectra:

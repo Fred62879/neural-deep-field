@@ -888,6 +888,8 @@ def define_cmd_line_args():
     infer_group.add_argument("--mark-spectra", action="store_true")
     infer_group.add_argument("--average-neighbour-spectra", action="store_true")
     infer_group.add_argument("--plot-clipped-spectrum", action="store_true")
+    infer_group.add_argument("--plot-spectrum-with-loss", action="store_true")
+    infer_group.add_argument("--plot-spectrum-with-ivar", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-lines", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-gt", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-recon", action="store_true")

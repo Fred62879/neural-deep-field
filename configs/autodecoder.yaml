@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-3200-spectra-generalize' #single-latent'
+    exp_name: 'autodecoder-3200-spectra-single-latent'
     # log_fname: ''
 
     tasks: ['codebook_pretrain']
@@ -82,15 +82,17 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240310-164818_spectra-no-convolve-narval'
+    infer_log_dir: '20240307-141408-3200-spectra-16-3-512-multi-conversion-convolve-sigma-25'
     infer_selected: True
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
-    plot_clipped_spectrum: False
-    plot_spectrum_with_lines: True
-    plot_spectrum_with_recon: False
+    plot_clipped_spectrum: True
+    plot_spectrum_with_loss: True
+    plot_spectrum_with_ivar: True
+    plot_spectrum_with_lines: False
+    plot_spectrum_with_recon: True
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: False
     plot_spectrum_under_optimal_wrong_bin: False
@@ -103,7 +105,7 @@ infer:
     spectra_latents_plot_pca_dim: 2
 
 spectra_data:
-    convolve_spectra: False
+    convolve_spectra: True
     spectra_smooth_sigma: 25
 
     num_supervision_spectra_upper_bound: 3200

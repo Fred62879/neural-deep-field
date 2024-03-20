@@ -14,9 +14,14 @@ from wisp.utils.numerical import calculate_sam_spectrum, \
     calculate_redshift_estimation_stats_based_on_residuals
 
 
-def plot_spectra(fig, axis, z, wave, flux, color, label, linestyle, linelist, progressive_val=None):
-    plot_color_line(fig, axis, wave, flux, color, label,
-                    linestyle, progressive_val=progressive_val)
+def plot_spectra(fig, axis, z, wave, flux, color, label, linestyle, linelist, progressive_val=None, plot_loss=False, plot_color=False):
+    if plot_color:
+        assert progressive_val is not None
+        plot_color_line(fig, axis, wave, flux, color, label,
+                        linestyle, progressive_val=progressive_val)
+    else: axis.plot(wave, flux, color=color, label=label, linestyle=linestyle)
+    if plot_loss:
+        axis.plot(wave, progressive_val, color="black", linestyle="dashed")
     if linelist is not None:
         overlay_vlines(fig, axis, z, wave, linelist)
 
@@ -25,19 +30,16 @@ def plot_color_line(fig, axis, x, y, color, label, linestyle, progressive_val=No
     Plot line with either given color or gradient color
       (calculated based on progressive val)
     """
-    if progressive_val is not None:
-        points = np.array([x, y]).T.reshape(-1, 1, 2)
-        segments = np.concatenate([points[:-1], points[1:]], axis=1)
+    points = np.array([x, y]).T.reshape(-1, 1, 2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
 
-        norm = plt.Normalize(progressive_val.min(), progressive_val.max())
-        lc = LineCollection(segments, cmap='viridis', norm=norm)
-        # Set the values used for colormapping
-        lc.set_array(progressive_val)
-        lc.set_linewidth(2)
-        line = axis.add_collection(lc)
-        fig.colorbar(line)
-    else:
-        axis.plot(x, y, color=color, label=label, linestyle=linestyle)
+    norm = plt.Normalize(progressive_val.min(), progressive_val.max())
+    lc = LineCollection(segments, cmap='viridis', norm=norm)
+    # Set the values used for colormapping
+    lc.set_array(progressive_val)
+    lc.set_linewidth(2)
+    line = axis.add_collection(lc)
+    fig.colorbar(line)
 
 def overlay_vlines(fig, axis, z, wave, linelist):
     """

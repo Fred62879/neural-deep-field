@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift','plot_redshift_est_stats'] #,'plot_redshift_est_residuals'] #'plot_est_redshift_logits'] # 'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','save_redshift','plot_redshift_est_stats'] #,'plot_redshift_est_residuals'] #'plot_est_redshift_logits'] # 'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -94,6 +94,7 @@ infer:
     infer_outlier_only: False
 
     plot_clipped_spectrum: True
+    plot_spectrum_with_loss: True
     plot_spectrum_with_recon: False
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: True
@@ -106,7 +107,7 @@ infer:
     pretrain_pca_dim_fname: '' #/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
-    log_redshift_est_stats: False
+    log_redshift_est_stats: True
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:

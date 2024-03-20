@@ -116,7 +116,8 @@ class CodebookPretrainNerf(BaseNeuralField):
                     if self.kwargs["plot_spectrum_under_gt_bin"]:
                         channels.append("gt_bin_spectra")
 
-            if self.kwargs["plot_spectrum_color_based_on_loss"]:
+            if self.kwargs["plot_spectrum_color_based_on_loss"] or \
+               self.kwargs["plot_spectrum_with_loss"]:
                 channels.append("spectra_lambdawise_loss")
 
         self._register_forward_function(self.pretrain, channels)

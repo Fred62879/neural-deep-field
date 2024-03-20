@@ -1491,6 +1491,9 @@ class CodebookTrainer(BaseTrainer):
                 # else: # optimize all bins equally
                 #     spectra_loss = torch.mean(all_bin_losses)
 
+                print(all_bin_losses.shape)
+                a, __ = torch.min(all_bin_losses, dim=-1)
+                print('*', a, a.shape)
                 if self.calculate_spectra_loss_based_on_optimal_bin:
                     spectra_loss, _ = torch.min(all_bin_losses, dim=-1)
                     spectra_loss = torch.mean(spectra_loss)
@@ -1499,16 +1502,20 @@ class CodebookTrainer(BaseTrainer):
                     ids = torch.argsort(all_bin_losses, dim=-1)
                     ids = ids[:,:self.extra_args["num_bins_to_calculate_spectra_loss"]]
                     ids = create_batch_ids(ids).view(2,-1)
-                    # print(ids.shape, all_bin_losses.shape)
+                    print(ids.shape, all_bin_losses.shape)
                     spectra_loss = (all_bin_losses[ids[0],ids[1]]).view(bsz,-1)
-                    # print(spectra_loss, spectra_loss.shape)
+                    print(spectra_loss, spectra_loss.shape)
                     spectra_loss = torch.mean(spectra_loss)
+                    print(spectra_loss, spectra_loss.shape)
+                    assert 0
                 else:
                     spectra_loss = torch.mean(all_bin_losses)
 
                 if self.plot_gt_bin_loss:
                     gt_bin_losses = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
                     self.log_dict["gt_bin_losses"] += gt_bin_losses.item()
+
+                assert 0
         else:
             recon_fluxes = ret["intensity"]
             spectra_masks = data["spectra_masks"]
