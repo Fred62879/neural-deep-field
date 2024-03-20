@@ -326,6 +326,7 @@ class AstroInferrer(BaseInferrer):
         self.plot_outlier_spectra_latents_pca = "plot_spectra_latents_pca" in tasks and \
             self.extra_args["infer_outlier_only"]
 
+        self.plot_spectra_with_lines = self.extra_args["plot_spectrum_with_lines"]
         self.plot_gt_bin_spectra = not self.recon_spectra_all_bins and \
             self.extra_args["plot_spectrum_under_gt_bin"]
         self.plot_optimal_wrong_bin_spectra = not self.recon_spectra_all_bins and \
@@ -893,6 +894,8 @@ class AstroInferrer(BaseInferrer):
             self.recon_fluxes = []
             if self.plot_spectra_residual:
                 self.spectra_ivar = []
+            if self.plot_spectra_with_lines:
+                self.gt_redshift = []
             if self.plot_gt_bin_spectra:
                 self.gt_bin_fluxes = []
                 self.gt_bin_spectra_losses = []
@@ -1252,6 +1255,8 @@ class AstroInferrer(BaseInferrer):
                         fluxes = fluxes.flatten(1,2) # [bsz,nsmpl]
                     self.recon_fluxes.extend(fluxes)
 
+                    if self.plot_spectra_with_lines:
+                        self.gt_redshift.extend(data["spectra_redshift"])
                     if self.plot_spectra_residual:
                         self.spectra_ivar.extend(data["spectra_source_data"][:,2])
                     if self.plot_gt_bin_spectra:
@@ -1609,6 +1614,9 @@ class AstroInferrer(BaseInferrer):
                     self.recon_fluxes_all = torch.stack(self.recon_fluxes_all).view(
                         self.dataset_length, self.num_redshift_bins, -1).detach().cpu().numpy()
 
+                if self.plot_spectra_with_lines:
+                    self.gt_redshift = torch.stack(
+                        self.gt_redshift).detach().cpu().numpy()
                 if self.plot_spectra_residual:
                     self.spectra_ivar = torch.stack(
                         self.spectra_ivar).detach().cpu().numpy()
@@ -1719,16 +1727,17 @@ class AstroInferrer(BaseInferrer):
             self.recon_wave = self.recon_wave[ids]
             self.recon_masks = self.recon_masks[ids]
             self.recon_fluxes = self.recon_fluxes[ids]
-
+            if self.plot_spectra_with_lines:
+                self.gt_redshift = self.gt_redshift[ids]
             if self.plot_gt_bin_spectra:
                 self.gt_bin_fluxes = self.gt_bin_fluxes[ids]
                 self.gt_bin_spectra_losses = self.gt_bin_spectra_losses[ids]
             if self.plot_optimal_wrong_bin_spectra:
                 self.optimal_wrong_bin_fluxes = self.optimal_wrong_bin_fluxes[ids]
-                self.optimal_wrong_bin_spectra_losses = self.optimal_wrong_bin_spectra_losses[ids]
+                self.optimal_wrong_bin_spectra_losses = \
+                    self.optimal_wrong_bin_spectra_losses[ids]
             if self.plot_spectra_color_based_on_loss:
                 self.spectra_lambdawise_losses = self.spectra_lambdawise_losses[ids]
-
             num_spectra = len(ids)
 
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
@@ -1740,6 +1749,9 @@ class AstroInferrer(BaseInferrer):
             lo = i * n_spectrum_per_fig
             hi = min(lo + n_spectrum_per_fig, num_spectra)
 
+            if self.plot_spectra_with_lines:
+                redshift = self.gt_redshift[lo:hi]
+            else: redshift = None
             if self.plot_gt_bin_spectra:
                 recon_fluxes2 = self.gt_bin_fluxes[lo:hi]
                 recon_losses2 = self.gt_bin_spectra_losses[lo:hi]
@@ -1750,6 +1762,7 @@ class AstroInferrer(BaseInferrer):
             else: recon_fluxes3, recon_losses3 = None, None
             if self.plot_spectra_color_based_on_loss:
                 lambdawise_losses = self.spectra_lambdawise_losses[lo:hi]
+            else: lambdawise_losses = None
 
             if self.infer_selected:
                 n = len(self._select_inferrence_ids())
@@ -1759,7 +1772,7 @@ class AstroInferrer(BaseInferrer):
 
             cur_metrics = self.dataset.plot_spectrum(
                 spectra_dir, fname,
-                self.extra_args["flux_norm_cho"],
+                self.extra_args["flux_norm_cho"], redshift,
                 self.gt_wave[lo:hi], self.gt_fluxes[lo:hi],
                 self.recon_wave[lo:hi], self.recon_fluxes[lo:hi],
                 recon_fluxes2=recon_fluxes2, recon_losses2=recon_losses2,

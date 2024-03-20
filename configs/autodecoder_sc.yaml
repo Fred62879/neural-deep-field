@@ -70,19 +70,21 @@ trainer:
     optimize_latents_for_each_redshift_bin: False #
     # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
 
-    calculate_spectra_loss_based_on_optimal_bin: True # only if we use single latent
+    calculate_spectra_loss_based_on_optimal_bin: False # only if we use single latent
+    calculate_spectra_loss_based_on_top_n_bins: True # only if we use single latent
+    num_bins_to_calculate_spectra_loss: 5
 
     resume_train: False
     resume_log_dir: ''
     resume_model_fname: 'model-ep500-bch0.pth'
 
-    spectra_loss_cho: l4
+    spectra_loss_cho: l2
     spectra_loss_reduction: none
 
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: ''
+    # infer_log_dir: '20240314-172421-sc-single-latent-loss-optimal-bin-500-epochs-141408'
 
     pretrain_infer_batch_size: 5
 
@@ -93,7 +95,7 @@ infer:
 
     plot_clipped_spectrum: True
     plot_spectrum_with_recon: False
-    plot_spectrum_color_based_on_loss: True
+    plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: True
     plot_spectrum_under_optimal_wrong_bin: True
 
@@ -104,7 +106,7 @@ infer:
     pretrain_pca_dim_fname: '' #/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
-    log_redshift_est_stats: True
+    log_redshift_est_stats: False
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:

@@ -14,9 +14,15 @@ from wisp.utils.numerical import calculate_sam_spectrum, \
     calculate_redshift_estimation_stats_based_on_residuals
 
 
-def plot_progressive(fig, axis, x, y, color, label, linestyle, progressive_val=None):
+def plot_spectra(fig, axis, z, wave, flux, color, label, linestyle, linelist, progressive_val=None):
+    plot_color_line(fig, axis, wave, flux, color, label,
+                    linestyle, progressive_val=progressive_val)
+    if linelist is not None:
+        overlay_vlines(fig, axis, z, wave, linelist)
+
+def plot_color_line(fig, axis, x, y, color, label, linestyle, progressive_val=None):
     """
-    plot line with either given color or gradient color
+    Plot line with either given color or gradient color
       (calculated based on progressive val)
     """
     if progressive_val is not None:
@@ -33,28 +39,23 @@ def plot_progressive(fig, axis, x, y, color, label, linestyle, progressive_val=N
     else:
         axis.plot(x, y, color=color, label=label, linestyle=linestyle)
 
-def plot_emission_lines():
-    from linetools.lists.linelist import LineList
-    import matplotlib.pyplot as plt
+def overlay_vlines(fig, axis, z, wave, linelist):
+    """
+    Overlay emission and absorption lines (observed lambda).
+    """
+    wv_range = (wave.min(), wave.max())  # Wavelength range of your spectrum
 
-    plt.figure(figsize=(14, 6))
-    plt.plot(wavelength, flux, lw=1)
-    linelist = LineList('Galaxy')
-
-    z = 1.5  # adjust this based on your target's redshift
-    wv_range = (wavelength.min(), wavelength.max())  # Wavelength range of your spectrum
-
-    for line in linelist.all_transitions():
-        line_wavelength = line['wrest'] * (1 + z)
-        if wv_range[0] <= line_wavelength  <= wv_range[1]:
-            plt.axvline(x=line_wavelength, color='r', linestyle='--', alpha=0.5)
-            plt.text(line_wavelength, plt.ylim()[1]*0.9,
-                     line['name'], rotation=90, fontsize=8, alpha=0.7, ha='center')
-
-    plt.xlabel('Wavelength')
-    plt.ylabel('Flux')
-    plt.tight_layout()
-    plt.show()
+    # for line in linelist.all_transitions("OI"):
+    # i = 0
+    for line in linelist._data:
+        line_wave = line["wrest"] * (1 + z)
+        # print(line_wave, line["wrest"], z)
+        if wv_range[0] <= line_wave  <= wv_range[1]:
+            # i += 1
+            axis.axvline(x=line_wave, color="blue", linestyle="dotted", alpha=0.5)
+            axis.text(line_wave, plt.ylim()[1]*0.9, line["name"],
+                      rotation=90, fontsize=8, alpha=0.7, ha="center")
+    # print(i)
 
 def plot_latents(latents, fname, color="blue"):
     """

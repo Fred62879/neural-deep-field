@@ -119,13 +119,21 @@ def create_gt_redshift_bin_masks(gt_redshift_bin_ids, num_bins):
 def create_batch_ids(ids):
     """ Add batch dim id to a given list of ids.
         @Param
-          ids: [n,] list of ids
+          ids: [n,...] list of ids
         @Return
-          ids: [2,n] ids with batch dim ([0,1,2,...,n])
+          ids: [2,n,...] ids with batch dim ([0,1,2,...,n])
     """
     n = len(ids)
-    indices = np.arange(n)[None,:]
-    ids = np.concatenate((indices, ids[None,:]), axis=0)
+    indices = np.arange(n)
+    if ids.ndim >= 2:
+        sp = ids.shape
+        n_per_sample = reduce(lambda x,y: x*y, sp[1:])
+        indices = np.repeat(indices, n_per_sample).reshape(sp)
+    if ids.__class__.__name__ == "Tensor":
+        indices = torch.tensor(indices).type(ids.dtype).to(ids.device)
+        ids = torch.cat((indices[None,:], ids[None,:]), dim=0)
+    else:
+        ids = np.concatenate((indices[None,:], ids[None,:]), axis=0)
     return ids
 
 def log_data(obj, field, fname=None, gt_field=None, mask=None,

@@ -391,6 +391,9 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--calculate-spectra-loss-based-on-optimal-bin",
                                 action="store_true", help="when use single latent, calculate \
                                 loss use best bin spectra loss.")
+    pretrain_group.add_argument("--calculate-spectra-loss-based-on-top-n-bins",
+                                action="store_true")
+    pretrain_group.add_argument("--num-bins-to-calculate-spectra-loss", action="store_true")
 
     pretrain_group.add_argument("--negative-supervise-wrong-redshift", action="store_true",
                                 help="discourage wrong redshift from generating high \
@@ -885,6 +888,7 @@ def define_cmd_line_args():
     infer_group.add_argument("--mark-spectra", action="store_true")
     infer_group.add_argument("--average-neighbour-spectra", action="store_true")
     infer_group.add_argument("--plot-clipped-spectrum", action="store_true")
+    infer_group.add_argument("--plot-spectrum-with-lines", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-gt", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-recon", action="store_true")
     infer_group.add_argument("--plot-spectrum-with-trans", action="store_true")

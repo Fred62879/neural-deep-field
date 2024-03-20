@@ -31,7 +31,7 @@ from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
     load_pretrained_model_weights, get_pretrained_model_fname, init_redshift_bins, \
     get_bool_regress_redshift, get_bool_classify_redshift, get_bool_has_redshift_latents, \
     get_optimal_wrong_bin_ids, freeze_layers_incl, freeze_layers_excl, create_latent_mask, \
-    set_seed, log_data, get_bin_ids
+    set_seed, log_data, get_bin_ids, create_batch_ids
 
 
 class CodebookTrainer(BaseTrainer):
@@ -131,7 +131,8 @@ class CodebookTrainer(BaseTrainer):
                     |_regularize_binwise_spectra_latents               -
                     |_optimize_latents_for_each_redshift_bin            |- sanity check OR
                     |_optimize_one_latent_for_all_redshift_bins         |  generalization
-                         |_calculate_spectra_loss_based_on_optimal_bin -
+                         |_calculate_spectra_loss_based_on_optimal_bin  |
+                         |_calculate_spectra_loss_based_on_top_n_bins  -
         """
         self.model_redshift = self.extra_args["model_redshift"]
         self.regress_redshift = get_bool_regress_redshift(**self.extra_args)
@@ -185,6 +186,11 @@ class CodebookTrainer(BaseTrainer):
         self.calculate_spectra_loss_based_on_optimal_bin = \
             self.optimize_one_latent_for_all_redshift_bins and \
             self.extra_args["calculate_spectra_loss_based_on_optimal_bin"]
+        self.calculate_spectra_loss_based_on_top_n_bins = \
+            self.optimize_one_latent_for_all_redshift_bins and \
+            self.extra_args["calculate_spectra_loss_based_on_top_n_bins"]
+        assert not (self.calculate_spectra_loss_based_on_optimal_bin and \
+                    self.calculate_spectra_loss_based_on_top_n_bins)
 
         if self.classify_redshift:
             redshift_bins = init_redshift_bins(
@@ -1487,6 +1493,15 @@ class CodebookTrainer(BaseTrainer):
 
                 if self.calculate_spectra_loss_based_on_optimal_bin:
                     spectra_loss, _ = torch.min(all_bin_losses, dim=-1)
+                    spectra_loss = torch.mean(spectra_loss)
+                elif self.calculate_spectra_loss_based_on_top_n_bins:
+                    bsz = len(all_bin_losses)
+                    ids = torch.argsort(all_bin_losses, dim=-1)
+                    ids = ids[:,:self.extra_args["num_bins_to_calculate_spectra_loss"]]
+                    ids = create_batch_ids(ids).view(2,-1)
+                    # print(ids.shape, all_bin_losses.shape)
+                    spectra_loss = (all_bin_losses[ids[0],ids[1]]).view(bsz,-1)
+                    # print(spectra_loss, spectra_loss.shape)
                     spectra_loss = torch.mean(spectra_loss)
                 else:
                     spectra_loss = torch.mean(all_bin_losses)

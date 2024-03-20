@@ -590,7 +590,7 @@ class AstroDataset(Dataset):
         """
         return self.fits_dataset.restore_evaluate_tiles(recon_pixels, **re_args)
 
-    def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
+    def plot_spectrum(self, spectra_dir, name, flux_norm_cho, redshift,
                       gt_wave, gt_fluxes, recon_wave, recon_fluxes,
                       recon_fluxes2=None,
                       recon_losses2=None,
@@ -607,7 +607,7 @@ class AstroDataset(Dataset):
                       clip=False, spectra_clipped=False
     ):
         return self.spectra_dataset.plot_spectrum(
-            spectra_dir, name, flux_norm_cho,
+            spectra_dir, name, flux_norm_cho, redshift,
             gt_wave, gt_fluxes, recon_wave, recon_fluxes,
             recon_fluxes2=recon_fluxes2,
             recon_losses2=recon_losses2,

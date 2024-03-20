@@ -17,6 +17,26 @@ def get_loss(cho, reduction, cuda):
     if cuda: loss = loss.cuda()
     return loss
 
+class lpnormloss(nn.Module):
+    def __init__(self, p, dim=-1, reduction="none"):
+        super(lpnormloss, self).__init__()
+        self.p = p
+        self.dim = dim
+        self.reduction = reduction
+
+    def forward(self, input, target):
+        if self.reduction == "none":
+            loss = torch.pow(input - target, self.p)
+        else:
+            loss = torch.linalg.norm(
+                input - target, ord=self.p, dim=self.dim)
+            if self.reduction == "sum":
+                loss = loss
+            elif self.reduction == "mean":
+                loss = loss / input.shape[self.dim]
+            else: raise ValueError("invalid reduction method")
+        return loss
+
 def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     gt_pixels = gt_pixels / (torch.sum(gt_pixels, dim=-1)[...,None])
     recon_pixels = recon_pixels / (torch.sum(recon_pixels, dim=-1)[...,None])
@@ -139,26 +159,6 @@ def spectral_masking_loss(loss, relative_train_bands, relative_inpaint_bands,
     masked_recon = torch.cat((masked_recon, b))
     error = loss(masked_gt, masked_recon)
     return error
-
-class lpnormloss(nn.Module):
-    def __init__(self, p, dim=-1, reduction="none"):
-        super(lpnormloss, self).__init__()
-        self.p = p
-        self.dim = dim
-        self.reduction = reduction
-
-    def forward(self, input, target):
-        if self.reduction == "none":
-            loss = torch.pow(input - target, self.p)
-        else:
-            loss = torch.linalg.norm(
-                input - target, ord=self.p, dim=self.dim)
-            if self.reduction == "sum":
-                loss = loss
-            elif self.reduction == "mean":
-                loss = loss / input.shape[self.dim]
-            else: raise ValueError("invalid reduction method")
-        return loss
 
 class sigmoid_denorm:
 
