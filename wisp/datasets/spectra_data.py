@@ -1095,7 +1095,7 @@ class SpectraData:
                                    save_spectra, calculate_metrics, linelist, idx, pargs):
         """ Plot one spectrum and save as required.
         """
-        sub_dir, title, z, gt_wave, gt_flux, recon_wave, recon_flux, \
+        sub_dir, title, z, gt_wave, ivar, gt_flux, recon_wave, recon_flux, \
             recon_flux2, recon_loss2, recon_flux3, recon_loss3, lambdawise_losses, \
             plot_gt_spectrum, plot_recon_spectrum = pargs
 
@@ -1122,7 +1122,7 @@ class SpectraData:
 
         if plot_gt_spectrum:
             plot_spectra(fig, axis, z, gt_wave, gt_flux, gt_color,
-                         "gt", "dashed", linelist, None)
+                         "gt", "dashed", linelist, None, ivar)
         if plot_recon_spectrum:
             if above_threshold is not None: # plot recon flux according to zncc
                 plot_spectra(fig, axis, z, recon_wave, recon_flux, recon_color,
@@ -1133,18 +1133,18 @@ class SpectraData:
                                  "purple", "recon", "solid", linelist, lambdawise_losses)
             else:
                 plot_spectra(fig, axis, z, recon_wave, recon_flux, recon_color,
-                             "recon", "solid", linelist, lambdawise_losses,
+                             "recon", "solid", linelist, lambdawise_losses, None,
                              self.kwargs["plot_spectrum_with_loss"],
                              self.kwargs["plot_spectrum_color_based_on_loss"])
         if recon_flux2 is not None:
             plot_spectra(fig, axis, z, recon_wave, recon_flux2, flux2_color,
-                         "gt bin", "solid", linelist, lambdawise_losses[0],
+                         "gt bin", "solid", linelist, lambdawise_losses[0], None,
                          self.kwargs["plot_spectrum_with_loss"],
                          self.kwargs["plot_spectrum_color_based_on_loss"])
             if recon_loss2 is not None: title += f": {recon_loss2:.{3}f}"
         if recon_flux3 is not None:
             plot_spectra(fig, axis, z, recon_wave, recon_flux3, flux3_color,
-                         "wrong bin", "solid", linelist, lambdawise_losses[-1],
+                         "wrong bin", "solid", linelist, lambdawise_losses[-1], None,
                          self.kwargs["plot_spectrum_with_loss"],
                          self.kwargs["plot_spectrum_color_based_on_loss"])
             if recon_loss3 is not None: title += f"/{recon_loss3:.{3}f}"
@@ -1190,7 +1190,7 @@ class SpectraData:
                                    spectra_clipped, calculate_metrics, data):
         """ Collect data for spectrum plotting for the given spectra.
         """
-        (title, z, gt_wave, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux,
+        (title, z, gt_wave, ivar, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux,
          recon_flux2, recon_loss2, recon_flux3, recon_loss3, lambdawise_losses) = data
         """
         lambdawise_losses
@@ -1209,6 +1209,8 @@ class SpectraData:
         if plot_gt_spectrum and clip and not spectra_clipped:
             gt_wave = gt_wave[gt_mask]
             gt_flux = gt_flux[gt_mask]
+            if ivar is not None:
+                ivar = ivar[gt_mask]
 
         if lambdawise_losses is not None:
             sub_dir += 'loss_based_color_'
@@ -1262,13 +1264,13 @@ class SpectraData:
             sub_dir += 'with_wrong_bin_'
 
         plot_recon_spectrum = self.kwargs["plot_spectrum_with_recon"]
-        pargs = (sub_dir, title, z, gt_wave, gt_flux, recon_wave, recon_flux,
+        pargs = (sub_dir, title, z, gt_wave, ivar, gt_flux, recon_wave, recon_flux,
                  recon_flux2, recon_loss2, recon_flux3, recon_loss3, lambdawise_losses,
                  plot_gt_spectrum, plot_recon_spectrum)
         return pargs
 
     def plot_spectrum(self, spectra_dir, name, flux_norm_cho,
-                      redshift, gt_wave, gt_fluxes,
+                      redshift, gt_wave, ivar, gt_fluxes,
                       recon_wave, recon_fluxes,
                       recon_fluxes2=None,
                       recon_losses2=None,
@@ -1291,7 +1293,8 @@ class SpectraData:
           name:          file name
           flux_norm_cho: norm choice for flux
 
-          wave:        corresponding wave for gt and recon fluxes
+          gt_wave:     corresponding wave for gt and recon fluxes
+          ivar:        inverse variance
           gt_fluxes:   [num_spectra,nsmpl]
           recon_fluxs: [num_spectra(,num_neighbours),nsmpl]
 
@@ -1308,6 +1311,7 @@ class SpectraData:
 
         n = len(recon_wave)
         if titles is None: titles = [None]*n
+        if ivar is None: ivar = [None]*n
         if redshift is None: redshift = [None]*n
         if gt_wave is None: gt_wave = [None]*n
         if gt_masks is None: gt_masks = [None]*n
@@ -1347,7 +1351,7 @@ class SpectraData:
                                 calculate_metrics, linelist)
         metrics = []
         for idx, cur_plot_data in enumerate(
-            zip(titles, redshift, gt_wave, gt_masks, gt_fluxes, recon_wave, recon_masks,
+            zip(titles, redshift, gt_wave, ivar, gt_masks, gt_fluxes, recon_wave, recon_masks,
                 recon_fluxes, recon_fluxes2, recon_losses2, recon_fluxes3, recon_losses3,
                 lambdawise_losses)
         ):

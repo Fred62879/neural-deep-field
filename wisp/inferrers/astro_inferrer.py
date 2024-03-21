@@ -887,6 +887,7 @@ class AstroInferrer(BaseInferrer):
         self.reset_data_iterator()
 
         if self.recon_spectra or self.recon_spectra_all_bins:
+            self.ivar = []
             self.gt_fluxes = []
             self.spectra_wave = []
             self.spectra_masks = []
@@ -1249,6 +1250,7 @@ class AstroInferrer(BaseInferrer):
                                                 data["init_redshift_prob"])
 
                 if self.recon_spectra or self.recon_spectra_all_bins:
+                    self.ivar.extend(data["spectra_source_data"][:,2])
                     self.gt_fluxes.extend(data["spectra_source_data"][:,1])
                     self.spectra_wave.extend(data["spectra_source_data"][:,0])
                     self.spectra_masks.extend(data["spectra_masks"])
@@ -1601,6 +1603,8 @@ class AstroInferrer(BaseInferrer):
             num_spectra = self.dataset_length
 
             if self.recon_spectra or self.recon_spectra_all_bins:
+                self.ivar = torch.stack(self.ivar).view(
+                    num_spectra, -1).detach().cpu().numpy()
                 self.gt_fluxes = torch.stack(self.gt_fluxes).view(
                     num_spectra, -1).detach().cpu().numpy()
                 self.gt_wave = torch.stack(self.spectra_wave).view(
@@ -1725,6 +1729,7 @@ class AstroInferrer(BaseInferrer):
 
         if ids is not None:
             titles = titles[ids]
+            self.ivar = self.ivar[ids]
             self.gt_wave = self.gt_wave[ids]
             self.gt_masks = self.gt_masks[ids]
             self.gt_fluxes = self.gt_fluxes[ids]
@@ -1777,7 +1782,7 @@ class AstroInferrer(BaseInferrer):
             cur_metrics = self.dataset.plot_spectrum(
                 spectra_dir, fname,
                 self.extra_args["flux_norm_cho"], redshift,
-                self.gt_wave[lo:hi], self.gt_fluxes[lo:hi],
+                self.gt_wave[lo:hi], self.ivar[lo:hi], self.gt_fluxes[lo:hi],
                 self.recon_wave[lo:hi], self.recon_fluxes[lo:hi],
                 recon_fluxes2=recon_fluxes2, recon_losses2=recon_losses2,
                 recon_fluxes3=recon_fluxes3, recon_losses3=recon_losses3,
