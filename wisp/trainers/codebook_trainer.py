@@ -397,7 +397,9 @@ class CodebookTrainer(BaseTrainer):
 
         loss_func = get_loss(
             self.extra_args["spectra_loss_cho"],
-            self.extra_args["spectra_loss_reduction"], self.cuda
+            self.extra_args["spectra_loss_reduction"], self.cuda,
+            filter_size=self.extra_args["spectra_ssim_loss_filter_size"],
+            filter_sigma=self.extra_args["spectra_ssim_loss_filter_sigma"],
         )
         if self.calculate_binwise_spectra_loss:
             self.spectra_loss_func = partial(
@@ -1492,6 +1494,7 @@ class CodebookTrainer(BaseTrainer):
                 #     spectra_loss = torch.mean(all_bin_losses)
 
                 print(all_bin_losses.shape)
+                assert 0
                 a, __ = torch.min(all_bin_losses, dim=-1)
                 print('*', a, a.shape)
                 if self.calculate_spectra_loss_based_on_optimal_bin:
@@ -1502,20 +1505,14 @@ class CodebookTrainer(BaseTrainer):
                     ids = torch.argsort(all_bin_losses, dim=-1)
                     ids = ids[:,:self.extra_args["num_bins_to_calculate_spectra_loss"]]
                     ids = create_batch_ids(ids).view(2,-1)
-                    print(ids.shape, all_bin_losses.shape)
                     spectra_loss = (all_bin_losses[ids[0],ids[1]]).view(bsz,-1)
-                    print(spectra_loss, spectra_loss.shape)
                     spectra_loss = torch.mean(spectra_loss)
-                    print(spectra_loss, spectra_loss.shape)
-                    assert 0
                 else:
                     spectra_loss = torch.mean(all_bin_losses)
 
                 if self.plot_gt_bin_loss:
                     gt_bin_losses = torch.mean(all_bin_losses[data["gt_redshift_bin_masks"]])
                     self.log_dict["gt_bin_losses"] += gt_bin_losses.item()
-
-                assert 0
         else:
             recon_fluxes = ret["intensity"]
             spectra_masks = data["spectra_masks"]
@@ -1529,9 +1526,7 @@ class CodebookTrainer(BaseTrainer):
                 self.cur_spectra_individ_losses.extend(spectra_loss.detach().cpu().numpy())
             if spectra_loss.ndim != 0:
                 assert spectra_loss.ndim == 1
-                # print(spectra_loss.shape)
                 spectra_loss = torch.mean(spectra_loss, dim=-1)
-                # print(spectra_loss.shape)
 
         # if spectra_loss.__class__.__name__ == "Tensor":
         #     self.log_dict["spectra_loss"] += spectra_loss.item()

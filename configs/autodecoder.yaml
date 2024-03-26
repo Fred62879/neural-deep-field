@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-3200-spectra-single-latent'
+    exp_name: 'autodecoder-3200-spectra-ssim' #-single-latent'
     # log_fname: ''
 
     tasks: ['codebook_pretrain']
@@ -54,11 +54,11 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 1000
+    num_epochs: 10000
     batch_size: 5500
-    log_cli_every: 100
+    log_cli_every: 1000
     plot_grad_every: -1
-    save_model_every: 100
+    save_model_every: 1000
 
     apply_gt_redshift: True
     calculate_binwise_spectra_loss: False # brute force, each bin has its own spectra
@@ -72,17 +72,20 @@ trainer:
     calculate_spectra_loss_based_on_top_n_bins: True # only if we use single latent
     num_bins_to_calculate_spectra_loss: 5
 
-    resume_train: False
-    resume_log_dir: ''
+    resume_train: True
+    resume_log_dir: '20240325-201746-10k-epochs'
     resume_model_fname: 'model-ep10000-bch0.pth'
 
-    spectra_loss_cho: l2
+    spectra_loss_cho: ssim1d
     spectra_loss_reduction: none
+
+    spectra_ssim_loss_filter_size: 9
+    spectra_ssim_loss_filter_sigma: 5
 
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240307-141408-3200-spectra-16-3-512-multi-conversion-convolve-sigma-25'
+    # infer_log_dir: '20240307-141408-3200-spectra-16-3-512-multi-conversion-convolve-sigma-25'
     infer_selected: True
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'redshift/model-0_redshift_outlier_ids.npy'
@@ -90,7 +93,7 @@ infer:
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: True
-    plot_spectrum_with_ivar: True
+    plot_spectrum_with_ivar: False
     plot_spectrum_with_lines: False
     plot_spectrum_with_recon: True
     plot_spectrum_color_based_on_loss: False
@@ -108,7 +111,7 @@ spectra_data:
     convolve_spectra: True
     spectra_smooth_sigma: 25
 
-    num_supervision_spectra_upper_bound: 3200
+    num_supervision_spectra_upper_bound: 35 #3200
 
     filter_redshift: False
     filter_redshift_lo: 0.02

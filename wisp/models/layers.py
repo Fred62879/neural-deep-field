@@ -410,6 +410,7 @@ def calculate_spectra_loss(
     """
     n_bins = recon_fluxes.shape[0]
 
+    print('*', recon_fluxes.shape)
     if recon_fluxes.ndim == 2: # apply_gt_redshift
         spectra_loss = loss_func(masks, gt_spectra, recon_fluxes) # [bsz,nsmpls]
         assert spectra_loss.ndim == 2

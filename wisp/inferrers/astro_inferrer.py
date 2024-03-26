@@ -326,6 +326,7 @@ class AstroInferrer(BaseInferrer):
         self.plot_outlier_spectra_latents_pca = "plot_spectra_latents_pca" in tasks and \
             self.extra_args["infer_outlier_only"]
 
+        self.plot_spectra_with_ivar = self.extra_args["plot_spectrum_with_ivar"]
         self.plot_spectra_with_loss = self.extra_args["plot_spectrum_with_loss"]
         self.plot_spectra_with_lines = self.extra_args["plot_spectrum_with_lines"]
         self.plot_gt_bin_spectra = not self.recon_spectra_all_bins and \
@@ -1468,7 +1469,9 @@ class AstroInferrer(BaseInferrer):
         else:
             loss = get_loss(
                 self.extra_args["spectra_loss_cho"],
-                self.extra_args["spectra_loss_reduction"], self.cuda
+                self.extra_args["spectra_loss_reduction"], self.cuda,
+                filter_size=self.extra_args["spectra_ssim_loss_filter_size"],
+                filter_sigma=self.extra_args["spectra_ssim_loss_filter_sigma"],
             )
             loss = partial(
                 spectra_supervision_loss, loss,
@@ -1761,6 +1764,9 @@ class AstroInferrer(BaseInferrer):
             if self.plot_spectra_with_lines:
                 redshift = self.gt_redshift[lo:hi]
             else: redshift = None
+            if self.plot_spectra_with_ivar:
+                ivar = self.ivar[lo:hi]
+            else: ivar = None
             if self.plot_gt_bin_spectra:
                 recon_fluxes2 = self.gt_bin_fluxes[lo:hi]
                 recon_losses2 = self.gt_bin_spectra_losses[lo:hi]
@@ -1779,10 +1785,11 @@ class AstroInferrer(BaseInferrer):
                 Path(spectra_dir).mkdir(parents=True, exist_ok=True)
             else: spectra_dir = self.spectra_dir
 
+            # print(lambdawise_losses.shape)
             cur_metrics = self.dataset.plot_spectrum(
                 spectra_dir, fname,
                 self.extra_args["flux_norm_cho"], redshift,
-                self.gt_wave[lo:hi], self.ivar[lo:hi], self.gt_fluxes[lo:hi],
+                self.gt_wave[lo:hi], ivar, self.gt_fluxes[lo:hi],
                 self.recon_wave[lo:hi], self.recon_fluxes[lo:hi],
                 recon_fluxes2=recon_fluxes2, recon_losses2=recon_losses2,
                 recon_fluxes3=recon_fluxes3, recon_losses3=recon_losses3,

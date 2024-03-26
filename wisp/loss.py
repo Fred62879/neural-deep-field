@@ -1,17 +1,24 @@
+
+import math
 import torch
 import torch.nn as nn
 import numpy as np
+import torch.nn.functional as F
 
 from wisp.utils.numerical import calculate_emd
+from skimage.metrics import structural_similarity as ssim
 
 
-def get_loss(cho, reduction, cuda):
+def get_loss(cho, reduction, cuda, filter_size=-1, filter_sigma=-1):
     if cho == "l1":
         loss = nn.L1Loss(reduction=reduction)
     elif cho == "l2":
         loss = nn.MSELoss(reduction=reduction)
     elif cho == "l4":
         loss = lpnormloss(p=4, reduction=reduction)
+    elif cho == "ssim1d":
+        assert filter_size != -1 and filter_sigma != -1
+        loss = ssim1d(filter_size, filter_sigma, reduction=reduction)
     else:
         raise Exception("Unsupported loss choice")
     if cuda: loss = loss.cuda()
@@ -234,3 +241,91 @@ def RandNerfLoss(y_hat, y, eps, reduce=0):
     return torch.mean(( (y_hat-y)/(sg_y_hat+eps) )**2)
     #return torch.mean(torch.abs(y_hat-y))
 '''
+
+class ssim1d(nn.Module):
+    def __init__(self, filter_size, filter_sigma, reduction="none", size_average=True, full=False):
+        super(ssim1d, self).__init__()
+        self.full = full
+        self.reduction = reduction
+        assert filter_size % 2
+        self.pad = (filter_size - 1) // 2
+        # self.val_range = val_range
+        self.filter_size = filter_size
+        self.size_average = size_average
+
+        self.filter = self.gaussian(filter_size, filter_sigma)
+
+    def forward(self, input, target):
+        # print(input.shape, target.shape, input.dtype, target.dtype)
+        # input_ = input.detach().cpu().numpy()
+        # target_ = target.detach().cpu().numpy()
+        # ssims = [self._forward(cur_in, cur_tar) for cur_in, cur_tar in zip(input, target)]
+        ssim = self._forward(input, target)
+        # return torch.tensor(ssims).type(input.dtype).to(input.device)
+        if self.reduction == "none":
+            pass
+        elif self.reduction == "mean":
+            ssim = torch.mean(ssim)
+        elif self.reduction == "sum":
+            ssim = torch.sum(ssim)
+        else: raise ValueError()
+        return ssim
+
+    def gaussian(self, size, sigma):
+        """
+        Generates a list of Tensor values drawn from a gaussian distribution with standard
+        diviation = sigma and sum of all elements = 1.
+        Length of list = filter_size
+        """
+        gauss =  torch.Tensor([
+            math.exp(-(x - size//2)**2/float(2*sigma**2)) for x in range(size)
+        ])
+        gauss = gauss/gauss.sum()
+        gauss = gauss[None,None,:].cuda()
+        return gauss
+
+    def _forward(self, s1, s2):
+        s1 = s1[:,None] # [bsz,1,nsmpl]
+        s2 = s2[:,None]
+        # print('*', s1.shape, s2.shape)
+        bsz, channels, nsmpls = s1.shape
+
+        # calculating the mu parameter (locally) for both signals using a gaussian filter
+        # calculates the luminosity params
+        # print(self.filter.shape, self.pad)
+        mu1 = F.conv1d(s1, self.filter, padding=self.pad, groups=channels)
+        mu2 = F.conv1d(s2, self.filter, padding=self.pad, groups=channels)
+        # print('mu', mu1.shape, mu2.shape)
+
+        mu1_sq = mu1 ** 2
+        mu2_sq = mu2 ** 2
+        mu12 = mu1 * mu2
+
+        # now we calculate the sigma square parameter
+        # Sigma deals with the contrast component
+        # print(s1.shape, self.pad, self.filter.shape)
+        sigma1_sq = F.conv1d(s1 * s1, self.filter, padding=self.pad, groups=channels) - mu1_sq
+        sigma2_sq = F.conv1d(s2 * s2, self.filter, padding=self.pad, groups=channels) - mu2_sq
+        sigma12 =  F.conv1d(s1 * s2, self.filter, padding=self.pad, groups=channels) - mu12
+        # print('sigma', sigma1_sq.shape, sigma2_sq.shape, sigma12.shape)
+
+        # Some constants for stability
+        C1 = (0.01 ) ** 2  # NOTE: Removed L from here (ref PT implementation)
+        C2 = (0.03 ) ** 2
+
+        contrast_metric = (2.0 * sigma12 + C2) / (sigma1_sq + sigma2_sq + C2)
+        contrast_metric = torch.mean(contrast_metric)
+
+        numerator1 = 2 * mu12 + C1
+        numerator2 = 2 * sigma12 + C2
+        denominator1 = mu1_sq + mu2_sq + C1
+        denominator2 = sigma1_sq + sigma2_sq + C2
+        # print(numerator1.shape, numerator2.shape, denominator1.shape, denominator2.shape)
+
+        ssim_score = (numerator1 * numerator2) / (denominator1 * denominator2)
+        return ssim_score[:,0]
+        # if self.size_average:
+        #    ret = ssim_score.mean()
+        # else: ret = ssim_score.mean(1).mean(1).mean(1)
+        # if self.full: return ret, contrast_metric
+        # return reta

@@ -1171,6 +1171,7 @@ class SpectraData:
     def process_recon_flux(
             self, recon_flux, recon_mask, clip, spectra_clipped, recon_wave, lambdawise_losses
     ):
+        # print(recon_flux.shape, recon_mask.shape, lambdawise_losses.shape, recon_mask.shape)
         # Process reconstructed spectra with local averageing (flux) and clipping.
         if recon_flux.ndim == 2:
             if self.kwargs["average_neighbour_spectra"]:
@@ -1205,6 +1206,8 @@ class SpectraData:
         plot_gt_spectrum = self.kwargs["plot_spectrum_with_gt"] \
             and gt_flux is not None and not is_codebook
         plot_recon_spectrum = self.kwargs["plot_spectrum_with_recon"]
+
+        if ivar is not None: sub_dir += "with_ivar_"
 
         if plot_gt_spectrum and clip and not spectra_clipped:
             gt_wave = gt_wave[gt_mask]
