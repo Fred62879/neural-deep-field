@@ -689,7 +689,13 @@ class AstroInferrer(BaseInferrer):
             log_data(self, "recon_pixels", gt_field="gt_pixels", log_ratio=True)
 
         if self.plot_spectra_latents_pca:
-            self._plot_spectra_latents_pca(-1, all_models_together=True)
+            if self.infer_selected:
+                fname = join(
+                    self.log_dir, "..", self.extra_args["spectra_inferrence_id_fname"])
+                assert exists(fname) and fname[-3:] == "npy"
+                ids = np.load(fname)
+            else: ids = None
+            self._plot_spectra_latents_pca(-1, ids=ids, all_models_together=True)
 
     #############
     # Infer with checkpoint
@@ -1522,7 +1528,9 @@ class AstroInferrer(BaseInferrer):
                 checkpoint = torch.load(model_fname)
                 latents = checkpoint["model_state_dict"]["nef.latents"]
                 all_latents.append(latents.detach().cpu().numpy())
-            all_latents = np.array(all_latents)
+            all_latents = np.array(all_latents) # [nmodels,nspectra,dim]
+            if ids is not None:
+                all_latents = all_latents[:,ids]
         else:
             assert self.plot_outlier_spectra_latents_pca
             model_fname = self.selected_model_fnames[model_id]
@@ -1537,9 +1545,8 @@ class AstroInferrer(BaseInferrer):
                 all_latents = all_latents[:,gt_bin_ids[0],gt_bin_ids[1],:]
             else:
                 all_latents = all_latents[gt_bin_ids[0],gt_bin_ids[1],:]
-
-        if not all_models_together:
-            all_latents = all_latents[ids]
+            if ids is not None:
+                all_latents = all_latents[ids]
 
         if self.extra_args["sanity_check_plot_same_pca_dim_as_pretrain"] and \
            self.mode == "redshift_pretrain_infer":

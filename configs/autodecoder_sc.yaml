@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','plot_spectra_latents_pca','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']
 
 optimizer:
     optimizer_type: 'adam'
@@ -93,7 +93,7 @@ infer:
     infer_selected: False
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: False
+    infer_outlier_only: True
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False
