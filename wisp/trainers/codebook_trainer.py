@@ -18,20 +18,14 @@ from torch.autograd import Variable
 from torch.utils.data import BatchSampler, \
     SequentialSampler, RandomSampler, DataLoader
 
+from wisp.utils.common import *
 from wisp.utils import PerfTimer
 from wisp.trainers import BaseTrainer
 from wisp.optimizers import multi_optimizer
 from wisp.utils.plot import plot_grad_flow, plot_multiple, \
     plot_redshift_estimation_stats_together, \
     plot_redshift_estimation_stats_individually
-from wisp.loss import get_loss, spectra_supervision_loss, \
-    spectra_supervision_emd_loss, pretrain_pixel_loss
-from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
-    select_inferrence_ids, load_embed, load_model_weights, forward, \
-    load_pretrained_model_weights, get_pretrained_model_fname, init_redshift_bins, \
-    get_bool_regress_redshift, get_bool_classify_redshift, get_bool_has_redshift_latents, \
-    get_optimal_wrong_bin_ids, freeze_layers_incl, freeze_layers_excl, create_latent_mask, \
-    set_seed, log_data, get_bin_ids, create_batch_ids
+from wisp.loss import get_loss, spectra_supervision_loss, pretrain_pixel_loss
 
 
 class CodebookTrainer(BaseTrainer):
@@ -1493,10 +1487,6 @@ class CodebookTrainer(BaseTrainer):
                 # else: # optimize all bins equally
                 #     spectra_loss = torch.mean(all_bin_losses)
 
-                print(all_bin_losses.shape)
-                assert 0
-                a, __ = torch.min(all_bin_losses, dim=-1)
-                print('*', a, a.shape)
                 if self.calculate_spectra_loss_based_on_optimal_bin:
                     spectra_loss, _ = torch.min(all_bin_losses, dim=-1)
                     spectra_loss = torch.mean(spectra_loss)

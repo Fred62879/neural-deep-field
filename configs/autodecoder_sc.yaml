@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-3200-spectra-single-latent'
+    exp_name: 'autodecoder-3200-spectra-ssim' #single-latent'
     # log_fname: ''
 
     tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','save_redshift','plot_redshift_est_stats'] #,'plot_redshift_est_residuals'] #'plot_est_redshift_logits'] # 'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -36,8 +36,8 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240307-141408-3200-spectra-16-3-512-multi-conversion-convolve-sigma-25'
-    pretrained_model_name: 'model-ep1000-bch0.pth'
+    pretrain_log_dir: '20240329-141546_100-spectra-no-clip-10k-epochs'
+    pretrained_model_name: 'model-ep10000-bch0.pth'
 
     regularize_spectra_latents: True
     spectra_latents_regu_beta: 16
@@ -56,35 +56,37 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 500
+    num_epochs: 200
     batch_size: 5500
-    log_cli_every: 100
+    log_cli_every: 20
     plot_grad_every: -1
-    save_model_every: 100
+    save_model_every: 20
 
     apply_gt_redshift: False
     calculate_binwise_spectra_loss: True # brute force, each bin has its own spectra
 
     # if brute force, we have three choices
     regularize_binwise_spectra_latents: False     # conflicts each other
-    optimize_latents_for_each_redshift_bin: False #
+    optimize_latents_for_each_redshift_bin: True #
     # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
 
-    calculate_spectra_loss_based_on_optimal_bin: False # only if we use single latent
-    calculate_spectra_loss_based_on_top_n_bins: True # only if we use single latent
+    calculate_spectra_loss_based_on_optimal_bin: True # only if we use single latent
+    calculate_spectra_loss_based_on_top_n_bins: False # only if we use single latent
     num_bins_to_calculate_spectra_loss: 5
 
     resume_train: False
     resume_log_dir: ''
-    resume_model_fname: 'model-ep500-bch0.pth'
+    resume_model_fname: 'model-ep100-bch0.pth'
 
-    spectra_loss_cho: l2
+    spectra_loss_cho: ssim1d
     spectra_loss_reduction: none
+    spectra_ssim_loss_filter_size: 9
+    spectra_ssim_loss_filter_sigma: 5
 
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: '20240314-172421-sc-single-latent-loss-optimal-bin-500-epochs-141408'
+    # infer_log_dir: '20240327-192537_35-spectra-sc-clip-0-1-200-epochs-r-184043'
 
     pretrain_infer_batch_size: 5
 
@@ -94,7 +96,9 @@ infer:
     infer_outlier_only: False
 
     plot_clipped_spectrum: True
-    plot_spectrum_with_loss: True
+    plot_spectrum_with_loss: False
+    plot_spectrum_with_ivar: False
+    plot_spectrum_with_lines: False
     plot_spectrum_with_recon: False
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: True
@@ -104,17 +108,17 @@ infer:
     num_spectrum_per_row: 7
 
     sanity_check_plot_same_pca_dim_as_pretrain: True
-    pretrain_pca_dim_fname: '' #/latents/2-dim/selected_axes.npy'
+    pretrain_pca_dim_fname: '20240327-184043_35-spectra-clip-0-1-2k-epochs-r/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
-    log_redshift_est_stats: True
+    log_redshift_est_stats: False
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:
     convolve_spectra: True
     spectra_smooth_sigma: 25
 
-    num_supervision_spectra_upper_bound: 3200
+    num_supervision_spectra_upper_bound: 100
 
     filter_redshift: False
     filter_redshift_lo: 0.02

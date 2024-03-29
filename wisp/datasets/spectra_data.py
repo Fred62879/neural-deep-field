@@ -530,6 +530,8 @@ class SpectraData:
         # log.info(f"test spectra ids: {test_ids}")
         # log.info(f"validation spectra ids: {validation_ids}")
         # log.info(f"supervision spectra ids: {supervision_ids}")
+        # validation_ids = [193]
+        # supervision_ids = [193]
 
         self.num_test_spectra = len(test_ids)
         self.num_validation_spectra = len(validation_ids)
