@@ -14,16 +14,26 @@ from wisp.utils.numerical import calculate_sam_spectrum, \
     calculate_redshift_estimation_stats_based_on_residuals
 
 
-def plot_spectra(fig, axis, z, wave, flux, color, label, linestyle, linelist, progressive_val=None, ivar=None, plot_loss=False, plot_color=False):
+def plot_spectra(
+        fig, axis, z, wave, flux, color, label, linestyle, linelist,
+        progressive_val=None, ivar=None, plot_loss=False, plot_color=False
+):
     if plot_color:
         assert progressive_val is not None
         plot_color_line(fig, axis, wave, flux, color, label,
                         linestyle, progressive_val=progressive_val)
-    else: axis.plot(wave, flux, color=color, label=label, linestyle=linestyle)
+    else:
+        axis.plot(wave, flux, color=color, label=label, linestyle=linestyle)
     if plot_loss:
         axis.plot(wave, progressive_val, color="black", linestyle="dashed")
     if ivar is not None:
-        axis.plot(wave, ivar, color="orange",linestyle="dotted")
+        # axis.plot(wave, ivar, color="orange",linestyle="dotted")
+        mask = ivar != 0
+        std = np.zeros(ivar.shape)
+        assert min(ivar) >= 0 or print(min(ivar))
+        std[mask] = np.sqrt(1/ivar[mask])
+        axis.plot(wave, flux - std, color="gray", linestyle="solid")
+        axis.plot(wave, flux + std, color="gray", linestyle="solid")
     if linelist is not None:
         overlay_vlines(fig, axis, z, wave, linelist)
 

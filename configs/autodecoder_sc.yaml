@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-3200-spectra-ssim' #single-latent'
+    exp_name: 'autodecoder-100-spectra-ssim-l2' #single-latent'
     # log_fname: ''
 
     tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','plot_spectra_latents_pca','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']
+    # tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -36,7 +36,7 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240329-141546_100-spectra-no-clip-10k-epochs'
+    pretrain_log_dir: '20240328-142427_l2-100-spectra-10k-epochs'
     pretrained_model_name: 'model-ep10000-bch0.pth'
 
     regularize_spectra_latents: True
@@ -67,7 +67,7 @@ trainer:
 
     # if brute force, we have three choices
     regularize_binwise_spectra_latents: False     # conflicts each other
-    optimize_latents_for_each_redshift_bin: True #
+    optimize_latents_for_each_redshift_bin: False #
     # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
 
     calculate_spectra_loss_based_on_optimal_bin: True # only if we use single latent
@@ -78,7 +78,7 @@ trainer:
     resume_log_dir: ''
     resume_model_fname: 'model-ep100-bch0.pth'
 
-    spectra_loss_cho: ssim1d
+    spectra_loss_cho: l2 #ssim1d
     spectra_loss_reduction: none
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
@@ -86,14 +86,14 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: '20240327-192537_35-spectra-sc-clip-0-1-200-epochs-r-184043'
+    infer_log_dir: '20240329-153036_sc-ssim-35-spectra-multi-latent-200-epochs-152038'
 
     pretrain_infer_batch_size: 5
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: True
+    infer_outlier_only: False
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False
@@ -111,7 +111,7 @@ infer:
     pretrain_pca_dim_fname: '20240327-184043_35-spectra-clip-0-1-2k-epochs-r/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
-    log_redshift_est_stats: False
+    log_redshift_est_stats: True
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:

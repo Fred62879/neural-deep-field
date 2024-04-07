@@ -21,7 +21,6 @@ import wisp.ops.spc as wisp_spc_ops
 import wisp.ops.grid as grid_ops
 
 from wisp.models.grids import BLASGrid
-from wisp.models.decoders import BasicDecoder
 
 import kaolin.ops.spc as spc_ops
 

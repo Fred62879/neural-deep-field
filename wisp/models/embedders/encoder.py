@@ -8,12 +8,11 @@ from wisp.utils.common import get_input_latent_dim
 import sys
 sys.path.insert(0, './wisp/models/embedders')
 from wisp.models.embedders.pe import RandGaus
+# from wisp.models.embedders.garf import Garf
 
 
 class Encoder(nn.Module):
-    """ Wrapper class for different encoding method:
-         - Positional encoding
-         - Grid
+    """ Wrapper class for different encoding method.
     """
     def __init__(self, input_dim, encode_method, embedder_args, **kwargs):
         super(Encoder, self).__init__()
@@ -22,11 +21,12 @@ class Encoder(nn.Module):
         self.input_dim = input_dim
         self.encode_method = encode_method
 
-        if encode_method == "positional_encoding":
-            self.embedder = RandGaus(embedder_args)
-        elif encode_method == "grid":
+        if encode_method == "grid":
             self.init_grid()
-        else: raise NotImplementedError
+        # elif encode_method == "gaussian":
+        #     self.garf = Garf(input_dim, **kwargs)
+        elif encode_method == "positional_encoding":
+            self.pe = RandGaus(embedder_args)
 
     def init_grid(self):
         grid_type = self.kwargs["grid_type"]
@@ -40,7 +40,7 @@ class Encoder(nn.Module):
             grid_class = HashGrid
         elif grid_type == "DenseGrid":
             grid_class = DenseGrid
-        else: raise NotImplementedError
+        else: raise NotImplementedError()
 
         self.grid = grid_class(
             self.kwargs["grid_feature_dim"],
@@ -59,24 +59,27 @@ class Encoder(nn.Module):
         self.effective_feature_dim = get_input_latent_dim(**self.kwargs)
 
     def forward(self, coords, lod_idx=None):
-        """ Encode given coords
-            @Param
-              coords: [...,batch_size,num_samples,coord_dim]
-            @Return
-              latents: [batch_size,num_samples,latent_dim]
+        """
+        Encode given coords
+          @Param
+            coords: [...,batch_size,num_samples,coord_dim]
+          @Return
+            latents: [batch_size,num_samples,latent_dim]
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
                           show_memory=self.kwargs["show_memory"])
 
         (batch, num_samples) = coords.shape[-3:-1]
 
-        if self.encode_method == "positional_encoding":
-            latents = self.embedder(coords) # [bsz,num_samples,coords_embed_dim]
-        elif self.encode_method == "grid":
+        if self.encode_method == "grid":
             if lod_idx is None:
                 lod_idx = len(self.grid.active_lods) - 1
             latents = self.grid.interpolate(coords, lod_idx)
             latents = latents.reshape(batch, num_samples, self.effective_feature_dim)
+        # elif self.encode_method == "gaussian":
+        #     latents = self.garf(coords)
+        elif self.encode_method == "positional_encoding":
+            latents = self.pe(coords) # [bsz,num_samples,coords_embed_dim]
         else:
             latents = coords
         return latents

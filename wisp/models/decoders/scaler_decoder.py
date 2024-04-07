@@ -5,10 +5,7 @@ import torch.nn.functional as F
 
 from wisp.utils import PerfTimer
 from wisp.utils.common import get_input_latent_dim
-
-from wisp.models.decoders import BasicDecoder, MLP
-from wisp.models.layers import get_layer_class
-from wisp.models.activations import get_activation_class
+from wisp.models.decoders.basic_decoders import BasicDecoder
 
 
 class ScalerDecoder(nn.Module):
@@ -35,9 +32,9 @@ class ScalerDecoder(nn.Module):
         if self.output_scaler: output_dim += 1
 
         self.scaler_decoder = BasicDecoder(
-            self.input_dim, output_dim,
-            get_activation_class(self.kwargs["scaler_decod_activation_type"]),
-            bias=True, layer=get_layer_class(self.kwargs["scaler_decod_layer_type"]),
+            self.input_dim, output_dim, True,
+            layer_type=self.kwargs["scaler_decod_layer_type"],
+            activation_type=self.kwargs["scaler_decod_activation_type"],
             num_layers=self.kwargs["scaler_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["scaler_decod_hidden_dim"],
             skip=self.kwargs["scaler_decod_skip_layers"]

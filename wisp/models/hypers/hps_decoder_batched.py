@@ -9,11 +9,10 @@ from wisp.utils import PerfTimer
 from wisp.utils.common import get_input_latent_dim, get_bool_classify_redshift, \
     create_batch_ids
 
-from wisp.models.decoders import Decoder, BasicDecoder
-from wisp.models.activations import get_activation_class
+from wisp.models.decoders import BasicDecoder, Siren
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
 from wisp.models.hypers.hps_converter_batched import HyperSpectralConverter
-from wisp.models.layers import Intensifier, Quantization, get_layer_class, ArgMax, \
+from wisp.models.layers import Intensifier, Quantization, ArgMax, \
     calculate_spectra_loss, calculate_redshift_logits
 
 class HyperSpectralDecoderB(nn.Module):
@@ -91,6 +90,9 @@ class HyperSpectralDecoderB(nn.Module):
                     input_dim = self.kwargs["wave_embed_dim"] + latents_dim
                 else:
                     raise ValueError()
+            elif self.kwargs["decoder_activation_type"] == "sin" or \
+                 self.kwargs["decoder_activation_type"] == "gaussian":
+                input_dim = self.kwargs["spectra_latent_dim"] + 1
             else:
                 # coords and wave are not encoded
                 input_dim = 3
@@ -106,22 +108,37 @@ class HyperSpectralDecoderB(nn.Module):
         input_dim = self.get_input_dim()
         output_dim = self.get_output_dim()
 
-        # skip_layers = np.arange(self.kwargs["decoder_num_hidden_layers"]) + 1
-        skip_layers = self.kwargs["decoder_skip_layers"]
+        if self.kwargs["decoder_activation_type"] == "sin":
+            self.spectra_decoder = Siren(
+                input_dim, output_dim,
+                self.kwargs["decoder_num_hidden_layers"],
+                self.kwargs["decoder_hidden_dim"],
+                self.kwargs["siren_first_w0"],
+                self.kwargs["siren_hidden_w0"],
+                self.kwargs["siren_seed"],
+                1, #self.kwargs["siren_coords_scaler"],
+                self.kwargs["siren_last_linear"])
 
-        self.spectra_decoder = BasicDecoder(
-            input_dim, output_dim,
-            get_activation_class(self.kwargs["decoder_activation_type"]),
-            bias=True, layer=get_layer_class(self.kwargs["decoder_layer_type"]),
-            num_layers=self.kwargs["decoder_num_hidden_layers"] + 1,
-            hidden_dim=self.kwargs["decoder_hidden_dim"],
-            batch_norm=self.kwargs["decoder_batch_norm"],
-            skip=skip_layers,
-            activate_before_skip=self.kwargs["decoder_activate_before_latents_skip"],
-            skip_all_layers=self.kwargs["decoder_latents_skip_all_layers"],
-            skip_method=self.kwargs["decoder_latents_skip_method"],
-            skip_add_conversion_method=self.kwargs["decoder_latents_skip_add_conversion_method"]
-        )
+        elif self.kwargs["decoder_activation_type"] == "gaussian":
+            self.spectra_decoder = Garf(
+                input_dim, output_dim,
+                self.kwargs["decoder_num_hidden_layers"],
+                self.kwargs["decoder_hidden_dim"],
+                self.kwargs["decoder_gaussian_sigma"],
+                self.kwargs["decoder_latents_skip_all_layers"])
+        else:
+            self.spectra_decoder = BasicDecoder(
+                input_dim, output_dim, True,
+                num_layers=self.kwargs["decoder_num_hidden_layers"] + 1,
+                hidden_dim=self.kwargs["decoder_hidden_dim"],
+                batch_norm=self.kwargs["decoder_batch_norm"],
+                layer_type=self.kwargs["decoder_layer_type"],
+                activation_type=self.kwargs["decoder_activation_type"],
+                skip=self.kwargs["decoder_skip_layers"],
+                skip_method=self.kwargs["decoder_latents_skip_method"],
+                skip_all_layers=self.kwargs["decoder_latents_skip_all_layers"],
+                activate_before_skip=self.kwargs["decoder_activate_before_latents_skip"],
+                skip_add_conversion_method=self.kwargs["decoder_latents_skip_add_conversion_method"])
 
     ##################
     # Setters
@@ -199,8 +216,9 @@ class HyperSpectralDecoderB(nn.Module):
         return spectra
 
     def spectra_dim_reduction(self, input, spectra, ret, qtz_args,
-                              spectra_masks, spectra_loss_func, gt_spectra,
-                              gt_redshift_bin_ids
+                              spectra_masks, spectra_loss_func,
+                              spectra_l2_loss_func,
+                              gt_spectra, gt_redshift_bin_ids
     ):
         if self.qtz_spectra:
             if self.reduction_order == "qtz_first":
@@ -208,9 +226,14 @@ class HyperSpectralDecoderB(nn.Module):
                 if self.classify_redshift:
                     ret["spectra_all_bins"] = spectra
                     if self.kwargs["calculate_binwise_spectra_loss"]:
-                        calculate_redshift_logits(
+                        # calculate_redshift_logits(
+                        #     spectra_loss_func, spectra_masks, gt_spectra,
+                        #     spectra, ret, **self.kwargs)
+                        calculate_spectra_loss(
                             spectra_loss_func, spectra_masks, gt_spectra,
-                            spectra, ret, **self.kwargs)
+                            spectra, ret, self.calculate_lambdawise_spectra_loss, **self.kwargs
+                        )
+                        calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret)
 
                     spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
 
@@ -228,8 +251,14 @@ class HyperSpectralDecoderB(nn.Module):
                     ret["spectra_all_bins"] = spectra
                     calculate_spectra_loss(
                         spectra_loss_func, spectra_masks, gt_spectra,
-                        spectra, ret, self.calculate_lambdawise_spectra_loss, **self.kwargs
-                    )
+                        spectra, ret, self.calculate_lambdawise_spectra_loss, **self.kwargs)
+
+                    if spectra_l2_loss_func is not None:
+                        calculate_spectra_loss(
+                            spectra_loss_func, spectra_masks, gt_spectra,
+                            spectra, ret, self.calculate_lambdawise_spectra_loss,
+                            loss_name_suffix="_l2", **self.kwargs)
+
                     calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret)
                     spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
                 else:
@@ -242,12 +271,17 @@ class HyperSpectralDecoderB(nn.Module):
                     spectra_loss_func, spectra_masks, gt_spectra,
                     spectra, ret, True, **self.kwargs)
 
+                if spectra_l2_loss_func is not None:
+                    calculate_spectra_loss(
+                        spectra_loss_func, spectra_masks, gt_spectra,
+                        spectra, ret, self.calculate_lambdawise_spectra_loss,
+                        loss_name_suffix="_l2", **self.kwargs)
         return spectra
 
     def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
                             wave_bound, ret, codebook, qtz_args,
-                            spectra_masks, spectra_loss_func, gt_spectra,
-                            gt_redshift_bin_ids
+                            spectra_masks, spectra_loss_func, spectra_l2_loss_func,
+                            gt_spectra, gt_redshift_bin_ids
     ):
         """ Reconstruct emitted (under possibly multiple redshift values) spectra
               using given input and wave.
@@ -279,7 +313,8 @@ class HyperSpectralDecoderB(nn.Module):
 
         spectra = self.spectra_dim_reduction(
             input, spectra, ret, qtz_args,
-            spectra_masks, spectra_loss_func, gt_spectra,
+            spectra_masks, spectra_loss_func,
+            spectra_l2_loss_func, gt_spectra,
             gt_redshift_bin_ids) # [bsz,nsmpl]
 
         if self.scale:
@@ -315,38 +350,43 @@ class HyperSpectralDecoderB(nn.Module):
                 codebook=None, qtz_args=None, ret=None,
                 spectra_masks=None,
                 spectra_loss_func=None,
+                spectra_l2_loss_func=None,
                 spectra_source_data=None,
-                gt_redshift_bin_ids=None
-    ):
-        """ @Param
-            latents:   (encoded or original) coords or logits for quantization.
-                         [bsz,1,...,space_dim or coords_encode_dim]
+                gt_redshift_bin_ids=None):
+        """
+        @Param
+        latents:   (encoded or original) coords or logits for quantization.
+                     [bsz,1,...,space_dim or coords_encode_dim]
 
-            - hyperspectral
-              wave:      lambda values, used to convert ra/dec to hyperspectral latents.
-                         [bsz,num_samples,1]
-              trans:     corresponding transmission values of lambda. [(bsz,)nbands,num_samples]
-              nsmpl:     average number of lambda samples falling within each band. [num_bands]
-              full_wave_bound: min and max value of lambda
-                               used for linear normalization of lambda
-            - spectra qtz
-              codebook    nn.Parameter [num_embed,embed_dim]
-              qtz_args
+        - hyperspectral
+          wave:      lambda values, used to convert ra/dec to hyperspectral latents.
+                     [bsz,num_samples,1]
+          trans:     corresponding transmission values of lambda. [(bsz,)nbands,num_samples]
+          nsmpl:     average number of lambda samples falling within each band. [num_bands]
+          full_wave_bound: min and max value of lambda
+                           used for linear normalization of lambda
+        - spectra qtz
+          codebook    nn.Parameter [num_embed,embed_dim]
+          qtz_args
 
-            ret (output from nerf and/or quantization): {
-                "scaler":        unique scaler value for each coord. [bsz,1]
-                "redshift":      unique redshift value for each coord. [bsz,1]
-                "embed_ids":     ids of embedding each pixel's latent is quantized to.
-                "codebook_loss": loss for codebook optimization.
-              }
+        - loss
+          spectra_loss_func: spectra loss of choice for training
+          spectra_l2_loss_func: when train with ssim, we may calculate l2 loss as well
 
-            - full_wave
-              full_wave_massk
+        ret (output from nerf and/or quantization): {
+            "scaler":        unique scaler value for each coord. [bsz,1]
+            "redshift":      unique redshift value for each coord. [bsz,1]
+            "embed_ids":     ids of embedding each pixel's latent is quantized to.
+            "codebook_loss": loss for codebook optimization.
+          }
 
-            @Return (added to `ret`)
-              spectra:   reconstructed spectra
-              intensity: reconstructed pixel values
-              sup_spectra: reconstructed spectra used for spectra supervision
+        - full_wave
+          full_wave_massk
+
+        @Return (added to `ret`)
+          spectra:   reconstructed spectra
+          intensity: reconstructed pixel values
+          sup_spectra: reconstructed spectra used for spectra supervision
         """
         bsz = latents.shape[0]
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
@@ -367,7 +407,10 @@ class HyperSpectralDecoderB(nn.Module):
             None if ret["bias"] is None else ret["bias"][:bsz],
             redshift,
             full_wave_bound, ret, codebook, qtz_args,
-            spectra_masks, spectra_loss_func, spectra_source_data,
+            spectra_masks,
+            spectra_loss_func,
+            spectra_l2_loss_func,
+            spectra_source_data,
             gt_redshift_bin_ids
         )
         timer.check("hps_decoder::spectra reconstruced")

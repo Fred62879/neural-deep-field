@@ -62,8 +62,8 @@ class SpectraData:
             else [kwargs["spectra_supervision_wave_lo"],
                   kwargs["spectra_supervision_wave_hi"]]
         self.trans_range = self.trans_obj.get_wave_range()
+        self.process_ivar = kwargs["process_ivar"]
         self.gt_convolved = kwargs["convolve_spectra"]
-        self.process_ivar = kwargs["process_ivar"] and self.kwargs["convolve_spectra"]
 
         self.dataset_path = get_dataset_path(**kwargs)
         self.set_path(self.dataset_path)
@@ -1128,25 +1128,25 @@ class SpectraData:
         if plot_recon_spectrum:
             if above_threshold is not None: # plot recon flux according to zncc
                 plot_spectra(fig, axis, z, recon_wave, recon_flux, recon_color,
-                             "recon", "dotted", linelist, lambdawise_losses)
+                             "recon", "dotted", None, lambdawise_losses)
                 segments = segment_bool_array(above_threshold)
                 for (lo, hi) in segments:
                     plot_spectra(fig, axis, z, recon_wave[lo:hi], recon_flux[lo:hi],
-                                 "purple", "recon", "solid", linelist, lambdawise_losses)
+                                 "purple", "recon", "solid", None, lambdawise_losses)
             else:
                 plot_spectra(fig, axis, z, recon_wave, recon_flux, recon_color,
-                             "recon", "solid", linelist, lambdawise_losses, None,
+                             "recon", "solid", None, lambdawise_losses, None,
                              self.kwargs["plot_spectrum_with_loss"],
                              self.kwargs["plot_spectrum_color_based_on_loss"])
         if recon_flux2 is not None:
             plot_spectra(fig, axis, z, recon_wave, recon_flux2, flux2_color,
-                         "gt bin", "solid", linelist, lambdawise_losses[0], None,
+                         "gt bin", "solid", None, lambdawise_losses[0], None,
                          self.kwargs["plot_spectrum_with_loss"],
                          self.kwargs["plot_spectrum_color_based_on_loss"])
             if recon_loss2 is not None: title += f": {recon_loss2:.{3}f}"
         if recon_flux3 is not None:
             plot_spectra(fig, axis, z, recon_wave, recon_flux3, flux3_color,
-                         "wrong bin", "solid", linelist, lambdawise_losses[-1], None,
+                         "wrong bin", "solid", None, lambdawise_losses[-1], None,
                          self.kwargs["plot_spectrum_with_loss"],
                          self.kwargs["plot_spectrum_color_based_on_loss"])
             if recon_loss3 is not None: title += f"/{recon_loss3:.{3}f}"
@@ -1190,7 +1190,7 @@ class SpectraData:
         return recon_wave, recon_flux, lambdawise_losses
 
     def process_spectrum_plot_data(self, flux_norm_cho, is_codebook, clip,
-                                   spectra_clipped, calculate_metrics, data):
+                                   spectra_clipped, calculate_metrics, linelist, data):
         """ Collect data for spectrum plotting for the given spectra.
         """
         (title, z, gt_wave, ivar, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux,
@@ -1210,6 +1210,7 @@ class SpectraData:
         plot_recon_spectrum = self.kwargs["plot_spectrum_with_recon"]
 
         if ivar is not None: sub_dir += "with_ivar_"
+        if linelist is not None: sub_dir += "with_lines_"
 
         if plot_gt_spectrum and clip and not spectra_clipped:
             gt_wave = gt_wave[gt_mask]
@@ -1349,7 +1350,7 @@ class SpectraData:
 
         process_data = partial(self.process_spectrum_plot_data,
                                flux_norm_cho, is_codebook, clip, spectra_clipped,
-                               calculate_metrics)
+                               calculate_metrics, linelist)
         plot_and_save = partial(self.plot_and_save_one_spectrum,
                                 name, spectra_dir, fig, axs, nrows, ncols,
                                 colors, save_spectra and not save_spectra_together,
@@ -1583,9 +1584,11 @@ def normalize_spectra(spectra, bound, process_ivar=False):
     spectra[1] = (spectra[1] - lo) / (hi - lo)
     # print(np.min(spectra[2]), np.max(spectra[2]))
     if process_ivar:
-        mask = spectra[2] != 0
-        spectra[2][mask] = (hi - lo)**2 / ( 1/spectra[2][mask] - lo)
+        mask = spectra[2] != 0 # ivar = 0 where err is infty
+        # spectra[2][mask] = (hi - lo)**2 / ( 1/spectra[2][mask] - lo)
+        spectra[2][mask] = (hi - lo)**2 * spectra[2][mask]
     # print(np.min(spectra[2]), np.max(spectra[2]))
+    # assert min(spectra[2]) >= 0
     return spectra
 
 def get_wave_weight(spectra, redshift, emitted_wave_distrib, bound):

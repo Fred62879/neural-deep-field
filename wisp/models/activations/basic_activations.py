@@ -14,10 +14,10 @@ class FullSort(nn.Module):
     """
     def forward(self, x):
         """Sorts the feature dimension.
-        
+
         Args:
             x (torch.FloatTensor): Some tensor of shape [..., feature_size]
-        
+
         Returns:
             (torch.FloatTensor): Activation of shape [..., feature_size]
         """
@@ -28,12 +28,12 @@ class MinMax(nn.Module):
     """
     def forward(self, x):
         """Partially sorts the feature dimension.
-        
+
         The feature dimension needs to be a multiple of 2.
 
         Args:
             x (torch.FloatTensor): Some tensor of shape [batch, feature_size]
-        
+
         Returns:
             (torch.FloatTensor): Activation of shape [batch, feature_size]
         """
@@ -55,14 +55,14 @@ class Identity(nn.Module):
         """
         return x
 
-def get_activation_class(activation_type):
+def get_activation_class(activation_type, gaussian_sigma=-1):
     """Utility function to return an activation function class based on the string description.
 
     Args:
         activation_type (str): The name for the activation function.
-    
+
     Returns:
-        (Function): The activation function to be used. 
+        (Function): The activation function to be used.
     """
     if activation_type == 'none':
         return Identity()
@@ -72,7 +72,9 @@ def get_activation_class(activation_type):
         return MinMax()
     elif activation_type == 'relu':
         return torch.relu
-    elif activation_type == 'sin':
-        return torch.sin
+    # elif activation_type == 'sin':
+    #     return torch.sin
+    # elif activation_type == 'gaussian':
+    #     return lambda x: (-0.5*(x)**2 / gaussian_sigma**2).exp()
     else:
         assert False and "activation type does not exist"

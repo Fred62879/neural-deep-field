@@ -396,7 +396,8 @@ def calculate_bayesian_redshift_logits(loss, mask, gt_spectra, recon_fluxes, red
     return logits
 
 def calculate_spectra_loss(
-        loss_func, masks, gt_spectra, recon_fluxes, ret, lambdawise=False, **kwargs
+        loss_func, masks, gt_spectra, recon_fluxes, ret,
+        lambdawise=False, loss_name_suffix="", **kwargs
 ):
     """
     Calculate spectra loss.
@@ -413,21 +414,24 @@ def calculate_spectra_loss(
     if recon_fluxes.ndim == 2: # apply_gt_redshift
         spectra_loss = loss_func(masks, gt_spectra, recon_fluxes) # [bsz,nsmpls]
         assert spectra_loss.ndim == 2
+
     elif recon_fluxes.ndim == 3: # brute force
         spectra_loss = loss_func(
             masks[None,:].tile(n_bins,1,1),
             gt_spectra[None,:].tile(n_bins,1,1,1),
-            recon_fluxes
-        ).permute(1,0,2) # [bsz,n_bins,nsmpls]
+            recon_fluxes).permute(1,0,2) # [bsz,n_bins,nsmpls]
         assert spectra_loss.ndim == 3
+
     else: raise ValueError()
 
     if lambdawise:
-        ret["spectra_lambdawise_loss"] = spectra_loss
+        nm = "spectra_lambdawise_loss" + loss_name_suffix
+        ret[nm] = spectra_loss
 
     if recon_fluxes.ndim == 3:
         spectra_loss = torch.mean(spectra_loss, dim=-1)
-        ret["spectra_binwise_loss"] = spectra_loss
+        nm = "spectra_binwise_loss" + loss_name_suffix
+        ret[nm] = spectra_loss
 
 def calculate_redshift_logits(beta, ret):
     """ Calculate logits for redshift bins.

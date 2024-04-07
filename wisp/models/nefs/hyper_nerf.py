@@ -135,8 +135,6 @@ class AstroHyperSpectralNerf(BaseNeuralField):
                           show_memory=self.kwargs["show_memory"])
         timer.reset()
 
-        # print(coords.shape)
-
         if self.encode_coords:
             latents = self.spatial_encoder(coords, lod_idx=lod_idx)
         else: latents = coords

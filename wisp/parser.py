@@ -258,13 +258,17 @@ def define_cmd_line_args():
     embedder_group.add_argument("--wave-embed-sigma", type=int, default=1,
                                 help="variance to intialize pe weights.")
 
-    embedder_group.add_argument("--wave-encoder-num-hidden-layers", type=int, default=1)
+    embedder_group.add_argument("--wave-encoder-skip-layers", nargs="+")
+    embedder_group.add_argument("--wave-encoder-skip-all-layers", action="store_true")
     embedder_group.add_argument("--wave-encoder-hidden-dim", type=int, default=64)
+    embedder_group.add_argument("--wave-encoder-num-hidden-layers", type=int, default=1)
+    embedder_group.add_argument("--wave-encoder-gaussian_sigma", type=int, default=1)
+
+    embedder_group.add_argument("--wave-encoder-siren-seed", type=int, default=0)
     embedder_group.add_argument("--wave-encoder-siren-first-w0", type=int, default=30)
     embedder_group.add_argument("--wave-encoder-siren-hidden-w0", type=int, default=30)
-    embedder_group.add_argument("--wave-encoder-siren-seed", type=int, default=0)
-    embedder_group.add_argument("--wave-encoder-siren-coords-scaler", type=int, default=1)
     embedder_group.add_argument("--wave-encoder-siren-last-linear", action="store_true")
+    embedder_group.add_argument("--wave-encoder-siren-coords-scaler", type=int, default=1)
 
     ###################
     # Grid arguments
@@ -328,6 +332,7 @@ def define_cmd_line_args():
     decoder_group.add_argument("--decoder-batch-norm", action="store_true")
     decoder_group.add_argument("--decoder-skip-layers", nargs="+", type=int,
                                help="Layer to have skip connection.")
+    decoder_group.add_argument("--decoder-gaussian-sigma", type=int)
 
     decoder_group.add_argument("--decoder-latents-skip-all-layers", action="store_true",
                                help="pass latents as skip to each decoder layer.")
@@ -703,6 +708,7 @@ def define_cmd_line_args():
     train_group.add_argument("--sockeye-log-dir", type=str)
 
     train_group.add_argument("--plot-loss", action="store_true")
+    train_group.add_argument("--plot-l2-loss", action="store_true")
     train_group.add_argument("--using-wandb", action="store_true")
     train_group.add_argument("--step-based-sample-w-replace", action="store_true")
     train_group.add_argument("--step-based-sample-wo-replace", action="store_true")

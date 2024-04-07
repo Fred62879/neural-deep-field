@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from wisp.utils import PerfTimer
 from wisp.models.embedders import Encoder
-from wisp.models.decoders import Decoder
+# from wisp.models.decoders import Decoder
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.layers import Intensifier
 
@@ -28,6 +28,8 @@ class AstroNerf(BaseNeuralField):
         self.num_bands = kwargs["num_bands"]
 
         self.init_encoder()
+        assert 0
+        # replace Decoder with BasicDecoder
         self.decoder = Decoder(**kwargs)
         self.norm = Intensifier(kwargs["intensification_method"])
 

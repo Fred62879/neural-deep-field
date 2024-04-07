@@ -434,6 +434,7 @@ def forward(
         step_num,
         space_dim,
         spectra_loss_func=None,
+        spectra_l2_loss_func=None,
         qtz=False,
         qtz_strategy="none",
         index_latent=False,
@@ -536,6 +537,7 @@ def forward(
         if calculate_binwise_spectra_loss:
             net_args["spectra_masks"] = data["spectra_masks"]
             net_args["spectra_loss_func"] = spectra_loss_func
+            net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.extend(
                 ["spectra_binwise_loss","redshift_logits"])
@@ -575,6 +577,7 @@ def load_pretrained_model_weights(model, pretrained_state, shared_layer_names=No
           the pretrained state and in `shared_layer_names` if not None.
         Also, we don't load layers included in excls.
     """
+    # print(excls)
     pretrained_dict = {}
     cur_state = model.state_dict()
     for n in cur_state.keys():
@@ -585,10 +588,14 @@ def load_pretrained_model_weights(model, pretrained_state, shared_layer_names=No
         if not to_exclude and (n in pretrained_state and (
                 shared_layer_names is None or includes_layer(shared_layer_names, n))
         ):
+            # print('*', n)
             pretrained_dict[n] = pretrained_state[n]
         else: pretrained_dict[n] = cur_state[n]
 
     model.load_state_dict(pretrained_dict)
+    # print()
+    # for n, p in model.named_parameters(): print(n)
+    # assert 0
 
 def load_model_weights(model, pretrained_state):
     cur_state = model.state_dict()

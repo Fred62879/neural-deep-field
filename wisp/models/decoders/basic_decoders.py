@@ -1,10 +1,3 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
-#
-# NVIDIA CORPORATION & AFFILIATES and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
 
 import numpy as np
 import torch
@@ -12,7 +5,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from scipy.stats import ortho_group
+from wisp.models.layers import get_layer_class
+from wisp.models.activations import get_activation_class
 from wisp.utils.common import get_gpu_info, query_GPU_mem, set_seed
+
 
 class MLP(nn.Module):
     def __init__(self, input_dim, output_dim, num_layers=1, hidden_dim=128, seed=0):
@@ -38,16 +34,18 @@ class MLP(nn.Module):
 class BasicDecoder(nn.Module):
     """Super basic but super useful MLP class.
     """
-    def __init__(self, input_dim, output_dim, activation,
-                 bias, layer = nn.Linear,
-                 num_layers = 1,
-                 hidden_dim = 128,
-                 batch_norm = False,
-                 skip       = [],
+    def __init__(self, input_dim, output_dim, bias,
+                 num_layers=1,
+                 hidden_dim=128,
+                 batch_norm=False,
+                 layer_type="none",
+                 activation_type="relu",
+                 skip=[],
+                 skip_method="add",
                  skip_all_layers=False,
                  activate_before_skip=False,
-                 skip_method="add",
-                 skip_add_conversion_method="convert_input"
+                 skip_add_conversion_method="convert_input",
+                 gaussian_sigma=-1
     ):
         """Initialize the BasicDecoder.
 
@@ -57,7 +55,7 @@ class BasicDecoder(nn.Module):
             activation (function): The activation function to use.
             bias (bool): If True, use bias.
             layer (nn.Module): The MLP layer module to use.
-            num_layers (int): The number of hidden layers in the MLP.
+            num_layers (int): The number of hidden layers + first layer in the MLP.
             hidden_dim (int): The hidden dimension of the MLP.
             skip (List[int]): List of layer indices where the input dimension is concatenated.
             skip_method:      add or concat
@@ -71,16 +69,19 @@ class BasicDecoder(nn.Module):
         """
         super().__init__()
 
+        self.bias = bias
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.activation = activation
-        self.bias = bias
-        self.layer = layer
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
+        self.activation_type = activation_type
+        self.layer = get_layer_class(layer_type)
+        self.activation = get_activation_class(activation_type, gaussian_sigma)
 
         self.batch_norm = batch_norm
         self.activate_before_skip = activate_before_skip
+
+        self.gaussian_sigma = gaussian_sigma
 
         self.skip = skip
         self.skip_method = skip_method
@@ -165,7 +166,7 @@ class BasicDecoder(nn.Module):
         """
         x, x_skip = self.prepare_skip(x)
 
-        h = self.forward_one_layer(0, x, x, x_skip)
+        h = self.forward_first_layer(x, x_skip)
         for i in range(1, self.num_layers):
             h = self.forward_one_layer(i, h, x, x_skip)
         out = self.lout(h)
@@ -174,6 +175,16 @@ class BasicDecoder(nn.Module):
         return out
 
     ## forward helpers
+    def forward_first_layer(self, x, x_skip):
+        # if self.activation_type == "gaussian":
+        #     x_ = self.layers[0](x)
+        #     mu = torch.mean(x_, axis = -1).unsqueeze(-1)
+        #     out = (-0.5*(mu - x_)**2 / self.gaussian_sigma**2).exp()
+        # else:
+        out = self.forward_one_layer(0, x, x, x_skip)
+        return out
+
+
     def forward_one_layer(self, i, h, x, x_skip=None):
         """
         Forward through one layer considering batch norm and skip.

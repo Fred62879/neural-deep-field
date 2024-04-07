@@ -37,41 +37,17 @@ class HyperSpectralConverter(nn.Module):
     def init_encoder(self):
         if self.kwargs["wave_encode_method"] == "positional_encoding":
             embedder_args = (
-                1,
-                self.kwargs["wave_embed_dim"],
+                1, self.kwargs["wave_embed_dim"],
                 self.kwargs["wave_embed_omega"],
                 self.kwargs["wave_embed_sigma"],
                 self.kwargs["wave_embed_bias"],
-                self.kwargs["wave_embed_seed"]
-            )
+                self.kwargs["wave_embed_seed"])
+
             self.wave_encoder = Encoder(
                 input_dim=1,
                 encode_method=self.kwargs["wave_encode_method"],
                 embedder_args=embedder_args,
-                **self.kwargs
-            )
-
-        elif self.kwargs["wave_encode_method"] == "relumlp":
-            # we abuse basic decoder and use it as an encoder here
-            self.wave_encoder = BasicDecoder(
-                1, self.kwargs["wave_embed_dim"],
-                torch.relu, bias=True, layer=nn.Linear,
-                num_layers=self.kwargs["wave_encoder_num_hidden_layers"] + 1,
-                hidden_dim=self.kwargs["wave_encoder_hidden_dim"], skip=[]
-            )
-
-        elif self.kwargs["wave_encode_method"] == "siren":
-            self.wave_encoder = Siren(
-                1, self.kwargs["wave_embed_dim"],
-                num_layers=self.kwargs["wave_encoder_num_hidden_layers"] + 1,
-                dim_hidden=self.kwargs["wave_encoder_hidden_dim"],
-                first_w0=self.kwargs["wave_encoder_siren_first_w0"],
-                hidden_w0=self.kwargs["wave_encoder_siren_hidden_w0"],
-                seed=self.kwargs["wave_encoder_siren_seed"],
-                coords_scaler=self.kwargs["wave_encoder_siren_coords_scaler"],
-                last_linear=self.kwargs["wave_encoder_siren_last_linear"],
-            )
-
+                **self.kwargs)
         else:
             assert not self.kwargs["encode_wave"]
 
@@ -176,9 +152,9 @@ class HyperSpectralConverter(nn.Module):
 
         if self.encode_wave:
             wave = self.wave_encoder(wave) # [...,bsz,num_samples,wave_embed_dim]
-        else:
-            # assert coords are not encoded as well, should only use siren in this case
-            assert not self.kwargs["encode_coords"] and embed_dim == 2
+        # else:
+        #     # assert coords are not encoded as well, should only use siren in this case
+        #     assert not self.kwargs["encode_coords"] and embed_dim == 2
 
         latents = self.combine_spatial_spectral(latents, wave)
         return latents

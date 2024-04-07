@@ -9,6 +9,7 @@ from wisp.utils.common import get_input_latent_dim, query_GPU_mem
 from wisp.models.decoders.basic_decoders import BasicDecoder, MLP
 #import sys
 #sys.path.insert(0, "./wisp/models/decoders")
+#from wisp.models.decoders.garf import Garf
 #from wisp.models.decoders.siren import Siren
 #from wisp.models.decoders.basic_decoders import BasicDecoder
 
@@ -90,6 +91,9 @@ class Decoder(nn.Module):
                 self.kwargs["siren_seed"],
                 self.kwargs["siren_coords_scaler"],
                 self.kwargs["siren_last_linear"])
+
+        # elif self.kwargs["decoder_activation_type"] == "gaussian":
+        #     self.decoder = Garf(input_dim, **self.kwargs)
 
         else: raise ValueError("Unrecognized decoder activation type.")
 

@@ -4,10 +4,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from wisp.utils import PerfTimer
-from wisp.models.decoders import BasicDecoder, MLP
 from wisp.utils.common import get_input_latent_dim
-from wisp.models.activations import get_activation_class
-from wisp.models.layers import get_layer_class, Quantization
+
+from wisp.models.layers import Quantization
+from wisp.models.decoders.basic_decoders import BasicDecoder
 from wisp.models.decoders.scaler_decoder import ScalerDecoder
 from wisp.models.decoders.redshift_decoder import RedshiftDecoder
 
@@ -73,9 +73,9 @@ class SpatialDecoder(nn.Module):
         skip_layers = self.kwargs["spatial_decod_skip_layers"]
 
         self.decode = BasicDecoder(
-            self.input_dim, output_dim,
-            get_activation_class(self.kwargs["spatial_decod_activation_type"]),
-            bias=True, layer=get_layer_class(self.kwargs["spatial_decod_layer_type"]),
+            self.input_dim, output_dim, True,
+            layer_type=self.kwargs["spatial_decod_layer_type"],
+            activation_type=self.kwargs["spatial_decod_activation_type"],
             num_layers=self.kwargs["spatial_decod_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["spatial_decod_hidden_dim"],
             skip=skip_layers

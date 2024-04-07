@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-3200-spectra-ssim' #single-latent'
+    exp_name: 'autodecoder-35-spectra-wave-embed' #single-latent'
     # log_fname: ''
 
     tasks: ['codebook_pretrain']
-    tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'recon_spectra'] #'save_redshift']
+    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -21,7 +21,14 @@ optimizer:
     sgd_momentum: 0.9
 
 embedder:
+    encode_wave: True
+    wave_encode_method: positional_encoding
     wave_embed_dim: 16
+
+    wave_encoder_hidden_dim: 128
+    wave_encoder_skip_layers: []
+    wave_encoder_gaussian_sigma: 5
+    wave_encoder_num_hidden_layers: 1
 
 pretrain:
     pretrain_batch_size: 3200
@@ -39,26 +46,36 @@ pretrain:
     pretrain_log_dir: ''
     pretrained_model_name: 'model-ep20000-bch0.pth'
 
-    regularize_spectra_latents: True
     spectra_latents_regu_beta: 16
 
 decoder:
+    decoder_activation_type: relu
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 3
-    decoder_hidden_dim: 512
+    decoder_num_hidden_layers: 1
+    decoder_hidden_dim: 128
     decoder_skip_layers: []
 
+    decoder_gaussian_sigma: 5
+
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_all_layers: False
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
+    siren_seed: 0
+    siren_first_w0: 24
+    siren_hidden_w0: 6
+    siren_coords_scaler: 1
+    siren_last_linear: True
+
 trainer:
-    num_epochs: 10000
+    num_epochs: 1000
     batch_size: 5500
-    log_cli_every: 1000
+    log_cli_every: 100
     plot_grad_every: -1
-    save_model_every: 1000
+    save_model_every: 100
+
+    plot_l2_loss: True
 
     apply_gt_redshift: True
     calculate_binwise_spectra_loss: False # brute force, each bin has its own spectra
@@ -84,16 +101,16 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240329-141546_100-spectra-no-clip-10k-epochs'
-    infer_selected: True
+    # infer_log_dir: ''
+    infer_selected: False
     pretrain_num_infer_upper_bound: 35
-    spectra_inferrence_id_fname: '20240329-142839_sc-100-spectra-multi-latent-200-epochs-141546/redshift/model-0_redshift_outlier_ids.npy'
+    # spectra_inferrence_id_fname: '/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
     plot_clipped_spectrum: True
-    plot_spectrum_with_loss: True
+    plot_spectrum_with_loss: False
     plot_spectrum_with_ivar: False
-    plot_spectrum_with_lines: False
+    plot_spectrum_with_lines: True
     plot_spectrum_with_recon: True
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: False
@@ -107,10 +124,11 @@ infer:
     spectra_latents_plot_pca_dim: 2
 
 spectra_data:
-    convolve_spectra: True
+    convolve_spectra: False
+    process_ivar: True
     spectra_smooth_sigma: 25
 
-    num_supervision_spectra_upper_bound: 100 #3200
+    num_supervision_spectra_upper_bound: 35 #100 #3200
 
     filter_redshift: False
     filter_redshift_lo: 0.02

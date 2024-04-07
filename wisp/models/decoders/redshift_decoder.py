@@ -6,11 +6,7 @@ import torch.nn.functional as F
 from wisp.utils import PerfTimer
 from wisp.utils.common import get_input_latent_dim, init_redshift_bins, \
     get_bool_has_redshift_latents
-
-from wisp.models.layers import get_layer_class
-from wisp.models.decoders import BasicDecoder
-from wisp.models.decoders.basic_decoders import average
-from wisp.models.activations import get_activation_class
+from wisp.models.decoders.basic_decoders import BasicDecoder
 
 
 class RedshiftDecoder(nn.Module):
@@ -43,9 +39,9 @@ class RedshiftDecoder(nn.Module):
 
         if not self.kwargs["optimize_redshift_latents_as_logits"]:
             self.redshift_decoder = BasicDecoder(
-                self.input_dim, output_dim,
-                get_activation_class(self.kwargs["redshift_decod_activation_type"]),
-                bias=True, layer=get_layer_class(self.kwargs["redshift_decod_layer_type"]),
+                self.input_dim, output_dim, True,
+                layer_type=self.kwargs["redshift_decod_layer_type"],
+                activation_type=self.kwargs["redshift_decod_activation_type"],
                 num_layers=self.kwargs["redshift_decod_num_hidden_layers"] + 1,
                 hidden_dim=self.kwargs["redshift_decod_hidden_dim"],
                 skip=self.kwargs["redshift_decod_skip_layers"]
