@@ -540,7 +540,7 @@ def forward(
             net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.extend(
-                ["spectra_binwise_loss","redshift_logits"])
+                ["spectra_binwise_loss","spectra_binwise_loss_l2","redshift_logits"])
         if calculate_lambdawise_spectra_loss:
             net_args["spectra_masks"] = data["spectra_masks"]
             net_args["spectra_loss_func"] = spectra_loss_func

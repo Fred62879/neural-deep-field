@@ -79,7 +79,7 @@ class CodebookTrainer(BaseTrainer):
 
         self.save_redshift = "save_redshift" in tasks
         self.save_qtz_weights = "save_qtz_weights" in tasks
-        self.recon_gt_spectra = "recon_gt_spectra" in tasks
+        self.recon_spectra = "recon_spectra" in tasks
         self.save_pixel_values = "save_pixel_values" in tasks
         self.plot_codebook_logits = "plot_codebook_logits" in tasks
         self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ" in tasks
@@ -597,7 +597,7 @@ class CodebookTrainer(BaseTrainer):
         if self.plot_l2_loss:
             self._plot_loss(self.l2_loss, self.l2_loss_fname)
             if self.plot_gt_bin_loss:
-                self._plot_loss(self.gt_bin_l2_loss, self.gt_bin_loss_l2_fname)
+                self._plot_loss(self.gt_bin_l2_loss, self.gt_bin_l2_loss_fname)
 
         if self.extra_args["log_gpu_every"] != -1:
             nvidia_smi.nvmlShutdown()
@@ -742,7 +742,7 @@ class CodebookTrainer(BaseTrainer):
                 self.gt_pixel_vals.extend(data["spectra_pixels"])
             if self.plot_codebook_logits:
                 self.codebook_logits.extend(ret["codebook_logits"])
-            if self.recon_gt_spectra:
+            if self.recon_spectra:
                 self.recon_fluxes.extend(ret["spectra"])
                 self.gt_fluxes.extend(data["spectra_source_data"][:,1])
                 self.spectra_wave.extend(data["spectra_source_data"][:,0])
@@ -1082,7 +1082,7 @@ class CodebookTrainer(BaseTrainer):
         if self.save_pixel_values:
             self.gt_pixel_vals = []
             self.recon_pixel_vals = []
-        if self.recon_gt_spectra:
+        if self.recon_spectra:
             self.gt_fluxes = []
             self.recon_fluxes = []
             self.spectra_wave = []
@@ -1124,8 +1124,8 @@ class CodebookTrainer(BaseTrainer):
             (self.cur_iter == 0 or self.cur_iter % self.plot_grad_every == 0)
 
     def save_local(self):
-        if self.recon_gt_spectra:
-            self._recon_gt_spectra()
+        if self.recon_spectra:
+            self._recon_spectra()
         if self.recon_codebook_spectra_individ:
             self._recon_codebook_spectra_individ()
         if self.save_qtz_weights:
@@ -1174,7 +1174,7 @@ class CodebookTrainer(BaseTrainer):
         w = weights[self.selected_ids,0]
         log.info(f"Qtz weights {w}")
 
-    def _recon_gt_spectra(self):
+    def _recon_spectra(self):
         log.info("reconstructing gt spectrum")
 
         self.gt_fluxes = torch.stack(self.gt_fluxes).view(
@@ -1184,30 +1184,34 @@ class CodebookTrainer(BaseTrainer):
         self.recon_fluxes = torch.stack(self.recon_fluxes).view(
             self.num_spectra, self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()[self.selected_ids]
+
         self.spectra_wave = torch.stack(self.spectra_wave).view(
             self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
         self.spectra_masks = torch.stack(self.spectra_masks).bool().view(
             self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
 
         # plot spectrum in multiple figures, each figure contains several spectrum
-        n_spectrum = len(self.selected_ids)
+        n_spectra = len(self.selected_ids)
+        titles = np.char.mod("%d", np.arange(n_spectra))
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
-        n_figs = int(np.ceil( n_spectrum / n_spectrum_per_fig ))
+        n_figs = int(np.ceil( n_spectra / n_spectrum_per_fig ))
 
         for i in range(n_figs):
             fname = f"ep{self.cur_iter}-bch{self.cur_batch}-plot{i}"
             lo = i * n_spectrum_per_fig
-            hi = min(lo + n_spectrum_per_fig, n_spectrum)
+            hi = min(lo + n_spectrum_per_fig, n_spectra)
 
-            self.dataset.plot_spectrum(
+            cur_metrics = self.dataset.plot_spectrum(
                 self.spectra_dir, fname,
-                self.extra_args["flux_norm_cho"],
-                self.spectra_wave[lo:hi], self.gt_fluxes[lo:hi],
+                self.extra_args["flux_norm_cho"], None,
+                self.spectra_wave[lo:hi], None, self.gt_fluxes[lo:hi],
                 self.spectra_wave[lo:hi], self.recon_fluxes[lo:hi],
+                lambdawise_losses=None,
                 clip=self.extra_args["plot_clipped_spectrum"],
                 gt_masks=self.spectra_masks[lo:hi],
-                recon_masks=self.spectra_masks[lo:hi]
-            )
+                recon_masks=self.spectra_masks[lo:hi],
+                calculate_metrics=False,
+                titles=titles[lo:hi])
 
     def _recon_codebook_spectra_individ(self):
         """ Reconstruct codebook spectra for each spectra individually.
@@ -1402,7 +1406,7 @@ class CodebookTrainer(BaseTrainer):
             regularize_codebook_spectra=self.regularize_codebook_spectra,
             calculate_binwise_spectra_loss=self.calculate_binwise_spectra_loss,
             save_coords=self.regularize_spectra_latents,
-            save_spectra=self.save_data and self.recon_gt_spectra,
+            save_spectra=True,
             save_redshift=self.save_data and self.save_redshift,
             save_qtz_weights=self.save_data and self.save_qtz_weights,
             save_redshift_logits=self.regularize_redshift_logits or \
@@ -1517,18 +1521,15 @@ class CodebookTrainer(BaseTrainer):
                 spectra_l2_loss = self._calculate_single_bin_loss(
                     ret, data, self.spectra_l2_loss_func)
 
-        # if spectra_loss.__class__.__name__ == "Tensor":
-        #     self.log_dict["spectra_loss"] += spectra_loss.item()
-        # else: self.log_dict["spectra_loss"] += spectra_loss
         self.log_dict["spectra_loss"] += spectra_loss.item()
         if self.plot_l2_loss:
             self.log_dict["spectra_l2_loss"] += spectra_l2_loss.item()
         return spectra_loss, spectra_l2_loss
 
     def _calculate_single_bin_loss(self, ret, data, loss_func):
-        # print('*', loss_func)
+        # print(torch.min(ret["spectra"]), torch.max(ret["spectra"]))
         spectra_loss = loss_func(
-            data["spectra_masks"], data["spectra_source_data"], ret["intensity"])
+            data["spectra_masks"], data["spectra_source_data"], ret["spectra"])
         # if self.extra_args["plot_individ_spectra_loss"]:
         #     assert spectra_loss.ndim == 1
         #     self.cur_spectra_individ_loss.extend(spectra_loss.detach().cpu().numpy())
@@ -1571,7 +1572,7 @@ class CodebookTrainer(BaseTrainer):
 
         if self.plot_gt_bin_loss:
             gt_bin_loss = torch.mean(all_bin_loss[data["gt_redshift_bin_masks"]])
-            loss_name = "gt_bin_loss" + loss_name_suffix
+            loss_name = f"gt_bin{loss_name_suffix}_loss"
             self.log_dict[loss_name] += gt_bin_loss.item()
 
         return spectra_loss

@@ -23,10 +23,9 @@ class Encoder(nn.Module):
 
         if encode_method == "grid":
             self.init_grid()
-        # elif encode_method == "gaussian":
-        #     self.garf = Garf(input_dim, **kwargs)
         elif encode_method == "positional_encoding":
             self.pe = RandGaus(embedder_args)
+            # self.embedder = RandGaus(embedder_args)
 
     def init_grid(self):
         grid_type = self.kwargs["grid_type"]

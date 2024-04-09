@@ -4,12 +4,14 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
+import matplotlib.pyplot as plt
+
 from functools import partial
 from wisp.utils import PerfTimer
 from wisp.utils.common import get_input_latent_dim, get_bool_classify_redshift, \
     create_batch_ids
 
-from wisp.models.decoders import BasicDecoder, Siren
+from wisp.models.decoders import BasicDecoder, Siren, Garf
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
 from wisp.models.hypers.hps_converter_batched import HyperSpectralConverter
 from wisp.models.layers import Intensifier, Quantization, ArgMax, \
@@ -125,6 +127,7 @@ class HyperSpectralDecoderB(nn.Module):
                 self.kwargs["decoder_num_hidden_layers"],
                 self.kwargs["decoder_hidden_dim"],
                 self.kwargs["decoder_gaussian_sigma"],
+                self.kwargs["decoder_skip_layers"],
                 self.kwargs["decoder_latents_skip_all_layers"])
         else:
             self.spectra_decoder = BasicDecoder(
@@ -255,7 +258,7 @@ class HyperSpectralDecoderB(nn.Module):
 
                     if spectra_l2_loss_func is not None:
                         calculate_spectra_loss(
-                            spectra_loss_func, spectra_masks, gt_spectra,
+                            spectra_l2_loss_func, spectra_masks, gt_spectra,
                             spectra, ret, self.calculate_lambdawise_spectra_loss,
                             loss_name_suffix="_l2", **self.kwargs)
 

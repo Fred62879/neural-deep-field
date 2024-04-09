@@ -720,7 +720,7 @@ class AstroInferrer(BaseInferrer):
                 self.argmax_redshift = []
                 self.weighted_redshift = []
             else: self.redshift = []
-            self.gt_redshift = []
+            self.gt_redshift_l = []
 
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
         if self.pretrain_infer:
@@ -904,7 +904,7 @@ class AstroInferrer(BaseInferrer):
             if self.plot_spectra_residual:
                 self.spectra_ivar = []
             if self.plot_spectra_with_lines:
-                self.gt_redshift = []
+                self.gt_redshift_l = []
             if self.plot_gt_bin_spectra:
                 self.gt_bin_fluxes = []
                 self.gt_bin_spectra_losses = []
@@ -1269,7 +1269,7 @@ class AstroInferrer(BaseInferrer):
                     self.recon_fluxes.extend(fluxes)
 
                     if self.plot_spectra_with_lines:
-                        self.gt_redshift.extend(data["spectra_redshift"])
+                        self.gt_redshift_l.extend(data["spectra_redshift"])
                     if self.plot_spectra_residual:
                         self.spectra_ivar.extend(data["spectra_source_data"][:,2])
                     if self.plot_gt_bin_spectra:
@@ -1466,6 +1466,9 @@ class AstroInferrer(BaseInferrer):
         else:
             ids = select_inferrence_ids(
                 self.num_spectra, self.extra_args["pretrain_num_infer_upper_bound"])
+            print(ids)
+            np.save('tmp.npy', ids)
+            assert 0
         return ids
 
     def _get_spectra_loss_func(self, data):
@@ -1633,8 +1636,8 @@ class AstroInferrer(BaseInferrer):
                         self.dataset_length, self.num_redshift_bins, -1).detach().cpu().numpy()
 
                 if self.plot_spectra_with_lines:
-                    self.gt_redshift = torch.stack(
-                        self.gt_redshift).detach().cpu().numpy()
+                    self.gt_redshift_l = torch.stack(
+                        self.gt_redshift_l).detach().cpu().numpy()
                 if self.plot_spectra_residual:
                     self.spectra_ivar = torch.stack(
                         self.spectra_ivar).detach().cpu().numpy()
@@ -1747,7 +1750,7 @@ class AstroInferrer(BaseInferrer):
             self.recon_masks = self.recon_masks[ids]
             self.recon_fluxes = self.recon_fluxes[ids]
             if self.plot_spectra_with_lines:
-                self.gt_redshift = self.gt_redshift[ids]
+                self.gt_redshift_l = self.gt_redshift_l[ids]
             if self.plot_gt_bin_spectra:
                 self.gt_bin_fluxes = self.gt_bin_fluxes[ids]
                 self.gt_bin_spectra_losses = self.gt_bin_spectra_losses[ids]
@@ -1769,7 +1772,7 @@ class AstroInferrer(BaseInferrer):
             hi = min(lo + n_spectrum_per_fig, num_spectra)
 
             if self.plot_spectra_with_lines:
-                redshift = self.gt_redshift[lo:hi]
+                redshift = self.gt_redshift_l[lo:hi]
             else: redshift = None
             if self.plot_spectra_with_ivar:
                 ivar = self.ivar[lo:hi]

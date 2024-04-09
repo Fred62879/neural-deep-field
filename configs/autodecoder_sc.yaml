@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-100-spectra-ssim-l2' #single-latent'
+    exp_name: 'autodecoder-100-spectra-pe'
     # log_fname: ''
 
     tasks: ['redshift_pretrain']
-    # tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -21,6 +21,8 @@ optimizer:
     sgd_momentum: 0.9
 
 embedder:
+    encode_wave: True
+    wave_encode_method: positional_encoding
     wave_embed_dim: 16
 
 pretrain:
@@ -29,26 +31,25 @@ pretrain:
     spectra_latent_dim: 16
     redshift_pretrain_num_spectra: 100
 
-    negative_supervise_wrong_redshift: False
-
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240328-142427_l2-100-spectra-10k-epochs'
-    pretrained_model_name: 'model-ep10000-bch0.pth'
+    pretrain_log_dir: '20240408-184327_ssim_32_dim_in_3_layers_512_dim_skip_all_5k_epochs'
+    pretrained_model_name: 'model-ep5000-bch0.pth'
 
     regularize_spectra_latents: True
     spectra_latents_regu_beta: 16
-    
-    binwise_spectra_latents_regu_beta: 4
 
 decoder:
+    decoder_activation_type: relu #gaussian
     decoder_batch_norm: False
     decoder_num_hidden_layers: 3
     decoder_hidden_dim: 512
     decoder_skip_layers: []
+
+    decoder_gaussian_sigma: .1
 
     decoder_activate_before_latents_skip: False
     decoder_latents_skip_all_layers: True
@@ -56,18 +57,20 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 200
+    num_epochs: 50
     batch_size: 5500
-    log_cli_every: 20
+    log_cli_every: 5
     plot_grad_every: -1
-    save_model_every: 20
+    save_model_every: 5
+
+    plot_l2_loss: True
 
     apply_gt_redshift: False
     calculate_binwise_spectra_loss: True # brute force, each bin has its own spectra
 
     # if brute force, we have three choices
     regularize_binwise_spectra_latents: False     # conflicts each other
-    optimize_latents_for_each_redshift_bin: False #
+    optimize_latents_for_each_redshift_bin: True  #
     # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
 
     calculate_spectra_loss_based_on_optimal_bin: True # only if we use single latent
@@ -78,7 +81,7 @@ trainer:
     resume_log_dir: ''
     resume_model_fname: 'model-ep100-bch0.pth'
 
-    spectra_loss_cho: l2 #ssim1d
+    spectra_loss_cho: ssim1d
     spectra_loss_reduction: none
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
@@ -86,7 +89,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240329-153036_sc-ssim-35-spectra-multi-latent-200-epochs-152038'
+    # infer_log_dir: ''
 
     pretrain_infer_batch_size: 5
 

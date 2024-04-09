@@ -74,7 +74,7 @@ def get_activation_class(activation_type, gaussian_sigma=-1):
         return torch.relu
     # elif activation_type == 'sin':
     #     return torch.sin
-    # elif activation_type == 'gaussian':
-    #     return lambda x: (-0.5*(x)**2 / gaussian_sigma**2).exp()
+    elif activation_type == 'gaussian':
+        return lambda x: (-0.5*(x)**2 / gaussian_sigma**2).exp()
     else:
         assert False and "activation type does not exist"

@@ -90,12 +90,8 @@ class BasicDecoder(nn.Module):
         assert self.skip_add_conversion_method == "convert_input" or \
             self.skip_add_conversion_method == "single_conversion" or \
             self.skip_add_conversion_method == "multi_conversion"
-
         if skip_all_layers:
-            #if self.skip_method == "add":
             self.skip = np.arange(num_layers)
-            #else: self.skip = np.arange(1, num_layers)
-
         self.perform_skip = len(self.skip) > 0
 
         self.init()
@@ -176,14 +172,13 @@ class BasicDecoder(nn.Module):
 
     ## forward helpers
     def forward_first_layer(self, x, x_skip):
-        # if self.activation_type == "gaussian":
-        #     x_ = self.layers[0](x)
-        #     mu = torch.mean(x_, axis = -1).unsqueeze(-1)
-        #     out = (-0.5*(mu - x_)**2 / self.gaussian_sigma**2).exp()
-        # else:
-        out = self.forward_one_layer(0, x, x, x_skip)
+        if self.activation_type == "gaussian":
+            x_ = self.layers[0](x)
+            mu = torch.mean(x_, axis = -1).unsqueeze(-1)
+            out = (-0.5*(mu - x_)**2 / self.gaussian_sigma**2).exp()
+        else:
+            out = self.forward_one_layer(0, x, x, x_skip)
         return out
-
 
     def forward_one_layer(self, i, h, x, x_skip=None):
         """

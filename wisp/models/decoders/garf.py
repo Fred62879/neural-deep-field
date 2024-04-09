@@ -1,6 +1,7 @@
 
 import torch
 import torch.nn as nn
+import numpy as np
 import logging as log
 
 from wisp.utils.common import set_seed
@@ -9,7 +10,7 @@ from wisp.utils.common import set_seed
 class Garf(nn.Module):
     def __init__(
             self, input_dim, output_dim, num_hidden_layers,
-            hidden_dim, gaussian_sigma, skip_all_layers
+            hidden_dim, gaussian_sigma, skip, skip_all_layers
     ):
         super(Garf, self).__init__()
 
@@ -27,6 +28,7 @@ class Garf(nn.Module):
         # if kwargs["wave_encoder_skip_all_layers"]:
         #     self.skip = np.arange(self.num_layers)
 
+        self.skip = skip
         if skip_all_layers:
             self.skip = np.arange(self.num_layers)
         self.perform_skip = len(self.skip) > 0
@@ -63,7 +65,7 @@ class Garf(nn.Module):
 
     def first_forward(self, x):
         x_ = self.first_layer(x)
-        mu = torch.mean(x_, axis = -1).unsqueeze(-1)
+        mu = torch.mean(x_, axis = -1)[...,None]
         out = (-0.5*(mu - x_)**2 / self.gaussian_sigma**2).exp()
         return out
 

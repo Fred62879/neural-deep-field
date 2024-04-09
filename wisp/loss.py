@@ -19,7 +19,6 @@ def get_loss(cho, reduction, cuda, filter_size=-1, filter_sigma=-1):
     elif cho == "l4":
         loss = lpnormloss(p=4, reduction=reduction)
     elif cho == "ssim1d":
-        assert filter_size != -1 and filter_sigma != -1
         loss = ssim1d(filter_size, filter_sigma, reduction=reduction)
     else:
         raise Exception("Unsupported loss choice")
@@ -51,6 +50,8 @@ class ssim1d(nn.Module):
                  reduction="none", size_average=True, full=False
     ):
         super(ssim1d, self).__init__()
+        assert filter_size > 0 and filter_sigma > 0
+
         self.full = full
         self.reduction = reduction
         assert filter_size % 2
@@ -63,6 +64,7 @@ class ssim1d(nn.Module):
 
     def forward(self, input, target):
         ssim = self._forward(input, target)
+        # ssim = F.mse_loss(input, target, reduction='none')
         if self.reduction == "none":
             pass
         elif self.reduction == "mean":
@@ -124,7 +126,6 @@ class ssim1d(nn.Module):
         ssim_score = (ssim_score + 1) / 2
         if torch.min(ssim_score) < 0 or torch.max(ssim_score) > 1.001:
             warnings.warn(f"min/max: {torch.min(ssim_score)}/{torch.max(ssim_score)}")
-        # ssim_score = torch.clip(ssim_score, 0, 1)
         if dim4: ssim_score = ssim_score.view(nbins,-1,nsmpls)
         return 1 - ssim_score
 

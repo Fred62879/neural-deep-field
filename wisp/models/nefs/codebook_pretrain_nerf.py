@@ -110,7 +110,8 @@ class CodebookPretrainNerf(BaseNeuralField):
                 channels.append("redshift_logits")
                 if self.kwargs["calculate_binwise_spectra_loss"]:
                     channels.extend([
-                        "spectra_binwise_loss","spectra_all_bins","optimal_bin_ids",\
+                        "spectra_binwise_loss","spectra_binwise_loss_l2",
+                        "spectra_all_bins","optimal_bin_ids",\
                         "gt_redshift_bin_ids","gt_redshift_bin_masks"
                     ])
                     if self.kwargs["plot_spectrum_under_gt_bin"]:
@@ -174,6 +175,7 @@ class CodebookPretrainNerf(BaseNeuralField):
                  init_redshift_prob=None, # debug
                  spectra_masks=None,
                  spectra_loss_func=None,
+                 spectra_l2_loss_func=None,
                  spectra_source_data=None,
                  gt_redshift_bin_ids=None,
                  gt_redshift_bin_masks=None
@@ -253,6 +255,7 @@ class CodebookPretrainNerf(BaseNeuralField):
             full_emitted_wave=full_emitted_wave,
             spectra_masks=spectra_masks,
             spectra_loss_func=spectra_loss_func,
+            spectra_l2_loss_func=spectra_l2_loss_func,
             spectra_source_data=spectra_source_data,
             gt_redshift_bin_ids=gt_redshift_bin_ids
         )

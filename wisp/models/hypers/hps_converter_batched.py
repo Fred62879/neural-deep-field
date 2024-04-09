@@ -32,7 +32,8 @@ class HyperSpectralConverter(nn.Module):
 
         self.classify_redshift = get_bool_classify_redshift(**kwargs)
 
-        self.init_encoder()
+        if self.encode_wave:
+            self.init_encoder()
 
     def init_encoder(self):
         if self.kwargs["wave_encode_method"] == "positional_encoding":
