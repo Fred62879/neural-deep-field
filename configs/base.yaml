@@ -496,17 +496,26 @@ trans_data:
     trans_sample_interval: 10
 
 spectra_data:
-    download_source_spectra: False
-    source_spectra_fname: "source_deimos_table_v7_different_wave_range_exclude_0_flux.tbl"
-    source_spectra_link: "https://irsa.ipac.caltech.edu/data/COSMOS/spectra/deimos/spec1d_tbl"
-    spectra_data_format: "tbl"
-    spectra_data_source: "deimos"
-    max_spectra_len: 8191 # hardcoded
+    spectra_cho: v1
+    spectra_process_patch_info: False
+    spectra_data_sources: [deimos,zcosmos]
 
-    num_gt_spectra_upper_bound: 7000 # spectra to load
+    download_deimos_source_spectra: False
+    deimos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/deimos/spec1d_tbl
+    deimos_spectra_data_format: tbl
+    deimos_processed_spectra_cho: v7_table
+    deimos_source_spectra_fname: source_deimos_table_v7_different_wave_range_exclude_0_flux.tbl
+
+    download_zcosmos_source_spectra: True
+    zcosmos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/z-cosmos/TBL
+    zcosmos_spectra_data_format: tbl
+    zcosmos_processed_spectra_cho: v1
+    zcosmos_source_spectra_fname: source_zcosmos_table.fits
+
+    max_spectra_len: 8191 # hardcoded
+    num_gt_spectra_upper_bound: 100000 # spectra to load
     num_supervision_spectra_upper_bound: 100
     val_spectra_ratio: 1 #0.8
-    source_spectra_cho: "" #"6000_to_8000"
 
     # **** Below fields should be modified together ****
     spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
@@ -516,7 +525,6 @@ spectra_data:
     process_ivar: True
     convolve_spectra: True
     spectra_smooth_sigma: -1
-    processed_spectra_cho: "v7_table"
     # **************************************************
 
     spectra_supervision_wave_lo: 6000

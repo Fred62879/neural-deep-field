@@ -18,9 +18,11 @@ from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_coords_norm_range_fname, add_dummy_dim, wave_within_bound, \
     get_dataset_path, get_img_data_path
 
+from tqdm import tqdm
 from pathlib import Path
 from astropy.io import fits
 from astropy.wcs import WCS
+from astropy.table import Table
 from functools import partial
 from os.path import join, exists
 from collections import defaultdict
@@ -49,10 +51,16 @@ class SpectraData:
         self.num_patches_c = len(self.all_patches_c)
         self.num_patches = len(self.all_patches_r)*len(self.all_patches_c)
 
-        self.source_spectra_link = kwargs["source_spectra_link"]
-        self.spectra_data_source = kwargs["spectra_data_source"]
-        self.spectra_data_format = kwargs["spectra_data_format"] # tbl or fits
-        self.download_source_spectra = kwargs["download_source_spectra"]
+        self.spectra_data_sources = kwargs["spectra_data_sources"]
+
+        self.deimos_source_spectra_link = kwargs["deimos_source_spectra_link"]
+        self.deimos_spectra_data_format = kwargs["deimos_spectra_data_format"]
+        self.download_deimos_source_spectra = kwargs["download_deimos_source_spectra"]
+
+        self.zcosmos_source_spectra_link = kwargs["zcosmos_source_spectra_link"]
+        self.zcosmos_spectra_data_format = kwargs["zcosmos_spectra_data_format"]
+        self.download_zcosmos_source_spectra = kwargs["download_zcosmos_source_spectra"]
+
         self.load_spectra_data_from_cache = kwargs["load_spectra_data_from_cache"]
 
         self.neighbour_size = kwargs["spectra_neighbour_size"]
@@ -76,76 +84,79 @@ class SpectraData:
             source_metadata_table:    ra,dec,zspec,spectra_fname
             processed_metadata_table: added pixel val and tract-patch
         """
-        paths = []
-        self.input_patch_path, img_data_path = get_img_data_path(dataset_path, **self.kwargs)
         spectra_path = join(dataset_path, "input/spectra")
-
-        n_neighbours = self.kwargs["spectra_neighbour_size"]
-
-        suffix = self.kwargs["source_spectra_cho"]
-        if suffix != "": suffix = "_" + suffix
-
         self.wave_range_fname = get_wave_range_fname(**self.kwargs)
         self.coords_norm_range_fname = get_coords_norm_range_fname(**self.kwargs)
-        spectra_cho = self.kwargs["processed_spectra_cho"]
-        if self.kwargs["convolve_spectra"]:
-            sigma = self.kwargs["spectra_smooth_sigma"]
-            spectra_cho += f"_convolved_sigma_{sigma}"
+        self.input_patch_path, img_data_path = get_img_data_path(dataset_path, **self.kwargs)
 
-        if self.spectra_data_source == "manual":
-            assert 0
-            self.source_metadata_table_fname = join(spectra_path, "deimos_old", "spectra.csv")
+        if "deimos" in self.spectra_data_sources:
+            self._set_path(
+                "deimos", spectra_path,
+                self.kwargs["deimos_processed_spectra_cho"],
+                self.kwargs["deimos_source_spectra_fname"],
+                self.deimos_spectra_data_format)
 
-        elif self.spectra_data_source == "deimos":
-            path = join(spectra_path, "deimos")
-            self.source_spectra_path = join(
-                path, f"source_spectra_{self.spectra_data_format}{suffix}")
-            self.source_metadata_table_fname = join(
-                path, self.kwargs["source_spectra_fname"])
+        if "zcosmos" in self.spectra_data_sources:
+            self._set_path(
+                "zcosmos", spectra_path,
+                self.kwargs["zcosmos_processed_spectra_cho"],
+                self.kwargs["zcosmos_source_spectra_fname"],
+                self.zcosmos_spectra_data_format)
 
-            processed_data_path = join(
-                path, f"processed_{spectra_cho}_{n_neighbours}_neighbours{suffix}")
-            self.processed_spectra_path = join(
-                processed_data_path, "processed_spectra")
+        processed_data_path = "processed_{}_{}_neighbours".format(
+            self.kwargs["spectra_cho"], self.kwargs["spectra_neighbour_size"])
+        processed_data_path = join(spectra_path, processed_data_path)
 
-            suffix = "_ivar_processed" if self.process_ivar else ""
-            self.processed_metadata_table_fname = join(
-                processed_data_path, f"processed_deimos_table{suffix}.tbl")
-
-        elif self.spectra_data_source == "zcosmos":
-            path = join(spectra_path, "zcosmos")
-            self.source_spectra_path = join(
-                path, f"source_spectra_{self.spectra_data_format}{suffix}")
-            self.source_metadata_table_fname = join(
-                path, "source_zcosmos_table.fits")
-
-            processed_data_path = join(
-                path, f"processed_{spectra_cho}_{n_neighbours}_neighbours{suffix}")
-            self.processed_spectra_path = join(
-                processed_data_path, "processed_spectra")
-            self.processed_metadata_table_fname = join(
-                processed_data_path, "processed_zcosmos_table.fits")
-
-        else: raise ValueError("Unsupported spectra data source choice.")
+        self.processed_metadata_table_fname =  join(
+            processed_data_path, "processed_table.tbl")
 
         suffix = str(self.kwargs["spectra_supervision_wave_lo"]) + "_" + \
             str(self.kwargs["spectra_supervision_wave_hi"]) + ".npy"
-        self.emitted_wave_fname = join(
-            processed_data_path, "emitted_wave_" + suffix)
+        self.emitted_wave_fname = join(processed_data_path, "emitted_wave_" + suffix)
         self.emitted_wave_masks_fname = join(
             processed_data_path, "emitted_wave_masks_" + suffix)
-
-        suffix = "_ivar_processed" if self.process_ivar else ""
+        suffix = "_ivar_unprocessed" if not self.process_ivar else ""
         self.gt_spectra_fname = join(processed_data_path, f"gt_spectra{suffix}.npy")
         self.gt_spectra_ids_fname = join(processed_data_path, "gt_spectra_ids.txt")
         self.gt_spectra_masks_fname = join(processed_data_path, "gt_spectra_masks.npy")
         self.gt_spectra_pixels_fname = join(processed_data_path, "gt_spectra_pixels.npy")
         self.gt_spectra_redshift_fname = join(processed_data_path, "gt_spectra_redshift.npy")
-        self.gt_spectra_img_coords_fname = join(processed_data_path, f"gt_spectra_img_coords.npy")
-        self.gt_spectra_world_coords_fname = join(processed_data_path, f"gt_spectra_world_coords.npy")
+        self.gt_spectra_img_coords_fname = join(
+            processed_data_path, f"gt_spectra_img_coords.npy")
+        self.gt_spectra_world_coords_fname = join(
+            processed_data_path, f"gt_spectra_world_coords.npy")
 
-        for path in [processed_data_path, self.processed_spectra_path]:
+        for path in [processed_data_path]: #, self.processed_spectra_path]:
             Path(path).mkdir(parents=True, exist_ok=True)
+
+    def _set_path(self, data_source, spectra_path, spectra_cho,
+                  source_spectra_fname, data_format
+    ):
+        if self.kwargs["convolve_spectra"]:
+            sigma = self.kwargs["spectra_smooth_sigma"]
+            spectra_cho = spectra_cho + f"_convolved_sigma_{sigma}"
+
+        path = join(spectra_path, data_source)
+        suffix = "_ivar_unprocessed" if not self.process_ivar else ""
+        n_neighbours = self.kwargs["spectra_neighbour_size"]
+        processed_data_path = join(
+            path, f"processed_{spectra_cho}_{n_neighbours}_neighbours{suffix}")
+
+        setattr(self, f"{data_source}_source_spectra_path",
+                join(path, f"source_spectra_{data_format}{suffix}"))
+        setattr(self, f"{data_source}_source_metadata_table_fname",
+                join(path, source_spectra_fname))
+        setattr(self, f"{data_source}_processed_spectra_path",
+                join(processed_data_path, "processed_spectra"))
+        setattr(self, f"{data_source}_processed_metadata_table_fname",
+                join(processed_data_path, f"processed_{data_source}_table{suffix}.tbl"))
+
+        suffix = str(self.kwargs["spectra_supervision_wave_lo"]) + "_" + \
+            str(self.kwargs["spectra_supervision_wave_hi"]) + ".npy"
+        setattr(self, f"{data_source}_emitted_wave_fname",
+                join(processed_data_path, "emitted_wave_" + suffix))
+        setattr(self, f"{data_source}_emitted_wave_masks_fname",
+                join(processed_data_path, "emitted_wave_masks_" + suffix))
 
     def load_accessory_data(self):
         self.full_wave = self.trans_obj.get_full_wave()
@@ -527,14 +538,15 @@ class SpectraData:
             validation_ids = np.append(validation_ids, selected_ids)
             assert len(set(validation_ids) & set(supervision_ids)) == 0
 
-        supervision_ids = np.array(([1397, 1063,  843,  819, 2985, 1539, 2852, 1921,  181, 2728,  700,1867, 1450, 1378,   14, 2391, 1894,  671,  163,  438,  834, 3041,862, 3027, 1870, 2219, 2193,  731,  403, 1388, 2821,  143, 2998,1935, 2907, 1693,  580,  272, 1700,  168, 1514, 1893,  421,  602,675, 2636,  317,  659, 2880, 1443, 2694, 1906, 2758, 2551, 1018,2750, 3106,  245, 2419, 2932, 2178,  743, 1675, 2228, 2926, 1317,2106, 1290, 2578, 1002, 2533, 1915, 2653, 1296, 2062, 1988,  442,2651, 1771, 2410,  265, 1035,  647,  640, 2269, 2189,  729, 2541,3173, 1302, 1557, 2719, 3135, 2292, 2023, 2854, 1939,  683,   32,2012, 2101,  392, 2716, 2986, 2323,  778, 1023,  303, 1994, 3030,2327, 2804, 1503, 1086,  888, 2771, 1049, 1022, 1829, 1387, 2244,590, 2543,  641, 1868,  501, 2891, 1795, 1080, 2004, 2038, 1505,2340, 1754, 1769, 2509,  852, 1588, 1924,  391])
+        # a = np.array([1397, 1063,  843,  819, 2985, 1539, 2852, 1921,  181, 2728,  700,1867, 1450, 1378,   14, 2391, 1894,  671,  163,  438,  834, 3041,862, 3027, 1870, 2219, 2193,  731,  403, 1388, 2821,  143, 2998,1935, 2907, 1693,  580,  272, 1700,  168, 1514, 1893,  421,  602,675, 2636,  317,  659, 2880, 1443, 2694, 1906, 2758, 2551, 1018,2750, 3106,  245, 2419, 2932, 2178,  743, 1675, 2228, 2926, 1317,2106, 1290, 2578, 1002, 2533, 1915, 2653, 1296, 2062, 1988,  442,2651, 1771, 2410,  265, 1035,  647,  640, 2269, 2189,  729, 2541,3173, 1302, 1557, 2719, 3135, 2292, 2023, 2854, 1939,  683,   32,2012, 2101,  392, 2716, 2986, 2323,  778, 1023,  303, 1994, 3030,2327, 2804, 1503, 1086,  888, 2771, 1049, 1022, 1829, 1387, 2244,590, 2543,  641, 1868,  501, 2891, 1795, 1080, 2004, 2038, 1505,2340, 1754, 1769, 2509,  852, 1588, 1924,  391])
+        # b=supervision_ids[a]
+        # np.save('tmp.npy',b)
+        # assert 0
 
-
+        # supervision_ids = np.array([849, 1758, 3906, 3637, 1369, 3862, 1561, 3706,  221, 3666, 2227,2317, 5711,  463,  193, 2964, 4672, 2999, 5270, 2291, 1858, 2526,2197,  746, 4870, 2233, 5787, 4449, 3233, 1854, 2548, 1918, 3177,1806, 1397, 1425, 5676, 5737, 2791, 1668, 4932, 4106, 1776, 5582,5680, 1677, 1461, 1524, 3460, 1665, 5775, 2032, 1899,  960, 5940,6054, 2420, 2058, 2510, 5880, 4941, 5863, 3397, 2503, 2415, 4311,4518, 2778,  180, 4544,  348,  360, 5447, 3062,  682, 4646, 3313,2648, 5823, 2941,  379, 3491, 5285, 5322,  230,  920, 2615, 5161,5701, 1179,  854, 1741, 5875, 5968, 5372, 5681, 3234, 1997, 2990,3894, 2766, 3485, 3064, 4536, 3513, 4599,  419,  761, 2955, 1253,3857,  874, 3338, 2411, 5917, 2042, 4169, 5311, 5312, 5748, 3459,1475, 2374, 1844, 1543, 2342, 3102, 2459, 5674, 2297,  478, 3800,1208, 5839, 4353, 6022, 4571, 2743, 5803,  369])
         # log.info(f"test spectra ids: {test_ids}")
         # log.info(f"validation spectra ids: {validation_ids}")
         # log.info(f"supervision spectra ids: {supervision_ids}")
-        # validation_ids = [193]
-        # supervision_ids = [193]
 
         self.num_test_spectra = len(test_ids)
         self.num_validation_spectra = len(validation_ids)
@@ -608,89 +620,90 @@ class SpectraData:
     def gather_processed_spectra(self):
         """ Load processed data for each spectra and save together.
         """
+        n = len(df)
         df = pandas.read_pickle(self.processed_metadata_table_fname)
         with open(self.gt_spectra_ids_fname, "rb") as fp:
             ids = pickle.load(fp)
         self.data["gt_spectra_ids"] = defaultdict(list, ids)
 
-        img_coords, world_coords, spectra = [], [], []
-        masks, redshift, pixels = [], [], []
+        masks, spectra, redshift = [], [], []
+        if self.kwargs["spectra_process_patch_info"]:
+            img_coords, world_coords, pixels = [], [], []
 
-        n = len(df)
         for i in range(n):
             redshift.append(df.iloc[i]["zspec"])
-            masks.append(
-                np.load(join(self.processed_spectra_path, df.iloc[i]["masks_fname"])))
-            pixels.append(
-                np.load(join(self.processed_spectra_path, df.iloc[i]["pixels_fname"])))
-            spectra.append(
-                np.load(join(self.processed_spectra_path, df.iloc[i]["spectra_fname"])))
-            img_coords.append(
-                np.load(join(self.processed_spectra_path, df.iloc[i]["img_coords_fname"]))[None,...])
-            world_coords.append(
-                np.load(join(self.processed_spectra_path, df.iloc[i]["world_coords_fname"]))[None,...])
+            fname = join(self.processed_spectra_path, df.iloc[i]["masks_fname"])
+            masks.append(np.load(fname))
+            fname = join(self.processed_spectra_path, df.iloc[i]["spectra_fname"])
+            spectra.append(np.load(fname))
+
+            if self.kwargs["spectra_process_patch_info"]:
+                fname = join(self.processed_spectra_path, df.iloc[i]["pixels_fname"])
+                pixels.append(np.load(fname))
+                fname = join(self.processed_spectra_path, df.iloc[i]["img_coords_fname"])
+                img_coords.append(np.load(fname)[None,...])
+                fname = join(self.processed_spectra_path, df.iloc[i]["world_coords_fname"])
+                world_coords.append(np.load(fname)[None,...])
 
         self.data["emitted_wave"] = np.load(self.emitted_wave_fname)[0]
 
         # [n_spectra,4+2*nbands,nsmpl]
         #  (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
         self.data["gt_spectra"] = np.array(spectra).astype(np.float32)
-
         self.data["gt_spectra_masks"] = np.array(masks).astype(bool)
-        self.data["gt_spectra_pixels"] = np.concatenate(pixels, axis=0).astype(np.float32)
         self.data["gt_spectra_redshift"] = np.array(redshift).astype(np.float32) # [n,]
-        self.data["gt_spectra_img_coords"] = np.concatenate(
-            img_coords, axis=0).astype(np.float32) # [n,n_neighbr,2]
-        self.data["gt_spectra_world_coords"] = np.concatenate(
-            world_coords, axis=0).astype(np.float32) # [n,n_neighbr,2]
-
-        # save data for all spectra together
         np.save(self.gt_spectra_fname, self.data["gt_spectra"])
         np.save(self.gt_spectra_masks_fname, self.data["gt_spectra_masks"])
-        np.save(self.gt_spectra_pixels_fname, self.data["gt_spectra_pixels"])
         np.save(self.gt_spectra_redshift_fname, self.data["gt_spectra_redshift"])
-        np.save(self.gt_spectra_img_coords_fname, self.data["gt_spectra_img_coords"])
-        np.save(self.gt_spectra_world_coords_fname, self.data["gt_spectra_world_coords"])
+
+        if self.kwargs["spectra_process_patch_info"]:
+            self.data["gt_spectra_pixels"] = np.concatenate(
+                pixels, axis=0).astype(np.float32)
+            self.data["gt_spectra_img_coords"] = np.concatenate(
+                img_coords, axis=0).astype(np.float32) # [n,n_neighbr,2]
+            self.data["gt_spectra_world_coords"] = np.concatenate(
+                world_coords, axis=0).astype(np.float32) # [n,n_neighbr,2]
+            np.save(self.gt_spectra_pixels_fname, self.data["gt_spectra_pixels"])
+            np.save(self.gt_spectra_img_coords_fname, self.data["gt_spectra_img_coords"])
+            np.save(self.gt_spectra_world_coords_fname, self.data["gt_spectra_world_coords"])
 
     def process_spectra(self):
         upper_bound = self.kwargs["num_gt_spectra_upper_bound"]
         df = self.load_source_metadata().iloc[:upper_bound]
-        log.info(f"found {len(df)} source spectra")
-
-        for field in ["tract","patch","masks_fname","pixels_fname",
-                      "img_coords_fname","world_coords_fname"]:
-            df[field] = "None"
-
-        if self.download_source_spectra:
-            spectra_fnames = list(df["spectra_fname"])
-            download_deimos_data_parallel(
-                self.source_spectra_link, self.source_spectra_path, spectra_fnames)
-            log.info("spectra-data::download complete")
+        num_spectra = len(df)
+        log.info(f"found {num_spectra} source spectra")
 
         self.trans_data = self.trans_obj.get_full_trans_data()
 
         if not exists(self.emitted_wave_fname):
             emitted_wave = self.calculate_emitted_wave_range(df)
         else: emitted_wave = np.load(self.emitted_wave_fname)
-
         if not exists(self.emitted_wave_masks_fname):
             self.data["emitted_wave_masks"] = self.generate_emitted_wave_masks(emitted_wave[0])
         else: self.data["emitted_wave_masks"] = np.load(self.emitted_wave_masks_fname)
-
         emitted_wave_distrib = interp1d(emitted_wave[0], emitted_wave[1])
-        header_wcs, headers = self.load_headers(df)
-        spectra_ids, spectra_to_drop = self.localize_spectra(df, header_wcs, headers)
-        self.load_spectra_patch_wise(df, spectra_ids, emitted_wave_distrib)
 
-        df.drop(spectra_to_drop, inplace=True)   # drop nonexist spectra
-        df.reset_index(inplace=True)
-        df.drop(columns=["index"], inplace=True) # drop extra index added by `reset_index`
+        df["masks_fname"] = "None"
 
-        df.dropna(
-            subset=["pixels_fname","img_coords_fname","world_coords_fname","spectra_fname"],
-            inplace=True)
-        df.reset_index(inplace=True)
-        df.drop(columns=["index"], inplace=True) # drop extra index added by `reset_index`
+        if self.kwargs["spectra_process_patch_info"]:
+            for field in ["tract","patch","pixels_fname",
+                          "img_coords_fname","world_coords_fname"]:
+                df[field] = "None"
+
+            header_wcs, headers = self.load_headers(df)
+            spectra_ids, spectra_to_drop = self.localize_spectra(df, header_wcs, headers)
+            self.load_spectra_patch_wise(df, spectra_ids, emitted_wave_distrib)
+
+            df.drop(spectra_to_drop, inplace=True)   # drop nonexist spectra
+            df.reset_index(inplace=True)
+            df.drop(columns=["index"], inplace=True) # drop extra index added by `reset_index`
+
+            df.dropna(subset=["pixels_fname","img_coords_fname",
+                              "world_coords_fname","spectra_fname"], inplace=True)
+            df.reset_index(inplace=True)
+            df.drop(columns=["index"], inplace=True)
+        else:
+            self.load_spectra_all_together(df, num_spectra, emitted_wave_distrib)
 
         df.to_pickle(self.processed_metadata_table_fname)
 
@@ -808,10 +821,17 @@ class SpectraData:
             pickle.dump(dict(spectra_ids), fp)
         return spectra_ids, spectra_to_drop
 
+    def load_spectra_all_together(self, df, num_spectra, emitted_wave_distrib):
+        # [ self.process_one_spectra(None, None, df, None, emitted_wave_distrib, idx, None)
+        #   for idx in range(num_spectra) ]
+        for idx in tqdm(range(num_spectra)):
+            self.process_one_spectra(None, None, df, None, emitted_wave_distrib, idx, None)
+
     def load_spectra_patch_wise(self, df, spectra_ids, emitted_wave_distrib):
         """ Load pixels and coords for each spectra in patch-wise order.
         """
-        process_each_patch = partial(self.process_spectra_in_one_patch, df, emitted_wave_distrib)
+        process_each_patch = partial(
+            self.process_spectra_in_one_patch, df, emitted_wave_distrib)
 
         for i, tract in enumerate(self.all_tracts):
             for j, patch_r in enumerate(self.all_patches_r):
@@ -871,7 +891,7 @@ class SpectraData:
         [ process_one_spectra(idx, img_coord)
           for i, (idx, img_coord) in enumerate(zip(spectra_ids, img_coords))]
 
-        suffix = "_ivar_processed" if self.process_ivar else ""
+        suffix = "_ivar_unprocessed" if not self.process_ivar else ""
 
         cur_patch_spectra_fname = join(
             self.processed_spectra_path, f"{patch_uid}{suffix}.npy")
@@ -890,61 +910,77 @@ class SpectraData:
         np.save(cur_patch_spectra_fname, np.array(cur_patch_spectra))
         np.save(cur_patch_masks_fname, np.array(cur_patch_spectra_masks))
 
-    def process_one_spectra(self, cur_patch_spectra,
-                            cur_patch_spectra_masks,
-                            df, patch, emitted_wave_distrib,
-                            idx, img_coord
+    def process_one_spectra(self, cur_patch_spectra, cur_patch_spectra_masks,
+                            df, patch, emitted_wave_distrib, idx, img_coord
     ):
-        """ Get pixel and normalized coord and
-              process spectra data for one spectra.
-            @Params
-              df: source metadata dataframe for all spectra
-              patch: patch that contains the current spectra
-              idx: spectra idx (within the df table)
-              img_coord: img coord for current spectra
         """
-        # if idx != 6039: return
+        Get pixel and normalized coord and process spectra data for one spectra.
+        @Params
+          df: source metadata dataframe for all spectra
+          patch: patch that contains the current spectra
+          idx: spectra idx (within the df table)
+          img_coord: img coord for current spectra
+        """
+        spectra_source = df.iloc[idx]["source"]
         spectra_fname = df.iloc[idx]["spectra_fname"]
-        if self.spectra_data_format == "fits":
-            fname = spectra_fname[:-5]
-        elif self.spectra_data_format == "tbl":
-            fname = spectra_fname[:-4]
-        else: raise ValueError("Unsupported spectra data source")
+        data_format = getattr(self, f"{spectra_source}_spectra_data_format")
+        source_spectra_path = getattr(self, f"{spectra_source}_source_spectra_path")
+        processed_spectra_path = getattr(self, f"{spectra_source}_processed_spectra_path")
 
-        suffix = "_ivar_processed" if self.process_ivar else ""
-
+        if data_format == "fits": fname = spectra_fname[:-5]
+        elif data_format == "tbl": fname = spectra_fname[:-4]
+        else: raise ValueError("Unsupported spectra data format")
+        suffix = "_ivar_unprocessed" if not self.process_ivar else ""
         masks_fname = f"{fname}_masks.npy"
-        pixels_fname = f"{fname}_pixels.npy"
-        img_coords_fname = f"{fname}_img_coord.npy"
-        world_coords_fname = f"{fname}_world_coord.npy"
-
-        df.at[idx,"spectra_fname"] = f"{fname}{suffix}.npy"
+        spectra_fname = f"{fname}{suffix}.npy"
         df.at[idx,"masks_fname"] = masks_fname
-        df.at[idx,"pixels_fname"] = pixels_fname
-        df.at[idx,"img_coords_fname"] = img_coords_fname
-        df.at[idx,"world_coords_fname"] = world_coords_fname
+        df.at[idx,"spectra_fname"] = spectra_fname
 
-        pixel_ids = patch.get_pixel_ids(img_coord[0], img_coord[1])
-        pixels = patch.get_pixels(pixel_ids) # [1,2]
+        masks_fname = join(processed_spectra_path, masks_fname)
+        spectra_in_fname = join(source_spectra_path, spectra_fname)
+        spectra_out_fname = join(processed_spectra_path, spectra_fname)
+        current_spectra_processed = exists(masks_fname) and exists(spectra_out_fname)
+        # print(masks_fname, exists(masks_fname))
+        # print(spectra_out_fname, exists(spectra_out_fname))
 
-        pixel_ids = patch.get_pixel_ids(
-            img_coord[0], img_coord[1], neighbour_size=self.neighbour_size)
-        img_coords = patch.get_img_coords(pixel_ids)     # mesh grid coords [n_neighbr,2]
-        world_coords = patch.get_world_coords(pixel_ids) # un-normed ra/dec [n_neighbr,2]
+        if not self.kwargs["spectra_process_patch_info"]:
+            if current_spectra_processed: return
+        else:
+            pixels_fname = f"{fname}_pixels.npy"
+            img_coords_fname = f"{fname}_img_coord.npy"
+            world_coords_fname = f"{fname}_world_coord.npy"
+            df.at[idx,"pixels_fname"] = pixels_fname
+            df.at[idx,"img_coords_fname"] = img_coords_fname
+            df.at[idx,"world_coords_fname"] = world_coords_fname
 
-        np.save(join(self.processed_spectra_path, pixels_fname), pixels)
-        np.save(join(self.processed_spectra_path, img_coords_fname), img_coords)
-        np.save(join(self.processed_spectra_path, world_coords_fname), world_coords)
+            pixels_fname = join(processed_spectra_path, pixels_fname)
+            img_coords_fname = join(processed_spectra_path, img_coords_fname)
+            world_coords_fname = join(processed_spectra_path, world_coords_fname)
+            current_spectra_processed &= exists(pixels_fname) and \
+                exists(img_coords_fname) and exists(world_coords_fname)
+            if current_spectra_processed:
+                cur_patch_spectra.append(np.load(spectra_out_fname))
+                cur_patch_spectra_masks.append(np.load(masks_fname))
+
+            pixel_ids = patch.get_pixel_ids(img_coord[0], img_coord[1])
+            pixels = patch.get_pixels(pixel_ids) # [1,2]
+
+            pixel_ids = patch.get_pixel_ids(
+                img_coord[0], img_coord[1], neighbour_size=self.neighbour_size)
+            img_coords = patch.get_img_coords(pixel_ids)     # mesh grid coords [n_neighbr,2]
+            world_coords = patch.get_world_coords(pixel_ids) # un-normed ra/dec [n_neighbr,2]
+
+            np.save(pixels_fname, pixels)
+            np.save(img_coords_fname, img_coords)
+            np.save(world_coords_fname, world_coords)
 
         # process source spectra and save locally
         gt_spectra, masks = process_gt_spectra(
-            join(self.source_spectra_path, spectra_fname),
-            join(self.processed_spectra_path, fname),
-            join(self.processed_spectra_path, masks_fname),
+            spectra_in_fname, spectra_out_fname, masks_fname,
             df.loc[idx,"zspec"],
             emitted_wave_distrib,
             sigma=self.smooth_sigma,
-            format=self.spectra_data_format,
+            format=data_format,
             trans_range=self.trans_range,
             trusted_range=self.trusted_wave_range,
             max_spectra_len=self.kwargs["max_spectra_len"],
@@ -952,20 +988,39 @@ class SpectraData:
             trans_data=self.trans_data,
             process_ivar=self.process_ivar
         )
-        cur_patch_spectra.append(gt_spectra)
-        cur_patch_spectra_masks.append(masks)
+
+        if self.kwargs["spectra_process_patch_info"]:
+            cur_patch_spectra.append(gt_spectra)
+            cur_patch_spectra_masks.append(masks)
 
     def load_source_metadata(self):
-        if self.spectra_data_source == "manual":
-            source_spectra_data = read_manual_table(self.manual_table_fname)
-        elif self.spectra_data_source == "deimos":
-            source_spectra_data = read_deimos_table(self.source_metadata_table_fname,
-                                                    self.spectra_data_format)
-        elif self.spectra_data_source == "zcosmos":
-            source_spectra_data = read_zcosmos_table(self.source_metadata_table_fname,
-                                                     self.spectra_data_format)
-        else: raise ValueError("Unsupported spectra data source")
-        return source_spectra_data
+        df = []
+
+        # if "manual" in self.spectra_data_sources:
+        #     data["manual"] = read_manual_table(self.manual_table_fname)
+
+        if "deimos" in self.spectra_data_sources:
+            cur_df = read_deimos_table(
+                self.deimos_source_metadata_table_fname,
+                self.deimos_spectra_data_format,
+                self.download_deimos_source_spectra,
+                self.deimos_source_spectra_link,
+                self.deimos_source_spectra_path)
+            df.append(cur_df)
+
+        if "zcosmos" in self.spectra_data_sources:
+            cur_df = read_zcosmos_table(
+                self.zcosmos_source_metadata_table_fname,
+                self.zcosmos_spectra_data_format,
+                self.download_zcosmos_source_spectra,
+                self.zcosmos_source_spectra_link,
+                self.zcosmos_source_spectra_path)
+            df.append(cur_df)
+
+        df = pandas.concat(df)
+        df.reset_index(inplace=True)
+        df.drop(columns=["index"], inplace=True)
+        return df
 
     # def find_full_wave_bound_ids(self):
     #     """ Find id of min and max wave of supervision range in terms of
@@ -1631,8 +1686,8 @@ def process_gt_spectra(infname, spectra_fname, spectra_mask_fname,
                     (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
           mask:     mask out bad flux values
     """
-    if process_ivar:
-        spectra_fname = spectra_fname + "_ivar_processed"
+    if not process_ivar:
+        spectra_fname = spectra_fname + "_ivar_unprocessed"
 
     if False: #exists(spectra_fname + ".npy") and exists(mask_fname):
         mask = np.load(mask_fname)
@@ -1691,7 +1746,7 @@ def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
 # Spectra loading
 #############
 
-def read_deimos_table(fname, format):
+def read_deimos_table(fname, format, download=False, link="", path=""):
     """ Read metadata table for deimos spectra data.
     """
     df = pandas.read_table(fname, comment='#', delim_whitespace=True)
@@ -1708,29 +1763,46 @@ def read_deimos_table(fname, format):
     # df.loc[df['id'].isnull(),'id'] = 'None'
     # df.reset_index(inplace=True) # reset index after dropping
     # df.drop(columns=["index"], inplace=True)
+    df["source"] = "deimos"
     df["ra"] = pandas.to_numeric(df["ra"])
     df["dec"] = pandas.to_numeric(df["dec"])
     df["zspec"] = pandas.to_numeric(df["zspec"])
+    if download:
+        spectra_fnames = list(df["spectra_fname"])
+        download_data_parallel(link, path, spectra_fnames)
+        log.info("deimos source spectra data download complete")
     return df
 
-def read_zcosmos_table(fname):
+def read_zcosmos_table(fname, format, download=False, link="", path=""):
     """ Read metadata table for zcosmos spectra data.
     """
     df = Table.read(fname).to_pandas()
+    # data = fits.open(fname)[1].data
+    # df = pandas.DataFrame(data)
     df.rename(columns={
         'OBJECT_ID': 'id',
         'RAJ2000':'ra',
         'DEJ2000':'dec',
         'REDSHIFT':'zspec',
-        'FILANEMS':'spectra_fname'
+        'FILENAME':'spectra_fname'
     }, inplace=True)
     df.drop(columns=['CC','IMAG_AB','FLAG_S','FLAG_X','FLAG_R','FLAG_UV'], inplace=True)
-    df.drop([0], inplace=True) # drop first row which is datatype
-    df.dropna(subset=["ra","dec","spectra_fname"], inplace=True)
+    # df.drop([0], inplace=True) # drop first row which is datatype
+    df.dropna(subset=["ra","dec","zspec","spectra_fname"], inplace=True)
     df.reset_index(inplace=True) # reset index after dropping
+    df.drop(columns=["index"], inplace=True)
+    df["source"] = "zcosmos"
     df["ra"] = pandas.to_numeric(df["ra"])
     df["dec"] = pandas.to_numeric(df["dec"])
     df["zspec"] = pandas.to_numeric(df["zspec"])
+    df["spectra_fname"] = df["spectra_fname"].str.decode("utf-8") #str(fname, encoding='utf-8')
+    if download:
+        spectra_fnames = list(df["spectra_fname"])
+        print(spectra_fnames)
+        assert 0
+        # print(link, path)
+        download_data_parallel(link, path, spectra_fnames)
+        log.info("zcosmos source spectra data download complete")
     return df
 
 def read_manual_table(fname):
@@ -1771,10 +1843,9 @@ def unpack_gt_spectra(fname, format="tbl"):
     spectra = np.array([wave, flux, ivar])
     return spectra
 
-def download_deimos_data_parallel(http_prefix, local_path, fnames):
+def download_data_parallel(http_prefix, local_path, fnames):
     fnames = list(filter(lambda fname: not exists(join(local_path, fname)), fnames))
     log.info(f"downloading {len(fnames)} spectra")
-    assert 0
 
     urls = [f"{http_prefix}/{fname}" for fname in fnames]
     out_fnames = [f"{local_path}/{fname}" for fname in fnames]
@@ -1784,7 +1855,8 @@ def download_deimos_data_parallel(http_prefix, local_path, fnames):
     for result in results:
         if result is not None:
             print('url:', result[0], 'time (s):', result[1])
-            # log.info(f"url: {result[0]}")
+            log.info(f"url: {result[0]}")
+            assert 0
 
 def download_from_url(input_):
     t0 = time.time()

@@ -90,6 +90,10 @@ class CodebookTrainer(BaseTrainer):
             self.mode = "redshift_pretrain"
         else: raise ValueError("Invalid mode!")
 
+        self.generalize = not self.extra_args["sample_from_codebook_pretrain_spectra"]
+        self.generalize_train_first_layer = self.generalize and \
+            self.extra_args["generalize_train_first_layer"]
+
         if self.mode == "redshift_pretrain":
             if self.extra_args["sample_from_codebook_pretrain_spectra"]:
                 self.num_spectra = self.extra_args["redshift_pretrain_num_spectra"]
@@ -345,9 +349,9 @@ class CodebookTrainer(BaseTrainer):
         self.train_pipeline.set_batch_reduction_order(
             self.extra_args["spectra_batch_reduction_order"])
 
-        # latents here are used to EITHER
-        #  generate codebook coefficients (no softmax applied) in codebook qtz setting OR
-        #  concatenate with lambda to be directly decoded as spectra in autodecoder setting
+        # latents here are used to
+        #  EITHER generate codebook coefficients (no softmax applied) in codebook qtz setting
+        #  OR concatenate with lambda to be directly decoded as spectra in autodecoder setting
         latents, redshift_latents = self.init_latents()
 
         if self.optimize_bins_separately:
@@ -812,6 +816,16 @@ class CodebookTrainer(BaseTrainer):
                     freeze_excls.append("redshift_decoder")
                     freeze_excls.append("nef.redshift_latents")
 
+            if self.generalize_train_first_layer:
+                assert(exists(self.pretrained_model_fname))
+                checkpoint = torch.load(self.pretrained_model_fname)
+                for n in checkpoint["model_state_dict"].keys():
+                    if "wave_encoder" in n or "spectra_decoder.layers.0" in n: # or "spectra_decoder.convert_layers" in n:
+                        freeze_excls.append(n)
+                        load_excls.append(n)
+
+            # print(freeze_excls)
+            # print(load_excls)
             freeze_layers_excl(self.train_pipeline, excls=freeze_excls)
             self.load_model(self.pretrained_model_fname, excls=load_excls)
         else:
@@ -945,6 +959,7 @@ class CodebookTrainer(BaseTrainer):
         assert(exists(model_fname))
         log.info(f"saved model found, loading {model_fname}")
         checkpoint = torch.load(model_fname)
+        # print(checkpoint["model_state_dict"].keys())
         load_pretrained_model_weights(
             self.train_pipeline, checkpoint["model_state_dict"], excls=excls)
 

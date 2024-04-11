@@ -203,6 +203,7 @@ def define_cmd_line_args():
     debug_group.add_argument("--plot-individ-spectra-loss", action="store_true")
     # debug_group.add_argument("--calculate-bin-wise-spectra-loss", action="store_true")
 
+    debug_group.add_argument("--generalize-train-first-layer", action="store_true")
     debug_group.add_argument("--sample-from-codebook-pretrain-spectra", action="store_true",
                              help="sample spectra for redshift pretrain from spectra \
                              used for codebook pretrain.")
@@ -619,16 +620,25 @@ def define_cmd_line_args():
     data_group.add_argument("--plot-trans", action="store_true")
 
     # spectra data
-    data_group.add_argument("--download-source-spectra", action="store_true")
-    data_group.add_argument("--interpolate-trans", action="store_true")
-    data_group.add_argument("--source-spectra-fname", type=str)
-    data_group.add_argument("--source-spectra-link", type=str)
-    data_group.add_argument("--spectra-data-format", type=str)
-    data_group.add_argument("--spectra-data-source", type=str)
+    data_group.add_argument("--spectra-data-sources", nargs="+", type=str)
+
+    data_group.add_argument("--deimos-source-spectra-link", type=str)
+    data_group.add_argument("--deimos-spectra-data-format", type=str)
+    data_group.add_argument("--deimos-source-spectra-fname", type=str)
+    data_group.add_argument("--deimos-processed-spectra-cho", type=str)
+    data_group.add_argument("--download-deimos-source-spectra", action="store_true")
+
+    data_group.add_argument("--zcosmos-source-spectra-link", type=str)
+    data_group.add_argument("--zcosmos-spectra-data-format", type=str)
+    data_group.add_argument("--zcosmos-source-spectra-fname", type=str)
+    data_group.add_argument("--zcosmos-processed-spectra-cho", type=str)
+    data_group.add_argument("--download-zcosmos-source-spectra", action="store_true")
+
     data_group.add_argument("--max-spectra-len", type=int)
     data_group.add_argument("--spectra-tracts", type=str, nargs='+')
     data_group.add_argument("--spectra-patches_r", type=str, nargs='+')
     data_group.add_argument("--spectra-patches_c", type=str, nargs='+')
+    data_group.add_argument("--interpolate-trans", action="store_true")
 
     #data_group.add_argument("--recon-spectra-clip-range", type=int, nargs='+')
     #data_group.add_argument("--dummy-spectra-clip-range", type=int, nargs='+')
@@ -653,8 +663,9 @@ def define_cmd_line_args():
                             help="ratio of validation over validation plus test spectra \
                             (the first ration% are validation spectra)\
                             only used when using full patch or train spectra pixels only.")
-    data_group.add_argument("--source-spectra-cho", type=str)
-    data_group.add_argument("--processed-spectra-cho", type=str)
+
+    data_group.add_argument("--spectra-cho", type=str)
+    data_group.add_argument("--spectra-process-patch-info", action="store_true")
     data_group.add_argument("--spectra-supervision-wave-lo", type=int)
     data_group.add_argument("--spectra-supervision-wave-hi", type=int)
     data_group.add_argument("--codebook-spectra-plot-wave-lo", type=int)

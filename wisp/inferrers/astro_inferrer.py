@@ -1466,9 +1466,6 @@ class AstroInferrer(BaseInferrer):
         else:
             ids = select_inferrence_ids(
                 self.num_spectra, self.extra_args["pretrain_num_infer_upper_bound"])
-            print(ids)
-            np.save('tmp.npy', ids)
-            assert 0
         return ids
 
     def _get_spectra_loss_func(self, data):

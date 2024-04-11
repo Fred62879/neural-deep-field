@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-3200-spectra-single-latent'
+    exp_name: 'autodecoder-200-spectra-pe'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'
+    #tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -39,20 +39,20 @@ pretrain:
     pretrain_log_dir: ''
     pretrained_model_name: 'model-ep20000-bch0.pth'
 
-    regularize_spectra_latents: True
-    spectra_latents_regu_beta: 16
+    regularize_spectra_latents: False
+    spectra_latents_regu_beta: -1
 
 decoder:
     decoder_activation_type: relu #gaussian
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 3
+    decoder_num_hidden_layers: 5
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
     decoder_gaussian_sigma: .1
 
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_all_layers: False
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
@@ -63,7 +63,7 @@ decoder:
     siren_last_linear: True
 
 trainer:
-    num_epochs: 5000
+    num_epochs: 10000
     batch_size: 5500
     log_cli_every: 1000
     plot_grad_every: -1
@@ -96,14 +96,14 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240307-141408-3200-spectra-16-3-512-multi-conversion-convolve-sigma-25'
+    infer_log_dir: '20240409-220434_l2_64_dim_in_5_512_no_skip_no_regu_10k_epochs'
     infer_selected: True
-    pretrain_num_infer_upper_bound: 140
+    pretrain_num_infer_upper_bound: 70
     # spectra_inferrence_id_fname: '/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
     plot_clipped_spectrum: True
-    plot_spectrum_with_loss: False
+    plot_spectrum_with_loss: True
     plot_spectrum_with_ivar: False
     plot_spectrum_with_lines: False
     plot_spectrum_with_recon: True
@@ -123,7 +123,7 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 25
 
-    num_supervision_spectra_upper_bound: 3200
+    num_supervision_spectra_upper_bound: 100000
 
     filter_redshift: False
     filter_redshift_lo: 0.02
