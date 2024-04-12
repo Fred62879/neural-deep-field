@@ -621,6 +621,7 @@ def define_cmd_line_args():
 
     # spectra data
     data_group.add_argument("--spectra-data-sources", nargs="+", type=str)
+    data_group.add_argument("--random-permute-source-spectra", action="store_true")
 
     data_group.add_argument("--deimos-source-spectra-link", type=str)
     data_group.add_argument("--deimos-spectra-data-format", type=str)
@@ -659,10 +660,13 @@ def define_cmd_line_args():
     data_group.add_argument("--num-supervision-spectra-upper-bound", type=int,
                              help="upper bound# of gt spectra used for supervision \
                              (always select the first n spectra).")
+
+    data_group.add_argument("--spectra-split-ratios", nargs="+", type=float,
+                            help="ratio of test,val,sup spectra.")
     data_group.add_argument("--val-spectra-ratio", type=float,
                             help="ratio of validation over validation plus test spectra \
                             (the first ration% are validation spectra)\
-                            only used when using full patch or train spectra pixels only.")
+                            used when using full patch or train spectra pixels only.")
 
     data_group.add_argument("--spectra-cho", type=str)
     data_group.add_argument("--spectra-process-patch-info", action="store_true")

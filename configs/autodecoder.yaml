@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    #tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -63,12 +63,12 @@ decoder:
     siren_last_linear: True
 
 trainer:
-    num_epochs: 10000
+    num_epochs: 2000
     batch_size: 5500
-    log_cli_every: 1000
+    log_cli_every: 200
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 1000
+    save_model_every: 200
 
     plot_l2_loss: True
 
@@ -96,11 +96,15 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240409-220434_l2_64_dim_in_5_512_no_skip_no_regu_10k_epochs'
+    #infer_log_dir: ''
     infer_selected: True
     pretrain_num_infer_upper_bound: 70
     # spectra_inferrence_id_fname: '/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
+
+    pretrain_infer_use_all_wave: True
+    pretrain_infer_num_wave: 200
+    pretrain_infer_wave_sample_method: 'uniform_non_random'
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: True
@@ -119,11 +123,17 @@ infer:
     spectra_latents_plot_pca_dim: 2
 
 spectra_data:
+    spectra_cho: v1
+    spectra_process_patch_info: False
+    spectra_data_sources: [deimos,zcosmos]
+    random_permute_source_spectra: True
+    
     convolve_spectra: True
     process_ivar: True
     spectra_smooth_sigma: 25
 
-    num_supervision_spectra_upper_bound: 100000
+    num_gt_spectra_upper_bound: 100
+    num_supervision_spectra_upper_bound: 100
 
     filter_redshift: False
     filter_redshift_lo: 0.02

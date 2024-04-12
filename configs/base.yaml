@@ -337,7 +337,7 @@ infer:
 
     infer_use_all_wave: True
     # infer_num_wave: 
-    pretrain_infer_use_all_wave: False
+    pretrain_infer_use_all_wave: True
     pretrain_infer_num_wave: 200
     pretrain_infer_wave_sample_method: 'uniform_non_random'
 
@@ -498,7 +498,7 @@ trans_data:
 spectra_data:
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deimos,zcosmos]
+    spectra_data_sources: [zcosmos]
 
     download_deimos_source_spectra: False
     deimos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/deimos/spec1d_tbl
@@ -506,16 +506,18 @@ spectra_data:
     deimos_processed_spectra_cho: v7_table
     deimos_source_spectra_fname: source_deimos_table_v7_different_wave_range_exclude_0_flux.tbl
 
-    download_zcosmos_source_spectra: True
-    zcosmos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/z-cosmos/TBL
+    download_zcosmos_source_spectra: False
+    zcosmos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/z-cosmos/DR3
     zcosmos_spectra_data_format: tbl
     zcosmos_processed_spectra_cho: v1
     zcosmos_source_spectra_fname: source_zcosmos_table.fits
 
     max_spectra_len: 8191 # hardcoded
-    num_gt_spectra_upper_bound: 100000 # spectra to load
+    num_gt_spectra_upper_bound: 500 #6500 # spectra to load
     num_supervision_spectra_upper_bound: 100
-    val_spectra_ratio: 1 #0.8
+    val_spectra_ratio: 0.2
+
+    spectra_split_ratios: [0.1,0.2,0.7]
 
     # **** Below fields should be modified together ****
     spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
