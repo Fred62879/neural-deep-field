@@ -494,7 +494,9 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_mode(self.mode)
 
         # set required fields from dataset
-        fields = ["wave_data","spectra_source_data","spectra_masks","spectra_redshift"]
+        fields = ["wave_data","spectra_source_data","spectra_sup_bounds",
+                  "spectra_masks","spectra_redshift"]
+
         # todo, codebook pretrain "coords" not handled
         if self.pixel_supervision:
             fields.append("spectra_pixels")

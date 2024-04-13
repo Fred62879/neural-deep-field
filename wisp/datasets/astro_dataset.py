@@ -192,6 +192,14 @@ class AstroDataset(Dataset):
         if self.spectra_source == "test":
             return self.spectra_dataset.get_test_masks(idx)
 
+    def get_spectra_sup_bounds(self, idx=None):
+        if self.spectra_source == "sup":
+            return self.spectra_dataset.get_supervision_sup_bounds(idx)
+        if self.spectra_source == "val":
+            return self.spectra_dataset.get_validation_sup_bounds(idx)
+        if self.spectra_source == "test":
+            return self.spectra_dataset.get_test_sup_bounds(idx)
+
     def get_spectra_coords(self, idx=None):
         if self.spectra_source == "sup":
             return self.spectra_dataset.get_supervision_coords(idx)
@@ -309,6 +317,8 @@ class AstroDataset(Dataset):
             data = self.get_spectra_pixels()
         elif field == "spectra_redshift":
             data = self.get_spectra_redshift()
+        elif field == "spectra_sup_bounds":
+            data = self.get_spectra_sup_bounds()
         elif field == "spectra_source_data":
             data = self.get_spectra_source_data()
 
@@ -393,14 +403,17 @@ class AstroDataset(Dataset):
             if self.sample_wave:
                 # sample from spectra data (wave, flux, ivar, and interpolated trans)
                 # sample_ids [bsz,nsmpl,2]
-
                 out["spectra_source_data"], sample_ids = batch_sample_torch(
                     out["spectra_source_data"], self.num_wave_samples,
-                    sample_method=self.wave_sample_method, keep_sample_ids=True)
+                    sample_method=self.wave_sample_method,
+                    sup_bounds=out["spectra_sup_bounds"],
+                    keep_sample_ids=True)
 
                 out["spectra_masks"] = batch_sample_torch(
                     out["spectra_masks"], self.num_wave_samples,
-                    sample_method=self.wave_sample_method, sample_ids=sample_ids)
+                    sample_method=self.wave_sample_method,
+                    sup_bounds=out["spectra_sup_bounds"],
+                    sample_ids=sample_ids)
 
             if self.perform_integration:
                 # out["trans_mask"] = out["spectra_source_data"][:,3]              # [bsz,nsmpl]

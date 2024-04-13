@@ -360,9 +360,9 @@ infer:
     recon_cutout_start_pos: [ [[256,256]], [[86,188]] ]
 
     # recon spectra
-    spectra_neighbour_size: 1
+    spectra_neighbour_size: -1
     flux_norm_cho: "identity"
-    average_neighbour_spectra: True
+    average_neighbour_spectra: False
     infer_spectra_individually: False
 
     num_spectrum_per_fig: 35
@@ -503,7 +503,7 @@ spectra_data:
     download_deimos_source_spectra: False
     deimos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/deimos/spec1d_tbl
     deimos_spectra_data_format: tbl
-    deimos_processed_spectra_cho: v7_table
+    deimos_processed_spectra_cho: v7
     deimos_source_spectra_fname: source_deimos_table_v7_different_wave_range_exclude_0_flux.tbl
 
     download_zcosmos_source_spectra: False

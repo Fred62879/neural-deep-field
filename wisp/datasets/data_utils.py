@@ -145,21 +145,24 @@ def clip_data_to_ref_wave_range(input_data, ref_wave, wave_range=None, wave_rang
     clipped_data = input_data[id_lo:id_hi+1]
     return clipped_data, wave_range_id
 
-def batch_sample_torch(data, nsmpl, sample_method="uniform", distrib=None,
-                       sample_ids=None, keep_sample_ids=False, ordered=True
+def batch_sample_torch(
+        data, nsmpl, sample_method="uniform", sup_bounds=None,
+        distrib=None, sample_ids=None, keep_sample_ids=False, ordered=True
 ):
-    """ Batched sampling from given data.
-        We sample the same nsmpl out of n samples for all dims in the middle.
-        @Param
-          data: [bsz,...,n]
-          sample_ids: pre-defined ids to sample
-          sample_method:
-            uniform: uniformly at random (most cases)
-            uniform_non_random: get every several wave (for pretrain infer)
-            importance: importance sampling (not used anymore)
-        @Return
-          ret:  [bsz,...,nsmpl]
-          sample_ids: [nsmpl,2]
+    """
+    Batched sampling from given data.
+    We sample the same nsmpl out of n samples for all dims in the middle.
+    @Param
+      data: [bsz,...,n]
+      sample_ids: pre-defined ids to sample
+      sample_method:
+        uniform: uniformly at random (most cases)
+        uniform_non_random: get every several wave (for pretrain infer)
+        importance: importance sampling (not used anymore)
+    sup_bounds: [bsz,2] supervision bound wave id [lo/hi]
+    @Return
+      ret:  [bsz,...,nsmpl]
+      sample_ids: [nsmpl,2]
     """
     sp = data.shape
     batches_share_ids = sample_method == "uniform_non_random"
@@ -172,6 +175,14 @@ def batch_sample_torch(data, nsmpl, sample_method="uniform", distrib=None,
     else:
         if sample_method == "uniform":
             sample_ids = torch.zeros(sp[0], nsmpl).uniform_(0, sp[-1]).to(torch.long)
+        elif sample_method == "uniform_dense":
+            assert sup_bounds is not None
+            lo, hi = sup_bounds[:,0], sup_bounds[:,1]
+            sample_ids = torch.rand(sp[0], nsmpl) # uniform random number [0,1)
+            sample_ids = sample_ids * (hi - lo)[:,None] + lo[:,None] # sacle to given range
+            sample_ids = sample_ids.to(torch.long)
+            # print(torch.min(sample_ids, dim=-1)[0])
+            # print(torch.max(sample_ids, dim=-1)[0])
         elif sample_method == "uniform_non_random":
             step = sp[-1] // nsmpl
             sample_ids = torch.arange(0, sp[-1], step)
