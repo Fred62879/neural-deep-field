@@ -1573,6 +1573,8 @@ def convolve_spectra(spectra, bound, std=5, border=True, process_ivar=False):
     lo, hi = bound
     n = hi - lo + 1
 
+    discret_val = np.mean(np.diff(spectra[0][lo:hi+1])) # get discretization value of lambda
+    std = std / discret_val
     kernel = Gaussian1DKernel(stddev=std)
     if border:
         nume = convolve(spectra[1][lo:hi+1], kernel) # flux

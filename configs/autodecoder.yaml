@@ -130,7 +130,7 @@ spectra_data:
     
     convolve_spectra: True
     process_ivar: True
-    spectra_smooth_sigma: 25
+    spectra_smooth_sigma: 15
 
     num_gt_spectra_upper_bound: 100
     num_supervision_spectra_upper_bound: 100
