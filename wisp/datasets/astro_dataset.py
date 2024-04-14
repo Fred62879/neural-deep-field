@@ -180,25 +180,25 @@ class AstroDataset(Dataset):
     def get_emitted_wave(self):
         return self.spectra_dataset.get_emitted_wave()
 
-    def get_emitted_wave_masks(self):
-        return self.spectra_dataset.get_emitted_wave_masks()
+    def get_emitted_wave_mask(self):
+        return self.spectra_dataset.get_emitted_wave_mask()
 
 
     def get_spectra_masks(self, idx=None):
         if self.spectra_source == "sup":
-            return self.spectra_dataset.get_supervision_masks(idx)
+            return self.spectra_dataset.get_supervision_mask(idx)
         if self.spectra_source == "val":
-            return self.spectra_dataset.get_validation_masks(idx)
+            return self.spectra_dataset.get_validation_mask(idx)
         if self.spectra_source == "test":
-            return self.spectra_dataset.get_test_masks(idx)
+            return self.spectra_dataset.get_test_mask(idx)
 
     def get_spectra_sup_bounds(self, idx=None):
         if self.spectra_source == "sup":
-            return self.spectra_dataset.get_supervision_sup_bounds(idx)
+            return self.spectra_dataset.get_supervision_sup_bound(idx)
         if self.spectra_source == "val":
-            return self.spectra_dataset.get_validation_sup_bounds(idx)
+            return self.spectra_dataset.get_validation_sup_bound(idx)
         if self.spectra_source == "test":
-            return self.spectra_dataset.get_test_sup_bounds(idx)
+            return self.spectra_dataset.get_test_sup_bound(idx)
 
     def get_spectra_coords(self, idx=None):
         if self.spectra_source == "sup":
@@ -392,7 +392,7 @@ class AstroDataset(Dataset):
             # doesn't consider effect of redshift on each spectra
             bsz = out["coords"].shape[0]
             wave = self.get_emitted_wave()
-            masks = self.get_emitted_wave_masks()
+            masks = self.get_emitted_wave_mask()
             out["wave"] = wave[None,:,None].tile(bsz,1,1)
             out["spectra_masks"] = masks[None,:].tile(bsz,1)
 
@@ -431,7 +431,7 @@ class AstroDataset(Dataset):
                     self.kwargs["regularize_across_codebook_spectra"]
             ):
                 out["emitted_wave"] = self.get_emitted_wave()
-                out["emitted_wave_masks"] = self.get_emitted_wave_masks()
+                out["emitted_wave_masks"] = self.get_emitted_wave_mask()
 
         elif self.wave_source == "trans":
             # trans wave are not batched, we sample at every step

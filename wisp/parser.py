@@ -670,6 +670,7 @@ def define_cmd_line_args():
                             used when using full patch or train spectra pixels only.")
 
     data_group.add_argument("--spectra-cho", type=str)
+    data_group.add_argument("--spectra-drop-not-in-patch", action="store_true")
     data_group.add_argument("--spectra-process-patch-info", action="store_true")
     data_group.add_argument("--spectra-supervision-wave-lo", type=int)
     data_group.add_argument("--spectra-supervision-wave-hi", type=int)

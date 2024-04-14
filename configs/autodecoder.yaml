@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-35-spectra-pe'
+    exp_name: 'autodecoder-200-spectra-pe'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
@@ -98,10 +98,10 @@ trainer:
     spectra_ssim_loss_filter_sigma: 5
 
 infer:
-    infer_last_model_only: False
+    infer_last_model_only: True
 
     #infer_log_dir: ''
-    infer_selected: False
+    infer_selected: True
     pretrain_num_infer_upper_bound: 70
     # spectra_inferrence_id_fname: '/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
@@ -127,17 +127,17 @@ infer:
     spectra_latents_plot_pca_dim: 2
 
 spectra_data:
-    spectra_cho: v2
+    spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [zcosmos]
+    spectra_data_sources: [deimos,zcosmos]
     random_permute_source_spectra: True
     
     convolve_spectra: True
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 35
-    num_supervision_spectra_upper_bound: 35
+    num_gt_spectra_upper_bound: 200
+    num_supervision_spectra_upper_bound: 200
 
     filter_redshift: False
     filter_redshift_lo: 0.02
