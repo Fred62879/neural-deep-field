@@ -13,7 +13,7 @@ from os.path import exists, join
 from functools import partial, lru_cache
 
 from wisp.inferrers import BaseInferrer
-from wisp.loss import get_loss, spectra_supervision_loss
+from wisp.loss import get_loss, get_reduce, spectra_supervision_loss
 from wisp.datasets.data_utils import get_bound_id
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
@@ -100,7 +100,9 @@ class AstroInferrer(BaseInferrer):
             if self.mode == "redshift_pretrain_infer":
                 self.dataset.set_spectra_source("val")
                 if self.extra_args["sample_from_codebook_pretrain_spectra"]:
-                    self.num_spectra = self.extra_args["redshift_pretrain_num_spectra"]
+                    num_spectra_max = self.dataset.get_num_validation_spectra()
+                    self.num_spectra = min(
+                        num_spectra_max, self.extra_args["redshift_pretrain_num_spectra"])
                 else: self.num_spectra = self.dataset.get_num_validation_spectra()
             else:
                 self.dataset.set_spectra_source("sup")
@@ -436,7 +438,8 @@ class AstroInferrer(BaseInferrer):
                 self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
                 self.wave_sample_method = self.extra_args["pretrain_infer_wave_sample_method"]
 
-            self.requested_fields.extend(["idx","spectra_source_data","spectra_masks"])
+            self.requested_fields.extend([
+                "idx","spectra_source_data","spectra_masks","spectra_sup_bounds"])
             if self.recon_img: # _sup_spectra
                 self.requested_fields.append("spectra_pixels")
             if self.apply_gt_redshift:
@@ -515,7 +518,9 @@ class AstroInferrer(BaseInferrer):
                 self.wave_sample_method = self.extra_args["pretrain_infer_wave_sample_method"]
 
             self.requested_fields.extend([
-                "idx","spectra_source_data","spectra_masks","spectra_redshift"])
+                "idx","spectra_source_data","spectra_masks",
+                "spectra_redshift","spectra_sup_bounds"]
+            )
             if self.plot_gt_bin_spectra or self.plot_optimal_wrong_bin_spectra or \
                self.recon_spectra_all_bins:
                 self.requested_fields.append("gt_redshift_bin_ids")
@@ -615,7 +620,8 @@ class AstroInferrer(BaseInferrer):
             if self.pretrain_infer:
                 self.coords_source = None
                 self.requested_fields.extend([
-                    "idx","spectra_source_data","spectra_masks","spectra_redshift"])
+                    "idx","spectra_source_data","spectra_masks",
+                    "spectra_redshift","spectra_sup_bounds"])
 
                 if self.infer_selected:
                     n = len(self._select_inferrence_ids())
@@ -1469,21 +1475,24 @@ class AstroInferrer(BaseInferrer):
         return ids
 
     def _get_spectra_loss_func(self, data):
-        if self.extra_args["spectra_loss_cho"] == "emd":
-            raise ValueError()
-            loss = spectra_supervision_emd_loss
-        else:
-            loss = get_loss(
-                self.extra_args["spectra_loss_cho"],
-                self.extra_args["spectra_loss_reduction"], self.cuda,
-                filter_size=self.extra_args["spectra_ssim_loss_filter_size"],
-                filter_sigma=self.extra_args["spectra_ssim_loss_filter_sigma"],
-            )
-            loss = partial(
-                spectra_supervision_loss, loss,
-                self.extra_args["weight_by_wave_coverage"], None
-            )
-        return loss
+        assert self.extra_args["spectra_loss_cho"] != "emd"
+
+        # cal_lambdawise_loss = self.apply_gt_redshift and (
+        #     self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss)
+        # reduction = None if cal_lambdawise_loss else \
+        #     self.extra_args["spectra_loss_reduction"]
+
+        self.spectra_reduce_func = get_reduce(self.extra_args["spectra_loss_reduction"])
+
+        loss_func = get_loss(
+            self.extra_args["spectra_loss_cho"], "none", self.cuda,
+            filter_size=self.extra_args["spectra_ssim_loss_filter_size"],
+            filter_sigma=self.extra_args["spectra_ssim_loss_filter_sigma"],
+        )
+        loss_func = spectra_supervision_loss(
+            loss_func, self.extra_args["weight_by_wave_coverage"])
+
+        return loss_func
 
     def _set_coords_from_checkpoint(self, checkpoint):
         """ Set dataset coords using saved model checkpoint.

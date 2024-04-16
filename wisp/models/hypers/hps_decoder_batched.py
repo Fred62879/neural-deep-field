@@ -228,16 +228,13 @@ class HyperSpectralDecoderB(nn.Module):
                 spectra = self.quantize_spectra(input, spectra, ret, qtz_args)
                 if self.classify_redshift:
                     ret["spectra_all_bins"] = spectra
+
                     if self.kwargs["calculate_binwise_spectra_loss"]:
-                        # calculate_redshift_logits(
-                        #     spectra_loss_func, spectra_masks, gt_spectra,
-                        #     spectra, ret, **self.kwargs)
                         calculate_spectra_loss(
                             spectra_loss_func, spectra_masks, gt_spectra,
                             spectra, ret, self.calculate_lambdawise_spectra_loss, **self.kwargs
                         )
                         calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret)
-
                     spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
 
             elif self.reduction_order == "bin_avg_first":

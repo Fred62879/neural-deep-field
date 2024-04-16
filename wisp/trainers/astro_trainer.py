@@ -90,6 +90,7 @@ class AstroTrainer(BaseTrainer):
         self.pixel_supervision = self.extra_args["pixel_supervision"]
         self.spectra_supervision = self.space_dim == 3 and \
             self.extra_args["spectra_supervision"]
+        assert not self.spectra_supervis
         assert self.pixel_supervision + self.spectra_supervision >= 1
 
         self.spectral_inpaint = self.pixel_supervision and \
@@ -179,9 +180,9 @@ class AstroTrainer(BaseTrainer):
                 self.extra_args["resume_model_name"])
 
     def init_loss(self):
-        if self.spectra_supervision:
-            loss = get_loss(self.extra_args["spectra_loss_cho"], self.cuda)
-            self.spectra_loss = partial(spectra_supervision_loss, loss)
+        # if self.spectra_supervision:
+        #     loss = get_loss(self.extra_args["spectra_loss_cho"], self.cuda)
+        #     self.spectra_loss = partial(spectra_supervision_loss, loss)
 
         if self.redshift_semi_supervision:
             loss = get_loss(self.extra_args["redshift_loss_cho"], self.cuda)
@@ -746,20 +747,21 @@ class AstroTrainer(BaseTrainer):
         # ii) spectra supervision loss
         spectra_loss, recon_spectra = 0, None
         if self.spectra_supervision:
-            recon_fluxes = ret["sup_spectra"]
-            gt_spectra = data["sup_spectra_data"]
-            spectra_masks = data["sup_spectra_masks"]
+            # recon_fluxes = ret["sup_spectra"]
+            # gt_spectra = data["sup_spectra_data"]
+            # spectra_masks = data["sup_spectra_masks"]
 
-            if len(recon_fluxes) == 0:
-                spectra_loss = 0
-            else:
-                spectra_loss = self.spectra_loss(
-                    spectra_masks, gt_spectra, recon_fluxes,
-                    weight_by_wave_coverage=self.extra_args["weight_by_wave_coverage"]
-                ) * self.spectra_beta
-                self.log_dict["spectra_loss"] += spectra_loss.item()
+            # if len(recon_fluxes) == 0:
+            #     spectra_loss = 0
+            # else:
+            #     spectra_loss = self.spectra_loss(
+            #         spectra_masks, gt_spectra, recon_fluxes,
+            #         weight_by_wave_coverage=self.extra_args["weight_by_wave_coverage"]
+            #     ) * self.spectra_beta
+            #     self.log_dict["spectra_loss"] += spectra_loss.item()
 
-            self.timer.check("spectra loss")
+            # self.timer.check("spectra loss")
+            raise NotImplementedError()
 
         # iii) redshift loss
         redshift_loss = 0

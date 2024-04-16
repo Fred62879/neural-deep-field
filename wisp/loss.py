@@ -11,6 +11,17 @@ from wisp.utils.numerical import calculate_emd
 from skimage.metrics import structural_similarity as ssim
 
 
+def get_reduce(cho):
+    if cho == "sum":
+        reduce_func = torch.sum
+    elif cho == "mean":
+        reduce_func = torch.mean
+    elif cho == "none":
+        # reduce_func = torch.nn.identity
+        assert 0
+    else: raise ValueError()
+    return reduce_func
+
 def get_loss(cho, reduction, cuda, filter_size=-1, filter_sigma=-1):
     if cho == "l1":
         loss = nn.L1Loss(reduction=reduction)
@@ -129,36 +140,55 @@ class ssim1d(nn.Module):
         if dim4: ssim_score = ssim_score.view(nbins,-1,nsmpls)
         return 1 - ssim_score
 
-def spectra_supervision_loss(
-        loss, weight_by_wave_coverage, reduce_func, mask, gt_spectra, recon_fluxes):
-    """
-    Loss function for spectra supervision
-    @Param
-      loss: l1/l2 as specified in config
-      mask:       [...,bsz,num_smpls]
-      gt_spectra: [...,bsz,4+2*nbanbds,num_smpls]
-                  (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
-      recon_fluxes: [...,bsz,num_smpls]
-    @Return
+class spectra_supervision_loss(nn.Module):
+    def __init__(self, loss_func, weight_by_wave_coverage):
+        """
+        Loss function for spectra supervision
+        @Param
+          loss: l1/l2 as specified in config
+        """
+        super(spectra_supervision_loss, self).__init__()
+        self.loss_func = loss_func
+        self.weight_by_wave_coverage = weight_by_wave_coverage
 
-    """
-    if weight_by_wave_coverage:
-        weight = gt_spectra[:,3]
-        ret = loss(gt_spectra[:,1]*mask*weight, recon_fluxes*mask*weight)
-    else:
-        if gt_spectra.ndim == 3:
-            ret = loss(gt_spectra[:,1]*mask, recon_fluxes*mask)
-        elif gt_spectra.ndim == 4: # binwise spectra loss
-            ret = loss(gt_spectra[:,:,1]*mask, recon_fluxes*mask)
-        else: raise ValueError()
+    def forward(self, gt_spectra, recon_fluxes):
+        """
+        Calculate lambda-wise spectra loss
+        @Param
+          gt_spectra: [...,bsz,4+2*nbanbds,num_smpls]
+                      (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
+          recon_fluxes: [...,bsz,num_smpls]
+        @Return
+          lambda-wise spectra loss [...,bsz,num_smpls]
+        """
+        if self.weight_by_wave_coverage:
+            if gt_spectra.ndim == 3:
+                weight = gt_spectra[:,3]
+                ret = self.loss_func(gt_spectra[:,1]*weight, recon_fluxes*weight)
+            elif gt_spectra.ndim == 4: # binwise spectra loss
+                weight = gt_spectra[:,:,3]
+                ret = self.loss_func(gt_spectra[:,:,1]*weight, recon_fluxes*weight)
+            else: raise ValueError()
+        else:
+            if gt_spectra.ndim == 3:
+                ret = self.loss_func(gt_spectra[:,1], recon_fluxes)
+            elif gt_spectra.ndim == 4: # binwise spectra loss
+                ret = self.loss_func(gt_spectra[:,:,1], recon_fluxes)
+            else: raise ValueError()
+        assert recon_fluxes.shape == ret.shape
+        return ret
 
-    # ret = torch.mean(torch.sum(ret, dim=-1), dim=-1)
-    assert ret.ndim <= 3
+    def reduce(self, lambdawise_loss, reduce_func, masks):
+        """
+        @Param
+          mask: [...,bsz,num_smpls]
+        """
+        assert reduce_func is not None
+        # lambdawise_loss [bsz,nsmpl]/[nbins,bsz]/[nbins,bsz,nsmpl]
 
-    if reduce_func is not None:
-        # ret [bsz,nsmpl]/[nbins,bsz]/[nbins,bsz,nsmpl]
-        ret = reduce_func(ret, dim=-1) # [bsz]/[nbins,bsz]
-    return ret
+        masked_loss = lambdawise_loss[masks] # [n]
+        loss = reduce_func(masked_loss, dim=-1)
+        return loss
 
 def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     gt_pixels = gt_pixels / (torch.sum(gt_pixels, dim=-1)[...,None])

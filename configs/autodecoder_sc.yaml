@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-100-spectra-pe'
-    # log_fname: ''
+    exp_name: 'autodecoder-400-spectra-pe'
+    log_fname: 'sc'
 
     tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
+    #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -28,19 +28,25 @@ embedder:
 pretrain:
     pretrain_batch_size: 100
 
+    pretrain_use_all_wave: False
+    pretrain_num_wave_samples: 50
+    pretrain_wave_sample_method: 'uniform_dense'
+
     spectra_latent_dim: 16
-    redshift_pretrain_num_spectra: 100
+
+    sample_from_codebook_pretrain_spectra: True
+    redshift_pretrain_num_spectra: 400
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240408-184327_ssim_32_dim_in_3_layers_512_dim_skip_all_5k_epochs'
-    pretrained_model_name: 'model-ep5000-bch0.pth'
+    pretrain_log_dir: '20240415-205657_ssim_32_dim_in_3_512_no_skip_no_regu_10k_epochs'
+    pretrained_model_name: 'model-ep10000-bch0.pth'
 
-    regularize_spectra_latents: True
-    spectra_latents_regu_beta: 16
+    regularize_spectra_latents: False
+    spectra_latents_regu_beta: -1
 
 decoder:
     decoder_activation_type: relu #gaussian
@@ -52,16 +58,16 @@ decoder:
     decoder_gaussian_sigma: .1
 
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_all_layers: False
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 50
+    num_epochs: 1000
     batch_size: 5500
-    log_cli_every: 5
+    log_cli_every: 100
     plot_grad_every: -1
-    save_model_every: 5
+    save_model_every: 100
 
     plot_l2_loss: True
 
@@ -79,10 +85,10 @@ trainer:
 
     resume_train: False
     resume_log_dir: ''
-    resume_model_fname: 'model-ep100-bch0.pth'
+    resume_model_fname: 'model-ep200-bch0.pth'
 
     spectra_loss_cho: ssim1d
-    spectra_loss_reduction: none
+    spectra_loss_reduction: mean #none
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
 
@@ -92,11 +98,14 @@ infer:
     # infer_log_dir: ''
 
     pretrain_infer_batch_size: 5
+    pretrain_infer_use_all_wave: False
+    pretrain_infer_num_wave: 200
+    pretrain_infer_wave_sample_method: 'uniform_non_random'
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: False
+    infer_outlier_only: True
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False
@@ -111,17 +120,24 @@ infer:
     num_spectrum_per_row: 7
 
     sanity_check_plot_same_pca_dim_as_pretrain: True
-    pretrain_pca_dim_fname: '20240327-184043_35-spectra-clip-0-1-2k-epochs-r/latents/2-dim/selected_axes.npy'
+    pretrain_pca_dim_fname: '' #'/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
     log_redshift_est_stats: True
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:
-    convolve_spectra: True
-    spectra_smooth_sigma: 25
+    spectra_cho: v1
+    spectra_process_patch_info: False
+    spectra_data_sources: [deimos,zcosmos]
+    random_permute_source_spectra: True
 
-    num_supervision_spectra_upper_bound: 100
+    convolve_spectra: True
+    process_ivar: True
+    spectra_smooth_sigma: 15
+
+    num_gt_spectra_upper_bound: 400
+    num_supervision_spectra_upper_bound: 400
 
     filter_redshift: False
     filter_redshift_lo: 0.02

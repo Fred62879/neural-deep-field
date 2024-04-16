@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-200-spectra-pe'
+    exp_name: 'autodecoder-400-spectra-pe'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
@@ -49,7 +49,7 @@ pretrain:
 decoder:
     decoder_activation_type: relu #gaussian
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 5
+    decoder_num_hidden_layers: 3
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
@@ -67,12 +67,12 @@ decoder:
     siren_last_linear: True
 
 trainer:
-    num_epochs: 5000
+    num_epochs: 10000
     batch_size: 5500
-    log_cli_every: 500
+    log_cli_every: 1000
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 500
+    save_model_every: 1000
 
     plot_l2_loss: True
 
@@ -92,8 +92,8 @@ trainer:
     resume_log_dir: ''
     resume_model_fname: 'model-ep2000-bch0.pth'
 
-    spectra_loss_cho: l2 #ssim1d
-    spectra_loss_reduction: none
+    spectra_loss_cho: ssim1d
+    spectra_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
 
@@ -102,7 +102,7 @@ infer:
 
     #infer_log_dir: ''
     infer_selected: True
-    pretrain_num_infer_upper_bound: 70
+    pretrain_num_infer_upper_bound: 140
     # spectra_inferrence_id_fname: '/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
@@ -136,8 +136,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 200
-    num_supervision_spectra_upper_bound: 200
+    num_gt_spectra_upper_bound: 400
+    num_supervision_spectra_upper_bound: 400
 
     filter_redshift: False
     filter_redshift_lo: 0.02

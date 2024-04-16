@@ -25,7 +25,7 @@ from wisp.optimizers import multi_optimizer
 from wisp.utils.plot import plot_grad_flow, plot_multiple, \
     plot_redshift_estimation_stats_together, \
     plot_redshift_estimation_stats_individually
-from wisp.loss import get_loss, spectra_supervision_loss, pretrain_pixel_loss
+from wisp.loss import get_loss, get_reduce, spectra_supervision_loss, pretrain_pixel_loss
 
 
 class CodebookTrainer(BaseTrainer):
@@ -96,7 +96,9 @@ class CodebookTrainer(BaseTrainer):
 
         if self.mode == "redshift_pretrain":
             if self.extra_args["sample_from_codebook_pretrain_spectra"]:
-                self.num_spectra = self.extra_args["redshift_pretrain_num_spectra"]
+                num_spectra_max = self.dataset.get_num_validation_spectra()
+                self.num_spectra = min(
+                    num_spectra_max, self.extra_args["redshift_pretrain_num_spectra"])
             else: self.num_spectra = self.dataset.get_num_validation_spectra()
         elif self.mode == "codebook_pretrain":
             self.num_spectra = self.dataset.get_num_supervision_spectra()
@@ -402,23 +404,20 @@ class CodebookTrainer(BaseTrainer):
             assert self.extra_args["spectra_loss_cho"][-4:] == "none"
             raise NotImplementedError()
 
-        reduction_method = None if self.calculate_binwise_spectra_loss else torch.mean
+        self.spectra_reduce_func = get_reduce(self.extra_args["spectra_loss_reduction"])
 
         loss_func = get_loss(
-            self.extra_args["spectra_loss_cho"],
-            self.extra_args["spectra_loss_reduction"], self.cuda,
+            self.extra_args["spectra_loss_cho"], "none", self.cuda,
             filter_size=self.extra_args["spectra_ssim_loss_filter_size"],
-            filter_sigma=self.extra_args["spectra_ssim_loss_filter_sigma"])
-        self.spectra_loss_func = partial(
-            spectra_supervision_loss, loss_func,
-            self.extra_args["weight_by_wave_coverage"], reduction_method)
+            filter_sigma=self.extra_args["spectra_ssim_loss_filter_sigma"]
+        )
+        self.spectra_loss_func = spectra_supervision_loss(
+            loss_func, self.extra_args["weight_by_wave_coverage"])
 
         if self.plot_l2_loss:
-            l2_loss_func = get_loss(
-                "l2", self.extra_args["spectra_loss_reduction"], self.cuda)
-            self.spectra_l2_loss_func = partial(
-                spectra_supervision_loss, l2_loss_func,
-                self.extra_args["weight_by_wave_coverage"], reduction_method)
+            l2_loss_func = get_loss("l2", "none", self.cuda)
+            self.spectra_l2_loss_func = spectra_supervision_loss(
+                l2_loss_func, self.extra_args["weight_by_wave_coverage"])
 
         if self.pixel_supervision:
             loss = get_loss(self.extra_args["pixel_loss_cho"], self.cuda)
@@ -1544,15 +1543,18 @@ class CodebookTrainer(BaseTrainer):
         return spectra_loss, spectra_l2_loss
 
     def _calculate_single_bin_loss(self, ret, data, loss_func):
-        # print(torch.min(ret["spectra"]), torch.max(ret["spectra"]))
-        spectra_loss = loss_func(
-            data["spectra_masks"], data["spectra_source_data"], ret["spectra"])
-        # if self.extra_args["plot_individ_spectra_loss"]:
-        #     assert spectra_loss.ndim == 1
-        #     self.cur_spectra_individ_loss.extend(spectra_loss.detach().cpu().numpy())
-        if spectra_loss.ndim != 0:
-            assert spectra_loss.ndim == 1
-            spectra_loss = torch.mean(spectra_loss, dim=-1)
+        lambdawise_spectra_loss = loss_func(data["spectra_source_data"], ret["spectra"])
+        assert lambdawise_spectra_loss.ndim == 2 # [bsz,nsmpl]
+
+        if self.extra_args["plot_individ_spectra_loss"]:
+            binwise_spectra_loss = lambdawise_loss * [data["spectra_masks"]]
+            binwise_spectra_loss = torch.sum(binwise_spectra_loss) / \
+                torch.sum(data["spectra_masks"], dim=-1)
+            self.cur_spectra_individ_loss.extend(
+                binwise_spectra_loss.detach().cpu().numpy())
+
+        spectra_loss = loss_func.reduce(
+            lambdawise_spectra_loss, self.spectra_reduce_func, data["spectra_masks"])
         return spectra_loss
 
     def _calculate_all_bin_loss(self, ret, data, loss_name_suffix=""):
@@ -1560,6 +1562,7 @@ class CodebookTrainer(BaseTrainer):
         # _gt_bin_ids = torch.argmax(
         #     data["gt_redshift_bin_masks"].to(torch.long), dim=-1)
         # print('spectra loss: ', _gt_bin_ids)
+
         loss_name = "spectra_binwise_loss" + loss_name_suffix
         all_bin_loss = ret[loss_name] # [bsz,n_bins]
 
@@ -1576,19 +1579,20 @@ class CodebookTrainer(BaseTrainer):
 
         if self.calculate_spectra_loss_based_on_optimal_bin:
             spectra_loss, _ = torch.min(all_bin_loss, dim=-1)
-            spectra_loss = torch.mean(spectra_loss)
+            spectra_loss = self.spectra_reduce_func(spectra_loss)
         elif self.calculate_spectra_loss_based_on_top_n_bins:
             bsz = len(all_bin_loss)
             ids = torch.argsort(all_bin_loss, dim=-1)
             ids = ids[:,:self.extra_args["num_bins_to_calculate_spectra_loss"]]
             ids = create_batch_ids(ids).view(2,-1)
             spectra_loss = (all_bin_loss[ids[0],ids[1]]).view(bsz,-1)
-            spectra_loss = torch.mean(spectra_loss)
+            spectra_loss = self.spectra_reduce_func(spectra_loss)
         else:
-            spectra_loss = torch.mean(all_bin_loss)
+            spectra_loss = self.spectra_reduce_func(all_bin_loss)
 
         if self.plot_gt_bin_loss:
-            gt_bin_loss = torch.mean(all_bin_loss[data["gt_redshift_bin_masks"]])
+            gt_bin_loss = self.spectra_reduce_func(
+                all_bin_loss[data["gt_redshift_bin_masks"]])
             loss_name = f"gt_bin{loss_name_suffix}_loss"
             self.log_dict[loss_name] += gt_bin_loss.item()
 

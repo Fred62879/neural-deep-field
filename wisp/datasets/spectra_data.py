@@ -304,7 +304,7 @@ class SpectraData:
             return self.data["validation_coords"][idx]
         return self.data["validation_coords"]
 
-    def get_validation_masks(self, idx=None):
+    def get_validation_mask(self, idx=None):
         """ Get validation spectra mask for plotting. """
         if idx is None:
             return self.data["validation_mask"]
@@ -485,6 +485,7 @@ class SpectraData:
         if self.spectra_process_patch_info:
             test_ids, validation_ids, supervision_ids = self.split_spectra_patch_wise()
         else: test_ids, validation_ids, supervision_ids = self.split_spectra_all_together()
+        validation_ids = self.update_validation_ids(supervision_ids)
 
         # if len(test_ids) == 0 or len(validation_ids) == 0:
         #     raise ValueError(
@@ -498,6 +499,27 @@ class SpectraData:
         self.num_validation_spectra = len(validation_ids)
         self.num_supervision_spectra = len(supervision_ids)
         return test_ids, validation_ids, supervision_ids
+
+    def update_validation_ids(self, supervision_ids):
+        """
+        Update validation spectra for sanity check or add more spectra for generalization.
+        """
+        if self.kwargs["sample_from_codebook_pretrain_spectra"]:
+            # select spectra for redshift pretrain from spectra used for codebook pretrain
+            indices = np.arange(len(supervision_ids))
+            np.random.seed(self.kwargs["seed"])
+            # np.random.shuffle(indices)
+            self.redshift_pretrain_ids = indices[:self.kwargs["redshift_pretrain_num_spectra"]]
+            validation_ids = supervision_ids[self.redshift_pretrain_ids]
+
+        elif self.kwargs["add_validation_spectra_not_in_supervision"]:
+            unseen_spectra_ids = np.array(
+                list(set(ids) - set(supervision_ids) - set(validation_ids)))
+            np.random.shuffle(unseen_spectra_ids)
+            selected_ids = unseen_spectra_ids[:self.kwargs["num_extra_validation_spectra"]]
+            validation_ids = np.append(validation_ids, selected_ids)
+            assert len(set(validation_ids) & set(supervision_ids)) == 0
+        return validation_ids
 
     def split_spectra_all_together(self):
         """
@@ -568,23 +590,6 @@ class SpectraData:
         np.random.seed(self.kwargs["seed"])
         np.random.shuffle(supervision_ids)
         supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
-
-        # add extra validation spectra
-        if self.kwargs["sample_from_codebook_pretrain_spectra"]:
-            # select spectra for redshift pretrain from spectra used for codebook pretrain
-            indices = np.arange(len(supervision_ids))
-            np.random.seed(self.kwargs["seed"])
-            # np.random.shuffle(indices)
-            self.redshift_pretrain_ids = indices[:self.kwargs["redshift_pretrain_num_spectra"]]
-            validation_ids = supervision_ids[self.redshift_pretrain_ids]
-
-        elif self.kwargs["add_validation_spectra_not_in_supervision"]:
-            unseen_spectra_ids = np.array(
-                list(set(ids) - set(supervision_ids) - set(validation_ids)))
-            np.random.shuffle(unseen_spectra_ids)
-            selected_ids = unseen_spectra_ids[:self.kwargs["num_extra_validation_spectra"]]
-            validation_ids = np.append(validation_ids, selected_ids)
-            assert len(set(validation_ids) & set(supervision_ids)) == 0
 
         return test_ids, validation_ids, supervision_ids
 

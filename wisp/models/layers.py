@@ -405,33 +405,38 @@ def calculate_spectra_loss(
       mask:       [bsz,num_smpls]
       gt_spectra: [bsz,4+2*nbanbds,num_smpls]
                   (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
-      recon_fluxes: [num_bins,bsz,num_smpls]
-    @Return
-      logits: [bsz,n_bins]
+      recon_fluxes: [(num_bins,)bsz,num_smpls]
+    @AddToDict
+      binwise_loss:    [bsz,n_bins]
+      lambdawise_loss: [bsz,n_bins,nsmpls]
     """
     n_bins = recon_fluxes.shape[0]
 
     if recon_fluxes.ndim == 2: # apply_gt_redshift
-        spectra_loss = loss_func(masks, gt_spectra, recon_fluxes) # [bsz,nsmpls]
-        assert spectra_loss.ndim == 2
-
+        lambdawise_loss = loss_func(gt_spectra, recon_fluxes) # [bsz,nsmpls]
     elif recon_fluxes.ndim == 3: # brute force
-        spectra_loss = loss_func(
-            masks[None,:].tile(n_bins,1,1),
-            gt_spectra[None,:].tile(n_bins,1,1,1),
-            recon_fluxes).permute(1,0,2) # [bsz,n_bins,nsmpls]
-        assert spectra_loss.ndim == 3
+        lambdawise_loss = loss_func(
+            gt_spectra[None,:].tile(n_bins,1,1,1), recon_fluxes) # [n_bins,bsz,nsmpls]
+    else:
+        raise ValueError()
 
-    else: raise ValueError()
+    assert recon_fluxes.shape == lambdawise_loss.shape
 
     if lambdawise:
         nm = "spectra_lambdawise_loss" + loss_name_suffix
-        ret[nm] = spectra_loss
+        ret[nm] = lambdawise_loss.permute(1,0,2)
 
     if recon_fluxes.ndim == 3:
-        spectra_loss = torch.mean(spectra_loss, dim=-1)
+        masks = masks[None,...].tile(n_bins,1,1)
+        binwise_loss = lambdawise_loss * masks # [nbins,bsz,nsmpl]
+        if kwargs["spectra_loss_reduction"] == "sum":
+            binwise_loss = torch.sum(binwise_loss, dim=-1) # [nbins,bsz]
+        elif kwargs["spectra_loss_reduction"] == "mean":
+            binwise_loss = torch.sum(binwise_loss, dim=-1) / torch.sum(masks, dim=-1)
+        else: raise ValueError()
+
         nm = "spectra_binwise_loss" + loss_name_suffix
-        ret[nm] = spectra_loss
+        ret[nm] = binwise_loss.T
 
 def calculate_redshift_logits(beta, ret):
     """ Calculate logits for redshift bins.
