@@ -25,6 +25,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.table import Table
 from os.path import join, exists
+from scipy.signal import resample
 from collections import defaultdict
 from functools import partial, reduce
 from scipy.interpolate import interp1d
@@ -971,6 +972,7 @@ class SpectraData:
 
         current_spectra_processed = exists(spectra_out_fname) and \
             exists(spectra_mask_fname) and exists(spectra_sup_bound_fname)
+        current_spectra_processed = False
 
         if not current_spectra_processed:
             gt_spectra, mask, sup_bound = process_gt_spectra(
@@ -981,6 +983,7 @@ class SpectraData:
                 spectra_sup_bound_fname,
                 df.loc[idx,"zspec"],
                 self.emitted_wave_distrib,
+                upsample_scale=self.kwargs["spectra_upsample_scale"],
                 sigma=self.spectra_smooth_sigma,
                 format=data_format,
                 trans_range=self.trans_range,
@@ -1581,6 +1584,53 @@ def interpolate_trans(trans_data, spectra_data, bound, sup_bound, fname=None, co
     ret = np.array([trans_mask] + list(trans) + list(band_mask))
     return ret
 
+def wave_based_sort(spectra):
+    """ Sort spectra based on wave.
+    """
+    ids = np.argsort(spectra[0])
+    return spectra[:,ids]
+
+def resample_spectra(spectra, upsample_scale):
+    """
+    Resample spectra to be regularly sampled.
+    We upsample the input spectra to higher frequency first
+      and then downsample back to the (close to) original frequency.
+    """
+    freq = np.mean(spectra[0,1:] - spectra[0,:-1])
+    n = len(spectra[0])
+    new_freq = freq * upsample_scale
+
+    # upsample first
+    upsampled_wave = np.linspace(spectra[0,0], spectra[0,-1], n * upsample_scale)
+    assert spectra[0,0] == upsampled_wave[0]
+    assert spectra[0,-1] == upsampled_wave[-1]
+    upsampled_flux = np.interp(upsampled_wave, spectra[0], spectra[1])
+    upsampled_ivar = np.interp(upsampled_wave, spectra[0], spectra[2])
+    upsampled_spectra = np.stack([upsampled_wave, upsampled_flux, upsampled_ivar])
+
+    # downsample to same length as before upsample (similar freq)
+    # downsampled_flux = resample(upsampled_flux, n)
+    # downsampled_ivar = resample(upsampled_ivar, n)
+    # downsampled_wave = np.linspace(spectra[0,0], spectra[0,-1], n)
+    # resampled_spectra = np.stack([downsampled_wave, downsampled_flux, downsampled_ivar])
+    ids = np.arange(0, n * upsample_scale, upsample_scale)
+    resampled_spectra = upsampled_spectra[:,ids]
+
+    freq = resampled_spectra[0,1:] - resampled_spectra[0,:-1]
+    mean_freq = np.mean(freq)
+    assert (freq - mean_freq < 1e-8).all()
+    assert spectra.shape == resampled_spectra.shape
+
+    # plt.plot(spectra[0], spectra[1])
+    # plt.savefig('tmp1.png')
+    # plt.close()
+    # plt.plot(resampled_spectra[0], resampled_spectra[1])
+    # plt.savefig('tmp2.png')
+    # plt.close()
+    # assert 0
+
+    return resampled_spectra
+
 def create_spectra_mask(spectra, max_spectra_len):
     """ Mask out padded region of spectra.
     """
@@ -1588,12 +1638,6 @@ def create_spectra_mask(spectra, max_spectra_len):
     if n == max_spectra_len: mask = np.ones(max_spectra_len).astype(bool)
     else: mask = np.zeros(max_spectra_len).astype(bool)
     return mask
-
-def wave_based_sort(spectra):
-    """ Sort spectra based on wave.
-    """
-    ids = np.argsort(spectra[0])
-    return spectra[:,ids]
 
 def pad_spectra(spectra, mask, max_len):
     """ Pad spectra if shorter than max_len.
@@ -1712,6 +1756,7 @@ def process_gt_spectra(
         spectra_mask_fname,
         spectra_sup_bound_fname,
         redshift, emitted_wave_distrib,
+        upsample_scale=10,
         sigma=-1, format="tbl",
         trans_range=None, supervision_wave_range=None,
         save=True, plot=True,
@@ -1734,47 +1779,43 @@ def process_gt_spectra(
                     (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
           mask:     mask out bad flux values
     """
-    if exists(spectra_fname) and exists(spectra_mask_fname) and exists(spectra_sup_bound_fname):
-        spectra = np.load(spectra_fname)
-        sup_mask = np.load(spectra_mask_fname)
-        sup_bound = np.load(spectra_sup_bound_fname)
-    else:
-        spectra = unpack_gt_spectra(
-            source_spectra_fname, format=format,
-            source=spectra_source, has_ivar=has_ivar) # [2/3,nsmpl]
-        assert spectra.shape[1] <= max_spectra_len
-        mask = create_spectra_mask(spectra, max_spectra_len)
-        spectra = wave_based_sort(spectra)
-        spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
-        spectra, mask = clean_flux(spectra, mask)
-        spectra = convolve_spectra(spectra, bound, std=sigma, process_ivar=process_ivar)
-        spectra, mask, sup_mask, sup_bound = mask_spectra_range(
-            spectra, mask, bound, trans_range, supervision_wave_range)
-        spectra = normalize_spectra(spectra, sup_bound, process_ivar=process_ivar)
-        spectra = spectra.astype(np.float32)
+    spectra = unpack_gt_spectra(
+        source_spectra_fname, format=format,
+        source=spectra_source, has_ivar=has_ivar) # [2/3,nsmpl]
+    assert spectra.shape[1] <= max_spectra_len
+    spectra = wave_based_sort(spectra)
+    spectra = resample_spectra(spectra, upsample_scale)
+    mask = create_spectra_mask(spectra, max_spectra_len)
+    spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
+    spectra, mask = clean_flux(spectra, mask)
+    spectra = convolve_spectra(spectra, bound, std=sigma, process_ivar=process_ivar)
+    spectra, mask, sup_mask, sup_bound = mask_spectra_range(
+        spectra, mask, bound, trans_range, supervision_wave_range)
+    spectra = normalize_spectra(spectra, sup_bound, process_ivar=process_ivar)
+    spectra = spectra.astype(np.float32)
 
-        weight = get_wave_weight(spectra, redshift, emitted_wave_distrib, sup_bound)
-        spectra = np.concatenate((spectra, weight[None,:]), axis=0)
+    weight = get_wave_weight(spectra, redshift, emitted_wave_distrib, sup_bound)
+    spectra = np.concatenate((spectra, weight[None,:]), axis=0)
 
-        interp_trans_data = interpolate_trans(
-            trans_data, spectra, bound, sup_bound, fname=spectra_fname[:-4], colors=colors)
-        spectra = np.concatenate((spectra, interp_trans_data), axis=0)
+    interp_trans_data = interpolate_trans(
+        trans_data, spectra, bound, sup_bound, fname=spectra_fname[:-4], colors=colors)
+    spectra = np.concatenate((spectra, interp_trans_data), axis=0)
 
-        if save:
-            np.save(spectra_fname, spectra)
-            np.save(spectra_mask_fname, sup_mask)
-            np.save(spectra_sup_bound_fname, sup_bound)
+    if save:
+        np.save(spectra_fname, spectra)
+        np.save(spectra_mask_fname, sup_mask)
+        np.save(spectra_sup_bound_fname, sup_bound)
 
-        if plot:
-            # mask defines the valid range of values of the current spectra_fname
-            # sup_mask defines the range we used for supervision
-            plt.plot(spectra[0,mask], spectra[1,mask])
-            plt.savefig(spectra_fname[:-4] + ".png")
-            plt.close()
+    if plot:
+        # mask defines the valid range of values of the current spectra_fname
+        # sup_mask defines the range we used for supervision
+        plt.plot(spectra[0,mask], spectra[1,mask])
+        plt.savefig(spectra_fname[:-4] + ".png")
+        plt.close()
 
-            plt.plot(spectra[0,mask], sup_mask[mask])
-            plt.savefig(spectra_fname[:-4] + "_mask.png")
-            plt.close()
+        plt.plot(spectra[0,mask], sup_mask[mask])
+        plt.savefig(spectra_fname[:-4] + "_mask.png")
+        plt.close()
 
     if validator is not None and not validator(spectra_data):
         return None, None

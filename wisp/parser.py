@@ -652,6 +652,7 @@ def define_cmd_line_args():
     data_group.add_argument("--convolve-spectra", action="store_true")
     data_group.add_argument("--spectra-smooth-sigma",type=int, default=5,
                             help="width of smooth kernel in units of angstrom")
+    data_group.add_argument("--spectra-upsample-scale",type=int, default=10)
     data_group.add_argument("--flux-norm-cho",type=str,
                             choices=["identity","max","sum","linr","scale_gt","scale_recon"],
                             help="0- divide with max, 1-divide with sum")
