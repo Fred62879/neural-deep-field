@@ -1466,7 +1466,23 @@ class AstroInferrer(BaseInferrer):
     def _select_inferrence_ids(self):
         fname = join(self.log_dir, "..", self.extra_args["spectra_inferrence_id_fname"])
         if exists(fname) and fname[-3:] == "npy":
-            ids = np.load(fname)
+            if self.mode == "codebook_pretrain_infer":
+                """
+                During sanity check, we sample from supervision spectra.
+                The sampled spectra have ids under context of all sanity check spectra.
+                For those outlier spectra, their ids (defined above) are saved.
+                Here, we infer for these outlier spectra using pretrained model.
+                We need to know their id under context of all supervision spectra.
+                We first find index of the supervision spectra selected for sanity check.
+                Then find from them those that are outlier during sanity check.
+                """
+                assert self.extra_args["sample_from_codebook_pretrain_spectra"]
+                outlier_ids = np.load(fname)
+                selected_supervision_spectra_ids = \
+                    self.dataset.get_redshift_pretrain_spectra_ids()
+                ids = selected_supervision_spectra_ids[outlier_ids]
+            else:
+                ids = np.load(fname)
             self.num_spectra = len(ids)
             log.info(f"infer with given ids, totally {self.num_spectra}")
         else:

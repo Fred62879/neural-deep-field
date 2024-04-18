@@ -201,6 +201,9 @@ class SpectraData:
         np.save(join(path, "validation_spectra_ids.npy"), self.val_ids)
         np.save(join(path, "test_spectra_ids.npy"), self.test_ids)
 
+    def get_supervision_spectra_ids(self):
+        return self.sup_ids
+
     def get_redshift_pretrain_spectra_ids(self):
         return self.redshift_pretrain_ids
 
@@ -450,13 +453,13 @@ class SpectraData:
             exists(self.gt_spectra_pixels_fname) and \
             exists(self.gt_spectra_img_coords_fname) and \
             exists(self.gt_spectra_world_coords_fname))
-        # print(spectra_data_cached, patch_info_cached, spectra_processed)
+        # print(spectra_data_cached, patch_info_cached)
 
-        #if self.load_spectra_data_from_cache and spectra_data_cached and patch_info_cached:
-        #    self.load_cached_spectra_data()
-        #else:
-        self.process_spectra()
-        self.gather_processed_spectra()
+        if self.load_spectra_data_from_cache and spectra_data_cached and patch_info_cached:
+            self.load_cached_spectra_data()
+        else:
+            self.process_spectra()
+            self.gather_processed_spectra()
 
         # print(len(self.data["gt_spectra"]))
         if self.kwargs["filter_redshift"]:
@@ -485,7 +488,7 @@ class SpectraData:
         if self.spectra_process_patch_info:
             test_ids, validation_ids, supervision_ids = self.split_spectra_patch_wise()
         else: test_ids, validation_ids, supervision_ids = self.split_spectra_all_together()
-        validation_ids = self.update_validation_ids(supervision_ids)
+        validation_ids = self.update_validation_ids(supervision_ids, validation_ids)
 
         # if len(test_ids) == 0 or len(validation_ids) == 0:
         #     raise ValueError(
@@ -500,14 +503,14 @@ class SpectraData:
         self.num_supervision_spectra = len(supervision_ids)
         return test_ids, validation_ids, supervision_ids
 
-    def update_validation_ids(self, supervision_ids):
+    def update_validation_ids(self, supervision_ids, validation_ids):
         """
         Update validation spectra for sanity check or add more spectra for generalization.
         """
         if self.kwargs["sample_from_codebook_pretrain_spectra"]:
             # select spectra for redshift pretrain from spectra used for codebook pretrain
             indices = np.arange(len(supervision_ids))
-            np.random.seed(self.kwargs["seed"])
+            # np.random.seed(self.kwargs["seed"])
             # np.random.shuffle(indices)
             self.redshift_pretrain_ids = indices[:self.kwargs["redshift_pretrain_num_spectra"]]
             validation_ids = supervision_ids[self.redshift_pretrain_ids]
@@ -519,6 +522,7 @@ class SpectraData:
             selected_ids = unseen_spectra_ids[:self.kwargs["num_extra_validation_spectra"]]
             validation_ids = np.append(validation_ids, selected_ids)
             assert len(set(validation_ids) & set(supervision_ids)) == 0
+
         return validation_ids
 
     def split_spectra_all_together(self):

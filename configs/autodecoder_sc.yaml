@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-400-spectra-pe'
+    exp_name: 'autodecoder-200-spectra-pe'
     log_fname: 'sc'
 
     tasks: ['redshift_pretrain']
-    #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
+    tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -35,14 +35,14 @@ pretrain:
     spectra_latent_dim: 16
 
     sample_from_codebook_pretrain_spectra: True
-    redshift_pretrain_num_spectra: 400
+    redshift_pretrain_num_spectra: 140
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240415-205657_ssim_32_dim_in_3_512_no_skip_no_regu_10k_epochs'
+    pretrain_log_dir: '20240417-175032_ssim_3_512_no_skip_no_regu_10k_epochs'
     pretrained_model_name: 'model-ep10000-bch0.pth'
 
     regularize_spectra_latents: False
@@ -88,7 +88,7 @@ trainer:
     resume_model_fname: 'model-ep200-bch0.pth'
 
     spectra_loss_cho: ssim1d
-    spectra_loss_reduction: mean #none
+    spectra_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
 
@@ -97,8 +97,8 @@ infer:
 
     # infer_log_dir: ''
 
-    pretrain_infer_batch_size: 5
-    pretrain_infer_use_all_wave: False
+    pretrain_infer_batch_size: 1
+    pretrain_infer_use_all_wave: True
     pretrain_infer_num_wave: 200
     pretrain_infer_wave_sample_method: 'uniform_non_random'
 
@@ -136,8 +136,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 400
-    num_supervision_spectra_upper_bound: 400
+    num_gt_spectra_upper_bound: 200
+    num_supervision_spectra_upper_bound: 200
 
     filter_redshift: False
     filter_redshift_lo: 0.02

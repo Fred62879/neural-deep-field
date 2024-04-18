@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-400-spectra-pe'
+    exp_name: 'autodecoder-200-spectra-pe'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
@@ -33,7 +33,7 @@ pretrain:
     pretrain_wave_sample_method: 'uniform_dense'
 
     spectra_latent_dim: 16
-    redshift_pretrain_num_spectra: 3200
+    redshift_pretrain_num_spectra: 
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
@@ -100,10 +100,10 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    #infer_log_dir: ''
+    infer_log_dir: '20240417-175032_ssim_3_512_no_skip_no_regu_10k_epochs'
     infer_selected: True
     pretrain_num_infer_upper_bound: 140
-    # spectra_inferrence_id_fname: '/redshift/model-0_redshift_outlier_ids.npy'
+    spectra_inferrence_id_fname: '20240417-180337_sc_140_spectra_1k_epochs_175032/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
     pretrain_infer_use_all_wave: True
@@ -136,8 +136,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 400
-    num_supervision_spectra_upper_bound: 400
+    num_gt_spectra_upper_bound: 200
+    num_supervision_spectra_upper_bound: 200
 
     filter_redshift: False
     filter_redshift_lo: 0.02

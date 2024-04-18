@@ -267,6 +267,9 @@ class AstroDataset(Dataset):
         # return self.trans_dataset.get_full_wave_bound()
         return self.data["wave_range"]
 
+    def get_supervision_spectra_ids(self):
+        return self.spectra_dataset.get_supervision_spectra_ids()
+
     def get_redshift_pretrain_spectra_ids(self):
         return self.spectra_dataset.get_redshift_pretrain_spectra_ids()
 

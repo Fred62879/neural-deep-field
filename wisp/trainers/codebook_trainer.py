@@ -1588,7 +1588,9 @@ class CodebookTrainer(BaseTrainer):
             spectra_loss = (all_bin_loss[ids[0],ids[1]]).view(bsz,-1)
             spectra_loss = self.spectra_reduce_func(spectra_loss)
         else:
-            spectra_loss = self.spectra_reduce_func(all_bin_loss)
+            spectra_loss = all_bin_loss
+
+        spectra_loss = self.spectra_reduce_func(all_bin_loss)
 
         if self.plot_gt_bin_loss:
             gt_bin_loss = self.spectra_reduce_func(

@@ -429,10 +429,13 @@ def calculate_spectra_loss(
     if recon_fluxes.ndim == 3:
         masks = masks[None,...].tile(n_bins,1,1)
         binwise_loss = lambdawise_loss * masks # [nbins,bsz,nsmpl]
+
         if kwargs["spectra_loss_reduction"] == "sum":
             binwise_loss = torch.sum(binwise_loss, dim=-1) # [nbins,bsz]
         elif kwargs["spectra_loss_reduction"] == "mean":
-            binwise_loss = torch.sum(binwise_loss, dim=-1) / torch.sum(masks, dim=-1)
+            masks = torch.sum(masks, dim=-1)
+            masks[masks == 0] = 1
+            binwise_loss = torch.sum(binwise_loss, dim=-1) / masks
         else: raise ValueError()
 
         nm = "spectra_binwise_loss" + loss_name_suffix

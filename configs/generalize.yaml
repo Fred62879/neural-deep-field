@@ -24,11 +24,11 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    generalize_train_first_layer: True
+    generalize_train_first_layer: False
 
     sample_from_codebook_pretrain_spectra: False
-    add_validation_spectra_not_in_supervision: True
-    num_extra_validation_spectra: 81 #16
+    add_validation_spectra_not_in_supervision: False
+    num_extra_validation_spectra: 16 #81
 
     pretrain_batch_size: 50
 
@@ -40,7 +40,7 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240410-133959_l2_32_dim_in_5_512_no_skip_no_regu_10k_epochs'
+    pretrain_log_dir: '20240417-175032_ssim_3_512_no_skip_no_regu_10k_epochs'
     pretrained_model_name: 'model-ep10000-bch0.pth'
 
     regularize_spectra_latents: False
@@ -48,7 +48,7 @@ pretrain:
 
 decoder:
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 5
+    decoder_num_hidden_layers: 3
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
@@ -58,11 +58,11 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 200
+    num_epochs: 1000
     batch_size: 5500
-    log_cli_every: 20
-    plot_grad_every: 20
-    save_model_every: 20
+    log_cli_every: 100
+    plot_grad_every: -1
+    save_model_every: 100
 
     plot_l2_loss: True
 
@@ -82,8 +82,8 @@ trainer:
     resume_log_dir: ''
     resume_model_fname: 'model-ep10000-bch0.pth'
 
-    spectra_loss_cho: l2 #ssim1d
-    spectra_loss_reduction: none
+    spectra_loss_cho: ssim1d
+    spectra_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
 
@@ -96,6 +96,11 @@ infer:
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
+
+    pretrain_infer_batch_size: 1
+    pretrain_infer_use_all_wave: True
+    pretrain_infer_num_wave: 200
+    pretrain_infer_wave_sample_method: 'uniform_non_random'
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False
@@ -117,10 +122,16 @@ infer:
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:
+    spectra_cho: v1
+    spectra_process_patch_info: False
+    spectra_data_sources: [deimos,zcosmos]
+    random_permute_source_spectra: True
+    
     convolve_spectra: True
     process_ivar: True
-    spectra_smooth_sigma: 25
+    spectra_smooth_sigma: 15
 
+    num_gt_spectra_upper_bound: 200
     num_supervision_spectra_upper_bound: 200
 
     filter_redshift: False
