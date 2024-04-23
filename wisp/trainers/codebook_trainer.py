@@ -62,6 +62,8 @@ class CodebookTrainer(BaseTrainer):
                     ret = self.step(data)
                     self.post_step(data, ret)
             else:
+                assert 0
+                # need to figure out how to sample
                 idx = self.sample_data()
                 data = self.dataset.__getitem__(idx)
                 ret = self.step(data)
@@ -501,9 +503,6 @@ class CodebookTrainer(BaseTrainer):
             fields.append("spectra_pixels")
         if self.plot_gt_bin_loss or self.neg_sup_wrong_redshift:
             fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_masks"])
-
-        if self.mode == "codebook_pretrain" or self.mode == "redshift_pretrain":
-            self.dataset.save_spectra_split_ids(self.log_dir)
 
         # use original spectra wave
         self.dataset.set_wave_source("spectra")

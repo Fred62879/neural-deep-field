@@ -11,7 +11,7 @@ from wisp.utils.common import create_patch_uid, get_bool_classify_redshift, quer
 from os.path import join
 from datetime import datetime
 from abc import ABC, abstractmethod
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import BatchSampler, SequentialSampler, DataLoader
 
 class BaseInferrer(ABC):
@@ -65,7 +65,7 @@ class BaseInferrer(ABC):
         self.log_dir = join(log_dir, extra_args["exp_name"], infer_log_dir)
 
         # Default TensorBoard Logging
-        self.writer = SummaryWriter(self.log_dir, purge_step=0)
+        # self.writer = SummaryWriter(self.log_dir, purge_step=0)
         self.timer.check('set_logger')
 
         # initialization

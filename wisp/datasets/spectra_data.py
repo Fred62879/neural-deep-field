@@ -108,11 +108,16 @@ class SpectraData:
             self.kwargs["spectra_cho"], sources, self.spectra_config,
             self.kwargs["num_gt_spectra_upper_bound"])
         cache_path = join(spectra_path, "cache", cache_path_name)
+        self.cache_path = cache_path
         Path(cache_path).mkdir(parents=True, exist_ok=True)
 
         self.wave_range_fname = get_wave_range_fname(**self.kwargs)
         self.coords_norm_range_fname = get_coords_norm_range_fname(**self.kwargs)
         self.input_patch_path, img_data_path = get_img_data_path(dataset_path, **self.kwargs)
+
+        self.test_id_fname = join(self.cache_path, "test_spectra_ids.npy")
+        self.validation_id_fname = join(self.cache_path, "validation_spectra_ids.npy")
+        self.supervision_id_fname = join(self.cache_path, "supervision_spectra_ids.npy")
 
         self.emitted_wave_fname = join(cache_path, "emitted_wave.npy")
         self.emitted_wave_mask_fname = join(cache_path, "emitted_wave_mask.npy")
@@ -190,17 +195,11 @@ class SpectraData:
         if self.kwargs["space_dim"] != 3: return
         if self.spectra_process_patch_info:
             self.process_coords()
-        self.train_valid_split()
+        self.split_spectra()
 
     #############
     # Getters
     #############
-
-    def save_spectra_split_ids(self, path):
-        # print(len(test_ids), len(validation_ids), len(supervision_ids))
-        np.save(join(path, "supervision_spectra_ids.npy"), self.sup_ids)
-        np.save(join(path, "validation_spectra_ids.npy"), self.val_ids)
-        np.save(join(path, "test_spectra_ids.npy"), self.test_ids)
 
     def get_supervision_spectra_ids(self):
         return self.sup_ids
@@ -384,11 +383,37 @@ class SpectraData:
             "emitted_wave_mask",
         ], torch.bool)
 
-    def train_valid_split(self):
-        test_ids, val_ids, sup_ids = self.split_spectra()
+    def split_spectra(self):
+        if exists(self.supervision_id_fname) and \
+           exists(self.validation_id_fname) and exists(self.test_id_fname):
+            test_ids = np.load(self.test_id_fname)
+            val_ids = np.load(self.validation_id_fname)
+            sup_ids = np.load(self.supervision_id_fname)
+        else:
+            ids = np.arange(self.num_gt_spectra)
+            if self.spectra_process_patch_info:
+                test_ids, val_ids, sup_ids = self.split_spectra_patch_wise()
+            else: test_ids, val_ids, sup_ids = self.split_spectra_all_together()
+            val_ids = self.update_validation_ids(sup_ids, val_ids)
+            # if len(test_ids) == 0 or len(val_ids) == 0:
+            #     raise ValueError(
+            #         "Please select patches properly to make sure the number \
+            #         of validation and test spectra is not zero.")
+            np.save(self.test_id_fname, test_ids)
+            np.save(self.validation_id_fname, val_ids)
+            np.save(self.supervision_id_fname, sup_ids)
+
         self.sup_ids = sup_ids
         self.val_ids = val_ids
         self.test_ids = test_ids
+        self.num_test_spectra = len(test_ids)
+        self.num_validation_spectra = len(val_ids)
+        self.num_supervision_spectra = len(sup_ids)
+
+        # log.info(f"test spectra ids: {test_ids}")
+        # log.info(f"val spectra ids: {val_ids}")
+        # log.info(f"sup spectra ids: {sup_ids}")
+        print(self.sup_ids, self.val_ids, self.test_ids)
         log.info(f"spectra train/valid/test: {len(sup_ids)}/{len(val_ids)}/{len(test_ids)}")
 
         # supervision spectra data (used during pretrain)
@@ -480,30 +505,6 @@ class SpectraData:
         for field in fields:
             self.data[field] = torch.tensor(self.data[field], dtype=dtype)
 
-    def split_spectra(self):
-        """
-        Split spectra into test, validation, or supervision set.
-        """
-        ids = np.arange(self.num_gt_spectra)
-
-        if self.spectra_process_patch_info:
-            test_ids, validation_ids, supervision_ids = self.split_spectra_patch_wise()
-        else: test_ids, validation_ids, supervision_ids = self.split_spectra_all_together()
-        validation_ids = self.update_validation_ids(supervision_ids, validation_ids)
-
-        # if len(test_ids) == 0 or len(validation_ids) == 0:
-        #     raise ValueError(
-        #         "Please select patches properly to make sure the number \
-        #         of validation and test spectra is not zero.")
-        # log.info(f"test spectra ids: {test_ids}")
-        # log.info(f"validation spectra ids: {validation_ids}")
-        # log.info(f"supervision spectra ids: {supervision_ids}")
-
-        self.num_test_spectra = len(test_ids)
-        self.num_validation_spectra = len(validation_ids)
-        self.num_supervision_spectra = len(supervision_ids)
-        return test_ids, validation_ids, supervision_ids
-
     def update_validation_ids(self, supervision_ids, validation_ids):
         """
         Update validation spectra for sanity check or add more spectra for generalization.
@@ -519,7 +520,8 @@ class SpectraData:
         elif self.kwargs["add_validation_spectra_not_in_supervision"]:
             unseen_spectra_ids = np.array(
                 list(set(ids) - set(supervision_ids) - set(validation_ids)))
-            np.random.shuffle(unseen_spectra_ids)
+            # np.random.seed(0)
+            # np.random.shuffle(unseen_spectra_ids)
             selected_ids = unseen_spectra_ids[:self.kwargs["num_extra_validation_spectra"]]
             validation_ids = np.append(validation_ids, selected_ids)
             assert len(set(validation_ids) & set(supervision_ids)) == 0
@@ -531,6 +533,7 @@ class SpectraData:
         Randomly divide all spectra into test, validation, or supervision set.
         """
         ids = np.arange(self.num_gt_spectra)
+        np.random.seed(0)
         np.random.shuffle(ids)
         test_ratio, val_ratio, sup_ratio = self.kwargs["spectra_split_ratios"]
         n_test = int(self.num_gt_spectra * test_ratio)
@@ -695,14 +698,17 @@ class SpectraData:
             np.save(self.gt_spectra_world_coords_fname, self.data["gt_spectra_world_coords"])
 
     def process_spectra(self):
+        df = self.load_source_metadata()
+        log.info(f"found {len(df)} source spectra")
+
         upper_bound = self.kwargs["num_gt_spectra_upper_bound"]
         df = self.load_source_metadata().iloc[:upper_bound]
         num_spectra = len(df)
-        log.info(f"found {num_spectra} source spectra")
+        log.info(f"load {num_spectra} source spectra")
 
         emitted_wave = self.calculate_emitted_wave_range(df)
         self.data["emitted_wave"] = emitted_wave
-        self.data["emitted_wave_mask"] = self.generate_emitted_wave_mask(emitted_wave[0])
+        # self.data["emitted_wave_mask"] = self.generate_emitted_wave_mask(emitted_wave[0])
 
         self.trans_data = self.trans_obj.get_full_trans_data()
         self.emitted_wave_distrib = interp1d(emitted_wave[0], emitted_wave[1])
@@ -761,7 +767,7 @@ class SpectraData:
             distrib[ int(lo/(1+cur_redshift)) - min_emitted_wave:
                      int(hi/(1+cur_redshift)) - min_emitted_wave ] += 1
 
-        _= [accumulate(cur_redshift) for cur_redshift in redshift]
+        _ = [accumulate(cur_redshift) for cur_redshift in redshift]
         distrib = np.array(distrib) # / sum(distrib))
 
         plt.plot(x, distrib); plt.title("Counts of spectra in restframe (emitted wave)")
@@ -972,7 +978,6 @@ class SpectraData:
 
         current_spectra_processed = exists(spectra_out_fname) and \
             exists(spectra_mask_fname) and exists(spectra_sup_bound_fname)
-        current_spectra_processed = False
 
         if not current_spectra_processed:
             gt_spectra, mask, sup_bound = process_gt_spectra(

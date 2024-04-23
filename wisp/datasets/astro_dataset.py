@@ -146,9 +146,6 @@ class AstroDataset(Dataset):
     # Getters
     ############
 
-    def save_spectra_split_ids(self, path):
-        self.spectra_dataset.save_spectra_split_ids(path)
-
     def get_trans_data_obj(self):
         return self.trans_dataset
 

@@ -1459,9 +1459,6 @@ class AstroInferrer(BaseInferrer):
         if self.classify_redshift:
             self.dataset.set_num_redshift_bins(self.num_redshift_bins)
 
-        if self.mode == "codebook_pretrain_infer" or self.mode == "redshift_pretrain_infer":
-            self.dataset.save_spectra_split_ids(self.log_dir)
-
     @lru_cache
     def _select_inferrence_ids(self):
         fname = join(self.log_dir, "..", self.extra_args["spectra_inferrence_id_fname"])
