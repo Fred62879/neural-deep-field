@@ -90,13 +90,16 @@ class CodebookTrainer(BaseTrainer):
             self.mode = "codebook_pretrain"
         elif "redshift_pretrain" in tasks:
             self.mode = "redshift_pretrain"
+        elif "generalization" in tasks:
+            self.mode == "generalization"
         else: raise ValueError("Invalid mode!")
 
-        self.generalize = not self.extra_args["sample_from_codebook_pretrain_spectra"]
-        self.generalize_train_first_layer = self.generalize and \
+        self.generalize_train_first_layer = self.mode == "generalization" and \
             self.extra_args["generalize_train_first_layer"]
 
-        if self.mode == "redshift_pretrain":
+        if self.mode == "generalization":
+            self.num_spectra = self.dataset.get_num_test_spectra()
+        elif self.mode == "redshift_pretrain":
             if self.extra_args["sample_from_codebook_pretrain_spectra"]:
                 num_spectra_max = self.dataset.get_num_validation_spectra()
                 self.num_spectra = min(
@@ -339,11 +342,13 @@ class CodebookTrainer(BaseTrainer):
 
             loss_dir = join(pretrained_dir, "losses")
             self.resume_loss_fname = join(loss_dir, "loss.npy")
-            self.resume_loss_fname = join(loss_dir, "l2_loss.npy")
             self.resume_gt_bin_loss_fname = join(loss_dir, "gt_bin_loss.npy")
-            self.resume_gt_bin_loss_fname = join(loss_dir, "gt_bin_l2_loss.npy")
             self.resume_wrong_bin_regu_fname = join(loss_dir, "wrong_bin_regu.npy")
             self.resume_wrong_bin_loss_fname = join(loss_dir, "wrong_bin_loss.npy")
+
+            if self.plot_l2_loss:
+                self.resume_l2_loss_fname = join(loss_dir, "l2_loss.npy")
+                self.resume_gt_bin_l2_loss_fname = join(loss_dir, "gt_bin_l2_loss.npy")
 
         if self.extra_args["plot_logits_for_gt_bin"]:
             self.gt_bin_logits_fname = join(self.log_dir, "gt_bin_logits")
@@ -1014,9 +1019,13 @@ class CodebookTrainer(BaseTrainer):
             if self.plot_loss:
                 if exists(self.resume_loss_fname):
                     self.loss = list(np.load(self.resume_loss_fname))
+                if exists(self.resume_l2_loss_fname):
+                    self.l2_loss = list(np.load(self.resume_l2_loss_fname))
                 if self.plot_gt_bin_loss:
                     if exists(self.resume_gt_bin_loss_fname):
                         self.gt_bin_loss = list(np.load(self.resume_gt_bin_loss_fname))
+                    if exists(self.resume_gt_bin_l2_loss_fname):
+                        self.gt_bin_l2_loss = list(np.load(self.resume_gt_bin_l2_loss_fname))
                 if self.neg_sup_wrong_redshift:
                     if exists(self.resume_gt_bin_loss_fname):
                         self.gt_bin_loss = list(np.load(self.resume_gt_bin_loss_fname))

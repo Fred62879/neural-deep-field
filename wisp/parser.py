@@ -476,9 +476,10 @@ def define_cmd_line_args():
                                 help="performe pretraining with 2d coords instead of \
                                 optimizing latent variables")
 
-    pretrain_group.add_argument("--redshift-pretrain-num-spectra", type=float, default=1,
+    pretrain_group.add_argument("--redshift-pretrain-num-spectra", type=int,
                                 help="num of spectra used for redshift pretrain, used to \
                                 sample a subset of spectra from codebook pretrain spectra.")
+    pretrain_group.add_argument("--generalization-max-num-spectra", type=int)
 
     pretrain_group.add_argument("--use-latents-as-coords", action="store_true",
                                 help="pass latents as coords to model.")

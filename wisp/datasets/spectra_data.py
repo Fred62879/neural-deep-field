@@ -384,11 +384,22 @@ class SpectraData:
         ], torch.bool)
 
     def split_spectra(self):
-        if exists(self.supervision_id_fname) and \
-           exists(self.validation_id_fname) and exists(self.test_id_fname):
-            test_ids = np.load(self.test_id_fname)
-            val_ids = np.load(self.validation_id_fname)
+        """
+        Split spectra into
+          supervision
+          validation   (same as supervision, used for sanity check) and
+          test spectra ( test_spectra + supervision_spectra == all_spectra).
+        """
+        if exists(self.supervision_id_fname):
             sup_ids = np.load(self.supervision_id_fname)
+            val_ids = sup_ids
+            if exists(self.test_id_fname):
+                test_ids = np.load(self.test_id_fname)
+            else:
+                indices = np.arange(self.num_gt_spectra)
+                test_ids = list(set(indices) - set(sup_ids))
+                test_ids = test_ids[:self.kwargs["generalization_max_num_spectra"]]
+                np.save(self.test_id_fname, test_ids)
         else:
             ids = np.arange(self.num_gt_spectra)
             if self.spectra_process_patch_info:
@@ -518,6 +529,7 @@ class SpectraData:
             validation_ids = supervision_ids[self.redshift_pretrain_ids]
 
         elif self.kwargs["add_validation_spectra_not_in_supervision"]:
+            raise NotImplementedError()
             unseen_spectra_ids = np.array(
                 list(set(ids) - set(supervision_ids) - set(validation_ids)))
             # np.random.seed(0)
