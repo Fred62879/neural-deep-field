@@ -170,6 +170,8 @@ pretrain:
     regularize_spectra_latents: False
     spectra_latents_regu_beta: 1000
 
+    binwise_spectra_latents_regu_beta: 4
+
     regularize_within_codebook_spectra: False
     regularize_across_codebook_spectra: False
     codebook_spectra_regu_beta: 1
@@ -186,7 +188,8 @@ pretrain:
     redshift_logit_latent_dim: 330
 
     main_train_with_pretrained_latents: False
-    redshift_pretrain_num_spectra: 100
+    sanity_check_max_num_spectra: -1
+    generalization_max_num_spectra: -1
 
     add_redshift_logit_bias: False
     plot_logits_for_gt_bin: False
@@ -244,10 +247,6 @@ spatial_decod:
     redshift_decod_layer_type: 'none'
     redshift_decod_activation_type: 'relu'
     redshift_decod_skip_layers: []
-
-    redshift_lo: -0.09
-    redshift_hi: 6.5
-    redshift_bin_width: 0.02
 
 hyperspectral:
     use_batched_hps_model: True
@@ -339,7 +338,7 @@ infer:
 
     infer_use_all_wave: True
     # infer_num_wave: 
-    pretrain_infer_use_all_wave: False
+    pretrain_infer_use_all_wave: True
     pretrain_infer_num_wave: 200
     pretrain_infer_wave_sample_method: 'uniform_non_random'
 
@@ -362,9 +361,9 @@ infer:
     recon_cutout_start_pos: [ [[256,256]], [[86,188]] ]
 
     # recon spectra
-    spectra_neighbour_size: 1
+    spectra_neighbour_size: -1
     flux_norm_cho: "identity"
-    average_neighbour_spectra: True
+    average_neighbour_spectra: False
     infer_spectra_individually: False
 
     num_spectrum_per_fig: 35
@@ -401,6 +400,9 @@ infer:
     redshift_est_stats_cho: 'accuracy'
     calculate_redshift_est_stats_based_on: 'residuals'
     num_redshift_est_stats_residual_levels: 10
+
+    log_redshift_est_stats: False
+    log_redshift_est_stats_residual_levels: []
 
     # plot pca latents scatter plot
     sanity_check_plot_same_pca_dim_as_pretrain: False
@@ -495,28 +497,40 @@ trans_data:
     trans_sample_interval: 10
 
 spectra_data:
-    download_source_spectra: False
-    source_spectra_fname: "source_deimos_table_v7_different_wave_range_exclude_0_flux.tbl"
-    source_spectra_link: "https://irsa.ipac.caltech.edu/data/COSMOS/spectra/deimos/spec1d_tbl"
-    spectra_data_format: "tbl"
-    spectra_data_source: "deimos"
-    max_spectra_len: 8191 # hardcoded
+    spectra_cho: v1
+    spectra_drop_not_in_patch: False
+    spectra_process_patch_info: False
+    spectra_data_sources: [zcosmos]
 
-    num_gt_spectra_upper_bound: 7000 # spectra to load
+    download_deimos_source_spectra: False
+    deimos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/deimos/spec1d_tbl
+    deimos_spectra_data_format: tbl
+    deimos_processed_spectra_cho: v7
+    deimos_source_spectra_fname: source_deimos_table_v7_different_wave_range_exclude_0_flux.tbl
+
+    download_zcosmos_source_spectra: False
+    zcosmos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/z-cosmos/DR3
+    zcosmos_spectra_data_format: tbl
+    zcosmos_processed_spectra_cho: v1
+    zcosmos_source_spectra_fname: source_zcosmos_table.fits
+
+    max_spectra_len: 8191 # hardcoded
+    num_gt_spectra_upper_bound: 500 #6500 # spectra to load
     num_supervision_spectra_upper_bound: 100
-    val_spectra_ratio: 1 #0.8
-    source_spectra_cho: "" #"6000_to_8000"
+    val_spectra_ratio: 0.2
+
+    sup_spectra_ratio: 0.95
+    spectra_split_ratios: [0.05,0,0.95]
 
     # **** Below fields should be modified together ****
     spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
     spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
+    # **************************************************
 
     process_ivar: True
     convolve_spectra: True
     spectra_smooth_sigma: -1
-    processed_spectra_cho: "v7_table"
-    # **************************************************
 
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
@@ -525,6 +539,14 @@ spectra_data:
     load_spectra_data_from_cache: True
     # debug1: 300 spectra [9812][0,1][0-8] normed
     # debug2: 30 spectra [9812][0][0,1,2] normed
+
+    redshift_lo: -0.09
+    redshift_hi: 6.5
+    redshift_bin_width: 0.02
+
+    filter_redshift: False
+    filter_redshift_lo: -1
+    filter_redshift_hi: -1
 
 inpaint:
     inpaint_cho: 'spectral_inpaint' #'no_inpaint'
