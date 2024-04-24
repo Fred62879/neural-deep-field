@@ -44,8 +44,8 @@ class BaseInferrer(ABC):
             extra_args["main_train_with_pretrained_latents"]
 
         self.index_latent = True
-        self.split_latent = self.mode == "redshift_pretrain_infer" and \
-            self.extra_args["split_latent"]
+        self.split_latent = self.extra_args["split_latent"] and \
+            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer")
 
         self.timer = PerfTimer(activate=extra_args["perf"])
         self.timer.reset()
@@ -128,7 +128,9 @@ class BaseInferrer(ABC):
     def infer(self):
         """ Perform each inferrence task (one at a time) using all selected models.
         """
-        if self.mode == "codebook_pretrain_infer" or self.mode == "redshift_pretrain_infer":
+        if self.mode == "codebook_pretrain_infer" or \
+           self.mode == "sanity_check_infer" or \
+           self.mode == "generalization_infer":
             self.infer_all_models()
         else:
             for i, (tract, patch) in enumerate(zip(

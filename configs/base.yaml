@@ -188,7 +188,8 @@ pretrain:
     redshift_logit_latent_dim: 330
 
     main_train_with_pretrained_latents: False
-    redshift_pretrain_num_spectra: 100
+    sanity_check_max_num_spectra: -1
+    generalization_max_num_spectra: -1
 
     add_redshift_logit_bias: False
     plot_logits_for_gt_bin: False
@@ -518,6 +519,7 @@ spectra_data:
     num_supervision_spectra_upper_bound: 100
     val_spectra_ratio: 0.2
 
+    sup_spectra_ratio: 0.95
     spectra_split_ratios: [0.05,0,0.95]
 
     # **** Below fields should be modified together ****

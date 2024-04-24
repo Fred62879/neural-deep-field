@@ -50,7 +50,8 @@ class HyperSpectralDecoderB(nn.Module):
             (kwargs["plot_spectrum_color_based_on_loss"] or \
              kwargs["plot_spectrum_with_loss"]) and \
              ("codebook_pretrain_infer" in kwargs["tasks"] or \
-              "redshift_pretrain_infer" in kwargs["tasks"])
+              "sanity_check_infer" in kwargs["tasks"] or \
+              "generalization_infer" in kwargs["tasks"])
 
         self.init_decoder()
         if self.qtz_spectra:

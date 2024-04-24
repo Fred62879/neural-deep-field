@@ -138,6 +138,7 @@ class ssim1d(nn.Module):
         if torch.min(ssim_score) < 0 or torch.max(ssim_score) > 1.001:
             warnings.warn(f"min/max: {torch.min(ssim_score)}/{torch.max(ssim_score)}")
         if dim4: ssim_score = ssim_score.view(nbins,-1,nsmpls)
+        # print(torch.min(ssim_score), torch.max(ssim_score))
         return 1 - ssim_score
 
 class spectra_supervision_loss(nn.Module):
@@ -173,6 +174,7 @@ class spectra_supervision_loss(nn.Module):
             if gt_spectra.ndim == 3:
                 ret = self.loss_func(gt_spectra[:,1], recon_fluxes)
             elif gt_spectra.ndim == 4: # binwise spectra loss
+                # print(gt_spectra.shape, recon_fluxes.shape)
                 ret = self.loss_func(gt_spectra[:,:,1], recon_fluxes)
             else: raise ValueError()
         assert recon_fluxes.shape == ret.shape

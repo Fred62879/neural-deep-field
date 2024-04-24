@@ -476,7 +476,7 @@ def define_cmd_line_args():
                                 help="performe pretraining with 2d coords instead of \
                                 optimizing latent variables")
 
-    pretrain_group.add_argument("--redshift-pretrain-num-spectra", type=int,
+    pretrain_group.add_argument("--sanity-check-max-num-spectra", type=int,
                                 help="num of spectra used for redshift pretrain, used to \
                                 sample a subset of spectra from codebook pretrain spectra.")
     pretrain_group.add_argument("--generalization-max-num-spectra", type=int)
@@ -664,6 +664,7 @@ def define_cmd_line_args():
                              help="upper bound# of gt spectra used for supervision \
                              (always select the first n spectra).")
 
+    data_group.add_argument("--sup-spectra-ratio", nargs="+", type=float)
     data_group.add_argument("--spectra-split-ratios", nargs="+", type=float,
                             help="ratio of test,val,sup spectra.")
     data_group.add_argument("--val-spectra-ratio", type=float,

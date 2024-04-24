@@ -2,12 +2,12 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-1600-spectra-pe'
+    exp_name: 'autodecoder-dz-spectra-pe'
     # log_fname: ''
 
 
     tasks: ['generalization']
-    #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift','plot_redshift_est_stats','plot_redshift_residual'] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
+    tasks: ['generalization_infer','recon_spectra','save_redshift','plot_redshift_est_stats','plot_redshift_residual'] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -22,27 +22,28 @@ optimizer:
     sgd_momentum: 0.9
 
 embedder:
+    encode_wave: True
+    wave_encode_method: positional_encoding
     wave_embed_dim: 16
 
 pretrain:
     generalize_train_first_layer: False
 
-    sample_from_codebook_pretrain_spectra: False
-    # add_validation_spectra_not_in_supervision: False
-    # num_extra_validation_spectra: 16 #81
-
     pretrain_batch_size: 50
 
+    pretrain_use_all_wave: False
+    pretrain_num_wave_samples: 100
+    pretrain_wave_sample_method: 'uniform_dense'
+
     spectra_latent_dim: 16
-    redshift_pretrain_num_spectra: 20
-    generalization_max_num_spectra: 10
+    generalization_max_num_spectra: 100
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240422-202457_ssim_32_in_3_512_no_skip_no_regu_4k_epochs_r'
+    pretrain_log_dir: '20240423-163308_ssim_32_in_3_512_no_skip_no_regu_2k_epochs'
     pretrained_model_name: 'model-ep2000-bch0.pth'
 
     regularize_spectra_latents: False
@@ -60,11 +61,11 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 200
+    num_epochs: 500
     batch_size: 5500
-    log_cli_every: 20
+    log_cli_every: 50
     plot_grad_every: -1
-    save_model_every: 20
+    save_model_every: 50
 
     plot_l2_loss: True
 
@@ -120,7 +121,7 @@ infer:
     pretrain_pca_dim_fname: '' #'/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
-    log_redshift_est_stats: True
+    log_redshift_est_stats: False
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:
@@ -134,8 +135,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 1600
-    num_supervision_spectra_upper_bound: 1600
+    num_gt_spectra_upper_bound: 30000
+    num_supervision_spectra_upper_bound: 30000
 
     filter_redshift: False
     filter_redshift_lo: 0.02

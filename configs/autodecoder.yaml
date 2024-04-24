@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-1600-spectra-pe'
+    exp_name: 'autodecoder-dz-spectra-pe'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'
+    # tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -33,7 +33,6 @@ pretrain:
     pretrain_wave_sample_method: 'uniform_dense'
 
     spectra_latent_dim: 16
-    redshift_pretrain_num_spectra: 
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
@@ -137,8 +136,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 1600
-    num_supervision_spectra_upper_bound: 1600
+    num_gt_spectra_upper_bound: 30000
+    num_supervision_spectra_upper_bound: 30000
 
     filter_redshift: False
     filter_redshift_lo: 0.02

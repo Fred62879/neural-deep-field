@@ -385,34 +385,13 @@ class SpectraData:
 
     def split_spectra(self):
         """
-        Split spectra into
-          supervision
-          validation   (same as supervision, used for sanity check) and
-          test spectra ( test_spectra + supervision_spectra == all_spectra).
+        Split spectra either
+        Randomly (when doing spectra pretrain, sanity check, and generalization) or
+        Patch-wise (when doing main train)
         """
-        if exists(self.supervision_id_fname):
-            sup_ids = np.load(self.supervision_id_fname)
-            val_ids = sup_ids
-            if exists(self.test_id_fname):
-                test_ids = np.load(self.test_id_fname)
-            else:
-                indices = np.arange(self.num_gt_spectra)
-                test_ids = list(set(indices) - set(sup_ids))
-                test_ids = test_ids[:self.kwargs["generalization_max_num_spectra"]]
-                np.save(self.test_id_fname, test_ids)
-        else:
-            ids = np.arange(self.num_gt_spectra)
-            if self.spectra_process_patch_info:
-                test_ids, val_ids, sup_ids = self.split_spectra_patch_wise()
-            else: test_ids, val_ids, sup_ids = self.split_spectra_all_together()
-            val_ids = self.update_validation_ids(sup_ids, val_ids)
-            # if len(test_ids) == 0 or len(val_ids) == 0:
-            #     raise ValueError(
-            #         "Please select patches properly to make sure the number \
-            #         of validation and test spectra is not zero.")
-            np.save(self.test_id_fname, test_ids)
-            np.save(self.validation_id_fname, val_ids)
-            np.save(self.supervision_id_fname, sup_ids)
+        if self.spectra_process_patch_info:
+            test_ids, val_ids, sup_ids = self.split_spectra_patch_wise()
+        else: test_ids, val_ids, sup_ids = self.split_spectra_all_together()
 
         self.sup_ids = sup_ids
         self.val_ids = val_ids
@@ -424,7 +403,6 @@ class SpectraData:
         # log.info(f"test spectra ids: {test_ids}")
         # log.info(f"val spectra ids: {val_ids}")
         # log.info(f"sup spectra ids: {sup_ids}")
-        print(self.sup_ids, self.val_ids, self.test_ids)
         log.info(f"spectra train/valid/test: {len(sup_ids)}/{len(val_ids)}/{len(test_ids)}")
 
         # supervision spectra data (used during pretrain)
@@ -516,20 +494,120 @@ class SpectraData:
         for field in fields:
             self.data[field] = torch.tensor(self.data[field], dtype=dtype)
 
+    def split_spectra_all_together(self):
+        """
+        Randomly split spectra into
+          supervision
+          validation   (same as supervision, used for sanity check) and
+          test spectra ( test_spectra + supervision_spectra == all_spectra).
+        """
+        if exists(self.supervision_id_fname):
+            sup_ids = np.load(self.supervision_id_fname)
+            indices = np.arange(self.num_gt_spectra)
+            test_ids = list(set(indices) - set(sup_ids))
+        else:
+            ids = np.arange(self.num_gt_spectra)
+            np.random.seed(0)
+            np.random.shuffle(ids)
+            # test_ratio, val_ratio, sup_ratio = self.kwargs["spectra_split_ratios"]
+            # n_test = int(self.num_gt_spectra * test_ratio)
+            # n_val = int(self.num_gt_spectra * val_ratio)
+            # test_ids = ids[:n_test]
+            # validation_ids = ids[n_test:n_test+n_val]
+            # supervision_ids = ids[n_test+n_val:]
+            sup_ratio = self.kwargs["sup_spectra_ratio"]
+            n_sup = int(self.num_gt_spectra * sup_ratio)
+            sup_ids = ids[:n_sup]
+            test_ids = ids[n_sup:]
+            np.save(self.supervision_id_fname, sup_ids)
+
+        test_ids = test_ids[:self.kwargs["generalization_max_num_spectra"]]
+        sup_ids = sup_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
+        val_ids = sup_ids[:self.kwargs["sanity_check_max_num_spectra"]]
+        return test_ids, val_ids, sup_ids
+
+    def split_spectra_patch_wise(self):
+        """
+        Use all spectra within main train patches as the test or validation set.
+        Sample randomly from the rest spectra as the supervision set.
+        """
+        if exists(self.test_spectra_ids_fname) and \
+           exists(self.validation_spectra_ids_fname) and \
+           exists(self.supervision_spectra_ids_fname):
+            test_ids = np.load(self.test_spectra_ids_fname)
+            validation_ids = np.load(self.validation_spectra_ids_fname)
+            supervision_ids = np.load(self.supervision_spectra_ids_fname)
+        else:
+            # reserve all spectra in main train image patch as validation or test spectra
+            acc, test_ids, validation_ids = 0, [], []
+            for i, (tract, patch) in enumerate(
+                zip(self.kwargs["tracts"], self.kwargs["patches"])
+            ):
+                patch_uid = create_patch_uid(tract, patch)
+                cur_spectra_id_coords = np.array(self.data["gt_spectra_ids"][patch_uid])
+                cur_spectra_ids = cur_spectra_id_coords[:,0]
+
+                if self.kwargs["train_spectra_pixels_only"] or self.kwargs["use_full_patch"]:
+                    # randomly split spectra in each patch into validation and test set
+                    np.random.shuffle(cur_spectra_ids)
+                    num_val = int(len(cur_spectra_ids) * self.kwargs["val_spectra_ratio"])
+                    cur_val_ids = cur_spectra_ids[:num_val]
+                    cur_test_ids = cur_spectra_ids[num_val:]
+                else:
+                    # use spectra within cutout as validation set and the rest as test set
+                    num_rows = self.kwargs["patch_cutout_num_rows"][i]
+                    num_cols = self.kwargs["patch_cutout_num_cols"][i]
+                    (r, c) = self.kwargs["patch_cutout_start_pos"][i] # top-left corner
+
+                    coords = cur_spectra_id_coords[:,1:]
+                    within_cutout = (coords[:,0] >= r) & (coords[:,0] < r + num_rows) & \
+                        (coords[:,1] >= c) & (coords[:,1] < c + num_cols)
+                    cur_val_ids = cur_spectra_ids[within_cutout]
+                    cur_test_ids = list(set(cur_spectra_ids) - set(cur_val_ids))
+
+                test_ids.extend(cur_test_ids)
+                validation_ids.extend(cur_val_ids)
+                # validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
+                # acc += len(cur_spectra_ids)
+
+            # reserve all spectra from test patches as test spectra
+            for i, (tract, patch) in enumerate(
+                zip(self.kwargs["test_tracts"], self.kwargs["test_patches"])
+            ):
+                patch_uid = create_patch_uid(tract, patch)
+                cur_spectra_id_coords = np.array(self.data["gt_spectra_ids"][patch_uid])
+                cur_spectra_ids = cur_spectra_id_coords[:,0]
+                test_ids.extend(cur_spectra_ids)
+
+            test_ids = np.array(test_ids)
+            validation_ids = np.array(validation_ids)
+            # use the rest spectra for pretrain
+            supervision_ids = np.array(
+                list(set(ids)-set(validation_ids)-set(test_ids))).astype(int)
+
+            # reupdate validation ids
+            validation_ids = self.update_validation_ids(
+                supervision_ids, validation_ids)
+            if len(test_ids) == 0 or len(validation_ids) == 0:
+                raise ValueError(
+                    "Please select patches properly to make sure the number \
+                    of validation and test spectra is not zero.")
+
+        return test_ids, validation_ids, supervision_ids
+
     def update_validation_ids(self, supervision_ids, validation_ids):
         """
         Update validation spectra for sanity check or add more spectra for generalization.
         """
-        if self.kwargs["sample_from_codebook_pretrain_spectra"]:
-            # select spectra for redshift pretrain from spectra used for codebook pretrain
-            indices = np.arange(len(supervision_ids))
-            # np.random.seed(self.kwargs["seed"])
-            # np.random.shuffle(indices)
-            self.redshift_pretrain_ids = indices[:self.kwargs["redshift_pretrain_num_spectra"]]
-            validation_ids = supervision_ids[self.redshift_pretrain_ids]
+        # if self.kwargs["sample_from_codebook_pretrain_spectra"]:
+        #     # select spectra for redshift pretrain from spectra used for codebook pretrain
+        #     indices = np.arange(len(supervision_ids))
+        #     # np.random.seed(self.kwargs["seed"])
+        #     # np.random.shuffle(indices)
+        #     self.redshift_pretrain_ids = indices[:self.kwargs["redshift_pretrain_num_spectra"]]
+        #     validation_ids = supervision_ids[self.redshift_pretrain_ids]
 
-        elif self.kwargs["add_validation_spectra_not_in_supervision"]:
-            raise NotImplementedError()
+        if self.kwargs["add_validation_spectra_not_in_supervision"]:
             unseen_spectra_ids = np.array(
                 list(set(ids) - set(supervision_ids) - set(validation_ids)))
             # np.random.seed(0)
@@ -539,79 +617,6 @@ class SpectraData:
             assert len(set(validation_ids) & set(supervision_ids)) == 0
 
         return validation_ids
-
-    def split_spectra_all_together(self):
-        """
-        Randomly divide all spectra into test, validation, or supervision set.
-        """
-        ids = np.arange(self.num_gt_spectra)
-        np.random.seed(0)
-        np.random.shuffle(ids)
-        test_ratio, val_ratio, sup_ratio = self.kwargs["spectra_split_ratios"]
-        n_test = int(self.num_gt_spectra * test_ratio)
-        n_val = int(self.num_gt_spectra * val_ratio)
-        test_ids = ids[:n_test]
-        validation_ids = ids[n_test:n_test+n_val]
-        supervision_ids = ids[n_test+n_val:][
-            :self.kwargs["num_supervision_spectra_upper_bound"]]
-        return test_ids, validation_ids, supervision_ids
-
-    def split_spectra_patch_wise(self):
-        """
-        Use all spectra within main train patches as the test or validation set.
-        Sample randomly from the rest spectra as the supervision set.
-        """
-        # reserve all spectra in main train image patch as validation or test spectra
-        acc, test_ids, validation_ids = 0, [], []
-        for i, (tract, patch) in enumerate(
-            zip(self.kwargs["tracts"], self.kwargs["patches"])
-        ):
-            patch_uid = create_patch_uid(tract, patch)
-            cur_spectra_id_coords = np.array(self.data["gt_spectra_ids"][patch_uid])
-            cur_spectra_ids = cur_spectra_id_coords[:,0]
-
-            if self.kwargs["train_spectra_pixels_only"] or self.kwargs["use_full_patch"]:
-                # randomly split spectra in each patch into validation and test set
-                np.random.shuffle(cur_spectra_ids)
-                num_val = int(len(cur_spectra_ids) * self.kwargs["val_spectra_ratio"])
-                cur_val_ids = cur_spectra_ids[:num_val]
-                cur_test_ids = cur_spectra_ids[num_val:]
-            else:
-                # use spectra within cutout as validation set and the rest as test set
-                num_rows = self.kwargs["patch_cutout_num_rows"][i]
-                num_cols = self.kwargs["patch_cutout_num_cols"][i]
-                (r, c) = self.kwargs["patch_cutout_start_pos"][i] # top-left corner
-
-                coords = cur_spectra_id_coords[:,1:]
-                within_cutout = (coords[:,0] >= r) & (coords[:,0] < r + num_rows) & \
-                    (coords[:,1] >= c) & (coords[:,1] < c + num_cols)
-                cur_val_ids = cur_spectra_ids[within_cutout]
-                cur_test_ids = list(set(cur_spectra_ids) - set(cur_val_ids))
-
-            test_ids.extend(cur_test_ids)
-            validation_ids.extend(cur_val_ids)
-            # validation_patch_ids[patch_uid] = np.arange(acc, acc+len(cur_spectra_ids))
-            # acc += len(cur_spectra_ids)
-
-        # reserve all spectra from test patches as test spectra
-        for i, (tract, patch) in enumerate(
-            zip(self.kwargs["test_tracts"], self.kwargs["test_patches"])
-        ):
-            patch_uid = create_patch_uid(tract, patch)
-            cur_spectra_id_coords = np.array(self.data["gt_spectra_ids"][patch_uid])
-            cur_spectra_ids = cur_spectra_id_coords[:,0]
-            test_ids.extend(cur_spectra_ids)
-
-        test_ids = np.array(test_ids)
-        validation_ids = np.array(validation_ids)
-
-        # use the rest spectra for pretrain
-        supervision_ids = np.array(list(set(ids)-set(validation_ids)-set(test_ids))).astype(int)
-        np.random.seed(self.kwargs["seed"])
-        np.random.shuffle(supervision_ids)
-        supervision_ids = supervision_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
-
-        return test_ids, validation_ids, supervision_ids
 
     def correct_redshift_based_on_bins(self):
         """

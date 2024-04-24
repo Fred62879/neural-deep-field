@@ -74,8 +74,9 @@ class AstroInferrer(BaseInferrer):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         if self.verbose: log.info(f"logging to {self.log_dir}")
         prefix = {"codebook_pretrain_infer":"pretrain",
-                  "redshift_pretrain_infer":"pretrain",
-                  "main_infer":"val", "test":"test"}[self.mode]
+                  "sanity_check_infer":"val",
+                  "generalization_infer":"test",
+                  "main_infer":"val","test":"test"}[self.mode]
 
         for cur_path, cur_pname, in zip(
                 ["model_dir","recon_dir","recon_synthetic_dir","metric_dir",
@@ -94,16 +95,17 @@ class AstroInferrer(BaseInferrer):
             Path(path).mkdir(parents=True, exist_ok=True)
 
     def init_data(self):
-        if self.mode == "codebook_pretrain_infer" or self.mode == "redshift_pretrain_infer":
+        if self.mode == "codebook_pretrain_infer" or \
+           self.mode == "sanity_check_infer" or \
+           self.mode == "generalization_infer":
             self.batch_size = self.extra_args["pretrain_infer_batch_size"]
 
-            if self.mode == "redshift_pretrain_infer":
+            if self.mode == "sanity_check_infer":
                 self.dataset.set_spectra_source("val")
-                if self.extra_args["sample_from_codebook_pretrain_spectra"]:
-                    num_spectra_max = self.dataset.get_num_validation_spectra()
-                    self.num_spectra = min(
-                        num_spectra_max, self.extra_args["redshift_pretrain_num_spectra"])
-                else: self.num_spectra = self.dataset.get_num_validation_spectra()
+                self.num_spectra = self.dataset.get_num_validation_spectra()
+            elif self.mode == "generalization_infer":
+                self.dataset.set_spectra_source("test")
+                self.num_spectra = self.dataset.get_num_test_spectra()
             else:
                 self.dataset.set_spectra_source("sup")
                 self.num_spectra = self.dataset.get_num_supervision_spectra()
@@ -181,10 +183,11 @@ class AstroInferrer(BaseInferrer):
         self.test = self.mode == "test"
         self.main_infer = self.mode == "main_infer"
         self.codebook_pretrain_infer = self.mode == "codebook_pretrain_infer"
-        self.redshift_pretrain_infer = self.mode == "redshift_pretrain_infer"
-        self.pretrain_infer = self.codebook_pretrain_infer or self.redshift_pretrain_infer
+        self.sanity_check_infer = self.mode == "sanity_check_infer"
+        self.generalization_infer = self.mode == "generalization_infer"
+        self.pretrain_infer = self.codebook_pretrain_infer or \
+            self.sanity_check_infer or self.generalization_infer
         assert sum([self.test,self.main_infer,self.pretrain_infer]) == 1
-        # assert not self.redshift_pretrain_infer or not self.infer_selected
 
         # quantization setups
         assert not self.extra_args["temped_qtz"]
@@ -243,19 +246,20 @@ class AstroInferrer(BaseInferrer):
                    self.neg_sup_wrong_redshift
 
         # sanity check & generalization mandates brute force
-        assert not self.mode == "redshift_pretrain_infer" or \
+        assert not \
+            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer") or \
             self.calculate_binwise_spectra_loss
         # three different brute force strategies during sc & generalization
         self.regularize_binwise_spectra_latents = \
-            self.mode == "redshift_pretrain" and \
+            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer") and \
             self.calculate_binwise_spectra_loss and \
             self.extra_args["regularize_binwise_spectra_latents"]
         self.optimize_latents_for_each_redshift_bin = \
-            self.mode == "redshift_pretrain" and \
+            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer") and \
             self.calculate_binwise_spectra_loss and \
             self.extra_args["optimize_latents_for_each_redshift_bin"]
         self.optimize_one_latent_for_all_redshift_bins = \
-            self.mode == "redshift_pretrain" and \
+            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer") and \
             self.calculate_binwise_spectra_loss and \
             not self.regularize_binwise_spectra_latents and \
             not self.extra_args["optimize_latents_for_each_redshift_bin"]
@@ -428,7 +432,9 @@ class AstroInferrer(BaseInferrer):
         self.requested_fields = []
 
         if self.pretrain_infer:
-            assert (not self.redshift_pretrain_infer or self.infer_selected), \
+            assert (
+                not (self.sanity_check_infer or self.generalization_infer) or \
+                self.infer_selected), \
                 "we shall only infer selected spectra during codebook pretrain infer."
 
             self.coords_source = None
@@ -1473,7 +1479,6 @@ class AstroInferrer(BaseInferrer):
                 We first find index of the supervision spectra selected for sanity check.
                 Then find from them those that are outlier during sanity check.
                 """
-                assert self.extra_args["sample_from_codebook_pretrain_spectra"]
                 outlier_ids = np.load(fname)
                 selected_supervision_spectra_ids = \
                     self.dataset.get_redshift_pretrain_spectra_ids()
@@ -1561,7 +1566,8 @@ class AstroInferrer(BaseInferrer):
             latents = checkpoint["model_state_dict"]["nef.latents"]
             all_latents = latents.detach().cpu().numpy() # [bsz,nbins,dim]
 
-        if self.mode == "redshift_pretrain_infer":
+        # index gt bin latents only
+        if self.mode == "sanity_check_infer" or self.mode == "generalization_infer":
             gt_bin_ids = self.dataset.create_gt_redshift_bin_ids()
             if all_models_together:
                 all_latents = all_latents[:,gt_bin_ids[0],gt_bin_ids[1],:]
@@ -1570,8 +1576,9 @@ class AstroInferrer(BaseInferrer):
             if ids is not None:
                 all_latents = all_latents[ids]
 
-        if self.extra_args["sanity_check_plot_same_pca_dim_as_pretrain"] and \
-           self.mode == "redshift_pretrain_infer":
+        # select pca latent dim
+        if self.mode == "sanity_check_infer" or self.mode == "generalization_infer":
+            assert self.extra_args["sanity_check_plot_same_pca_dim_as_pretrain"]
             fname = join(self.log_dir, "..", self.extra_args["pretrain_pca_dim_fname"])
             assert exists(fname)
             selected_axes = np.load(fname)

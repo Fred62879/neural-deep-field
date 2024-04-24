@@ -82,7 +82,10 @@ class AstroDataset(Dataset):
     ############
 
     def set_mode(self, mode):
-        """ Possible modes: ["codebook_pretrain","redshift_pretrain","main_train","codebook_pretrain_infer","redshift_pretrain_infer","main_infer","test"]
+        """
+        Possible modes: ["codebook_pretrain","sanity_check","generalization",
+                         "main_train","codebook_pretrain_infer","sanity_check_infer",
+                         "generalization_infer","main_infer","test"]
         """
         self.mode = mode
 
@@ -365,7 +368,8 @@ class AstroDataset(Dataset):
         """
         if self.infer_selected:
             assert self.mode == "codebook_pretrain_infer" or \
-                self.mode == "redshift_pretrain_infer"
+                self.mode == "sanity_check_infer" or \
+                self.mode == "generalization_infer"
             assert "selected_ids" in self.data
             data = data[self.data["selected_ids"]]
         return data[idx]

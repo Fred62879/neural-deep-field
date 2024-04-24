@@ -314,8 +314,10 @@ def get_input_latent_dim(**kwargs):
     if kwargs["pretrain_codebook"] and \
        ("codebook_pretrain" in kwargs["tasks"] or \
         "codebook_pretrain_infer" in kwargs["tasks"] or \
-        "redshift_pretrain" in kwargs["tasks"] or \
-        "redshift_pretrain_infer" in kwargs["tasks"] or \
+        "sanity_check" in kwargs["tasks"] or \
+        "sanity_check_infer" in kwargs["tasks"] or \
+        "generalization" in kwargs["tasks"] or \
+        "generalization_infer" in kwargs["tasks"] or \
         kwargs["main_train_with_pretrained_latents"]
        ):
         latents_dim = kwargs["spectra_latent_dim"]

@@ -20,14 +20,15 @@ def register_class(cls, name):
     globals()[name] = cls
 
 def get_pretrain_pipelines(pipelines, tasks, args):
-    if "codebook_pretrain" in tasks or "redshift_pretrain" in tasks:
+    if "codebook_pretrain" in tasks or "sanity_check" in tasks or "generalization" in tasks:
         pretrain_nef = CodebookPretrainNerf(
             codebook_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
             **vars(args)
         )
         pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
 
-    if "codebook_pretrain_infer" in tasks or "redshift_pretrain_infer" in tasks:
+    if "codebook_pretrain_infer" in tasks or "sanity_check_infer" in tasks or \
+       "generalization_infer" in tasks:
         pretrain_nef = CodebookPretrainNerf(
             codebook_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
             **vars(args)

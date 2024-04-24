@@ -5,8 +5,8 @@ global:
     exp_name: 'autodecoder-200-spectra-pe'
     log_fname: 'sc'
 
-    tasks: ['redshift_pretrain']
-    tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
+    tasks: ['sanity_check']
+    tasks: ['sanity_check_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -35,7 +35,7 @@ pretrain:
     spectra_latent_dim: 16
 
     sample_from_codebook_pretrain_spectra: True
-    redshift_pretrain_num_spectra: 140
+    sanity_check_max_num_spectra: 10
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False

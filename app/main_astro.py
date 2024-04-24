@@ -33,7 +33,7 @@ if __name__ == "__main__":
         )
         trainer.train()
 
-    if "redshift_pretrain" in tasks and args.pretrain_codebook:
+    if ("generalization" in tasks or "sanity_check" in tasks) and args.pretrain_codebook:
         optim_cls, optim_params = get_optimizer_from_config(args)
         trainer_cls = CodebookTrainerDebug if args.debug_lbfgs else CodebookTrainer
         trainer = get_trainer_from_config(
@@ -55,10 +55,16 @@ if __name__ == "__main__":
             pipelines, dataset, device, "codebook_pretrain_infer", args)
         inferrer.infer()
 
-    if "redshift_pretrain_infer" in tasks and args.pretrain_codebook:
+    if "sanity_check_infer" in tasks and args.pretrain_codebook:
         # infer for pretrained model (recon gt spectra & codebook spectra ect.)
         inferrer = get_inferrer_from_config(
-            pipelines, dataset, device, "redshift_pretrain_infer", args)
+            pipelines, dataset, device, "sanity_check_infer", args)
+        inferrer.infer()
+
+    if "generalization_infer" in tasks and args.pretrain_codebook:
+        # infer for pretrained model (recon gt spectra & codebook spectra ect.)
+        inferrer = get_inferrer_from_config(
+            pipelines, dataset, device, "generalization_infer", args)
         inferrer.infer()
 
     if "main_infer" in tasks:
