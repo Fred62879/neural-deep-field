@@ -64,6 +64,9 @@ class SpectraData:
         self.zcosmos_spectra_data_format = kwargs["zcosmos_spectra_data_format"]
         self.download_zcosmos_source_spectra = kwargs["download_zcosmos_source_spectra"]
 
+        self.deep2_spectra_data_format = kwargs["deep2_spectra_data_format"]
+        self.deep3_spectra_data_format = kwargs["deep3_spectra_data_format"]
+
         self.load_spectra_data_from_cache = kwargs["load_spectra_data_from_cache"]
 
         self.spectra_smooth_sigma = kwargs["spectra_smooth_sigma"]
@@ -148,6 +151,20 @@ class SpectraData:
                 self.kwargs["zcosmos_processed_spectra_cho"],
                 self.kwargs["zcosmos_source_spectra_fname"],
                 self.zcosmos_spectra_data_format)
+
+        if "deep2" in self.spectra_data_sources:
+            self._set_path(
+                "deep2", spectra_path,
+                self.kwargs["deep2_processed_spectra_cho"],
+                self.kwargs["deep2_source_spectra_fname"],
+                self.deep2_spectra_data_format)
+
+        if "deep3" in self.spectra_data_sources:
+            self._set_path(
+                "deep3", spectra_path,
+                self.kwargs["deep3_processed_spectra_cho"],
+                self.kwargs["deep3_source_spectra_fname"],
+                self.deep3_spectra_data_format)
 
     def _set_path(self, data_source, spectra_path, spectra_cho,
                   source_spectra_fname, data_format
@@ -873,6 +890,11 @@ class SpectraData:
         # [ self.process_one_spectra(None, None, df, None, idx, None)
         #   for idx in range(num_spectra) ]
         for idx in tqdm(range(num_spectra)):
+        #     if df.loc[idx,"source"] == "deep3":
+        #         for deep3_portion in ["b","r"]:
+        #             self.process_one_spectra(
+        #                 None, None, None, df, None, idx, None, deep3_portion)
+        #     else:
             self.process_one_spectra(
                 None, None, None, df, None, idx, None)
 
@@ -970,6 +992,7 @@ class SpectraData:
           patch: patch that contains the current spectra
           idx: spectra idx (within the df table)
           img_coord: img coord for current spectra
+          deep3_portion: each deep3 spectra is recorded separately into r and b portion
         """
         spectra_source = df.iloc[idx]["source"]
         data_format = getattr(self, f"{spectra_source}_spectra_data_format")
@@ -980,6 +1003,9 @@ class SpectraData:
         if data_format == "fits": fname = spectra_fname[:-5]
         elif data_format == "tbl": fname = spectra_fname[:-4]
         else: raise ValueError("Unsupported spectra data format")
+
+        deep3_portion = df.loc[idx,"deep3_portion"]
+        if not pandas.isna(deep3_portion): fname += f"_{deep3_portion}"
 
         spectra_out_fname = f"{fname}.npy"
         spectra_mask_fname = f"{fname}_mask.npy"
@@ -997,24 +1023,27 @@ class SpectraData:
             exists(spectra_mask_fname) and exists(spectra_sup_bound_fname)
 
         if not current_spectra_processed:
+            spectra = unpack_gt_spectra(
+                spectra_in_fname, format=data_format,
+                source=spectra_source, has_ivar=True,
+                deep3_portion=deep3_portion
+            ) # [(2,)2/3,nsmpl]
+
             gt_spectra, mask, sup_bound = process_gt_spectra(
-                spectra_source,
-                spectra_in_fname,
+                spectra,
                 spectra_out_fname,
                 spectra_mask_fname,
                 spectra_sup_bound_fname,
                 df.loc[idx,"zspec"],
                 self.emitted_wave_distrib,
-                upsample_scale=self.kwargs["spectra_upsample_scale"],
-                sigma=self.spectra_smooth_sigma,
-                format=data_format,
-                trans_range=self.trans_range,
-                supervision_wave_range=self.supervision_wave_range,
-                max_spectra_len=self.kwargs["max_spectra_len"],
-                colors=self.kwargs["plot_colors"],
                 trans_data=self.trans_data,
-                has_ivar=True, #spectra_source != ""
-                process_ivar=self.process_ivar)
+                trans_range=self.trans_range,
+                process_ivar=self.process_ivar,
+                sigma=self.spectra_smooth_sigma,
+                colors=self.kwargs["plot_colors"],
+                max_spectra_len=self.kwargs["max_spectra_len"],
+                supervision_wave_range=self.supervision_wave_range,
+                upsample_scale=self.kwargs["spectra_upsample_scale"])
         else:
             if self.spectra_process_patch_info:
                 gt_spectra = np.load(spectra_out_fname)
@@ -1075,6 +1104,12 @@ class SpectraData:
                 download=self.download_zcosmos_source_spectra,
                 link=self.zcosmos_source_spectra_link,
                 path=self.zcosmos_source_spectra_path)
+            df.append(cur_df)
+
+        if "deep3" in self.spectra_data_sources:
+            cur_df = read_deep3_table(
+                self.deep3_source_metadata_table_fname,
+                format=self.deep3_spectra_data_format)
             df.append(cur_df)
 
         df = pandas.concat(df)
@@ -1612,6 +1647,67 @@ def wave_based_sort(spectra):
     ids = np.argsort(spectra[0])
     return spectra[:,ids]
 
+def find_valid_spectra_range(spectra):
+    invalid = spectra[2] <= 0 # ivar <= 0
+    invalid = invalid | np.isnan(spectra[1])
+    invalid = invalid | (spectra[1] == np.inf)
+    invalid = invalid | (spectra[1] == -np.inf)
+    return ~invalid
+
+# def check_invalid_within_valid_range(valid):
+#     """
+#     Check if the given spectra has invalid observations within valid range
+#      ( i.e. whether this happens: ivar [0,0,0,1,1,1,0,0,0,1,1,1,0,0,0] 0s in the middle).
+#     @Params
+#       valid: [n] Bool array indicating whether each lambda has valid observation
+#     @Return
+#       lo: start index of valid range (3 in ex above)
+#       hi: end index of valid range (11 in ex above)
+#       bool: whether ex above happens
+#     """
+#     ids = np.arange(len(valid))
+#     valid_ids = ids[valid]
+#     n_invalid_head = valid_ids[0]
+#     n_invalid_tail = n - 1 - valid_ids[-1]
+#     invalid_exist_within_valid_range = np.sum(valid) < n - n_invalid_head - n_invalid_tail
+#     return valid_ids[0], valid_ids[-1], invalid_exist_within_valid_range
+
+def handle_spectra_invalid_range(spectra, spectra_fname, plot):
+    """
+    Handle range of spectra where  there are no valid observations.
+    """
+    if plot:
+        plt.plot(spectra[0],spectra[1])
+        plt.savefig(spectra_fname[:-4] + "_orig.png")
+        plt.close()
+
+    n = spectra.shape[1]
+    valid = find_valid_spectra_range(spectra)
+    # lo, hi, invalid_embedded = check_invalid_within_valid_range(valid)
+    # if invalid_embedded:
+    #    pass # may want to print and check manually
+
+    # mask nested invalid range
+    ids = np.arange(n)
+    valid_ids = ids[valid]
+    mask = np.zeros(n)
+    mask[valid] = 1
+    if plot:
+        plt.plot(spectra[0],spectra[1])
+        plt.plot(spectra[0],mask*np.max(spectra[1]))
+        plt.savefig(spectra_fname[:-4] + "_orig_w_mask.png")
+        plt.close()
+
+    # drop (instead of mask) head and tail invalid range
+    mask = mask[valid_ids[0]:valid_ids[-1]+1]
+    spectra = spectra[:,valid_ids[0]:valid_ids[-1]+1]
+    if plot:
+        plt.plot(spectra[0],spectra[1])
+        plt.plot(spectra[0], mask*np.max(spectra[1]))
+        plt.savefig(spectra_fname[:-4] + "_orig_cut_two_ends_w_mask.png")
+        plt.close()
+    return spectra, mask
+
 def resample_spectra(spectra, upsample_scale):
     """
     Resample spectra to be regularly sampled.
@@ -1653,17 +1749,18 @@ def resample_spectra(spectra, upsample_scale):
 
     return resampled_spectra
 
-def create_spectra_mask(spectra, max_spectra_len):
-    """ Mask out padded region of spectra.
-    """
-    m, n = spectra.shape
-    if n == max_spectra_len: mask = np.ones(max_spectra_len).astype(bool)
-    else: mask = np.zeros(max_spectra_len).astype(bool)
-    return mask
+# def create_spectra_mask(spectra, max_spectra_len):
+#     """
+#     Mask out invalid and padded region of spectra.
+#     """
+#     m, n = spectra.shape
+#     if n == max_spectra_len: mask = np.ones(max_spectra_len).astype(bool)
+#     else: mask = np.zeros(max_spectra_len).astype(bool)
+#     return mask
 
 def pad_spectra(spectra, mask, max_len):
-    """ Pad spectra if shorter than max_len.
-        Update mask to 1 for un-padded region.
+    """
+    Pad spectra if shorter than max_len and update mask to 1 for un-padded region.
     """
     m, n = spectra.shape
     offset = max_len - n
@@ -1772,19 +1869,11 @@ def get_wave_weight(spectra, redshift, emitted_wave_distrib, bound):
     return weight
 
 def process_gt_spectra(
-        spectra_source,
-        source_spectra_fname,
-        spectra_fname,
-        spectra_mask_fname,
-        spectra_sup_bound_fname,
-        redshift, emitted_wave_distrib,
-        upsample_scale=10,
-        sigma=-1, format="tbl",
-        trans_range=None, supervision_wave_range=None,
-        save=True, plot=True,
-        colors=None, trans_data=None,
-        max_spectra_len=-1, validator=None,
-        has_ivar=True, process_ivar=True
+        spectra, spectra_fname, spectra_mask_fname,
+        spectra_sup_bound_fname, redshift, emitted_wave_distrib,
+        sigma=-1, upsample_scale=10, trans_range=None, save=True, plot=True,
+        colors=None, trans_data=None, supervision_wave_range=None, max_spectra_len=-1,
+        validator=None, process_ivar=True
 ):
     """ Load gt spectra wave and flux for spectra supervision and
           spectrum plotting. Also smooth the gt spectra.
@@ -1801,19 +1890,23 @@ def process_gt_spectra(
                     (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
           mask:     mask out bad flux values
     """
-    spectra = unpack_gt_spectra(
-        source_spectra_fname, format=format,
-        source=spectra_source, has_ivar=has_ivar) # [2/3,nsmpl]
     assert spectra.shape[1] <= max_spectra_len
     spectra = wave_based_sort(spectra)
+    raise NotImplementedError()
+
+    print(spectra.shape)
+    spectra, mask = handle_spectra_invalid_range(spectra, spectra_fname, plot)
+    # mask = create_spectra_mask(spectra, max_spectra_len)
+    print(spectra.shape)
     spectra = resample_spectra(spectra, upsample_scale)
-    mask = create_spectra_mask(spectra, max_spectra_len)
-    spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
-    spectra, mask = clean_flux(spectra, mask)
+    # spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
+    # spectra, mask = clean_flux(spectra, mask)
     spectra = convolve_spectra(spectra, bound, std=sigma, process_ivar=process_ivar)
     spectra, mask, sup_mask, sup_bound = mask_spectra_range(
         spectra, mask, bound, trans_range, supervision_wave_range)
     spectra = normalize_spectra(spectra, sup_bound, process_ivar=process_ivar)
+
+    spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
     spectra = spectra.astype(np.float32)
 
     weight = get_wave_weight(spectra, redshift, emitted_wave_distrib, sup_bound)
@@ -1906,9 +1999,7 @@ def read_zcosmos_table(fname, format, download=False, link="", path=""):
     }, inplace=True)
     df.drop(columns=['CC','IMAG_AB','FLAG_S','FLAG_X','FLAG_R','FLAG_UV'], inplace=True)
     df.dropna(subset=["ra","dec","zspec","spectra_fname"], inplace=True)
-    df.reset_index(inplace=True) # reset index after dropping
-    df.drop(columns=["index"], inplace=True)
-    df["source"] = "zcosmos"
+    df.reset_index(inplace=True, drop=True) # reset index after dropping
     df["ra"] = pandas.to_numeric(df["ra"])
     df["dec"] = pandas.to_numeric(df["dec"])
     df["zspec"] = pandas.to_numeric(df["zspec"])
@@ -1922,6 +2013,15 @@ def read_zcosmos_table(fname, format, download=False, link="", path=""):
         spectra_fnames = list(df[col_name])
         download_data_parallel(link, path, spectra_fnames)
         log.info("zcosmos source spectra data download complete")
+    df["source"] = "zcosmos"
+    return df
+
+def read_deep3_table(fname, format):
+    with open(fname, "rb") as fp:
+        df = pickle.load(fp)
+    df.dropna(subset=["zspec"], inplace=True)
+    df.reset_index(inplace=True, drop=True)
+    df["source"] = "deep3"
     return df
 
 def read_manual_table(fname):
@@ -1944,7 +2044,7 @@ def read_manual_table(fname):
         data[colname] = np.array(data[colname]).astype(dtype)
     return data
 
-def unpack_gt_spectra(fname, format="tbl", source="deimos", has_ivar=True):
+def unpack_gt_spectra(fname, format="tbl", source="deimos", has_ivar=True, deep3_portion=None):
     if format == "tbl":
         if source == "deimos":
             data = pandas.read_table(fname, comment="#", delim_whitespace=True)
@@ -1957,16 +2057,25 @@ def unpack_gt_spectra(fname, format="tbl", source="deimos", has_ivar=True):
         if has_ivar: ivar = data[:,2]
         else: ivar = np.ones(wave.shape)
     elif format == "fits":
-        hdu = fits.open(fname)[1]
-        header = hdu.header
-        data = hdu.data[0]
-        data_names = [header["TTYPE1"],header["TTYPE2"],header["TTYPE3"]]
-        wave_id = data_names.index("LAMBDA")
-        flux_id = data_names.index("FLUX")
-        ivar_id = data_names.index("IVAR")
-        wave, flux = data[wave_id], data[flux_id]
-        if has_ivar: ivar = data[ivar_id]
-        else: ivar = np.ones(wave.shape)
+        if source == "deep3":
+            """
+            header["EXTNAME"]
+            1: Bxspf-B; 2: Bxspf-R; 3: Horne-B; 4: Horne-R
+            """
+            hdu_id = { "Bxspf-B":1, "Bxspf-R":2 }[deep3_portion]
+            hdu = fits.open(fname)[hdu_id].data
+            wave, flux, ivar = hdu["LAMBDA"][0], hdu["SPEC"][0], hdu["IVAR"][0]
+        else:
+            hdu = fits.open(fname)[1]
+            header = hdu.header
+            data = hdu.data[0]
+            data_names = [header["TTYPE1"],header["TTYPE2"],header["TTYPE3"]]
+            wave_id = data_names.index("LAMBDA")
+            flux_id = data_names.index("FLUX")
+            ivar_id = data_names.index("IVAR")
+            wave, flux = data[wave_id], data[flux_id]
+            if has_ivar: ivar = data[ivar_id]
+            else: ivar = np.ones(wave.shape)
     else:
         raise ValueError(f"invalid spectra data format: {format}")
     spectra = np.array([wave, flux, ivar])

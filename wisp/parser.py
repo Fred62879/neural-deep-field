@@ -636,6 +636,14 @@ def define_cmd_line_args():
     data_group.add_argument("--zcosmos-processed-spectra-cho", type=str)
     data_group.add_argument("--download-zcosmos-source-spectra", action="store_true")
 
+    data_group.add_argument("--deep2-spectra-data-format", type=str)
+    data_group.add_argument("--deep2-source-spectra-fname", type=str)
+    data_group.add_argument("--deep2-processed-spectra-cho", type=str)
+
+    data_group.add_argument("--deep3-spectra-data-format", type=str)
+    data_group.add_argument("--deep3-source-spectra-fname", type=str)
+    data_group.add_argument("--deep3-processed-spectra-cho", type=str)
+
     data_group.add_argument("--max-spectra-len", type=int)
     data_group.add_argument("--spectra-tracts", type=str, nargs='+')
     data_group.add_argument("--spectra-patches_r", type=str, nargs='+')
