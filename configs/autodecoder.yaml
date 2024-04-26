@@ -32,6 +32,18 @@ pretrain:
     pretrain_num_wave_samples: 100
     pretrain_wave_sample_method: 'uniform_dense'
 
+    apply_gt_redshift: True
+    calculate_binwise_spectra_loss: False # brute force, each bin has its own spectra
+
+    # if brute force, we have three choices
+    regularize_binwise_spectra_latents: False      # conflicts each other
+    optimize_latents_for_each_redshift_bin: False  #
+    # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
+
+    calculate_spectra_loss_based_on_optimal_bin: False # only if we use single latent
+    calculate_spectra_loss_based_on_top_n_bins: True # only if we use single latent
+    num_bins_to_calculate_spectra_loss: 5
+
     spectra_latent_dim: 16
 
     load_pretrained_spectra_latents: False
@@ -74,18 +86,6 @@ trainer:
     save_model_every: 200
 
     plot_l2_loss: True
-
-    apply_gt_redshift: True
-    calculate_binwise_spectra_loss: False # brute force, each bin has its own spectra
-
-    # if brute force, we have three choices
-    regularize_binwise_spectra_latents: False      # conflicts each other
-    optimize_latents_for_each_redshift_bin: False  #
-    # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
-
-    calculate_spectra_loss_based_on_optimal_bin: False # only if we use single latent
-    calculate_spectra_loss_based_on_top_n_bins: True # only if we use single latent
-    num_bins_to_calculate_spectra_loss: 5
 
     resume_train: True
     resume_log_dir: '20240422-191522_ssim_32_in_3_512_no_skip_no_regu_2k_epochs'

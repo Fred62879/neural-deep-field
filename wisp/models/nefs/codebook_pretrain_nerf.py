@@ -121,6 +121,9 @@ class CodebookPretrainNerf(BaseNeuralField):
                self.kwargs["plot_spectrum_with_loss"]:
                 channels.append("spectra_lambdawise_loss")
 
+            if self.kwargs["regress_lambdawise_weights"]:
+                channels.append("lambdawise_weights")
+
         self._register_forward_function(self.pretrain, channels)
 
     def init_model(self):

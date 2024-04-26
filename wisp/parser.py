@@ -347,6 +347,9 @@ def define_cmd_line_args():
     decoder_group.add_argument("--siren-coords-scaler", type=int, default=1)
     decoder_group.add_argument("--siren-last-linear", action="store_true")
 
+    decoder_group.add_argument("--lambdawise-weights-decoder-num-layers", action="store_true")
+    decoder_group.add_argument("--lambdawise-weights-decoder-hidden-dim", action="store_true")
+
     ###################
     # Quantization arguments
     ###################
@@ -385,6 +388,8 @@ def define_cmd_line_args():
                                 help="alternate optimization starts with.")
     pretrain_group.add_argument("--em-alternation-steps", nargs="+", type=int,
                                 help="alternately optimize each for given steps.")
+
+    pretrain_group.add_argument("--regress-lambdawise-weights", action="store_true")
 
     # redshift generation strategy
     pretrain_group.add_argument("--apply-gt-redshift", action="store_true",
@@ -769,7 +774,10 @@ def define_cmd_line_args():
     train_group.add_argument("--pixel-loss-cho",type=str, choices=["l1","l2"])
     train_group.add_argument("--pixel-loss-reduction",type=str, choices=["none","sum","mean"])
     train_group.add_argument("--spectra-loss-cho",type=str, choices=["l1","l2"])
-    train_group.add_argument("--spectra-loss-reduction",type=str, choices=["none","sum","mean"])
+    train_group.add_argument("--spectra-loss-reduction",type=str,
+                             choices=["none","sum","mean"])
+    train_group.add_argument("--spectra-lambdawise-loss-reduction",type=str,
+                             choices=["none","sum","mean"])
     train_group.add_argument("--redshift-loss-cho",type=str, choices=["l1","l2"])
     train_group.add_argument("--redshift-loss-reduction",type=str, choices=["none","sum","mean"])
 

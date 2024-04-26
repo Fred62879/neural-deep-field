@@ -218,11 +218,17 @@ class CodebookTrainer(BaseTrainer):
         self.plot_loss = self.extra_args["plot_loss"]
         self.plot_l2_loss = self.extra_args["plot_l2_loss"] and \
             self.extra_args["spectra_loss_cho"] == "ssim1d"
-        self.plot_gt_bin_loss = (self.mode == "sanity_check" or self.mode == "generalization") and \
-            self.calculate_binwise_spectra_loss
+        self.plot_gt_bin_loss = self.calculate_binwise_spectra_loss and \
+            (self.mode == "sanity_check" or self.mode == "generalization")
+
         self.index_latent = True # index latents as coords in model
-        self.split_latent = (self.mode == "sanity_check" or self.mode == "generalization") and \
-            self.extra_args["split_latent"]
+        self.split_latent = self.extra_args["split_latent"] and \
+            (self.mode == "sanity_check" or self.mode == "generalization")
+
+        self.regress_lambdawise_weights = self.extra_args["regress_lambdawise_weights"] and \
+            (self.mode == "sanity_check" or self.mode == "generalization")
+        # assert not self.regress_lambdawise_weights or \
+        #     self.extra_args["spectra_lambdawise_loss_reduction"] == "none"
 
         self.regularize_redshift_logits = self.extra_args["regularize_redshift_logits"]
         self.redshift_logits_regu_method = self.extra_args["redshift_logits_regu_method"]
@@ -1426,6 +1432,7 @@ class CodebookTrainer(BaseTrainer):
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
             optimize_bins_separately=self.optimize_bins_separately,
+            regress_lambdawise_weights=self.regress_lambdawise_weights,
             regularize_codebook_spectra=self.regularize_codebook_spectra,
             calculate_binwise_spectra_loss=self.calculate_binwise_spectra_loss,
             save_coords=self.regularize_spectra_latents,

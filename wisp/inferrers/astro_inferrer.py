@@ -1499,8 +1499,7 @@ class AstroInferrer(BaseInferrer):
         #     self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss)
         # reduction = None if cal_lambdawise_loss else \
         #     self.extra_args["spectra_loss_reduction"]
-
-        self.spectra_reduce_func = get_reduce(self.extra_args["spectra_loss_reduction"])
+        # self.spectra_reduce_func = get_reduce(self.extra_args["spectra_loss_reduction"])
 
         loss_func = get_loss(
             self.extra_args["spectra_loss_cho"], "none", self.cuda,

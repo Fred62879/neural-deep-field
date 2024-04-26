@@ -427,19 +427,23 @@ def calculate_spectra_loss(
         ret[nm] = lambdawise_loss.permute(1,0,2)
 
     if recon_fluxes.ndim == 3:
-        masks = masks[None,...].tile(n_bins,1,1)
-        binwise_loss = lambdawise_loss * masks # [nbins,bsz,nsmpl]
+        if kwargs["regress_lambdawise_weights"]:
+            weights = ret["lambdawise_weights"]
+            lambdawise_loss = lambdawise_loss * weights
 
-        if kwargs["spectra_loss_reduction"] == "sum":
-            binwise_loss = torch.sum(binwise_loss, dim=-1) # [nbins,bsz]
-        elif kwargs["spectra_loss_reduction"] == "mean":
+        masks = masks[None,...].tile(n_bins,1,1)
+        lambdawise_loss = lambdawise_loss * masks # [nbins,bsz,nsmpl]
+
+        if kwargs["spectra_lambdawise_loss_reduction"] == "sum":
+            binwise_loss = torch.sum(lambdawise_loss, dim=-1).T # [nbins,bsz]
+        elif kwargs["spectra_lambdawise_loss_reduction"] == "mean":
             masks = torch.sum(masks, dim=-1)
             masks[masks == 0] = 1
-            binwise_loss = torch.sum(binwise_loss, dim=-1) / masks
+            binwise_loss = (torch.sum(lambdawise_loss, dim=-1) / masks).T
         else: raise ValueError()
 
         nm = "spectra_binwise_loss" + loss_name_suffix
-        ret[nm] = binwise_loss.T
+        ret[nm] = binwise_loss
 
 def calculate_redshift_logits(beta, ret):
     """ Calculate logits for redshift bins.

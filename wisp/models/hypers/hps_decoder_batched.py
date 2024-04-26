@@ -36,6 +36,7 @@ class HyperSpectralDecoderB(nn.Module):
         self.qtz_spectra = qtz_spectra
 
         self.reduction_order = "qtz_first"
+        self.regress_lambdawise_weights = kwargs["regress_lambdawise_weights"]
         self.classify_redshift = _model_redshift and get_bool_classify_redshift(**kwargs)
 
         # self.recon_codebook_spectra = kwargs["regu_codebook_spectra"] and \
@@ -143,6 +144,11 @@ class HyperSpectralDecoderB(nn.Module):
                 skip_all_layers=self.kwargs["decoder_latents_skip_all_layers"],
                 activate_before_skip=self.kwargs["decoder_activate_before_latents_skip"],
                 skip_add_conversion_method=self.kwargs["decoder_latents_skip_add_conversion_method"])
+        if self.regress_lambdawise_weights:
+            self.lambdawise_weights_decoder = BasicDecoder(
+                input_dim, 1, True,
+                num_layers=self.kwargs["lambdawise_weights_decoder_num_layers"],
+                hidden_dim=self.kwargs["lambdawise_weights_decoder_hidden_dim"])
 
     ##################
     # Setters
@@ -312,6 +318,12 @@ class HyperSpectralDecoderB(nn.Module):
             latents = self.convert(wave, input, redshift, wave_bound) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
 
+        if self.regress_lambdawise_weights:
+            # latents [...,bsz,nsmpl,dim], weights [...,bsz,nsmpl,1]
+            weights = self.lambdawise_weights_decoder(latents)[...,0]
+            weights = F.softmax(weights, dim=-1)
+            ret["lambdawise_weights"] = weights
+
         spectra = self.spectra_dim_reduction(
             input, spectra, ret, qtz_args,
             spectra_masks, spectra_loss_func,
@@ -327,7 +339,7 @@ class HyperSpectralDecoderB(nn.Module):
         if self.intensify:
             spectra = self.intensifier(spectra)
 
-        return spectra
+        return latents, spectra
 
     def forward_codebook_spectra(self, codebook, full_emitted_wave, full_wave_bound, ret):
         """ @Params
@@ -402,7 +414,7 @@ class HyperSpectralDecoderB(nn.Module):
             ret["redshift"] if self.classify_redshift else ret["redshift"][:bsz]
         timer.check("hps_decoder::got redshift")
 
-        ret["spectra"] = self.reconstruct_spectra(
+        latents, ret["spectra"] = self.reconstruct_spectra(
             latents, wave,
             None if ret["scaler"] is None else ret["scaler"][:bsz],
             None if ret["bias"] is None else ret["bias"][:bsz],

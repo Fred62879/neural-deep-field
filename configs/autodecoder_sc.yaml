@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-200-spectra-pe'
+    exp_name: 'autodecoder-10-spectra-pe'
     log_fname: 'sc'
 
     tasks: ['sanity_check']
-    tasks: ['sanity_check_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
+    #tasks: ['sanity_check_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -31,6 +31,18 @@ pretrain:
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 50
     pretrain_wave_sample_method: 'uniform_dense'
+    
+    apply_gt_redshift: False
+    calculate_binwise_spectra_loss: True # brute force, each bin has its own spectra
+
+    # if brute force, we have three choices
+    regularize_binwise_spectra_latents: False     # conflicts each other
+    optimize_latents_for_each_redshift_bin: True  #
+    # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
+
+    calculate_spectra_loss_based_on_optimal_bin: True # only if we use single latent
+    calculate_spectra_loss_based_on_top_n_bins: False # only if we use single latent
+    num_bins_to_calculate_spectra_loss: 5
 
     spectra_latent_dim: 16
 
@@ -42,11 +54,15 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240417-175032_ssim_3_512_no_skip_no_regu_10k_epochs'
-    pretrained_model_name: 'model-ep10000-bch0.pth'
+    pretrain_log_dir: '20240425-185026'
+    pretrained_model_name: 'model-ep1200-bch0.pth'
 
     regularize_spectra_latents: False
     spectra_latents_regu_beta: -1
+
+    regress_lambdawise_weights: True
+    lambdawise_weights_decoder_num_layers: 1
+    lambdawise_weights_decoder_hidden_dim: 128
 
 decoder:
     decoder_activation_type: relu #gaussian
@@ -71,24 +87,13 @@ trainer:
 
     plot_l2_loss: True
 
-    apply_gt_redshift: False
-    calculate_binwise_spectra_loss: True # brute force, each bin has its own spectra
-
-    # if brute force, we have three choices
-    regularize_binwise_spectra_latents: False     # conflicts each other
-    optimize_latents_for_each_redshift_bin: True  #
-    # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
-
-    calculate_spectra_loss_based_on_optimal_bin: True # only if we use single latent
-    calculate_spectra_loss_based_on_top_n_bins: False # only if we use single latent
-    num_bins_to_calculate_spectra_loss: 5
-
     resume_train: False
     resume_log_dir: ''
     resume_model_fname: 'model-ep200-bch0.pth'
 
     spectra_loss_cho: ssim1d
     spectra_loss_reduction: mean
+    spectra_lambdawise_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
 
@@ -136,8 +141,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 200
-    num_supervision_spectra_upper_bound: 200
+    num_gt_spectra_upper_bound: 10
+    num_supervision_spectra_upper_bound: 10
 
     filter_redshift: False
     filter_redshift_lo: 0.02
