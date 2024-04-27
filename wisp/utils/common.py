@@ -86,9 +86,11 @@ def get_optimal_wrong_bin_ids(ret, data):
     """ Get id of the non-GT redshift bin that achieves the lowest spectra loss.
     """
     all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
+    val = all_bin_losses[data["gt_redshift_bin_masks"]]
     all_bin_losses[data["gt_redshift_bin_masks"]] = float('inf')
     optimal_wrong_bin_losses, optimal_wrong_bin_ids = torch.min(
         all_bin_losses, dim=-1) # ids of optimal wrong bins
+    all_bin_losses[data["gt_redshift_bin_masks"]] = val
     return optimal_wrong_bin_ids, optimal_wrong_bin_losses
 
 def get_bin_id(lo, bin_width, val):
@@ -331,6 +333,11 @@ def get_input_latent_dim(**kwargs):
         latents_dim = 2
     return latents_dim
 
+def remove_from_device(data):
+    for field in data.keys():
+        if data[field].__class__.__name__ == "Tensor":
+            data[field] = data[field].detach().cpu()
+
 def add_to_device(data, valid_fields, device):
     for field in valid_fields:
         if field in data:
@@ -364,8 +371,8 @@ def query_GPU_mem():
     handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
     # card id 0 hardcoded here, there is also a call to get all available card ids, so we could iterate
     info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
-    print(f"Total memory: {info.total/1e9}GB")
-    print(f"Free memory: {info.free/1e9}GB")
+    # print(f"Total memory: {info.total/1e9}GB")
+    # print(f"Free memory: {info.free/1e9}GB")
     print(f"Used memory: {info.used/1e9}GB")
     nvidia_smi.nvmlShutdown()
 
@@ -448,7 +455,6 @@ def forward(
         trans_sample_method="none",
         optimize_bins_separately=False,
         redshift_supervision_train=False,
-        regress_lambdawise_weights=False,
         regularize_codebook_spectra=False,
         calculate_binwise_spectra_loss=False,
         calculate_lambdawise_spectra_loss=False,
@@ -468,6 +474,7 @@ def forward(
         save_spectra_latents=False,
         save_codebook_spectra=False,
         save_spectra_all_bins=False,
+        save_lambdawise_weights=False,
         init_redshift_prob=None, # debug
 ):
     net_args, requested_channels = {}, []
@@ -553,7 +560,7 @@ def forward(
             net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
         if optimize_bins_separately:
             net_args["gt_redshift_bin_masks"] = data["gt_redshift_bin_masks"]
-        if regress_lambdawise_weights:
+        if save_lambdawise_weights:
             requested_channels.append("lambdawise_weights")
     else:
         raise ValueError("Unsupported space dimension.")

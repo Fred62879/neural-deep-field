@@ -679,6 +679,7 @@ class CodebookTrainer(BaseTrainer):
         self.log_dict["redshift_logits_regu"] = 0.0
         self.log_dict["spectra_latents_regu"] = 0.0
         self.log_dict["codebook_spectra_regu"] = 0.0
+        self.log_dict["spectra_wrong_bin_regu"] = 0.0
         self.log_dict["binwise_spectra_latents_regu"] = 0.0
 
     #############
@@ -1078,6 +1079,8 @@ class CodebookTrainer(BaseTrainer):
     def add_loss(self):
         m = len(self.train_data_loader) if self.train_based_on_epochs else 1
 
+        # we need to store below data on cpu
+        # i.e. self.log_dict["xxx"] should be on cpu rather than gpu
         self.loss.append(self.log_dict["total_loss"] / m)
         if self.plot_gt_bin_loss:
             self.gt_bin_loss.append(self.log_dict["gt_bin_loss"] / m)
@@ -1432,7 +1435,6 @@ class CodebookTrainer(BaseTrainer):
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
             optimize_bins_separately=self.optimize_bins_separately,
-            regress_lambdawise_weights=self.regress_lambdawise_weights,
             regularize_codebook_spectra=self.regularize_codebook_spectra,
             calculate_binwise_spectra_loss=self.calculate_binwise_spectra_loss,
             save_coords=self.regularize_spectra_latents,
@@ -1447,7 +1449,8 @@ class CodebookTrainer(BaseTrainer):
         )
         self.timer.check("forwarded")
 
-        spectra_loss, spectra_l2_loss = self._calculate_spectra_loss(ret, data)
+        spectra_loss, spectra_l2_loss, spectra_wrong_bin_regu = \
+            self._calculate_spectra_loss(ret, data)
 
         # ii) pixel supervision loss
         recon_loss = 0
@@ -1523,7 +1526,8 @@ class CodebookTrainer(BaseTrainer):
             self.log_dict["codebook_spectra_regu"] += codebook_spectra_regu
 
         total_loss = spectra_loss + recon_loss + spectra_latents_regu + \
-            redshift_logits_regu + codebook_spectra_regu + binwise_spectra_latents_regu
+            spectra_wrong_bin_regu + redshift_logits_regu + \
+            codebook_spectra_regu + binwise_spectra_latents_regu
         self.log_dict["total_loss"] += total_loss.item()
 
         if self.plot_l2_loss:
@@ -1535,14 +1539,15 @@ class CodebookTrainer(BaseTrainer):
         return total_loss, ret
 
     def _calculate_spectra_loss(self, ret, data):
-        spectra_l2_loss = None
+        spectra_wrong_bin_regu, spectra_l2_loss = 0, None
+
         if self.calculate_binwise_spectra_loss:
             if self.neg_sup_wrong_redshift:
                 spectra_loss = self._calculate_neg_sup_loss(ret, data)
             else:
-                spectra_loss = self._calculate_all_bin_loss(ret, data)
+                spectra_loss, spectra_wrong_bin_regu = self._calculate_all_bin_loss(ret, data)
                 if self.plot_l2_loss:
-                    spectra_l2_loss = self._calculate_all_bin_loss(
+                    spectra_l2_loss, _ = self._calculate_all_bin_loss(
                         ret, data, loss_name_suffix="_l2")
         else:
             spectra_loss = self._calculate_single_bin_loss(
@@ -1554,7 +1559,9 @@ class CodebookTrainer(BaseTrainer):
         self.log_dict["spectra_loss"] += spectra_loss.item()
         if self.plot_l2_loss:
             self.log_dict["spectra_l2_loss"] += spectra_l2_loss.item()
-        return spectra_loss, spectra_l2_loss
+
+        # print(spectra_loss, spectra_wrong_bin_regu)
+        return spectra_loss, spectra_l2_loss, spectra_wrong_bin_regu
 
     def _calculate_single_bin_loss(self, ret, data, loss_func):
         lambdawise_spectra_loss = loss_func(data["spectra_source_data"], ret["spectra"])
@@ -1579,6 +1586,7 @@ class CodebookTrainer(BaseTrainer):
 
         loss_name = "spectra_binwise_loss" + loss_name_suffix
         all_bin_loss = ret[loss_name] # [bsz,n_bins]
+        spectra_regu = 0
 
         # if self.optimize_gt_bin_only:
         #     _masks = data["gt_redshift_bin_masks"].to(all_bin_loss.device)
@@ -1602,6 +1610,13 @@ class CodebookTrainer(BaseTrainer):
             spectra_loss = (all_bin_loss[ids[0],ids[1]]).view(bsz,-1)
             spectra_loss = self.spectra_reduce_func(spectra_loss)
         else:
+            if self.regress_lambdawise_weights:
+                gt_bin_loss = all_bin_loss[data["gt_redshift_bin_masks"]] # [bsz]
+                _, optimal_wrong_bin_loss = get_optimal_wrong_bin_ids(ret, data) # [bsz]
+                spectra_regu = gt_bin_loss - optimal_wrong_bin_loss
+                spectra_regu[spectra_regu < 0] = 0
+                spectra_regu = self.spectra_reduce_func(spectra_regu)
+                self.log_dict["spectra_wrong_bin_regu"] += spectra_regu
             spectra_loss = all_bin_loss
 
         spectra_loss = self.spectra_reduce_func(all_bin_loss)
@@ -1612,7 +1627,7 @@ class CodebookTrainer(BaseTrainer):
             loss_name = f"gt_bin{loss_name_suffix}_loss"
             self.log_dict[loss_name] += gt_bin_loss.item()
 
-        return spectra_loss
+        return spectra_loss, spectra_regu
 
     def _calculate_neg_sup_loss(self, ret, data):
         """ Calculate spectra loss under negative supervision settings.
@@ -1700,6 +1715,9 @@ class CodebookTrainer(BaseTrainer):
         if self.regularize_codebook_spectra:
             log_text += " | codebook spectra regu: {:>.3E}".format(
                 self.log_dict["codebook_spectra_regu"] / m)
+        if self.regress_lambdawise_weights:
+            log_text += " | spectra wrong bin regu: {:>.3E}".format(
+                self.log_dict["spectra_wrong_bin_regu"] / m)
 
         log.info(log_text)
 

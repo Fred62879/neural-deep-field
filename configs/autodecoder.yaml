@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-10-spectra-pe'
+    exp_name: 'autodecoder-1600-spectra-pe'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    #tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -101,7 +101,7 @@ infer:
 
     # infer_log_dir: ''
     infer_selected: True
-    pretrain_num_infer_upper_bound: 140
+    pretrain_num_infer_upper_bound: 70
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
@@ -136,8 +136,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 10 #25400
-    num_supervision_spectra_upper_bound: 10 #25400
+    num_gt_spectra_upper_bound: 1600 #25400
+    num_supervision_spectra_upper_bound: 1600 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02

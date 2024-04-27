@@ -438,10 +438,12 @@ def calculate_spectra_loss(
             binwise_loss = torch.sum(lambdawise_loss, dim=-1).T # [nbins,bsz]
         elif kwargs["spectra_lambdawise_loss_reduction"] == "mean":
             masks = torch.sum(masks, dim=-1)
+            # print(torch.isinf(lambdawise_loss).any())
             masks[masks == 0] = 1
             binwise_loss = (torch.sum(lambdawise_loss, dim=-1) / masks).T
         else: raise ValueError()
 
+        # print(torch.isinf(binwise_loss).any())
         nm = "spectra_binwise_loss" + loss_name_suffix
         ret[nm] = binwise_loss
 

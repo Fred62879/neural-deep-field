@@ -197,6 +197,10 @@ pretrain:
 
     debug_lbfgs: False
 
+    regress_lambdawise_weights: False
+    lambdawise_weights_decoder_num_layers: 1
+    lambdawise_weights_decoder_hidden_dim: 128
+
 decoder:
     decoder_batch_norm: False
     decoder_num_hidden_layers: 1

@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-10-spectra-pe'
+    exp_name: 'autodecoder-1600-spectra-pe'
     log_fname: 'sc'
 
     tasks: ['sanity_check']
-    #tasks: ['sanity_check_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
+    tasks: ['sanity_check_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -26,7 +26,7 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    pretrain_batch_size: 100
+    pretrain_batch_size: 150 #95
 
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 50
@@ -47,20 +47,20 @@ pretrain:
     spectra_latent_dim: 16
 
     sample_from_codebook_pretrain_spectra: True
-    sanity_check_max_num_spectra: 10
+    sanity_check_max_num_spectra: 100
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240425-185026'
-    pretrained_model_name: 'model-ep1200-bch0.pth'
+    pretrain_log_dir: '20240426-155851'
+    pretrained_model_name: 'model-ep2000-bch0.pth'
 
     regularize_spectra_latents: False
     spectra_latents_regu_beta: -1
 
-    regress_lambdawise_weights: True
+    regress_lambdawise_weights: False
     lambdawise_weights_decoder_num_layers: 1
     lambdawise_weights_decoder_hidden_dim: 128
 
@@ -79,11 +79,11 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 1000
+    num_epochs: 500
     batch_size: 5500
-    log_cli_every: 100
+    log_cli_every: 50
     plot_grad_every: -1
-    save_model_every: 100
+    save_model_every: 50
 
     plot_l2_loss: True
 
@@ -141,8 +141,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 10
-    num_supervision_spectra_upper_bound: 10
+    num_gt_spectra_upper_bound: 1600
+    num_supervision_spectra_upper_bound: 1600
 
     filter_redshift: False
     filter_redshift_lo: 0.02

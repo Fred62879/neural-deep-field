@@ -198,6 +198,8 @@ class BaseTrainer(ABC):
         """
         Override this function to use custom logs.
         """
+        del self.log_dict
+        self.log_dict = {}
         self.log_dict['total_loss'] = 0.0
         self.log_dict['total_iter_count'] = 0
 

@@ -1004,8 +1004,9 @@ class SpectraData:
         elif data_format == "tbl": fname = spectra_fname[:-4]
         else: raise ValueError("Unsupported spectra data format")
 
-        deep3_portion = df.loc[idx,"deep3_portion"]
-        if not pandas.isna(deep3_portion): fname += f"_{deep3_portion}"
+        if "deep3_portion" in df:
+            deep3_portion = df.loc[idx,"deep3_portion"]
+            if not pandas.isna(deep3_portion): fname += f"_{deep3_portion}"
 
         spectra_out_fname = f"{fname}.npy"
         spectra_mask_fname = f"{fname}_mask.npy"
