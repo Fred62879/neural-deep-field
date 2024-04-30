@@ -26,7 +26,7 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    pretrain_batch_size: 150 #95
+    pretrain_batch_size: 100
 
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 50
@@ -60,7 +60,8 @@ pretrain:
     regularize_spectra_latents: False
     spectra_latents_regu_beta: -1
 
-    regress_lambdawise_weights: False
+    regress_lambdawise_weights: True
+    regress_lambdawise_weights_share_latents: True
     lambdawise_weights_decoder_num_layers: 1
     lambdawise_weights_decoder_hidden_dim: 128
 
@@ -79,11 +80,11 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 500
+    num_epochs: 10
     batch_size: 5500
-    log_cli_every: 50
+    log_cli_every: 2
     plot_grad_every: -1
-    save_model_every: 50
+    save_model_every: 2
 
     plot_l2_loss: True
 

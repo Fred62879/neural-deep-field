@@ -37,6 +37,8 @@ class HyperSpectralDecoderB(nn.Module):
 
         self.reduction_order = "qtz_first"
         self.regress_lambdawise_weights = kwargs["regress_lambdawise_weights"]
+        self.regress_lambdawise_weights_share_latents = \
+            kwargs["regress_lambdawise_weights_share_latents"]
         self.classify_redshift = _model_redshift and get_bool_classify_redshift(**kwargs)
 
         # self.recon_codebook_spectra = kwargs["regu_codebook_spectra"] and \
@@ -288,7 +290,7 @@ class HyperSpectralDecoderB(nn.Module):
     def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
                             wave_bound, ret, codebook, qtz_args,
                             spectra_masks, spectra_loss_func, spectra_l2_loss_func,
-                            gt_spectra, gt_redshift_bin_ids
+                            gt_spectra, gt_redshift_bin_ids, optm_bin_ids
     ):
         """ Reconstruct emitted (under possibly multiple redshift values) spectra
               using given input and wave.
@@ -300,6 +302,7 @@ class HyperSpectralDecoderB(nn.Module):
                          [bsz] o.w.
                wave_bound: lo and hi lambda values used for linear normalization [2]
                codebook: nn.Parameter([num_embed,embed_dim])
+               optm_bin_ids: id of bin with best spectra quality from previous optim round
             @Return
                spectra: reconstructed emitted spectra [bsz,num_nsmpl]
         """
@@ -320,8 +323,16 @@ class HyperSpectralDecoderB(nn.Module):
 
         if self.regress_lambdawise_weights:
             # latents [...,bsz,nsmpl,dim], weights [...,bsz,nsmpl,1]
-            weights = self.lambdawise_weights_decoder(latents)[...,0]
+            if self.regress_lambdawise_weights_share_latents:
+                optm_bin_ids = create_batch_ids(optm_bin_ids)
+                # print('*', optm_bin_ids.shape, optm_bin_ids, latents.shape)
+                weight_latents = latents[optm_bin_ids[1],optm_bin_ids[0]]
+            else: weight_latents = latents
+
+            weights = self.lambdawise_weights_decoder(weight_latents)[...,0]
             weights = F.softmax(weights, dim=-1)
+            if self.regress_lambdawise_weights_share_latents and latents.ndim == 4:
+                weights = weights[None,...].tile(latents.shape[0],1,1)
             ret["lambdawise_weights"] = weights
 
         spectra = self.spectra_dim_reduction(
@@ -365,7 +376,9 @@ class HyperSpectralDecoderB(nn.Module):
                 spectra_loss_func=None,
                 spectra_l2_loss_func=None,
                 spectra_source_data=None,
-                gt_redshift_bin_ids=None):
+                optm_bin_ids=None,
+                gt_redshift_bin_ids=None
+    ):
         """
         @Param
         latents:   (encoded or original) coords or logits for quantization.
@@ -424,7 +437,8 @@ class HyperSpectralDecoderB(nn.Module):
             spectra_loss_func,
             spectra_l2_loss_func,
             spectra_source_data,
-            gt_redshift_bin_ids
+            gt_redshift_bin_ids,
+            optm_bin_ids
         )
         timer.check("hps_decoder::spectra reconstruced")
 

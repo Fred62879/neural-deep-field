@@ -227,8 +227,8 @@ class CodebookTrainer(BaseTrainer):
 
         self.regress_lambdawise_weights = self.extra_args["regress_lambdawise_weights"] and \
             (self.mode == "sanity_check" or self.mode == "generalization")
-        # assert not self.regress_lambdawise_weights or \
-        #     self.extra_args["spectra_lambdawise_loss_reduction"] == "none"
+        self.regress_lambdawise_weights_share_latents = self.regress_lambdawise_weights and \
+            self.extra_args["regress_lambdawise_weights_share_latents"]
 
         self.regularize_redshift_logits = self.extra_args["regularize_redshift_logits"]
         self.redshift_logits_regu_method = self.extra_args["redshift_logits_regu_method"]
@@ -545,6 +545,11 @@ class CodebookTrainer(BaseTrainer):
         if self.classify_redshift:
             self.dataset.set_num_redshift_bins(self.num_redshift_bins)
 
+        if self.regress_lambdawise_weights_share_latents:
+            self.optm_bin_ids = torch.zeros(self.num_spectra).to(torch.long)
+            self.dataset.set_hardcode_data("optm_bin_ids", self.optm_bin_ids)
+            fields.append("optm_bin_ids")
+
         self.dataset.set_fields(fields)
 
     #############
@@ -638,6 +643,9 @@ class CodebookTrainer(BaseTrainer):
         if self.save_data_every > -1 and self.cur_iter % self.save_data_every == 0:
             self.pre_save_data()
 
+        if self.regress_lambdawise_weights_share_latents:
+            self.optm_bin_ids = []
+
         self.timer.check("begun iteration")
 
     def end_iter(self):
@@ -652,6 +660,10 @@ class CodebookTrainer(BaseTrainer):
             self.render_tb()
         if self.save_data_every > -1 and self.cur_iter % self.save_data_every == 0:
             self.post_save_data()
+
+        if self.regress_lambdawise_weights_share_latents:
+            self.optm_bin_ids = torch.stack(self.optm_bin_ids).detach().cpu()
+            self.dataset.set_hardcode_data("optm_bin_ids", self.optm_bin_ids)
 
         self._toggle_grad(on_off="on")
         freeze_layers_incl( # always freeze pe
@@ -1005,6 +1017,8 @@ class CodebookTrainer(BaseTrainer):
         }
         if (self.mode == "sanity_check" or self.mode == "generalization"):
             checkpoint["codebook_pretrain_total_steps"] = self.codebook_pretrain_total_steps
+        if self.regress_lambdawise_weights_share_latents:
+            checkpoint["optimal_bin_ids"] = self.optm_bin_ids
         torch.save(checkpoint, model_fname)
         return checkpoint
 
@@ -1437,8 +1451,9 @@ class CodebookTrainer(BaseTrainer):
             optimize_bins_separately=self.optimize_bins_separately,
             regularize_codebook_spectra=self.regularize_codebook_spectra,
             calculate_binwise_spectra_loss=self.calculate_binwise_spectra_loss,
-            save_coords=self.regularize_spectra_latents,
+            regress_lambdawise_weights_share_latents=self.regress_lambdawise_weights_share_latents,
             save_spectra=True,
+            save_coords=self.regularize_spectra_latents,
             save_redshift=self.save_data and self.save_redshift,
             save_qtz_weights=self.save_data and self.save_qtz_weights,
             save_redshift_logits=self.regularize_redshift_logits or \
@@ -1610,6 +1625,7 @@ class CodebookTrainer(BaseTrainer):
             spectra_loss = (all_bin_loss[ids[0],ids[1]]).view(bsz,-1)
             spectra_loss = self.spectra_reduce_func(spectra_loss)
         else:
+            spectra_loss = all_bin_loss
             if self.regress_lambdawise_weights:
                 gt_bin_loss = all_bin_loss[data["gt_redshift_bin_masks"]] # [bsz]
                 _, optimal_wrong_bin_loss = get_optimal_wrong_bin_ids(ret, data) # [bsz]
@@ -1617,7 +1633,8 @@ class CodebookTrainer(BaseTrainer):
                 spectra_regu[spectra_regu < 0] = 0
                 spectra_regu = self.spectra_reduce_func(spectra_regu)
                 self.log_dict["spectra_wrong_bin_regu"] += spectra_regu
-            spectra_loss = all_bin_loss
+                if self.regress_lambdawise_weights_share_latents:
+                    self.optm_bin_ids.extend(torch.argmin(all_bin_loss, dim=-1))
 
         spectra_loss = self.spectra_reduce_func(all_bin_loss)
 

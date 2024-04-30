@@ -174,7 +174,6 @@ class spectra_supervision_loss(nn.Module):
             if gt_spectra.ndim == 3:
                 ret = self.loss_func(gt_spectra[:,1], recon_fluxes)
             elif gt_spectra.ndim == 4: # binwise spectra loss
-                # print(gt_spectra.shape, recon_fluxes.shape)
                 ret = self.loss_func(gt_spectra[:,:,1], recon_fluxes)
             else: raise ValueError()
         assert recon_fluxes.shape == ret.shape

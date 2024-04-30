@@ -165,6 +165,7 @@ class CodebookPretrainNerf(BaseNeuralField):
                  full_emitted_wave=None,
                  qtz_args=None, specz=None,
                  idx=None, selected_ids=None,
+                 optm_bin_ids=None,
                  init_redshift_prob=None, # debug
                  spectra_masks=None,
                  spectra_loss_func=None,
@@ -189,6 +190,7 @@ class CodebookPretrainNerf(BaseNeuralField):
 
               specz: gt redshift
 
+              optm_bin_ids: [bsz] ids of bin with best spectra quality at pervious step
               gt_redshift_bin_ids: [bsz,nbins]
               gt_redshift_bin_masks: [bsz,nbins]
         """
@@ -250,6 +252,7 @@ class CodebookPretrainNerf(BaseNeuralField):
             spectra_loss_func=spectra_loss_func,
             spectra_l2_loss_func=spectra_l2_loss_func,
             spectra_source_data=spectra_source_data,
+            optm_bin_ids=optm_bin_ids,
             gt_redshift_bin_ids=gt_redshift_bin_ids
         )
 

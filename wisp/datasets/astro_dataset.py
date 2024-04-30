@@ -149,6 +149,9 @@ class AstroDataset(Dataset):
     # Getters
     ############
 
+    def get_fields(self):
+        return list(self.requested_fields)
+
     def get_trans_data_obj(self):
         return self.trans_dataset
 

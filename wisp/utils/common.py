@@ -458,6 +458,7 @@ def forward(
         regularize_codebook_spectra=False,
         calculate_binwise_spectra_loss=False,
         calculate_lambdawise_spectra_loss=False,
+        regress_lambdawise_weights_share_latents=False,
         save_coords=False,
         save_scaler=False,
         save_spectra=False,
@@ -562,6 +563,8 @@ def forward(
             net_args["gt_redshift_bin_masks"] = data["gt_redshift_bin_masks"]
         if save_lambdawise_weights:
             requested_channels.append("lambdawise_weights")
+        if regress_lambdawise_weights_share_latents:
+            net_args["optm_bin_ids"] = data["optm_bin_ids"]
     else:
         raise ValueError("Unsupported space dimension.")
 

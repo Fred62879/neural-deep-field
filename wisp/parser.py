@@ -390,6 +390,8 @@ def define_cmd_line_args():
                                 help="alternately optimize each for given steps.")
 
     pretrain_group.add_argument("--regress-lambdawise-weights", action="store_true")
+    pretrain_group.add_argument("--regress-lambdawise-weights-share-latents",
+                                action="store_true")
 
     # redshift generation strategy
     pretrain_group.add_argument("--apply-gt-redshift", action="store_true",

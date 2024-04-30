@@ -280,6 +280,11 @@ class AstroInferrer(BaseInferrer):
         self.save_redshift_main = self.save_redshift and self.main_infer
         self.save_redshift_test = self.save_redshift and self.test
 
+        self.regress_lambdawise_weights = self.extra_args["regress_lambdawise_weights"] and \
+            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer")
+        self.regress_lambdawise_weights_share_latents = self.regress_lambdawise_weights and \
+            self.extra_args["regress_lambdawise_weights_share_latents"]
+
         # i) infer all coords using original model
         self.recon_img_all_pixels = False
         self.recon_img_sup_spectra = False  # -
@@ -972,6 +977,14 @@ class AstroInferrer(BaseInferrer):
             else:
                 self.spectra_infer_pipeline.set_latents(
                     checkpoint["model_state_dict"]["nef.latents"])
+
+                if self.regress_lambdawise_weights_share_latents:
+                    optm_bin_ids = checkpoint["optimal_bin_ids"]
+                    self.dataset.set_hardcode_data("optm_bin_ids", optm_bin_ids)
+                    fields = self.dataset.get_fields()
+                    fields.append("optm_bin_ids")
+                    self.dataset.set_fields( set(fields) )
+
             if self.has_redshift_latents:
                 self.spectra_infer_pipeline.set_redshift_latents(
                     checkpoint["model_state_dict"]["nef.redshift_latents"])
@@ -1254,6 +1267,8 @@ class AstroInferrer(BaseInferrer):
                         calculate_lambdawise_spectra_loss= \
                             self.plot_spectra_color_based_on_loss or \
                             self.plot_spectra_with_loss,
+                        regress_lambdawise_weights_share_latents= \
+                            self.regress_lambdawise_weights_share_latents,
                         save_redshift=self.save_redshift,
                         save_spectra=self.recon_spectra,
                         save_qtz_weights=self.save_qtz_weights,
