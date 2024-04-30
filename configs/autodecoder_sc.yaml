@@ -108,16 +108,17 @@ infer:
     pretrain_infer_num_wave: 200
     pretrain_infer_wave_sample_method: 'uniform_non_random'
 
-    infer_selected: False
-    pretrain_num_infer_upper_bound: 35
+    infer_selected: True
+    pretrain_num_infer_upper_bound: 5
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: True
+    infer_outlier_only: False
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False
     plot_spectrum_with_ivar: False
     plot_spectrum_with_lines: False
     plot_spectrum_with_recon: False
+    plot_spectrum_with_weights: True
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: True
     plot_spectrum_under_optimal_wrong_bin: True

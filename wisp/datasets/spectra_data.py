@@ -1254,7 +1254,7 @@ class SpectraData:
         """
         sub_dir, title, z, gt_wave, ivar, gt_flux, recon_wave, recon_flux, \
             recon_flux2, recon_loss2, recon_flux3, recon_loss3, lambdawise_losses, \
-            plot_gt_spectrum, plot_recon_spectrum = pargs
+            lambdawise_weights, plot_gt_spectrum, plot_recon_spectrum = pargs
 
         if self.kwargs["plot_spectrum_together"]:
             if nrows == 1: axis = axs if ncols == 1 else axs[idx%ncols]
@@ -1293,6 +1293,11 @@ class SpectraData:
                              "recon", "solid", None, lambdawise_losses, None,
                              self.kwargs["plot_spectrum_with_loss"],
                              self.kwargs["plot_spectrum_color_based_on_loss"])
+
+        if lambdawise_weights is not None:
+            plot_spectra(fig, axis, z, recon_wave, lambdawise_weights, "gray",
+                         "gt bin", "solid", None, None, None,)
+
         if recon_flux2 is not None:
             plot_spectra(fig, axis, z, recon_wave, recon_flux2, flux2_color,
                          "gt bin", "solid", None, lambdawise_losses[0], None,
@@ -1326,10 +1331,11 @@ class SpectraData:
         return sub_dir, metrics
 
     def process_recon_flux(
-            self, recon_flux, recon_mask, clip, spectra_clipped, recon_wave, lambdawise_losses
+        self, recon_flux, recon_mask, clip, spectra_clipped, recon_wave, lambdawise_losses
     ):
-        # print(recon_flux.shape, recon_mask.shape, lambdawise_losses.shape, recon_mask.shape)
-        # Process reconstructed spectra with local averageing (flux) and clipping.
+        """
+        Process reconstructed spectra with local averageing (flux) and clipping.
+        """
         if recon_flux.ndim == 2:
             if self.average_neighbour_spectra:
                 recon_flux = np.mean(recon_flux, axis=0)
@@ -1339,17 +1345,16 @@ class SpectraData:
             recon_wave = recon_wave[recon_mask]
             recon_flux = recon_flux[recon_mask]
             if lambdawise_losses is not None:
-                # print(lambdawise_losses.shape, recon_mask.shape, sum(recon_mask))
                 lambdawise_losses = lambdawise_losses[recon_mask]
-                # print('*', lambdawise_losses.shape, lambdawise_losses)
         return recon_wave, recon_flux, lambdawise_losses
 
     def process_spectrum_plot_data(self, flux_norm_cho, is_codebook, clip,
                                    spectra_clipped, calculate_metrics, linelist, data):
         """ Collect data for spectrum plotting for the given spectra.
         """
-        (title, z, gt_wave, ivar, gt_mask, gt_flux, recon_wave, recon_mask, recon_flux,
-         recon_flux2, recon_loss2, recon_flux3, recon_loss3, lambdawise_losses) = data
+        (title, z, gt_wave, ivar, gt_mask, gt_flux, recon_wave, recon_mask,
+         recon_flux, recon_flux2, recon_loss2, recon_flux3, recon_loss3,
+         lambdawise_losses, lambdawise_weights) = data
         """
         lambdawise_losses
           apply_gt_redshift: [nsmpl]
@@ -1358,11 +1363,14 @@ class SpectraData:
         sub_dir = ""
         if self.spectra_neighbour_size > 0:
             sub_dir += f"average_{self.spectra_neighbour_size}_neighbours_"
-        if ivar is not None:              sub_dir += "with_ivar_"
-        if linelist is not None:          sub_dir += "with_lines_"
-        if self.convolve_spectra:         sub_dir += "convolved_"
-        if clip or spectra_clipped:       sub_dir += "clipped_"
-        if lambdawise_losses is not None: sub_dir += 'loss_based_color_'
+        if ivar is not None:               sub_dir += "with_ivar_"
+        if linelist is not None:           sub_dir += "with_lines_"
+        if self.convolve_spectra:          sub_dir += "convolved_"
+        if clip or spectra_clipped:        sub_dir += "clipped_"
+        if recon_flux2 is not None:        sub_dir += 'with_gt_bin_'
+        if recon_flux3 is not None:        sub_dir += 'with_wrong_bin_'
+        if lambdawise_losses is not None:  sub_dir += 'loss_based_color_'
+        if lambdawise_weights is not None: sub_dir += 'with_weights_'
 
         plot_gt_spectrum = self.kwargs["plot_spectrum_with_gt"] \
             and gt_flux is not None and not is_codebook
@@ -1374,6 +1382,11 @@ class SpectraData:
             if ivar is not None:
                 ivar = ivar[gt_mask]
 
+        if lambdawise_weights is not None:
+            if clip and not spectra_clipped:
+                # print(lambdawise_weights.shape, recon_mask.shape, recon_mask.dtype)
+                lambdawise_weights = lambdawise_weights[recon_mask]
+
         if plot_recon_spectrum:
             recon_wave_p, recon_flux, lambdawise_losses = self.process_recon_flux(
                 recon_flux, recon_mask, clip, spectra_clipped, recon_wave, lambdawise_losses)
@@ -1383,16 +1396,16 @@ class SpectraData:
             else: lambdawise_losses = [None,None]
             if recon_flux2 is not None: # gt bin spectra
                 recon_wave_p, recon_flux2, lambdawise_losses[0] = self.process_recon_flux(
-                    recon_flux2, recon_mask, clip, spectra_clipped,
-                    recon_wave, lambdawise_losses[0])
+                    recon_flux2, recon_mask, clip, spectra_clipped, recon_wave,
+                    lambdawise_losses[0])
             if recon_flux3 is not None: # wrong bin spectra
                 recon_wave_p, recon_flux3, lambdawise_losses[-1] = self.process_recon_flux(
-                    recon_flux3, recon_mask, clip, spectra_clipped,
-                    recon_wave, lambdawise_losses[-1])
+                    recon_flux3, recon_mask, clip, spectra_clipped, recon_wave,
+                    lambdawise_losses[-1])
             lambdawise_losses = np.array(lambdawise_losses)
 
         plot_recon_spectrum = plot_recon_spectrum or recon_flux2 is not None or \
-            recon_flux3 is not None
+            recon_flux3 is not None or lambdawise_weights is not None
         if plot_recon_spectrum: recon_wave = recon_wave_p
 
         # recon and gt spectra differ in shape, to calculate metrics, we do interpolation
@@ -1412,19 +1425,18 @@ class SpectraData:
             sub_dir, is_codebook, plot_gt_spectrum, plot_recon_spectrum,
             flux_norm_cho, gt_flux, recon_flux)
         if recon_flux2 is not None:
-            _, _, recon_flux2 = self.normalize_one_flux(
-                sub_dir, is_codebook, False, plot_recon_spectrum,
-                flux_norm_cho, None, recon_flux2)
-            sub_dir += 'with_gt_bin_'
+            recon_flux2 = self.normalize_one_flux(
+                sub_dir, is_codebook, False, plot_recon_spectrum, flux_norm_cho,
+                None, recon_flux2)[-1]
         if recon_flux3 is not None:
-            _, _, recon_flux3 = self.normalize_one_flux(
-                sub_dir, is_codebook, False, plot_recon_spectrum,
-                flux_norm_cho, None, recon_flux3)
-            sub_dir += 'with_wrong_bin_'
+            recon_flux3 = self.normalize_one_flux(
+                sub_dir, is_codebook, False, plot_recon_spectrum, flux_norm_cho,
+                None, recon_flux3)[-1]
 
         plot_recon_spectrum = self.kwargs["plot_spectrum_with_recon"]
-        pargs = (sub_dir, title, z, gt_wave, ivar, gt_flux, recon_wave, recon_flux,
-                 recon_flux2, recon_loss2, recon_flux3, recon_loss3, lambdawise_losses,
+        pargs = (sub_dir, title, z, gt_wave, ivar, gt_flux, recon_wave,
+                 recon_flux, recon_flux2, recon_loss2, recon_flux3, recon_loss3,
+                 lambdawise_losses, lambdawise_weights,
                  plot_gt_spectrum, plot_recon_spectrum)
         return pargs
 
@@ -1436,6 +1448,7 @@ class SpectraData:
                       recon_fluxes3=None,
                       recon_losses3=None,
                       lambdawise_losses=None,
+                      lambdawise_weights=None,
                       colors=None,
                       titles=None,
                       is_codebook=False,
@@ -1481,6 +1494,7 @@ class SpectraData:
         if recon_fluxes3 is None: recon_fluxes3 = [None]*n
         if recon_losses3 is None: recon_losses3 = [None]*n
         if lambdawise_losses is None: lambdawise_losses = [None]*n
+        if lambdawise_weights is None: lambdawise_weights = [None]*n
 
         assert gt_fluxes[0] is None or \
             (len(gt_wave) == n and len(gt_fluxes) == n and len(gt_masks) == n)
@@ -1512,7 +1526,7 @@ class SpectraData:
         for idx, cur_plot_data in enumerate(
             zip(titles, redshift, gt_wave, ivar, gt_masks, gt_fluxes, recon_wave, recon_masks,
                 recon_fluxes, recon_fluxes2, recon_losses2, recon_fluxes3, recon_losses3,
-                lambdawise_losses)
+                lambdawise_losses, lambdawise_weights)
         ):
             pargs = process_data(cur_plot_data)
             sub_dir, cur_metrics = plot_and_save(idx, pargs)

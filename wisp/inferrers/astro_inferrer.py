@@ -340,6 +340,8 @@ class AstroInferrer(BaseInferrer):
         self.plot_spectra_with_ivar = self.extra_args["plot_spectrum_with_ivar"]
         self.plot_spectra_with_loss = self.extra_args["plot_spectrum_with_loss"]
         self.plot_spectra_with_lines = self.extra_args["plot_spectrum_with_lines"]
+        self.plot_spectra_with_weights = self.regress_lambdawise_weights and \
+            self.extra_args["plot_spectrum_with_weights"]
         self.plot_gt_bin_spectra = not self.recon_spectra_all_bins and \
             self.extra_args["plot_spectrum_under_gt_bin"]
         self.plot_optimal_wrong_bin_spectra = not self.recon_spectra_all_bins and \
@@ -928,6 +930,8 @@ class AstroInferrer(BaseInferrer):
             if self.plot_optimal_wrong_bin_spectra:
                 self.optimal_wrong_bin_fluxes = []
                 self.optimal_wrong_bin_spectra_losses = []
+            if self.plot_spectra_with_weights:
+                self.spectra_lambdawise_weights = []
             if self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss:
                 self.spectra_lambdawise_losses = []
 
@@ -1281,7 +1285,9 @@ class AstroInferrer(BaseInferrer):
                         save_spectra_all_bins=self.recon_spectra_all_bins or \
                                               self.plot_optimal_wrong_bin_spectra,
                         init_redshift_prob= None if "init_redshift_prob" not in data else \
-                                                data["init_redshift_prob"])
+                                                data["init_redshift_prob"],
+                        save_lambdawise_weights=self.regress_lambdawise_weights and \
+                            self.plot_spectra_with_weights)
 
                 if self.recon_spectra or self.recon_spectra_all_bins:
                     self.ivar.extend(data["spectra_source_data"][:,2])
@@ -1307,6 +1313,7 @@ class AstroInferrer(BaseInferrer):
                         fluxes, losses = self._get_optimal_wrong_bin_fluxes(ret, data)
                         self.optimal_wrong_bin_fluxes.extend(fluxes)
                         self.optimal_wrong_bin_spectra_losses.extend(losses)
+
                     if self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss:
                         losses = ret["spectra_lambdawise_loss"]
                         if self.apply_gt_redshift:
@@ -1328,6 +1335,10 @@ class AstroInferrer(BaseInferrer):
                             lambdawise_losses = torch.stack(
                                 lambdawise_losses).permute(1,0,2) # [bsz,2,nsmpl]
                             self.spectra_lambdawise_losses.extend(lambdawise_losses)
+
+                    if self.plot_spectra_with_weights:
+                        lambdawise_weights = ret["lambdawise_weights"][:,0]
+                        self.spectra_lambdawise_weights.extend(lambdawise_weights)
 
                 if self.recon_spectra_all_bins:
                     self.recon_fluxes_all.extend(
@@ -1695,6 +1706,9 @@ class AstroInferrer(BaseInferrer):
                 if self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss:
                     self.spectra_lambdawise_losses = torch.stack(
                         self.spectra_lambdawise_losses).detach().cpu().numpy()
+                if self.plot_spectra_with_weights:
+                    self.spectra_lambdawise_weights = torch.stack(
+                        self.spectra_lambdawise_weights).detach().cpu().numpy()
         else:
             if self.main_infer:
                 if self.recon_spectra_pixels_only:
@@ -1800,6 +1814,8 @@ class AstroInferrer(BaseInferrer):
                     self.optimal_wrong_bin_spectra_losses[ids]
             if self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss:
                 self.spectra_lambdawise_losses = self.spectra_lambdawise_losses[ids]
+            if self.plot_spectra_with_weights:
+                self.spectra_lambdawise_weights = self.spectra_lambdawise_weights[ids]
             num_spectra = len(ids)
 
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
@@ -1828,6 +1844,9 @@ class AstroInferrer(BaseInferrer):
             if self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss:
                 lambdawise_losses = self.spectra_lambdawise_losses[lo:hi]
             else: lambdawise_losses = None
+            if self.plot_spectra_with_weights:
+                lambdawise_weights = self.spectra_lambdawise_weights[lo:hi]
+            else: lambdawise_weights = None
 
             if self.infer_selected:
                 n = len(self._select_inferrence_ids())
@@ -1835,7 +1854,15 @@ class AstroInferrer(BaseInferrer):
                 Path(spectra_dir).mkdir(parents=True, exist_ok=True)
             else: spectra_dir = self.spectra_dir
 
-            # print(lambdawise_losses.shape)
+            # print(lambdawise_weights.shape)
+            # print(np.sum(lambdawise_weights, axis=-1))
+            # print(lambdawise_weights[0])
+            # import matplotlib.pyplot as plt
+            # plt.plot(lambdawise_weights[0])
+            # plt.savefig('tmp.png')
+            # plt.close()
+            # assert 0
+
             cur_metrics = self.dataset.plot_spectrum(
                 spectra_dir, fname,
                 self.extra_args["flux_norm_cho"], redshift,
@@ -1844,6 +1871,7 @@ class AstroInferrer(BaseInferrer):
                 recon_fluxes2=recon_fluxes2, recon_losses2=recon_losses2,
                 recon_fluxes3=recon_fluxes3, recon_losses3=recon_losses3,
                 lambdawise_losses=lambdawise_losses,
+                lambdawise_weights=lambdawise_weights,
                 clip=self.extra_args["plot_clipped_spectrum"],
                 gt_masks=self.gt_masks[lo:hi],
                 recon_masks=self.recon_masks[lo:hi],
