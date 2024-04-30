@@ -47,6 +47,8 @@ pretrain:
     calculate_spectra_loss_based_on_top_n_bins: False # only if we use single latent
     num_bins_to_calculate_spectra_loss: 5
 
+    classify_redshift_based_on_l2: True
+
     spectra_latent_dim: 16
     generalization_max_num_spectra: 100
 
@@ -61,14 +63,19 @@ pretrain:
     regularize_spectra_latents: False
     spectra_latents_regu_beta: -1
 
+    regress_lambdawise_weights: False
+    regress_lambdawise_weights_share_latents: False
+    lambdawise_weights_decoder_num_layers: 1
+    lambdawise_weights_decoder_hidden_dim: 128
+
 decoder:
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 5
+    decoder_num_hidden_layers: 3
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_all_layers: False
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
@@ -87,13 +94,14 @@ trainer:
 
     spectra_loss_cho: ssim1d
     spectra_loss_reduction: mean
+    spectra_lambdawise_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
 
 infer:
     infer_last_model_only: True
 
-    #infer_log_dir: ''
+    infer_log_dir: '20240423-175653_sc_100_spectra_163308'
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 35
@@ -108,11 +116,11 @@ infer:
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False
     plot_spectrum_with_ivar: False
-    plot_spectrum_with_lines: True
+    plot_spectrum_with_lines: False
     plot_spectrum_with_recon: False
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: True
-    plot_spectrum_under_optimal_wrong_bin: False
+    plot_spectrum_under_optimal_wrong_bin: True
 
     num_spectrum_per_fig: 35
     num_spectrum_per_row: 7

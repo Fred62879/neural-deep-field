@@ -398,7 +398,8 @@ def define_cmd_line_args():
                                 help="apply gt redshift instead of generating redshift.")
     pretrain_group.add_argument("--calculate-binwise-spectra-loss", action="store_true",
                                 help="brute force, generate spectra for each bin individually.")
-    pretrain_group.add_argument("--optimize-latents-for-each-redshift-bin", action="store_true",
+    pretrain_group.add_argument("--optimize-latents-for-each-redshift-bin",
+                                action="store_true",
                                 help="if brute force, we may assign each bin with a latent.")
 
     pretrain_group.add_argument("--calculate-spectra-loss-based-on-optimal-bin",
@@ -407,6 +408,9 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--calculate-spectra-loss-based-on-top-n-bins",
                                 action="store_true")
     pretrain_group.add_argument("--num-bins-to-calculate-spectra-loss", action="store_true")
+
+    pretrain_group.add_argument("--classify-redshift-based-on-l2", action="store_true",
+                                help="when classify bins, use l2 loss")
 
     pretrain_group.add_argument("--negative-supervise-wrong-redshift", action="store_true",
                                 help="discourage wrong redshift from generating high \

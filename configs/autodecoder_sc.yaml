@@ -44,6 +44,8 @@ pretrain:
     calculate_spectra_loss_based_on_top_n_bins: False # only if we use single latent
     num_bins_to_calculate_spectra_loss: 5
 
+    classify_redshift_based_on_l2: True
+
     spectra_latent_dim: 16
 
     sample_from_codebook_pretrain_spectra: True

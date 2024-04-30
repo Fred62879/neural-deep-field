@@ -34,12 +34,16 @@ class HyperSpectralDecoderB(nn.Module):
         self.add_bias = add_bias
         self.intensify = intensify
         self.qtz_spectra = qtz_spectra
-
         self.reduction_order = "qtz_first"
-        self.regress_lambdawise_weights = kwargs["regress_lambdawise_weights"]
-        self.regress_lambdawise_weights_share_latents = \
-            kwargs["regress_lambdawise_weights_share_latents"]
+
+        self.classify_redshift = _model_redshift and kwargs["apply_gt_redshift"]
         self.classify_redshift = _model_redshift and get_bool_classify_redshift(**kwargs)
+        self.classify_redshift_based_on_l2 = self.classify_redshift and \
+            kwargs["classify_redshift_based_on_l2"]
+
+        self.regress_lambdawise_weights = kwargs["regress_lambdawise_weights"]
+        self.regress_lambdawise_weights_share_latents = self.regress_lambdawise_weights and \
+            kwargs["regress_lambdawise_weights_share_latents"]
 
         # self.recon_codebook_spectra = kwargs["regu_codebook_spectra"] and \
         #     self.kwargs["space_dim"] == 3 and self.kwargs["quantize_spectra"]
@@ -174,26 +178,61 @@ class HyperSpectralDecoderB(nn.Module):
             calculate_bayesian_redshift_logits, loss, mask, gt_spectra)
 
     ##################
-    # Model forwarding
+    # Quantization helpers
+    ##################
+
+    def quantize_spectra(self, logits, codebook_spectra, ret, qtz_args):
+        _, spectra = self.qtz(logits, codebook_spectra, ret, qtz_args)
+        spectra = torch.squeeze(spectra, dim=-2) # [...,bsz,nsmpl]
+        return spectra
+
+    def _qtz_first(
+            self, input, spectra, ret, qtz_args, spectra_masks,
+            spectra_loss_func, gt_spectra, gt_redshift_bin_ids
+    ):
+        spectra = self.quantize_spectra(input, spectra, ret, qtz_args)
+        if self.classify_redshift:
+            ret["spectra_all_bins"] = spectra
+
+            if self.kwargs["calculate_binwise_spectra_loss"]:
+                calculate_spectra_loss(
+                    spectra_loss_func, spectra_masks, gt_spectra,
+                    spectra, ret, self.calculate_lambdawise_spectra_loss, **self.kwargs
+                )
+                calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret)
+            spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
+        return spectra
+
+    def _bin_avg_first(self, input, spectra, ret, qtz_args):
+        if self.classify_redshift:
+            spectra = self.classify_redshift4D(spectra, ret)
+        ret["codebook_spectra"] = spectra.permute(1,0,2)
+        spectra = self.quantize_spectra(input, spectra, ret, qtz_args)
+        return spectra
+
+    ##################
+    # Classification helpers
     ##################
 
     def classify_redshift4D(self, spectra, ret):
-        """ @Param
-              spectra [num_redshift_bins,num_embed,bsz,nsmpl]
-              ret["redshift_logits"] [bsz,num_redshift_bins]
-            @Return
-              spectra [num_embed,bsz,nsmpl]
+        """
+        @Param
+          spectra [num_redshift_bins,num_embed,bsz,nsmpl]
+          ret["redshift_logits"] [bsz,num_redshift_bins]
+        @Return
+          spectra [num_embed,bsz,nsmpl]
         """
         num_embed = spectra.shape[1]
         spectra = torch.einsum("ij,jkim->kim", ret["redshift_logits"], spectra)
         return spectra
 
     def classify_redshift3D(self, spectra, gt_redshift_bin_ids, ret):
-        """ @Param
+        """
+        @Param
               spectra [num_redshift_bins,bsz,nsmpl]
-              ret["redshift_logits"] [bsz,num_redshift_bins]
-            @Return
-              spectra [bsz,nsmpl]
+          ret["redshift_logits"] [bsz,num_redshift_bins]
+        @Return
+          spectra [bsz,nsmpl]
         """
         if self.kwargs["calculate_binwise_spectra_loss"]:
             # index with argmax, this spectra is for visualization only
@@ -222,59 +261,57 @@ class HyperSpectralDecoderB(nn.Module):
         # else: raise ValueError()
         return spectra
 
-    def quantize_spectra(self, logits, codebook_spectra, ret, qtz_args):
-        _, spectra = self.qtz(logits, codebook_spectra, ret, qtz_args)
-        spectra = torch.squeeze(spectra, dim=-2) # [...,bsz,nsmpl]
+    def _classify_redshift(
+            self, spectra, ret, spectra_masks, spectra_loss_func, spectra_l2_loss_func,
+            gt_spectra, gt_redshift_bin_ids
+    ):
+        assert self.kwargs["calculate_binwise_spectra_loss"] or print(
+            "only support brute force in case of redshift classification")
+
+        assert spectra.ndim == 3
+        ret["spectra_all_bins"] = spectra
+        calculate_spectra_loss(
+            spectra_loss_func, spectra_masks, gt_spectra,
+            spectra, ret, self.calculate_lambdawise_spectra_loss, **self.kwargs)
+
+        if spectra_l2_loss_func is not None:
+            calculate_spectra_loss(
+                spectra_l2_loss_func, spectra_masks, gt_spectra,
+                spectra, ret, self.calculate_lambdawise_spectra_loss,
+                loss_name_suffix="_l2", **self.kwargs)
+
+        calculate_redshift_logits(
+            self.kwargs["binwise_loss_beta"], ret,
+            suffix="_l2" if self.classify_redshift_based_on_l2 else ""
+        )
+        spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
         return spectra
 
-    def spectra_dim_reduction(self, input, spectra, ret, qtz_args,
-                              spectra_masks, spectra_loss_func,
-                              spectra_l2_loss_func,
-                              gt_spectra, gt_redshift_bin_ids
+    ##################
+    # Model forward
+    ##################
+
+    def spectra_dim_reduction(
+            self, input, spectra, ret, qtz_args, spectra_masks, spectra_loss_func,
+            spectra_l2_loss_func, gt_spectra, gt_redshift_bin_ids
     ):
         if self.qtz_spectra:
             if self.reduction_order == "qtz_first":
-                spectra = self.quantize_spectra(input, spectra, ret, qtz_args)
-                if self.classify_redshift:
-                    ret["spectra_all_bins"] = spectra
-
-                    if self.kwargs["calculate_binwise_spectra_loss"]:
-                        calculate_spectra_loss(
-                            spectra_loss_func, spectra_masks, gt_spectra,
-                            spectra, ret, self.calculate_lambdawise_spectra_loss, **self.kwargs
-                        )
-                        calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret)
-                    spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
-
+                spectra = self._qtz_first(
+                    input, spectra, ret, qtz_args, spectra_masks,
+                    spectra_loss_func, gt_spectra, gt_redshift_bin_ids
+                )
             elif self.reduction_order == "bin_avg_first":
-                if self.classify_redshift:
-                    spectra = self.classify_redshift4D(spectra, ret)
-                ret["codebook_spectra"] = spectra.permute(1,0,2)
-                spectra = self.quantize_spectra(input, spectra, ret, qtz_args)
+                spectra = self._bin_avg_first(input, spectra, ret, qtz_args)
             else:
                 raise ValueError()
         else:
             if self.classify_redshift:
-                if self.kwargs["calculate_binwise_spectra_loss"]:
-                    assert spectra.ndim == 3
-                    ret["spectra_all_bins"] = spectra
-                    calculate_spectra_loss(
-                        spectra_loss_func, spectra_masks, gt_spectra,
-                        spectra, ret, self.calculate_lambdawise_spectra_loss, **self.kwargs)
-
-                    if spectra_l2_loss_func is not None:
-                        calculate_spectra_loss(
-                            spectra_l2_loss_func, spectra_masks, gt_spectra,
-                            spectra, ret, self.calculate_lambdawise_spectra_loss,
-                            loss_name_suffix="_l2", **self.kwargs)
-
-                    calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret)
-                    spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
-                else:
-                    raise NotImplementedError(
-                        "only support brute force in case of redshift classification")
-
-            elif self.kwargs["apply_gt_redshift"] and self.calculate_lambdawise_spectra_loss:
+                spectra = self._classify_redshift(
+                    spectra, ret, spectra_masks, spectra_loss_func, spectra_l2_loss_func,
+                    gt_spectra, gt_redshift_bin_ids
+                )
+            elif self.apply_gt_redshift and self.calculate_lambdawise_spectra_loss:
                 assert spectra.ndim == 2
                 calculate_spectra_loss(
                     spectra_loss_func, spectra_masks, gt_spectra,
@@ -287,24 +324,25 @@ class HyperSpectralDecoderB(nn.Module):
                         loss_name_suffix="_l2", **self.kwargs)
         return spectra
 
-    def reconstruct_spectra(self, input, wave, scaler, bias, redshift,
-                            wave_bound, ret, codebook, qtz_args,
-                            spectra_masks, spectra_loss_func, spectra_l2_loss_func,
-                            gt_spectra, gt_redshift_bin_ids, optm_bin_ids
+    def reconstruct_spectra(
+            self, input, wave, scaler, bias, redshift, wave_bound, ret, codebook,
+            qtz_args, spectra_masks, spectra_loss_func, spectra_l2_loss_func, gt_spectra,
+            gt_redshift_bin_ids, optm_bin_ids
     ):
-        """ Reconstruct emitted (under possibly multiple redshift values) spectra
-              using given input and wave.
-            Scale spectra intensity using scaler, bias, and sinh func, if needed.
-            @Param:
-               input: 2D coords or embedded latents or logits [bsz,1,2/embed_dim]
-               wave:  [bsz,num_samples,1]
-               redshift: [num_bins] if model redshift using classification model
-                         [bsz] o.w.
-               wave_bound: lo and hi lambda values used for linear normalization [2]
-               codebook: nn.Parameter([num_embed,embed_dim])
-               optm_bin_ids: id of bin with best spectra quality from previous optim round
-            @Return
-               spectra: reconstructed emitted spectra [bsz,num_nsmpl]
+        """
+        Reconstruct emitted spectra (under possibly multiple redshift values)
+          using given input and wave.
+        Scale spectra intensity using scaler, bias, and sinh func, if needed.
+        @Param:
+           input: 2D coords or embedded latents or logits [bsz,1,2/embed_dim]
+           wave:  [bsz,num_samples,1]
+           redshift: [num_bins] if model redshift using classification model
+                     [bsz] o.w.
+           wave_bound: lo and hi lambda values used for linear normalization [2]
+           codebook: nn.Parameter([num_embed,embed_dim])
+           optm_bin_ids: id of bin with best spectra quality from previous optim round
+        @Return
+           spectra: reconstructed emitted spectra [bsz,num_nsmpl]
         """
         bsz = wave.shape[0]
 
@@ -426,6 +464,9 @@ class HyperSpectralDecoderB(nn.Module):
         redshift = None if ret["redshift"] is None else \
             ret["redshift"] if self.classify_redshift else ret["redshift"][:bsz]
         timer.check("hps_decoder::got redshift")
+
+        if self.classify_redshift_based_on_l2:
+            assert self.kwargs["spectra_loss_cho"] == "l2" or spectra_l2_loss_func is not None
 
         latents, ret["spectra"] = self.reconstruct_spectra(
             latents, wave,

@@ -232,6 +232,9 @@ class AstroInferrer(BaseInferrer):
         assert not self.calculate_binwise_spectra_loss or \
             (not self.qtz or self.extra_args["spectra_batch_reduction_order"] == "qtz_first")
 
+        self.classify_redshift_based_on_l2 = self.classify_redshift and \
+            self.extra_args["classify_redshift_based_on_l2"]
+
         self.neg_sup_wrong_redshift = \
             self.mode == "codebook_pretrain" and \
             self.calculate_binwise_spectra_loss and \
@@ -1247,12 +1250,17 @@ class AstroInferrer(BaseInferrer):
                 #         get_loss(self.extra_args["spectra_loss_cho"], self.cuda),
                 #         data["spectra_masks"], data["spectra_source_data"])
 
+                l2_loss_func = None
                 if self.calculate_binwise_spectra_loss:
                     self.spectra_infer_pipeline.set_batch_reduction_order("qtz_first")
-                    loss_func = self._get_spectra_loss_func(data)
+                    loss_func = self._get_spectra_loss_func(
+                        self.extra_args["spectra_loss_cho"])
+                    if self.classify_redshift_based_on_l2:
+                        l2_loss_func = self._get_spectra_loss_func("l2")
                 elif self.apply_gt_redshift and (
                         self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss):
-                    loss_func = self._get_spectra_loss_func(data)
+                    loss_func = self._get_spectra_loss_func(
+                        self.extra_args["spectra_loss_cho"])
                 else: loss_func = None
 
                 with torch.no_grad():
@@ -1262,6 +1270,7 @@ class AstroInferrer(BaseInferrer):
                         iterations,
                         self.space_dim,
                         spectra_loss_func=loss_func,
+                        spectra_l2_loss_func=l2_loss_func,
                         qtz=self.qtz,
                         qtz_strategy=self.qtz_strategy,
                         index_latent=self.index_latent,
@@ -1518,8 +1527,8 @@ class AstroInferrer(BaseInferrer):
                 self.num_spectra, self.extra_args["pretrain_num_infer_upper_bound"])
         return ids
 
-    def _get_spectra_loss_func(self, data):
-        assert self.extra_args["spectra_loss_cho"] != "emd"
+    def _get_spectra_loss_func(self, loss_cho):
+        assert loss_cho != "emd"
 
         # cal_lambdawise_loss = self.apply_gt_redshift and (
         #     self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss)
@@ -1528,7 +1537,7 @@ class AstroInferrer(BaseInferrer):
         # self.spectra_reduce_func = get_reduce(self.extra_args["spectra_loss_reduction"])
 
         loss_func = get_loss(
-            self.extra_args["spectra_loss_cho"], "none", self.cuda,
+            loss_cho, "none", self.cuda,
             filter_size=self.extra_args["spectra_ssim_loss_filter_size"],
             filter_sigma=self.extra_args["spectra_ssim_loss_filter_sigma"],
         )

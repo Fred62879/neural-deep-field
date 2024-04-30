@@ -447,9 +447,9 @@ def calculate_spectra_loss(
         nm = "spectra_binwise_loss" + loss_name_suffix
         ret[nm] = binwise_loss
 
-def calculate_redshift_logits(beta, ret):
+def calculate_redshift_logits(beta, ret, suffix=""):
     """ Calculate logits for redshift bins.
     """
     # calculate logits for each bin as softmax of negative loss
-    logits = -ret["spectra_binwise_loss"] * beta
+    logits = -ret[f"spectra_binwise_loss{suffix}"] * beta
     ret["redshift_logits"] = F.softmax(logits, dim=-1)
