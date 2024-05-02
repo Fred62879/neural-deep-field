@@ -204,7 +204,7 @@ def calculate_redshift_estimation_stats_based_on_residuals(
     lo, hi = np.min(residuals), np.max(residuals)
     if lo == hi:
         assert lo == 0
-        return None, None, None
+        return None, None
 
     if residual_levels is not None:
         pass

@@ -15,7 +15,7 @@ from wisp.models.decoders import BasicDecoder, Siren, Garf
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
 from wisp.models.hypers.hps_converter_batched import HyperSpectralConverter
 from wisp.models.layers import Intensifier, Quantization, ArgMax, \
-    calculate_spectra_loss, calculate_redshift_logits
+    calculate_spectra_loss, calculate_redshift_logits, normalize_Linear
 
 class HyperSpectralDecoderB(nn.Module):
 
@@ -367,10 +367,12 @@ class HyperSpectralDecoderB(nn.Module):
                 weight_latents = latents[optm_bin_ids[1],optm_bin_ids[0]]
             else: weight_latents = latents
 
-            weights = self.lambdawise_weights_decoder(weight_latents)[...,0]
-            weights = F.softmax(weights, dim=-1)
+            weights = self.lambdawise_weights_decoder(weight_latents)[...,0] # [...,bsz,nsmpl]
+            # weights = F.softmax(weights, dim=-1)
+            weights = normalize_Linear(weights)
             if self.regress_lambdawise_weights_share_latents and latents.ndim == 4:
-                weights = weights[None,...].tile(latents.shape[0],1,1)
+                # add extra dim for `num_of_bins`
+                weights = weights[None,...].tile(latents.shape[0],1,1) # [nbins,bsz,nsmpl]
             ret["lambdawise_weights"] = weights
 
         spectra = self.spectra_dim_reduction(

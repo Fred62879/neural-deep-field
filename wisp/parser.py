@@ -392,6 +392,9 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--regress-lambdawise-weights", action="store_true")
     pretrain_group.add_argument("--regress-lambdawise-weights-share-latents",
                                 action="store_true")
+    pretrain_group.add_argument("--regress-lambdawise-weights-use-gt-bin-latent",
+                                action="store_true")
+    pretrain_group.add_argument("--wrong-bin-regu-beta", type=int)
 
     # redshift generation strategy
     pretrain_group.add_argument("--apply-gt-redshift", action="store_true",

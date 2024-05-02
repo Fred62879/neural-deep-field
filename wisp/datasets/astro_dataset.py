@@ -187,6 +187,9 @@ class AstroDataset(Dataset):
         return self.spectra_dataset.get_emitted_wave_mask()
 
 
+    def get_spectra_source(self):
+        return self.spectra_source
+
     def get_spectra_masks(self, idx=None):
         if self.spectra_source == "sup":
             return self.spectra_dataset.get_supervision_mask(idx)
@@ -273,8 +276,11 @@ class AstroDataset(Dataset):
     def get_supervision_spectra_ids(self):
         return self.spectra_dataset.get_supervision_spectra_ids()
 
-    def get_redshift_pretrain_spectra_ids(self):
-        return self.spectra_dataset.get_redshift_pretrain_spectra_ids()
+    def get_validation_spectra_ids(self):
+        return self.spectra_dataset.get_validation_spectra_ids()
+
+    def get_sanity_check_spectra_ids(self):
+        return self.spectra_dataset.get_sanity_check_spectra_ids()
 
     def __len__(self):
         """ Length of the dataset in number of coords.

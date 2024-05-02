@@ -94,6 +94,12 @@ class AstroInferrer(BaseInferrer):
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
 
+        if (self.mode == "sanity_check_infer" or self.mode == "generalization_infer") and \
+           self.classify_redshift and self.extra_args["spectra_loss_cho"] != "l2" and \
+            self.extra_args["classify_redshift_based_on_l2"]:
+            self.redshift_dir = f"{self.redshift_dir}/l2_based"
+            Path(self.redshift_dir).mkdir(parents=True, exist_ok=True)
+
     def init_data(self):
         if self.mode == "codebook_pretrain_infer" or \
            self.mode == "sanity_check_infer" or \
@@ -2128,7 +2134,9 @@ class AstroInferrer(BaseInferrer):
         log.info("all bin codebook coeff plotting done")
 
     def _plot_redshift_est_stats(self, model_id, suffix="", ids=None):
-        fname = join(self.redshift_dir, f"model-{model_id}")
+        suffix = "_selected_residuals" \
+            if self.extra_args["log_redshift_est_stats"] else "_all_residuals"
+        fname = join(self.redshift_dir, f"model-{model_id}{suffix}")
 
         residual_levels = self.extra_args["log_redshift_est_stats_residual_levels"] \
             if self.extra_args["log_redshift_est_stats"] else None

@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-1600-spectra-pe'
+    exp_name: 'autodecoder-200-spectra-pe'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
@@ -87,8 +87,8 @@ trainer:
 
     plot_l2_loss: True
 
-    resume_train: True
-    resume_log_dir: '20240422-191522_ssim_32_in_3_512_no_skip_no_regu_2k_epochs'
+    resume_train: False
+    resume_log_dir: ''
     resume_model_fname: 'model-ep2000-bch0.pth'
 
     spectra_loss_cho: ssim1d
@@ -136,8 +136,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 1600 #25400
-    num_supervision_spectra_upper_bound: 1600 #25400
+    num_gt_spectra_upper_bound: 200 #25400
+    num_supervision_spectra_upper_bound: 200 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02

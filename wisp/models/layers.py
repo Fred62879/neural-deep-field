@@ -28,17 +28,29 @@ def normalize_frobenius(x):
     return x / norm
 
 def normalize_L_1(x):
-    """Normalizes the matrix according to the L1 norm.
-
-    Args:
+    """
+    Normalizes the matrix according to the L1 norm.
+    @Params:
         x (torch.FloatTensor): A matrix.
-
-    Returns:
+    @Returns:
         (torch.FloatTensor): A normalized matrix.
     """
     abscolsum = torch.sum(torch.abs(x), dim=0)
     abscolsum = torch.min(torch.stack([1.0/abscolsum, torch.ones_like(abscolsum)], dim=0), dim=0)[0]
     return x * abscolsum[None,:]
+
+def normalize_Linear(x):
+    """
+    Normalizes the matrix according to [0,1].
+    @Params:
+        x (torch.FloatTensor): A matrix.
+    @Returns:
+        (torch.FloatTensor): A normalized matrix.
+    """
+    lo, _ = torch.min(x, dim=-1, keepdim=True)
+    hi, _ = torch.max(x, dim=-1, keepdim=True)
+    ret = (x - lo) / (hi - lo)
+    return ret
 
 def normalize_L_inf(x):
     """Normalizes the matrix according to the Linf norm.

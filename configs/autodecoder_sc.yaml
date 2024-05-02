@@ -5,8 +5,8 @@ global:
     exp_name: 'autodecoder-1600-spectra-pe'
     log_fname: 'sc'
 
-    tasks: ['sanity_check']
-    tasks: ['sanity_check_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
+    tasks: ['sanity_check'] #,'recon_spectra']
+    tasks: ['sanity_check_infer','recon_spectra','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -26,7 +26,7 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    pretrain_batch_size: 100
+    pretrain_batch_size: 50
 
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 50
@@ -44,7 +44,7 @@ pretrain:
     calculate_spectra_loss_based_on_top_n_bins: False # only if we use single latent
     num_bins_to_calculate_spectra_loss: 5
 
-    classify_redshift_based_on_l2: True
+    classify_redshift_based_on_l2: False
 
     spectra_latent_dim: 16
 
@@ -56,7 +56,7 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240426-155851'
+    pretrain_log_dir: '20240422-202457_ssim_32_in_3_512_no_skip_no_regu_4k_epochs_r'
     pretrained_model_name: 'model-ep2000-bch0.pth'
 
     regularize_spectra_latents: False
@@ -64,6 +64,8 @@ pretrain:
 
     regress_lambdawise_weights: True
     regress_lambdawise_weights_share_latents: True
+    regress_lambdawise_weights_use_gt_bin_latent: True
+    wrong_bin_regu_beta: 1
     lambdawise_weights_decoder_num_layers: 1
     lambdawise_weights_decoder_hidden_dim: 128
 
@@ -82,17 +84,18 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 10
+    num_epochs: 500
     batch_size: 5500
-    log_cli_every: 2
-    plot_grad_every: -1
-    save_model_every: 2
+    log_cli_every: 50
+    plot_grad_every: 50
+    save_data_every: -1
+    save_model_every: 50
 
     plot_l2_loss: True
 
     resume_train: False
     resume_log_dir: ''
-    resume_model_fname: 'model-ep200-bch0.pth'
+    resume_model_fname: 'model-ep500-bch0.pth'
 
     spectra_loss_cho: ssim1d
     spectra_loss_reduction: mean
@@ -110,8 +113,8 @@ infer:
     pretrain_infer_num_wave: 200
     pretrain_infer_wave_sample_method: 'uniform_non_random'
 
-    infer_selected: True
-    pretrain_num_infer_upper_bound: 5
+    infer_selected: False
+    pretrain_num_infer_upper_bound: 100
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
@@ -132,7 +135,7 @@ infer:
     pretrain_pca_dim_fname: '' #'/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
-    log_redshift_est_stats: True
+    log_redshift_est_stats: False
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:
