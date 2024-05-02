@@ -150,6 +150,9 @@ class CodebookTrainer(BaseTrainer):
         #  we need to perform qtz first in hyperspectral_decoder::dim_reduction
         assert not self.calculate_binwise_spectra_loss or \
             (not self.qtz or self.extra_args["spectra_batch_reduction_order"] == "qtz_first")
+        assert not self.classify_redshift or \
+            self.calculate_binwise_spectra_loss or \
+            print("only support brute force in case of redshift classification")
 
         self.neg_sup_wrong_redshift = \
             self.mode == "codebook_pretrain" and \
