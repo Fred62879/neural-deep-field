@@ -438,7 +438,7 @@ def calculate_spectra_loss(
         nm = "spectra_lambdawise_loss" + loss_name_suffix
         ret[nm] = lambdawise_loss.permute(1,0,2)
 
-    if recon_fluxes.ndim == 3:
+    if recon_fluxes.ndim == 3: # brute forace
         if kwargs["regress_lambdawise_weights"]:
             weights = ret["lambdawise_weights"]
             lambdawise_loss = lambdawise_loss * weights

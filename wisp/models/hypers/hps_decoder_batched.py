@@ -36,7 +36,7 @@ class HyperSpectralDecoderB(nn.Module):
         self.qtz_spectra = qtz_spectra
         self.reduction_order = "qtz_first"
 
-        self.classify_redshift = _model_redshift and kwargs["apply_gt_redshift"]
+        self.apply_gt_redshift = _model_redshift and kwargs["apply_gt_redshift"]
         self.classify_redshift = _model_redshift and get_bool_classify_redshift(**kwargs)
         self.classify_redshift_based_on_l2 = self.classify_redshift and \
             kwargs["classify_redshift_based_on_l2"]
@@ -54,8 +54,9 @@ class HyperSpectralDecoderB(nn.Module):
         )
 
         self.calculate_lambdawise_spectra_loss = \
-            (kwargs["plot_spectrum_color_based_on_loss"] or \
-             kwargs["plot_spectrum_with_loss"]) and \
+            (kwargs["plot_spectrum_with_loss"] or \
+             kwargs["plot_spectrum_color_based_on_loss"] or \
+             kwargs["accumulate_global_lambdawise_loss"]) and \
              ("codebook_pretrain_infer" in kwargs["tasks"] or \
               "sanity_check_infer" in kwargs["tasks"] or \
               "generalization_infer" in kwargs["tasks"])
@@ -216,9 +217,11 @@ class HyperSpectralDecoderB(nn.Module):
 
     def classify_redshift4D(self, spectra, ret):
         """
+        Get the final reconstructed spectra based on spectra under all bins
+          (i.e. weighted average of spectra under all bins) (for codebook quantization usage).
         @Param
-          spectra [num_redshift_bins,num_embed,bsz,nsmpl]
-          ret["redshift_logits"] [bsz,num_redshift_bins]
+          spectra [nbins,num_embed,bsz,nsmpls]
+          ret["redshift_logits"] [bsz,nbins]
         @Return
           spectra [num_embed,bsz,nsmpl]
         """
@@ -228,15 +231,19 @@ class HyperSpectralDecoderB(nn.Module):
 
     def classify_redshift3D(self, spectra, gt_redshift_bin_ids, ret):
         """
+        Get the final reconstructed spectra based on spectra under all bins
+          (i.e. weighted average or argmax of spectra under all bins) (no qtz usage).
         @Param
-              spectra [num_redshift_bins,bsz,nsmpl]
-          ret["redshift_logits"] [bsz,num_redshift_bins]
+          spectra [nbins,bsz,nsmpl]
+          ret["redshift_logits"] [bsz,nbins]
         @Return
           spectra [bsz,nsmpl]
         """
         if self.kwargs["calculate_binwise_spectra_loss"]:
-            # index with argmax, this spectra is for visualization only
-            #  optimization relies on spectra loss calculated for each bin
+            """
+            Get argmax spectra which is for visualization only.
+            Optimization requires loss of spectra under each bin.
+            """
             ret["redshift_logits"] = ret["redshift_logits"].detach()
             ids = torch.argmax(ret["redshift_logits"], dim=-1)
             ret["optimal_bin_ids"] = ids
@@ -250,15 +257,6 @@ class HyperSpectralDecoderB(nn.Module):
         else:
             spectra = torch.matmul(
                 ret["redshift_logits"][:,None], spectra.permute(1,0,2))[:,0]
-        # elif self.kwargs["redshift_classification_method"] == "argmax":
-        #     # spectra = ArgMax.apply(ret["redshift_logits"], spectra)
-        #     ids = ArgMax.apply(ret["redshift_logits"])
-        #     spectra = torch.matmul(ids[:,None], spectra.permute(1,0,2))[:,0]
-        # elif self.kwargs["redshift_classification_method"] == "bayesian_weighted_avg":
-        #     logits = self.calculate_bayesian_redshift_logits(
-        #         spectra, ret["redshift_logits"], **self.kwargs) # [bsz,num_bins]
-        #     spectra = torch.matmul(logits, spectra.permute(1,0,2))[:,0]
-        # else: raise ValueError()
         return spectra
 
     def _classify_redshift(
@@ -308,8 +306,8 @@ class HyperSpectralDecoderB(nn.Module):
         else:
             if self.classify_redshift:
                 spectra = self._classify_redshift(
-                    spectra, ret, spectra_masks, spectra_loss_func, spectra_l2_loss_func,
-                    gt_spectra, gt_redshift_bin_ids
+                    spectra, ret, spectra_masks, spectra_loss_func,
+                    spectra_l2_loss_func, gt_spectra, gt_redshift_bin_ids
                 )
             elif self.apply_gt_redshift and self.calculate_lambdawise_spectra_loss:
                 assert spectra.ndim == 2
@@ -323,6 +321,20 @@ class HyperSpectralDecoderB(nn.Module):
                         spectra, ret, self.calculate_lambdawise_spectra_loss,
                         loss_name_suffix="_l2", **self.kwargs)
         return spectra
+
+    def _regress_lambdawise_weights(self, latents, optm_bin_ids, ret):
+            # latents [...,bsz,nsmpl,dim], weights [...,bsz,nsmpl,1]
+            if self.regress_lambdawise_weights_share_latents:
+                optm_bin_ids = create_batch_ids(optm_bin_ids)
+                weight_latents = latents[optm_bin_ids[1],optm_bin_ids[0]]
+            else: weight_latents = latents
+
+            weights = self.lambdawise_weights_decoder(weight_latents)[...,0] # [...,bsz,nsmpl]
+            weights = normalize_Linear(weights)
+            if self.regress_lambdawise_weights_share_latents and latents.ndim == 4:
+                # add extra dim for `num_of_bins`
+                weights = weights[None,...].tile(latents.shape[0],1,1) # [nbins,bsz,nsmpl]
+            ret["lambdawise_weights"] = weights
 
     def reconstruct_spectra(
             self, input, wave, scaler, bias, redshift, wave_bound, ret, codebook,
@@ -345,35 +357,22 @@ class HyperSpectralDecoderB(nn.Module):
            spectra: reconstructed emitted spectra [bsz,num_nsmpl]
         """
         bsz = wave.shape[0]
-
         if self.qtz_spectra:
+            """
+            each spectra has different lambda thus needs its own codebook spectra
+            each redshift bin shift lambda differently thus needs its own codebook spectra
+            latents [(num_bins,)num_embed,bsz,nsmpl,dim]
+            spectra (codebook spectra) [(num_bins,)num_embed,bsz,nsmpl]
+            """
             codes = codebook.weight[:,None,None].tile(1,bsz,1,1)
-            # [(num_bins,)num_embed,bsz,nsmpl,dim]
             latents = self.convert(wave, codes, redshift, wave_bound)
-
-            # each spectra has different lambda thus needs its own codebook spectra
-            # each redshift bin shift lambda differently thus needs its own codebook spectra
-            # codebook spectra [(num_bins,)num_embed,bsz,nsmpl]
             spectra = self.spectra_decoder(latents)[...,0]
         else:
             latents = self.convert(wave, input, redshift, wave_bound) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
 
         if self.regress_lambdawise_weights:
-            # latents [...,bsz,nsmpl,dim], weights [...,bsz,nsmpl,1]
-            if self.regress_lambdawise_weights_share_latents:
-                optm_bin_ids = create_batch_ids(optm_bin_ids)
-                # print('*', optm_bin_ids.shape, optm_bin_ids, latents.shape)
-                weight_latents = latents[optm_bin_ids[1],optm_bin_ids[0]]
-            else: weight_latents = latents
-
-            weights = self.lambdawise_weights_decoder(weight_latents)[...,0] # [...,bsz,nsmpl]
-            # weights = F.softmax(weights, dim=-1)
-            weights = normalize_Linear(weights)
-            if self.regress_lambdawise_weights_share_latents and latents.ndim == 4:
-                # add extra dim for `num_of_bins`
-                weights = weights[None,...].tile(latents.shape[0],1,1) # [nbins,bsz,nsmpl]
-            ret["lambdawise_weights"] = weights
+            self._regress_lambdawise_weights(latents, optm_bin_ids, ret)
 
         spectra = self.spectra_dim_reduction(
             input, spectra, ret, qtz_args,

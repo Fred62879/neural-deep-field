@@ -1475,12 +1475,11 @@ class CodebookTrainer(BaseTrainer):
         #         ).to(init_redshift_prob.device)
         # else: init_redshift_prob = None
 
-        spectra_l2_loss_func = None
+        spectra_loss_func, spectra_l2_loss_func = None, None
         if self.calculate_binwise_spectra_loss:
             spectra_loss_func = self.spectra_loss_func
             if self.plot_l2_loss:
                 spectra_l2_loss_func = self.spectra_l2_loss_func
-        else: spectra_loss_func=None
 
         if (self.mode == "sanity_check" or self.mode == "generalization"):
             steps = self.codebook_pretrain_total_steps

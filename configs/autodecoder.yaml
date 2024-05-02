@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-200-spectra-pe'
+    exp_name: 'autodecoder-1600-spectra-pe'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
@@ -57,6 +57,8 @@ pretrain:
     regularize_spectra_latents: False
     spectra_latents_regu_beta: -1
 
+    accumulate_global_lambdawise_loss: True
+
 decoder:
     decoder_activation_type: relu #gaussian
     decoder_batch_norm: False
@@ -99,9 +101,9 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: ''
+    infer_log_dir: '20240422-202457_ssim_32_in_3_512_no_skip_no_regu_4k_epochs_r'
     infer_selected: True
-    pretrain_num_infer_upper_bound: 70
+    pretrain_num_infer_upper_bound: 2
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
@@ -136,8 +138,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 200 #25400
-    num_supervision_spectra_upper_bound: 200 #25400
+    num_gt_spectra_upper_bound: 1600 #25400
+    num_supervision_spectra_upper_bound: 1600 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02

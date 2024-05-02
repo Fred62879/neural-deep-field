@@ -294,6 +294,10 @@ class AstroInferrer(BaseInferrer):
         self.regress_lambdawise_weights_share_latents = self.regress_lambdawise_weights and \
             self.extra_args["regress_lambdawise_weights_share_latents"]
 
+        self.accumulate_global_lambdawise_loss = \
+            self.extra_args["accumulate_global_lambdawise_loss"] and \
+            (self.mode == "codebook_pretrain_infer" or self.mode == "sanity_check_infer")
+
         # i) infer all coords using original model
         self.recon_img_all_pixels = False
         self.recon_img_sup_spectra = False  # -
@@ -1284,8 +1288,9 @@ class AstroInferrer(BaseInferrer):
                         apply_gt_redshift=self.apply_gt_redshift,
                         calculate_binwise_spectra_loss=self.calculate_binwise_spectra_loss,
                         calculate_lambdawise_spectra_loss= \
+                            self.plot_spectra_with_loss or \
                             self.plot_spectra_color_based_on_loss or \
-                            self.plot_spectra_with_loss,
+                            self.accumulate_global_lambdawise_loss,
                         regress_lambdawise_weights_share_latents= \
                             self.regress_lambdawise_weights_share_latents,
                         save_redshift=self.save_redshift,
@@ -1303,6 +1308,9 @@ class AstroInferrer(BaseInferrer):
                                                 data["init_redshift_prob"],
                         save_lambdawise_weights=self.regress_lambdawise_weights and \
                             self.plot_spectra_with_weights)
+
+                print(ret["spectra_lambdawise_loss"].shape)
+                assert 0
 
                 if self.recon_spectra or self.recon_spectra_all_bins:
                     self.ivar.extend(data["spectra_source_data"][:,2])

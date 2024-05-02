@@ -69,6 +69,8 @@ pretrain:
     lambdawise_weights_decoder_num_layers: 1
     lambdawise_weights_decoder_hidden_dim: 128
 
+    accumulate_global_lambdawise_loss: True
+
 decoder:
     decoder_activation_type: relu #gaussian
     decoder_batch_norm: False

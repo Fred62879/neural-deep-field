@@ -396,6 +396,8 @@ def define_cmd_line_args():
                                 action="store_true")
     pretrain_group.add_argument("--wrong-bin-regu-beta", type=int)
 
+    pretrain_group.add_argument("--accumulate-global-lambdawise-loss", action="store_true")
+
     # redshift generation strategy
     pretrain_group.add_argument("--apply-gt-redshift", action="store_true",
                                 help="apply gt redshift instead of generating redshift.")
