@@ -1465,19 +1465,6 @@ class CodebookTrainer(BaseTrainer):
         add_to_device(data, self.gpu_fields, self.device)
         self.timer.check("added to gpu")
 
-        # if self.classify_redshift and \
-        #    self.extra_args["redshift_classification_method"] == "bayesian_weighted_avg":
-        #     self.train_pipeline.set_bayesian_redshift_logits_calculation(
-        #         get_loss(self.extra_args["spectra_loss_cho"], self.cuda),
-        #         data["spectra_masks"], data["spectra_source_data"])
-        # if self.extra_args["add_redshift_logit_bias"]:
-        #     init_redshift_prob = data["init_redshift_prob"]
-        #     if self.cur_iter != 0:
-        #         init_redshift_prob = torch.zeros(
-        #             init_redshift_prob.shape, dtype=init_redshift_prob.dtype
-        #         ).to(init_redshift_prob.device)
-        # else: init_redshift_prob = None
-
         spectra_loss_func, spectra_l2_loss_func = None, None
         if self.calculate_binwise_spectra_loss:
             spectra_loss_func = self.spectra_loss_func
@@ -1499,6 +1486,7 @@ class CodebookTrainer(BaseTrainer):
             qtz_strategy=self.qtz_strategy,
             index_latent=self.index_latent,
             split_latent=self.split_latent,
+            plot_l2_loss=self.plot_l2_loss,
             apply_gt_redshift=self.apply_gt_redshift,
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,

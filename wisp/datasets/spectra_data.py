@@ -1368,10 +1368,11 @@ class SpectraData:
         if self.kwargs["plot_spectrum_with_recon"]:
             sub_dir = sub_dir + "with_recon_"
         if lambdawise_losses is not None:
+            loss_cho = self.kwargs["spectra_loss_cho"]
             if self.kwargs["plot_spectrum_with_loss"]:
-                sub_dir += 'with_loss_'
+                sub_dir += f"with_{loss_cho}_loss_"
             if self.kwargs["plot_spectrum_color_based_on_loss"]:
-                sub_dir += 'color_based_on_loss_'
+                sub_dir += f"color_based_on_{loss_cho}_loss_"
         if self.kwargs["spectra_loss_cho"] != "l2" and \
            self.kwargs["classify_redshift_based_on_l2"]:
             sub_dir += "based_on_l2_"

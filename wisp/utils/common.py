@@ -82,6 +82,16 @@ def get_bool_has_redshift_latents(**kwargs):
     """
     return get_bool_regress_redshift(**kwargs) and kwargs["split_latent"]
 
+def get_bool_calculate_lambdawise_spectra_loss(**kwargs):
+    return (
+        kwargs["plot_spectrum_with_loss"] or \
+        kwargs["plot_spectrum_color_based_on_loss"] or \
+        kwargs["accumulate_global_lambdawise_loss"]
+    ) and (
+        "sanity_check_infer" in kwargs["tasks"] or \
+        "generalization_infer" in kwargs["tasks"] or \
+        "codebook_pretrain_infer" in kwargs["tasks"] )
+
 def get_optimal_wrong_bin_ids(ret, data):
     """ Get id of the non-GT redshift bin that achieves the lowest spectra loss.
     """
@@ -448,6 +458,7 @@ def forward(
         qtz_strategy="none",
         index_latent=False,
         split_latent=False,
+        plot_l2_loss=False,
         apply_gt_redshift=False,
         codebook_pretrain=False,
         spectra_supervision=False,
@@ -456,6 +467,7 @@ def forward(
         optimize_bins_separately=False,
         redshift_supervision_train=False,
         regularize_codebook_spectra=False,
+        classify_redshift_based_on_l2=False,
         calculate_binwise_spectra_loss=False,
         calculate_lambdawise_spectra_loss=False,
         regress_lambdawise_weights_share_latents=False,
@@ -549,10 +561,12 @@ def forward(
         if calculate_binwise_spectra_loss:
             net_args["spectra_masks"] = data["spectra_masks"]
             net_args["spectra_loss_func"] = spectra_loss_func
-            net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
-            requested_channels.extend([
-                "spectra_binwise_loss","spectra_binwise_loss_l2","redshift_logits"])
+            requested_channels.extend(["spectra_binwise_loss","redshift_logits"])
+            if plot_l2_loss or classify_based_on_l2_loss:
+                assert spectra_l2_loss_func is not None
+                net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
+                requested_channels.append("spectra_binwise_loss_l2")
         if calculate_lambdawise_spectra_loss:
             net_args["spectra_masks"] = data["spectra_masks"]
             net_args["spectra_loss_func"] = spectra_loss_func

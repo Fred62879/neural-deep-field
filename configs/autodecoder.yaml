@@ -87,13 +87,13 @@ trainer:
     save_data_every: -1
     save_model_every: 200
 
-    plot_l2_loss: True
+    plot_l2_loss: False
 
     resume_train: False
     resume_log_dir: ''
     resume_model_fname: 'model-ep2000-bch0.pth'
 
-    spectra_loss_cho: ssim1d
+    spectra_loss_cho: l2 #ssim1d
     spectra_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
@@ -103,7 +103,7 @@ infer:
 
     infer_log_dir: '20240422-202457_ssim_32_in_3_512_no_skip_no_regu_4k_epochs_r'
     infer_selected: True
-    pretrain_num_infer_upper_bound: 2
+    pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
@@ -112,7 +112,7 @@ infer:
     pretrain_infer_wave_sample_method: 'uniform_dense'
 
     plot_clipped_spectrum: True
-    plot_spectrum_with_loss: False
+    plot_spectrum_with_loss: True
     plot_spectrum_with_ivar: False
     plot_spectrum_with_lines: False
     plot_spectrum_with_recon: True

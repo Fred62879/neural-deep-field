@@ -17,16 +17,11 @@ from wisp.loss import get_loss, get_reduce, spectra_supervision_loss
 from wisp.datasets.data_utils import get_bound_id
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
+from wisp.utils.common import *
 from wisp.utils.numerical import reduce_latents_dim_pca
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_line, \
     plot_latent_embed, annotated_heat, plot_simple, plot_multiple, plot_latents, \
     plot_redshift_estimation_stats_together, plot_redshift_estimation_stats_individually
-from wisp.utils.common import add_to_device, forward, select_inferrence_ids, \
-    create_batch_ids, get_bin_ids, get_optimal_wrong_bin_ids, init_redshift_bins, \
-    get_bool_regress_redshift, get_bool_classify_redshift, get_bool_has_redshift_latents, \
-    load_model_weights, load_pretrained_model_weights, load_layer_weights, load_embed, \
-    log_data, to_numpy, sort_alphanumeric
-
 
 class AstroInferrer(BaseInferrer):
     """ Inferrer class for astro dataset.
@@ -228,11 +223,16 @@ class AstroInferrer(BaseInferrer):
         self.apply_gt_redshift = self.model_redshift and self.extra_args["apply_gt_redshift"]
         assert not self.model_redshift or \
             sum([self.regress_redshift, self.classify_redshift, self.apply_gt_redshift]) == 1
+
         # regress redshift
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
+
         # classify redshift
         self.calculate_binwise_spectra_loss = self.model_redshift and \
             self.classify_redshift and self.extra_args["calculate_binwise_spectra_loss"]
+        self.calculate_lambdawise_spectra_loss = self.model_redshift and \
+            get_bool_calculate_lambdawise_spectra_loss(**self.extra_args)
+
         # if we want to calculate binwise spectra loss when we do quantization
         #  we need to perform qtz first in hyperspectral_decoder::dim_reduction
         assert not self.calculate_binwise_spectra_loss or \
@@ -1230,49 +1230,35 @@ class AstroInferrer(BaseInferrer):
     def infer_spectra(self, model_id, checkpoint):
         iterations = checkpoint["total_steps"]
         model_state = checkpoint["model_state_dict"]
-
         load_model_weights(self.spectra_infer_pipeline, model_state)
-
-        ## debug, test apply_gt_spectra in redshift_pretrain_infer
-        # shared_layers = set(self.spectra_infer_pipeline.state_dict().keys())
-        # to_remove = []
-        # for k in shared_layers:
-        #     if "redshift" in k: to_remove.append(k)
-        # for k in to_remove: shared_layers.remove(k)
-        # load_pretrained_model_weights(
-        #     self.spectra_infer_pipeline, model_state, shared_layer_names=shared_layers
-        # )
-        ## ends here
-
         self.spectra_infer_pipeline.eval()
 
         while True:
             try:
-                data = self.next_batch()
-                add_to_device(data, self.extra_args["gpu_data"], self.device)
-
                 if self.recon_spectra_all_bins:
                     self.spectra_infer_pipeline.set_batch_reduction_order("qtz_first")
+                """
+                In case of `apply_gt_redshift`, `loss_func` is assigned when we want to
+                  plot spectrum with loss or calculate global restframe spectra error.
+                In case of `brute_force`, `loss_func` is assigned for the same purpose.
+                `l2_loss_func` is assigned only when we train with non-l2 objective
+                  while want to infer based on `l2` loss.
+                """
+                loss_func, l2_loss_func = None, None
+                if self.apply_gt_redshift:
+                    if self.calculate_lambdawise_spectra_loss:
+                        loss_func = self._get_spectra_loss_func(
+                            self.extra_args["spectra_loss_cho"])
 
-                # if self.classify_redshift and \
-                #    self.extra_args["redshift_classification_method"] == "bayesian_weighted_avg":
-                #     self.spectra_infer_pipeline.set_bayesian_redshift_logits_calculation(
-                #         get_loss(self.extra_args["spectra_loss_cho"], self.cuda),
-                #         data["spectra_masks"], data["spectra_source_data"])
-
-                l2_loss_func = None
-                if self.calculate_binwise_spectra_loss:
+                elif self.calculate_binwise_spectra_loss:
                     self.spectra_infer_pipeline.set_batch_reduction_order("qtz_first")
                     loss_func = self._get_spectra_loss_func(
                         self.extra_args["spectra_loss_cho"])
                     if self.classify_redshift_based_on_l2:
                         l2_loss_func = self._get_spectra_loss_func("l2")
-                elif self.apply_gt_redshift and (
-                        self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss):
-                    loss_func = self._get_spectra_loss_func(
-                        self.extra_args["spectra_loss_cho"])
-                else: loss_func = None
 
+                data = self.next_batch()
+                add_to_device(data, self.extra_args["gpu_data"], self.device)
                 with torch.no_grad():
                     ret = forward(
                         data,
@@ -1286,11 +1272,12 @@ class AstroInferrer(BaseInferrer):
                         index_latent=self.index_latent,
                         split_latent=self.split_latent,
                         apply_gt_redshift=self.apply_gt_redshift,
-                        calculate_binwise_spectra_loss=self.calculate_binwise_spectra_loss,
-                        calculate_lambdawise_spectra_loss= \
-                            self.plot_spectra_with_loss or \
-                            self.plot_spectra_color_based_on_loss or \
-                            self.accumulate_global_lambdawise_loss,
+                        classify_redshift_based_on_l2=\
+                            self.classify_redshift_based_on_l2,
+                        calculate_binwise_spectra_loss=\
+                            self.calculate_binwise_spectra_loss,
+                        calculate_lambdawise_spectra_loss=\
+                            self.calculate_lambdawise_spectra_loss,
                         regress_lambdawise_weights_share_latents= \
                             self.regress_lambdawise_weights_share_latents,
                         save_redshift=self.save_redshift,
@@ -1308,9 +1295,6 @@ class AstroInferrer(BaseInferrer):
                                                 data["init_redshift_prob"],
                         save_lambdawise_weights=self.regress_lambdawise_weights and \
                             self.plot_spectra_with_weights)
-
-                print(ret["spectra_lambdawise_loss"].shape)
-                assert 0
 
                 if self.recon_spectra or self.recon_spectra_all_bins:
                     self.ivar.extend(data["spectra_source_data"][:,2])
@@ -1542,22 +1526,14 @@ class AstroInferrer(BaseInferrer):
         return ids
 
     def _get_spectra_loss_func(self, loss_cho):
-        assert loss_cho != "emd"
-
-        # cal_lambdawise_loss = self.apply_gt_redshift and (
-        #     self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss)
-        # reduction = None if cal_lambdawise_loss else \
-        #     self.extra_args["spectra_loss_reduction"]
-        # self.spectra_reduce_func = get_reduce(self.extra_args["spectra_loss_reduction"])
-
         loss_func = get_loss(
             loss_cho, "none", self.cuda,
             filter_size=self.extra_args["spectra_ssim_loss_filter_size"],
             filter_sigma=self.extra_args["spectra_ssim_loss_filter_sigma"],
         )
         loss_func = spectra_supervision_loss(
-            loss_func, self.extra_args["weight_by_wave_coverage"])
-
+            loss_func, self.extra_args["weight_by_wave_coverage"]
+        )
         return loss_func
 
     def _set_coords_from_checkpoint(self, checkpoint):

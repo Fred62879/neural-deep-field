@@ -408,8 +408,8 @@ def calculate_bayesian_redshift_logits(loss, mask, gt_spectra, recon_fluxes, red
     return logits
 
 def calculate_spectra_loss(
-        loss_func, masks, gt_spectra, recon_fluxes, ret,
-        lambdawise=False, loss_name_suffix="", **kwargs
+    loss_func, masks, gt_spectra, recon_fluxes, ret,
+    save_lambdawise_loss=False, loss_name_suffix="", **kwargs
 ):
     """
     Calculate spectra loss.
@@ -423,20 +423,25 @@ def calculate_spectra_loss(
       lambdawise_loss: [bsz,n_bins,nsmpls]
     """
     n_bins = recon_fluxes.shape[0]
+    brute_force = recon_fluxes.ndim == 3
+    apply_gt_redshift = recon_fluxes.ndim == 2
 
-    if recon_fluxes.ndim == 2: # apply_gt_redshift
+    if apply_gt_redshift:
         lambdawise_loss = loss_func(gt_spectra, recon_fluxes) # [bsz,nsmpls]
-    elif recon_fluxes.ndim == 3: # brute force
+    elif brute_force:
         lambdawise_loss = loss_func(
-            gt_spectra[None,:].tile(n_bins,1,1,1), recon_fluxes) # [n_bins,bsz,nsmpls]
-    else:
-        raise ValueError()
+            gt_spectra[None,:].tile(n_bins,1,1,1), recon_fluxes
+        ) # [n_bins,bsz,nsmpls]
+    else: raise ValueError()
 
     assert recon_fluxes.shape == lambdawise_loss.shape
 
-    if lambdawise:
+    if save_lambdawise_loss:
         nm = "spectra_lambdawise_loss" + loss_name_suffix
-        ret[nm] = lambdawise_loss.permute(1,0,2)
+        if apply_gt_redshift:
+            ret[nm] = lambdawise_loss
+        elif brute_force:
+            ret[nm] = lambdawise_loss.permute(1,0,2)
 
     if recon_fluxes.ndim == 3: # brute forace
         if kwargs["regress_lambdawise_weights"]:
