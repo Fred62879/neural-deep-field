@@ -57,7 +57,7 @@ pretrain:
     regularize_spectra_latents: False
     spectra_latents_regu_beta: -1
 
-    accumulate_global_lambdawise_loss: True
+    accumulate_global_lambdawise_spectra_loss: True
 
 decoder:
     decoder_activation_type: relu #gaussian
