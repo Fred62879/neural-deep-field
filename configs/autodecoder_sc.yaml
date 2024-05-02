@@ -69,8 +69,6 @@ pretrain:
     lambdawise_weights_decoder_num_layers: 1
     lambdawise_weights_decoder_hidden_dim: 128
 
-    accumulate_global_lambdawise_spectra_loss: True
-
 decoder:
     decoder_activation_type: relu #gaussian
     decoder_batch_norm: False
@@ -129,6 +127,8 @@ infer:
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: True
     plot_spectrum_under_optimal_wrong_bin: True
+
+    plot_global_lambdawise_spectra_loss: True
 
     num_spectrum_per_fig: 35
     num_spectrum_per_row: 7
