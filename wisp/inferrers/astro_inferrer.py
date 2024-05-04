@@ -132,7 +132,8 @@ class AstroInferrer(BaseInferrer):
     def init_model(self):
         self.full_pipeline = self.pipelines["full"]
         log.info(self.full_pipeline)
-        if self.recon_spectra or self.recon_spectra_all_bins or self.recon_redshift:
+        if self.recon_spectra or self.recon_spectra_all_bins or self.recon_redshift or \
+           self.plot_global_lambdawise_spectra_loss:
             self.spectra_infer_pipeline = self.pipelines["spectra_infer"]
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
             self.codebook_spectra_infer_pipeline = self.pipelines["codebook_spectra_infer"]
@@ -300,10 +301,6 @@ class AstroInferrer(BaseInferrer):
         self.regress_lambdawise_weights_share_latents = self.regress_lambdawise_weights and \
             self.extra_args["regress_lambdawise_weights_share_latents"]
 
-        self.plot_global_lambdawise_spectra_loss = \
-            self.extra_args["plot_global_lambdawise_spectra_loss"] and \
-            (self.mode == "codebook_pretrain_infer" or self.mode == "sanity_check_infer")
-
         # i) infer all coords using original model
         self.recon_img_all_pixels = False
         self.recon_img_sup_spectra = False  # -
@@ -355,6 +352,8 @@ class AstroInferrer(BaseInferrer):
         self.plot_codebook_coeff_all_bins = "plot_codebook_coeff_all_bins" in tasks
         self.plot_outlier_spectra_latents_pca = "plot_spectra_latents_pca" in tasks and \
             self.extra_args["infer_outlier_only"]
+        self.plot_global_lambdawise_spectra_loss = \
+            "plot_global_lambdawise_spectra_loss" in tasks
 
         self.plot_spectra_with_ivar = self.extra_args["plot_spectrum_with_ivar"]
         self.plot_spectra_with_loss = self.extra_args["plot_spectrum_with_loss"]
@@ -369,6 +368,9 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["plot_spectrum_color_based_on_loss"]
         self.plot_optimal_wrong_bin_codebook_coeff = not self.recon_spectra_all_bins and \
             self.extra_args["plot_codebook_coeff_under_optimal_wrong_bin"]
+        self.plot_global_lambdawise_spectra_loss_with_ivar = \
+            self.plot_global_lambdawise_spectra_loss and \
+            self.extra_args["plot_global_lambdawise_spectra_loss_with_ivar"]
 
         assert not self.plot_codebook_coeff or self.qtz_spectra
         assert not self.save_spectra_latents or self.qtz_spectra
@@ -386,6 +388,9 @@ class AstroInferrer(BaseInferrer):
             self.qtz_spectra and self.calculate_binwise_spectra_loss)
         assert sum([self.recon_spectra, self.recon_spectra_all_bins]) <= 1
         assert self.extra_args["calculate_redshift_est_stats_based_on"] == "residuals"
+
+        assert not self.plot_global_lambdawise_spectra_loss or \
+            (self.mode == "codebook_pretrain_infer" or self.mode == "sanity_check_infer")
 
         self.recon_redshift = self.save_redshift or \
             self.save_optimal_bin_ids or \
@@ -418,7 +423,8 @@ class AstroInferrer(BaseInferrer):
            self.save_scaler or self.plot_embed_map or self.plot_latent_embed:
             self.group_tasks.append("infer_all_coords_full_model")
 
-        if self.recon_spectra or self.recon_redshift or self.recon_spectra_all_bins:
+        if self.recon_spectra or self.recon_redshift or self.recon_spectra_all_bins or \
+           self.plot_global_lambdawise_spectra_loss:
            self.group_tasks.append("infer_selected_coords_partial_model")
 
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
@@ -962,6 +968,8 @@ class AstroInferrer(BaseInferrer):
             self.spectra_masks_g = []
             self.spectra_redshift_g = []
             self.spectra_lambdawise_losses_g = []
+            if self.plot_global_lambdawise_spectra_loss_with_ivar:
+                self.spectra_ivar_g = []
 
         if self.recon_spectra_all_bins:
             self.recon_fluxes_all = []
@@ -1688,6 +1696,8 @@ class AstroInferrer(BaseInferrer):
             self.spectra_masks_g.extend(data["spectra_masks"])
             self.spectra_redshift_g.extend(data["spectra_redshift"])
             self.spectra_lambdawise_losses_g.extend(ret["spectra_lambdawise_loss"])
+            if self.plot_global_lambdawise_spectra_loss_with_ivar:
+                self.spectra_ivar_g.extend(data["spectra_source_data"][:,2])
 
     def collect_spectra_inferrence_data_after_each_epoch(self):
         if self.pretrain_infer:
@@ -1751,6 +1761,9 @@ class AstroInferrer(BaseInferrer):
                 self.spectra_redshift_g).detach().cpu().numpy()
             self.spectra_lambdawise_losses_g = torch.stack(
                 self.spectra_lambdawise_losses_g).detach().cpu().numpy()
+            if self.plot_global_lambdawise_spectra_loss_with_ivar:
+                self.spectra_ivar_g = torch.stack(
+                    self.spectra_ivar_g).detach().cpu().numpy()
 
     def collect_main_train_spectra_inferrence_data_after_each_epoch(self):
         if self.main_infer:
@@ -2315,6 +2328,9 @@ class AstroInferrer(BaseInferrer):
         log.info("redshift estimation residuals plotting done")
 
     def _plot_global_lambdawise_spectra_loss(self, model_id):
+        """
+        Accumulate spectra loss under restframe for all spectra and plot.
+        """
         emitted_wave = self.spectra_wave_g / (1 + self.spectra_redshift_g[:,None])
         emitted_wave = emitted_wave[self.spectra_masks_g]
         lambdawise_losses = self.spectra_lambdawise_losses_g[self.spectra_masks_g]
@@ -2322,6 +2338,12 @@ class AstroInferrer(BaseInferrer):
         ids = np.argsort(emitted_wave)
         emitted_wave = emitted_wave[ids]
         lambdawise_losses = lambdawise_losses[ids]
+        if self.plot_global_lambdawise_spectra_loss_with_ivar:
+            ivar = self.spectra_ivar_g[self.spectra_masks_g][ids]
+            print(ivar.shape)
+            assert (ivar != 0).all()
+            assert 0
+            std = np.sqrt(ivar)
         # print(emitted_wave, emitted_wave.shape)
 
         lo, hi = min(emitted_wave), max(emitted_wave)
@@ -2333,7 +2355,7 @@ class AstroInferrer(BaseInferrer):
         # discrete_emitted_wave = np.arange(lo, hi + val, val)
 
         cts, discrete_emitted_wave = np.histogram(emitted_wave, bins=n_intervals)
-        print(cts, discrete_emitted_wave)
+        # print(cts, discrete_emitted_wave)
 
         lo, discrete_losses = 0, []
         for ct in cts:
@@ -2342,15 +2364,29 @@ class AstroInferrer(BaseInferrer):
             discrete_losses.append(sum(cur_losses) / ct)
             lo += ct
         discrete_losses = np.array(discrete_losses)
-        print(discrete_emitted_wave.shape, discrete_losses.shape)
+        # print(discrete_emitted_wave.shape, discrete_losses.shape)
         discrete_emitted_wave = discrete_emitted_wave[:-1] + val / 2
 
         suffix = ""
         suffix += ("_" + self.extra_args["spectra_loss_cho"])
         suffix += "_outlier" if self.extra_args["infer_outlier_only"] else ""
-        fname = join(self.spectra_dir, f"model-{model_id}_global_error{suffix}")
+        if self.infer_selected:
+            dir = join(self.spectra_dir, "_selected_{}".format(
+                self.extra_args["pretrain_num_infer_upper_bound"]))
+        else: dir = self.spectra_dir
+
+        fname = join(dir, f"model-{model_id}_global_loss{suffix}")
         plt.plot(discrete_emitted_wave, discrete_losses)
         plt.savefig(fname); plt.close()
+
+        fname = join(dir, f"model-{model_id}_global_counts{suffix}")
+        plt.plot(discrete_emitted_wave, cts)
+        plt.savefig(fname); plt.close()
+
+        if self.plot_global_lambdawise_spectra_loss_with_ivar:
+            fname = join(dir, f"model-{model_id}_global_ivar_loss{suffix}")
+            plt.plot(discrete_emitted_wave, )
+            plt.savefig(fname); plt.close()
 
     ###########
     # utilities
