@@ -571,7 +571,7 @@ class AstroInferrer(BaseInferrer):
                self.plot_optimal_wrong_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_masks")
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
-                self.requested_fields.append("spectra_obs_source")
+                self.requested_fields.append("spectra_ivar_reliable")
 
             if self.infer_selected:
                 # n = len(self._select_inferrence_ids())
@@ -976,7 +976,7 @@ class AstroInferrer(BaseInferrer):
             self.spectra_lambdawise_losses_g = []
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
                 self.spectra_ivar_g = []
-                self.spectra_obs_source = []
+                self.spectra_ivar_reliable = []
 
         if self.recon_spectra_all_bins:
             self.recon_fluxes_all = []
@@ -1704,7 +1704,7 @@ class AstroInferrer(BaseInferrer):
             self.spectra_redshift_g.extend(data["spectra_redshift"])
             self.spectra_lambdawise_losses_g.extend(ret["spectra_lambdawise_loss"])
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
-                self.spectra_obs_source.extend(data["spectra_obs_source"])
+                self.spectra_ivar_reliable.extend(data["spectra_ivar_reliable"])
                 self.spectra_ivar_g.extend(data["spectra_source_data"][:,2])
 
     def collect_spectra_inferrence_data_after_each_epoch(self):
@@ -1772,7 +1772,7 @@ class AstroInferrer(BaseInferrer):
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
                 self.spectra_ivar_g = torch.stack(
                     self.spectra_ivar_g).detach().cpu().numpy()
-                self.spectra_obs_source = np.array(self.spectra_obs_source)
+                self.spectra_ivar_reliable = np.array(self.spectra_ivar_reliable)
 
     def collect_main_train_spectra_inferrence_data_after_each_epoch(self):
         if self.main_infer:
@@ -2394,7 +2394,7 @@ class AstroInferrer(BaseInferrer):
 
         # process data
         if self.plot_global_lambdawise_spectra_loss_with_ivar:
-            ivar_reliable = self.spectra_obs_source != "zcosmos"
+            ivar_reliable = self.spectra_ivar_reliable
             if sum(ivar_reliable) > 0:
                 ivar = self.spectra_ivar_g[ivar_reliable]
                 masks = self.spectra_masks_g[ivar_reliable]

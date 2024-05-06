@@ -7,6 +7,7 @@ import torch
 import pandas
 import pickle
 import requests
+import warnings
 import numpy as np
 import logging as log
 import matplotlib.pyplot as plt
@@ -133,7 +134,7 @@ class SpectraData:
         self.gt_spectra_mask_fname = join(cache_path, "gt_spectra_mask.npy")
         self.gt_spectra_redshift_fname = join(cache_path, "gt_spectra_redshift.npy")
         self.gt_spectra_sup_bound_fname = join(cache_path, "gt_spectra_sup_bound.npy")
-        self.gt_spectra_obs_source_fname = join(cache_path, "gt_spectra_obs_source.npy")
+        self.gt_spectra_ivar_reliable_fname = join(cache_path, "gt_spectra_ivar_reliable.npy")
 
         if self.spectra_process_patch_info:
             self.gt_spectra_ids_fname = join(cache_path, "gt_spectra_ids.txt")
@@ -289,10 +290,10 @@ class SpectraData:
             return self.data["supervision_spectra"]
         return self.data["supervision_spectra"][idx]
 
-    def get_supervision_obs_source(self, idx=None):
+    def get_supervision_ivar_reliable(self, idx=None):
         if idx is None:
-            return self.data["supervision_obs_source"]
-        return self.data["supervision_obs_source"][idx]
+            return self.data["supervision_ivar_reliable"]
+        return self.data["supervision_ivar_reliable"][idx]
 
     def get_supervision_sup_bound(self, idx=None):
         """ Get supervision wave bound ids. """
@@ -342,10 +343,10 @@ class SpectraData:
             return self.data["validation_mask"]
         return self.data["validation_mask"][idx]
 
-    def get_validation_obs_source(self, idx=None):
+    def get_validation_ivar_reliable(self, idx=None):
         if idx is None:
-            return self.data["validation_obs_source"]
-        return self.data["validation_obs_source"][idx]
+            return self.data["validation_ivar_reliable"]
+        return self.data["validation_ivar_reliable"][idx]
 
     def get_validation_sup_bound(self, idx=None):
         """ Get validation wave bound ids. """
@@ -380,10 +381,10 @@ class SpectraData:
             return self.data["test_redshift"][idx]
         return self.data["test_redshift"]
 
-    def get_test_obs_source(self, idx=None):
+    def get_test_ivar_reliable(self, idx=None):
         if idx is None:
-            return self.data["test_obs_source"]
-        return self.data["test_obs_source"][idx]
+            return self.data["test_ivar_reliable"]
+        return self.data["test_ivar_reliable"][idx]
 
     #############
     # Helpers
@@ -449,21 +450,21 @@ class SpectraData:
         self.data["supervision_mask"] = self.data["gt_spectra_mask"][sup_ids]
         self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][sup_ids]
         self.data["supervision_sup_bound"] = self.data["gt_spectra_sup_bound"][sup_ids]
-        self.data["supervision_obs_source"] = self.data["gt_spectra_obs_source"][sup_ids]
+        self.data["supervision_ivar_reliable"] = self.data["gt_spectra_ivar_reliable"][sup_ids]
 
         # valiation(and semi sup) spectra data (used during main train)
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
         self.data["validation_mask"] = self.data["gt_spectra_mask"][val_ids]
         self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
         self.data["validation_sup_bound"] = self.data["gt_spectra_sup_bound"][val_ids]
-        self.data["validation_obs_source"] = self.data["gt_spectra_obs_source"][val_ids]
+        self.data["validation_ivar_reliable"] = self.data["gt_spectra_ivar_reliable"][val_ids]
 
         # test spectra data (used during main inferrence only)
         self.data["test_spectra"] = self.data["gt_spectra"][test_ids]
         self.data["test_mask"] = self.data["gt_spectra_mask"][test_ids]
         self.data["test_redshift"] = self.data["gt_spectra_redshift"][test_ids]
         self.data["test_sup_bound"] = self.data["gt_spectra_sup_bound"][test_ids]
-        self.data["test_obs_source"] = self.data["gt_spectra_obs_source"][test_ids]
+        self.data["test_ivar_reliable"] = self.data["gt_spectra_ivar_reliable"][test_ids]
 
         if self.spectra_process_patch_info:
             if self.kwargs["pretrain_pixel_supervision"]:
@@ -505,7 +506,7 @@ class SpectraData:
             exists(self.gt_spectra_mask_fname) and \
             exists(self.gt_spectra_redshift_fname) and \
             exists(self.gt_spectra_sup_bound_fname) and \
-            exists(self.gt_spectra_obs_source_fname)
+            exists(self.gt_spectra_ivar_reliable_fname)
         patch_info_cached = not self.spectra_process_patch_info or (
             exists(self.gt_spectra_ids_fname) and \
             exists(self.gt_spectra_pixels_fname) and \
@@ -693,7 +694,7 @@ class SpectraData:
         self.data["gt_spectra_mask"] = np.load(self.gt_spectra_mask_fname)
         self.data["gt_spectra_redshift"] = np.load(self.gt_spectra_redshift_fname)
         self.data["gt_spectra_sup_bound"] = np.load(self.gt_spectra_sup_bound_fname)
-        self.data["gt_spectra_obs_source"] = np.load(self.gt_spectra_obs_source_fname)
+        self.data["gt_spectra_ivar_reliable"] = np.load(self.gt_spectra_ivar_reliable_fname)
 
         if self.spectra_process_patch_info:
             with open(self.gt_spectra_ids_fname, "rb") as fp:
@@ -708,7 +709,7 @@ class SpectraData:
         """
         df = pandas.read_pickle(self.cache_metadata_table_fname)
         n = len(df)
-        mask, spectra, redshift, sup_bound, obs_source = [], [], [], [], []
+        mask, spectra, redshift, sup_bound, ivar_reliable = [], [], [], [], []
         if self.spectra_process_patch_info:
             with open(self.gt_spectra_ids_fname, "rb") as fp:
                 ids = pickle.load(fp)
@@ -717,8 +718,8 @@ class SpectraData:
 
         for i in range(n):
             redshift.append(df.iloc[i]["zspec"])
-            obs_source.append(df.iloc[i]["source"])
             sup_bound.append(df.iloc[i]["sup_wave_bound"])
+            ivar_reliable.append(df.iloc[i]["ivar_reliable"])
 
             source = df.iloc[i]["source"]
             path = getattr(self, f"{source}_processed_spectra_path")
@@ -743,13 +744,13 @@ class SpectraData:
         self.data["gt_spectra"] = np.array(spectra).astype(np.float32)
         self.data["gt_spectra_mask"] = np.array(mask).astype(bool)
         self.data["gt_spectra_sup_bound"] = np.array(sup_bound)
-        self.data["gt_spectra_obs_source"] = np.array(obs_source)
+        self.data["gt_spectra_ivar_reliable"] = np.array(ivar_reliable)
         self.data["gt_spectra_redshift"] = np.array(redshift).astype(np.float32) # [n,]
         np.save(self.gt_spectra_fname, self.data["gt_spectra"])
         np.save(self.gt_spectra_mask_fname, self.data["gt_spectra_mask"])
         np.save(self.gt_spectra_redshift_fname, self.data["gt_spectra_redshift"])
         np.save(self.gt_spectra_sup_bound_fname, self.data["gt_spectra_sup_bound"])
-        np.save(self.gt_spectra_obs_source_fname, self.data["gt_spectra_obs_source"])
+        np.save(self.gt_spectra_ivar_reliable_fname, self.data["gt_spectra_ivar_reliable"])
 
         if self.spectra_process_patch_info:
             self.data["gt_spectra_pixels"] = np.concatenate(
@@ -918,16 +919,21 @@ class SpectraData:
         return spectra_ids, spectra_to_drop
 
     def load_spectra_all_together(self, df, num_spectra):
-        # [ self.process_one_spectra(None, None, df, None, idx, None)
-        #   for idx in range(num_spectra) ]
-        for idx in tqdm(range(num_spectra)):
+        # for idx in tqdm(range(num_spectra)):
         #     if df.loc[idx,"source"] == "deep3":
         #         for deep3_portion in ["b","r"]:
         #             self.process_one_spectra(
         #                 None, None, None, df, None, idx, None, deep3_portion)
         #     else:
+        #         self.process_one_spectra(
+        #             None, None, None, df, None, idx, None)
+
+        for idx in tqdm(range(num_spectra)):
             self.process_one_spectra(
                 None, None, None, df, None, idx, None)
+
+        # [ self.process_one_spectra(None, None, None, df, None, idx, None)
+        #   for idx in range(num_spectra) ]
 
     def load_spectra_patch_wise(self, df, spectra_ids):
         """ Load pixels and coords for each spectra in patch-wise order.
@@ -1063,20 +1069,23 @@ class SpectraData:
                 deep3_portion=deep3_portion
             ) # [(2,)2/3,nsmpl]
 
-            gt_spectra, mask, sup_bound = process_gt_spectra(
+            sup_bound, ivar_reliable, spectra_valid = process_gt_spectra(
                 spectra, spectra_out_fname, spectra_mask_fname, spectra_sup_bound_fname,
                 df.loc[idx,"zspec"], self.emitted_wave_distrib, self.max_spectra_len,
                 self.trans_range, self.supervision_wave_range,
                 self.spectra_smooth_sigma, self.spectra_upsample_scale,
                 trans_data=self.trans_data,
                 ivar_reliable=ivar_reliable,
-                colors=self.kwargs["plot_colors"])
+                colors=self.kwargs["plot_colors"]
+            )
+            if not spectra_valid: return
         else:
             if self.spectra_process_patch_info:
                 gt_spectra = np.load(spectra_out_fname)
                 mask = np.load(spectra_mask_fname)
             sup_bound = np.load(spectra_sup_bound_fname)
 
+        df.at[idx,"ivar_reliable"] = ivar_reliable
         df.at[idx,"sup_wave_bound"] = np.array(sup_bound)
 
         if self.spectra_process_patch_info:
@@ -1639,7 +1648,10 @@ def interpolate_trans(trans_data, spectra_data, bound, sup_bound, fname=None, co
 
     source_trans = trans_data[:,1:].T
     trans_wave = trans_data[:,0]
-    spectra_wave = spectra_data[0]
+    # print(bound, sup_bound)
+    # print(spectra_data[0], bound)
+    # print(spectra_data[0][bound[0]:bound[1]+1])
+    spectra_wave = spectra_data[0][bound[0]:bound[1]+1]
 
     # clip spectra wave to be within transmission wave range
     trans_wave_range = [min(trans_wave), max(trans_wave)]
@@ -1696,9 +1708,7 @@ def interpolate_trans(trans_data, spectra_data, bound, sup_bound, fname=None, co
     ret = np.array([trans_mask] + list(trans) + list(band_mask))
     return ret
 
-def find_invalid(arr, invalid=None):
-    if invalid is None:
-        invalid = np.zeros(len(arr), dtype=np.bool)
+def find_invalid(arr, invalid):
     invalid = invalid | np.isnan(arr)
     invalid = invalid | (arr == np.inf)
     invalid = invalid | (arr == -np.inf)
@@ -1738,15 +1748,24 @@ def check_invalid_within_valid_range(valid):
     invalid_exist_within_valid_range = np.sum(valid) < n - n_invalid_head - n_invalid_tail
     return valid_ids[0], valid_ids[-1], invalid_exist_within_valid_range
 
-def find_valid_spectra_range(spectra, ivar_reliable=True):
+def find_valid_spectra_range(spectra, spectra_fname, ivar_reliable):
+    # print(spectra_fname)
     invalid = np.zeros(spectra.shape[1], dtype=np.bool) # spectra [3,nsmpls]
     invalid = find_invalid(spectra[1], invalid)
     invalid = find_invalid(spectra[2], invalid)
+    # ivar should >= 0 always, we set this to check if any spectra has ivar < 0
+    invalid = invalid | (spectra[2] < 0)
+    # print(sum(invalid), spectra.shape)
 
     if ivar_reliable:
-        invalid = invalid | (spectra[2] <= 0) # ivar <= 0
-    invalid = invalid | (spectra[0] < 0) # wave
-    return ~invalid
+        obs_invalid = spectra[2] == 0
+        # print(sum(obs_invalid), spectra.shape)
+        if sum(obs_invalid) == spectra.shape[1]:
+            # if ivar are all 0, we assume this ivar is unreliable but keep using the obs
+            ivar_reliable = False
+            warnings.warn(f"{spectra_fname} has unreliable ivar")
+        else: invalid = invalid | obs_invalid
+    return ~invalid, ivar_reliable
 
 def mask_invalid_spectra(spectra, spectra_fname, ivar_reliable):
     """
@@ -1757,7 +1776,10 @@ def mask_invalid_spectra(spectra, spectra_fname, ivar_reliable):
     plt.close()
 
     n = spectra.shape[1]
-    valid = find_valid_spectra_range(spectra, ivar_reliable=ivar_reliable)
+    valid, ivar_reliable = find_valid_spectra_range(
+        spectra, spectra_fname, ivar_reliable)
+    if sum(valid) == 0: return None, None, None
+
     # lo, hi, invalid_embedded = check_invalid_within_valid_range(valid)
     # if invalid_embedded:
     #    pass # may want to print and check manually
@@ -1773,27 +1795,16 @@ def mask_invalid_spectra(spectra, spectra_fname, ivar_reliable):
     plt.close()
 
     # drop (instead of mask) head and tail invalid range
+    # print(mask.shape, valid_ids.shape)
+    # print(valid_ids[0], valid_ids[-1])
     mask = mask[valid_ids[0]:valid_ids[-1]+1]
     spectra = spectra[:,valid_ids[0]:valid_ids[-1]+1]
     plt.plot(spectra[0],spectra[1])
-    plt.plot(spectra[0], mask*np.max(spectra[1]))
+    plt.plot(spectra[0],mask*np.max(spectra[1]))
     plt.savefig(spectra_fname[:-4] + "_orig_cut_two_ends_w_mask.png")
     plt.close()
     mask = mask.astype(np.bool)
-    return spectra, mask
-
-def pad_spectra(spectra, mask, max_len):
-    """
-    Pad spectra if shorter than max_len and update mask to 0 for padded region.
-    """
-    m, n = spectra.shape
-    new_mask = np.zeros(max_len).astype(mask.dtype)
-    new_spectra = np.full((m,max_len), -1).astype(spectra.dtype)
-    offset = max_len - n
-    lo, hi = offset//2, offset//2+n-1
-    new_mask[lo:hi+1] = mask
-    new_spectra[:,lo:hi+1] = spectra
-    return new_spectra, new_mask, (lo, hi)
+    return spectra, mask, ivar_reliable
 
 def resample_mask(wave, resampled_wave, mask):
     """
@@ -1827,7 +1838,7 @@ def resample_mask(wave, resampled_wave, mask):
     """
     lo_wave = wave[lo_ids]
     hi_wave = wave[hi_ids]
-    print(lo_wave, hi_wave, lo_ids, hi_ids)
+    # print(lo_wave, hi_wave, lo_ids, hi_ids)
     resampled_lo_ids = np.array([
         np.nonzero(resampled_wave > cur_lo_wave)[0][0] for cur_lo_wave in lo_wave])
     resampled_hi_ids = np.array([
@@ -1900,7 +1911,12 @@ def convolve_spectra(spectra, mask, std, border, ivar_reliable):
     std = std / discret_val
     kernel = Gaussian1DKernel(stddev=std)
 
-    conved = convolve(spectra[1], kernel, mask=1-mask)
+    try:
+        conved = convolve(spectra[1], kernel, mask=1-mask)
+    except RuntimeWarning:
+        print(spectra_fname)
+        assert 0
+
     if border:
         denom = convolve(np.ones(n), kernel, mask=1-mask)
         spectra[1] = conved / denom
@@ -1931,17 +1947,34 @@ def mask_spectra_range(spectra, mask, trans_range, supervision_wave_range):
       supervision_wave_range: spectra supervision wave range
     """
     m, n = spectra.shape
+    bound = (0, n-1)
     lo1, hi1 = trans_range
     lo2, hi2 = supervision_wave_range
     wave_range = (max(lo1,lo2), min(hi1,hi2))
     (id_lo, id_hi) = get_bound_id(wave_range, spectra[0])
+    sup_bound = (id_lo, id_hi)
 
     new_mask = np.zeros(n).astype(bool)
     new_mask[id_lo:id_hi+1] = 1
     sup_mask = copy.deepcopy(mask)
-    sup_mask &= new_mask
-    sup_bound = (id_lo, id_hi)
-    return spectra, sup_mask, sup_bound
+    sup_mask = sup_mask & new_mask
+    return spectra, sup_mask, bound, sup_bound
+
+def pad_spectra(spectra, mask, sup_mask, max_len):
+    """
+    Pad spectra if shorter than max_len and update mask to 0 for padded region.
+    """
+    m, n = spectra.shape
+    if n == max_len:
+        return spectra, mask, sup_mask
+
+    new_mask = np.zeros(max_len).astype(mask.dtype)
+    new_sup_mask = np.zeros(max_len).astype(mask.dtype)
+    new_spectra = np.full((m,max_len), math.nan).astype(spectra.dtype)
+    new_mask[:n] = mask
+    new_sup_mask[:n] = sup_mask
+    new_spectra[:,:n] = spectra
+    return new_spectra, new_mask, new_sup_mask
 
 def normalize_spectra(spectra, bound, ivar_reliable):
     """
@@ -1993,13 +2026,24 @@ def process_gt_spectra(
     assert spectra.shape[1] <= max_spectra_len
     spectra = filter_invalid_lambda(spectra)
     spectra = wave_based_sort(spectra)
-    spectra, mask = mask_invalid_spectra(spectra, spectra_fname, ivar_reliable)
+    spectra, mask, ivar_reliable = mask_invalid_spectra(
+        spectra, spectra_fname, ivar_reliable)
+
+    if spectra is None:
+        warnings.warn(f"{spectra_fname} has no valid observations")
+        assert 0
+        return None, None, False
+
     if sigma > 0:
         spectra, mask = resample_spectra(spectra, mask, upsample_scale, spectra_fname)
         spectra = convolve_spectra(spectra, mask, sigma, True, ivar_reliable)
-    spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
-    spectra, sup_mask, sup_bound = mask_spectra_range(
+
+    # spectra now is contiguously valid (with possibly nested invalid range)
+    assert mask[0] and mask[-1]
+
+    spectra, sup_mask, bound, sup_bound = mask_spectra_range(
         spectra, mask, trans_range, supervision_wave_range)
+    spectra, mask, sup_mask = pad_spectra(spectra, mask, sup_mask, max_spectra_len)
     spectra = normalize_spectra(spectra, sup_bound, ivar_reliable)
     spectra = spectra.astype(np.float32)
 
@@ -2028,7 +2072,7 @@ def process_gt_spectra(
 
     if validator is not None and not validator(spectra_data):
         return None, None
-    return spectra, sup_mask, sup_bound
+    return sup_bound, ivar_reliable, True
 
 def overlay_spectrum(gt_fn, gen_wave, gen_spectra):
     gt = np.load(gt_fn)
