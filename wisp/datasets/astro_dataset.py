@@ -198,6 +198,14 @@ class AstroDataset(Dataset):
         if self.spectra_source == "test":
             return self.spectra_dataset.get_test_mask(idx)
 
+    def get_spectra_obs_source(self, idx=None):
+        if self.spectra_source == "sup":
+            return self.spectra_dataset.get_supervision_obs_source(idx)
+        if self.spectra_source == "val":
+            return self.spectra_dataset.get_validation_obs_source(idx)
+        if self.spectra_source == "test":
+            return self.spectra_dataset.get_test_obs_source(idx)
+
     def get_spectra_sup_bounds(self, idx=None):
         if self.spectra_source == "sup":
             return self.spectra_dataset.get_supervision_sup_bound(idx)
@@ -331,6 +339,8 @@ class AstroDataset(Dataset):
             data = self.get_spectra_redshift()
         elif field == "spectra_sup_bounds":
             data = self.get_spectra_sup_bounds()
+        elif field == "spectra_obs_source":
+            data = self.get_spectra_obs_source()
         elif field == "spectra_source_data":
             data = self.get_spectra_source_data()
 

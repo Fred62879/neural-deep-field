@@ -570,6 +570,8 @@ class AstroInferrer(BaseInferrer):
             if self.neg_sup_wrong_redshift or self.plot_gt_bin_spectra or \
                self.plot_optimal_wrong_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_masks")
+            if self.plot_global_lambdawise_spectra_loss_with_ivar:
+                self.requested_fields.append("spectra_obs_source")
 
             if self.infer_selected:
                 # n = len(self._select_inferrence_ids())
@@ -974,6 +976,7 @@ class AstroInferrer(BaseInferrer):
             self.spectra_lambdawise_losses_g = []
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
                 self.spectra_ivar_g = []
+                self.spectra_obs_source = []
 
         if self.recon_spectra_all_bins:
             self.recon_fluxes_all = []
@@ -1701,6 +1704,7 @@ class AstroInferrer(BaseInferrer):
             self.spectra_redshift_g.extend(data["spectra_redshift"])
             self.spectra_lambdawise_losses_g.extend(ret["spectra_lambdawise_loss"])
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
+                self.spectra_obs_source.extend(data["spectra_obs_source"])
                 self.spectra_ivar_g.extend(data["spectra_source_data"][:,2])
 
     def collect_spectra_inferrence_data_after_each_epoch(self):
@@ -1768,6 +1772,7 @@ class AstroInferrer(BaseInferrer):
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
                 self.spectra_ivar_g = torch.stack(
                     self.spectra_ivar_g).detach().cpu().numpy()
+                self.spectra_obs_source = np.array(self.spectra_obs_source)
 
     def collect_main_train_spectra_inferrence_data_after_each_epoch(self):
         if self.main_infer:
@@ -2335,79 +2340,77 @@ class AstroInferrer(BaseInferrer):
         """
         Accumulate spectra loss under restframe for all spectra and plot.
         """
-        emitted_wave = self.spectra_wave_g / (1 + self.spectra_redshift_g[:,None])
-        emitted_wave = emitted_wave[self.spectra_masks_g]
-        lambdawise_losses = self.spectra_lambdawise_losses_g[self.spectra_masks_g]
 
-        ids = np.argsort(emitted_wave)
-        emitted_wave = emitted_wave[ids]
-        lambdawise_losses = lambdawise_losses[ids]
-        if self.plot_global_lambdawise_spectra_loss_with_ivar:
-            ivar = self.spectra_ivar_g[self.spectra_masks_g][ids]
-            print(ivar.shape)
-            # assert (ivar >= 0).all()
-            assert 0
-            std = np.sqrt(ivar)
+        def func(emitted_wave, lambdawise_losses, suffix=""):
+            ids = np.argsort(emitted_wave)
+            emitted_wave = emitted_wave[ids]
+            lambdawise_losses = lambdawise_losses[ids]
 
-        # print(emitted_wave, emitted_wave.shape)
+            lo, hi = min(emitted_wave), max(emitted_wave)
+            val = self.extra_args["emitted_wave_overlap_discretization_val"]
+            n_intervals = int((hi - lo) // val + 1)
+            # print(lo, hi, val, n_intervals)
 
-        lo, hi = min(emitted_wave), max(emitted_wave)
-        val = self.extra_args["emitted_wave_overlap_discretization_val"]
-        n_intervals = int((hi - lo) // val + 1)
-        # print(lo, hi, val, n_intervals)
+            # bin_ids = (spectra_emitted_wave - lo) / val
+            # discrete_emitted_wave = np.arange(lo, hi + val, val)
+            cts, discrete_emitted_wave = np.histogram(emitted_wave, bins=n_intervals)
 
-        # bin_ids = (spectra_emitted_wave - lo) / val
-        # discrete_emitted_wave = np.arange(lo, hi + val, val)
+            lo, discrete_losses = 0, []
+            for ct in cts:
+                cur_losses = lambdawise_losses[lo:lo+ct]
+                if len(cur_losses) == 0: ct = 1
+                discrete_losses.append(sum(cur_losses) / ct)
+                lo += ct
+            discrete_losses = np.array(discrete_losses)
+            discrete_emitted_wave = discrete_emitted_wave[:-1] + val / 2
 
-        cts, discrete_emitted_wave = np.histogram(emitted_wave, bins=n_intervals)
-        # print(cts, discrete_emitted_wave)
+            suffix += ("_" + self.extra_args["spectra_loss_cho"])
+            suffix += "_outlier" if self.extra_args["infer_outlier_only"] else ""
+            if self.infer_selected:
+                dir = join(self.spectra_dir, "_selected_{}".format(
+                    self.extra_args["pretrain_num_infer_upper_bound"]))
+            else: dir = self.spectra_dir
 
-        lo, discrete_losses = 0, []
-        for ct in cts:
-            cur_losses = lambdawise_losses[lo:lo+ct]
-            if len(cur_losses) == 0: ct = 1
-            discrete_losses.append(sum(cur_losses) / ct)
-            lo += ct
-        discrete_losses = np.array(discrete_losses)
-        # print(discrete_emitted_wave.shape, discrete_losses.shape)
-        discrete_emitted_wave = discrete_emitted_wave[:-1] + val / 2
-
-        suffix = ""
-        suffix += ("_" + self.extra_args["spectra_loss_cho"])
-        suffix += "_outlier" if self.extra_args["infer_outlier_only"] else ""
-        if self.infer_selected:
-            dir = join(self.spectra_dir, "_selected_{}".format(
-                self.extra_args["pretrain_num_infer_upper_bound"]))
-        else: dir = self.spectra_dir
-
-        fname = join(dir, f"model-{model_id}_global_loss{suffix}")
-        plt.plot(discrete_emitted_wave, discrete_losses)
-        plt.xlabel("restframe lambda"); plt.ylabel(f"{suffix} loss")
-        plt.savefig(fname); plt.close()
-
-        fname = join(dir, f"model-{model_id}_global_counts{suffix}")
-        plt.plot(discrete_emitted_wave, cts)
-        plt.xlabel("restframe lambda"); plt.ylabel(f"counts")
-        plt.savefig(fname); plt.close()
-
-        # if self.plot_global_lambdawise_spectra_loss_with_ivar:
-        #     fname = join(dir, f"model-{model_id}_global_ivar_loss{suffix}")
-        #     plt.plot(discrete_emitted_wave)
-        #     plt.savefig(fname); plt.close()
-
-        if self.plot_global_lambdawise_spectra_loss_with_lines:
-            fname = join(dir, f"model-{model_id}_global_loss{suffix}_with_lines")
+            fname = join(dir, f"model-{model_id}_global_loss{suffix}")
             plt.plot(discrete_emitted_wave, discrete_losses)
             plt.xlabel("restframe lambda"); plt.ylabel(f"{suffix} loss")
-            linelist = LineList("ISM")
-            lo, hi = min(emitted_wave), max(emitted_wave)
-            for line in linelist._data:
-                line_wave = line["wrest"]
-                if lo <= line_wave <= hi:
-                    plt.axvline(x=line_wave, color="blue", linestyle="dotted", alpha=0.5)
-                    plt.text(line_wave, plt.ylim()[1]*0.9, line["name"],
-                              rotation=90, fontsize=8, alpha=0.7, ha="center")
             plt.savefig(fname); plt.close()
+
+            if self.plot_global_lambdawise_spectra_loss_with_lines:
+                fname = join(dir, f"model-{model_id}_global_loss{suffix}_with_lines")
+                plt.plot(discrete_emitted_wave, discrete_losses)
+                plt.xlabel("restframe lambda"); plt.ylabel(f"{suffix} loss")
+                linelist = LineList("ISM")
+                lo, hi = min(emitted_wave), max(emitted_wave)
+                for line in linelist._data:
+                    line_wave = line["wrest"]
+                    if lo <= line_wave <= hi:
+                        plt.axvline(x=line_wave, color="blue", linestyle="dotted", alpha=0.5)
+                        plt.text(line_wave, plt.ylim()[1]*0.9, line["name"],
+                                 rotation=90, fontsize=8, alpha=0.7, ha="center")
+                plt.savefig(fname); plt.close()
+
+        emitted_wave = self.spectra_wave_g / (1 + self.spectra_redshift_g[:,None])
+
+        # process data
+        if self.plot_global_lambdawise_spectra_loss_with_ivar:
+            ivar_reliable = self.spectra_obs_source != "zcosmos"
+            if sum(ivar_reliable) > 0:
+                ivar = self.spectra_ivar_g[ivar_reliable]
+                masks = self.spectra_masks_g[ivar_reliable]
+                emitted_wave_i = emitted_wave[ivar_reliable]
+                lambdawise_losses = self.spectra_lambdawise_losses_g[ivar_reliable]
+                # print(emitted_wave_i.shape, masks.shape, ivar.shape, lambdawise_losses.shape)
+
+                std = np.sqrt(ivar[masks])
+                emitted_wave_i = emitted_wave_i[masks]
+                lambdawise_losses = lambdawise_losses[masks] * std
+                # print(emitted_wave_i.shape, lambdawise_losses.shape)
+                func(emitted_wave_i, lambdawise_losses, suffix="_ivar")
+
+        emitted_wave = emitted_wave[self.spectra_masks_g]
+        lambdawise_losses = self.spectra_lambdawise_losses_g[self.spectra_masks_g]
+        func(emitted_wave, lambdawise_losses)
 
     ###########
     # utilities

@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    # tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'recon_spectra'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'recon_spectra'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -99,7 +99,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240422-202457_ssim_32_in_3_512_no_skip_no_regu_4k_epochs_r'
+    # infer_log_dir: ''
     infer_selected: False
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
@@ -117,7 +117,7 @@ infer:
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: False
     plot_spectrum_under_optimal_wrong_bin: False
-    plot_global_lambdawise_spectra_loss_with_ivar: False
+    plot_global_lambdawise_spectra_loss_with_ivar: True
     plot_global_lambdawise_spectra_loss_with_lines: True
     emitted_wave_overlap_discretization_val: 1e-1
 

@@ -271,7 +271,8 @@ class HyperSpectralDecoderB(nn.Module):
           input:   2D coords or embedded latents or logits [bsz,1,2/embed_dim]
           spectra: spectra reconstructed under all redshift bins
         """
-        if self.apply_gt_redshift and not self.calculate_lambdawise_spectra_loss: return
+        if self.apply_gt_redshift and not self.calculate_lambdawise_spectra_loss:
+            return spectra
 
         if self.classify_redshift:
             assert spectra.ndim == 3

@@ -133,6 +133,7 @@ class SpectraData:
         self.gt_spectra_mask_fname = join(cache_path, "gt_spectra_mask.npy")
         self.gt_spectra_redshift_fname = join(cache_path, "gt_spectra_redshift.npy")
         self.gt_spectra_sup_bound_fname = join(cache_path, "gt_spectra_sup_bound.npy")
+        self.gt_spectra_obs_source_fname = join(cache_path, "gt_spectra_obs_source.npy")
 
         if self.spectra_process_patch_info:
             self.gt_spectra_ids_fname = join(cache_path, "gt_spectra_ids.txt")
@@ -288,6 +289,11 @@ class SpectraData:
             return self.data["supervision_spectra"]
         return self.data["supervision_spectra"][idx]
 
+    def get_supervision_obs_source(self, idx=None):
+        if idx is None:
+            return self.data["supervision_obs_source"]
+        return self.data["supervision_obs_source"][idx]
+
     def get_supervision_sup_bound(self, idx=None):
         """ Get supervision wave bound ids. """
         if idx is None:
@@ -336,6 +342,11 @@ class SpectraData:
             return self.data["validation_mask"]
         return self.data["validation_mask"][idx]
 
+    def get_validation_obs_source(self, idx=None):
+        if idx is None:
+            return self.data["validation_obs_source"]
+        return self.data["validation_obs_source"][idx]
+
     def get_validation_sup_bound(self, idx=None):
         """ Get validation wave bound ids. """
         if idx is None:
@@ -368,6 +379,11 @@ class SpectraData:
         if idx is not None:
             return self.data["test_redshift"][idx]
         return self.data["test_redshift"]
+
+    def get_test_obs_source(self, idx=None):
+        if idx is None:
+            return self.data["test_obs_source"]
+        return self.data["test_obs_source"][idx]
 
     #############
     # Helpers
@@ -433,18 +449,21 @@ class SpectraData:
         self.data["supervision_mask"] = self.data["gt_spectra_mask"][sup_ids]
         self.data["supervision_redshift"] = self.data["gt_spectra_redshift"][sup_ids]
         self.data["supervision_sup_bound"] = self.data["gt_spectra_sup_bound"][sup_ids]
+        self.data["supervision_obs_source"] = self.data["gt_spectra_obs_source"][sup_ids]
 
         # valiation(and semi sup) spectra data (used during main train)
         self.data["validation_spectra"] = self.data["gt_spectra"][val_ids]
         self.data["validation_mask"] = self.data["gt_spectra_mask"][val_ids]
         self.data["semi_supervision_redshift"] = self.data["gt_spectra_redshift"][val_ids]
         self.data["validation_sup_bound"] = self.data["gt_spectra_sup_bound"][val_ids]
+        self.data["validation_obs_source"] = self.data["gt_spectra_obs_source"][val_ids]
 
         # test spectra data (used during main inferrence only)
         self.data["test_spectra"] = self.data["gt_spectra"][test_ids]
         self.data["test_mask"] = self.data["gt_spectra_mask"][test_ids]
         self.data["test_redshift"] = self.data["gt_spectra_redshift"][test_ids]
         self.data["test_sup_bound"] = self.data["gt_spectra_sup_bound"][test_ids]
+        self.data["test_obs_source"] = self.data["gt_spectra_obs_source"][test_ids]
 
         if self.spectra_process_patch_info:
             if self.kwargs["pretrain_pixel_supervision"]:
@@ -485,7 +504,8 @@ class SpectraData:
             exists(self.gt_spectra_fname) and \
             exists(self.gt_spectra_mask_fname) and \
             exists(self.gt_spectra_redshift_fname) and \
-            exists(self.gt_spectra_sup_bound_fname)
+            exists(self.gt_spectra_sup_bound_fname) and \
+            exists(self.gt_spectra_obs_source_fname)
         patch_info_cached = not self.spectra_process_patch_info or (
             exists(self.gt_spectra_ids_fname) and \
             exists(self.gt_spectra_pixels_fname) and \
@@ -673,6 +693,7 @@ class SpectraData:
         self.data["gt_spectra_mask"] = np.load(self.gt_spectra_mask_fname)
         self.data["gt_spectra_redshift"] = np.load(self.gt_spectra_redshift_fname)
         self.data["gt_spectra_sup_bound"] = np.load(self.gt_spectra_sup_bound_fname)
+        self.data["gt_spectra_obs_source"] = np.load(self.gt_spectra_obs_source_fname)
 
         if self.spectra_process_patch_info:
             with open(self.gt_spectra_ids_fname, "rb") as fp:
@@ -687,7 +708,7 @@ class SpectraData:
         """
         df = pandas.read_pickle(self.cache_metadata_table_fname)
         n = len(df)
-        mask, spectra, redshift, sup_bound = [], [], [], []
+        mask, spectra, redshift, sup_bound, obs_source = [], [], [], [], []
         if self.spectra_process_patch_info:
             with open(self.gt_spectra_ids_fname, "rb") as fp:
                 ids = pickle.load(fp)
@@ -696,6 +717,7 @@ class SpectraData:
 
         for i in range(n):
             redshift.append(df.iloc[i]["zspec"])
+            obs_source.append(df.iloc[i]["source"])
             sup_bound.append(df.iloc[i]["sup_wave_bound"])
 
             source = df.iloc[i]["source"]
@@ -721,11 +743,13 @@ class SpectraData:
         self.data["gt_spectra"] = np.array(spectra).astype(np.float32)
         self.data["gt_spectra_mask"] = np.array(mask).astype(bool)
         self.data["gt_spectra_sup_bound"] = np.array(sup_bound)
+        self.data["gt_spectra_obs_source"] = np.array(obs_source)
         self.data["gt_spectra_redshift"] = np.array(redshift).astype(np.float32) # [n,]
         np.save(self.gt_spectra_fname, self.data["gt_spectra"])
         np.save(self.gt_spectra_mask_fname, self.data["gt_spectra_mask"])
         np.save(self.gt_spectra_redshift_fname, self.data["gt_spectra_redshift"])
         np.save(self.gt_spectra_sup_bound_fname, self.data["gt_spectra_sup_bound"])
+        np.save(self.gt_spectra_obs_source_fname, self.data["gt_spectra_obs_source"])
 
         if self.spectra_process_patch_info:
             self.data["gt_spectra_pixels"] = np.concatenate(
@@ -1672,7 +1696,9 @@ def interpolate_trans(trans_data, spectra_data, bound, sup_bound, fname=None, co
     ret = np.array([trans_mask] + list(trans) + list(band_mask))
     return ret
 
-def find_invalid(arr, invalid):
+def find_invalid(arr, invalid=None):
+    if invalid is None:
+        invalid = np.zeros(len(arr), dtype=np.bool)
     invalid = invalid | np.isnan(arr)
     invalid = invalid | (arr == np.inf)
     invalid = invalid | (arr == -np.inf)
