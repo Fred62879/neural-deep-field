@@ -11,6 +11,7 @@ from tqdm import tqdm
 from pathlib import Path
 from os.path import exists, join
 from functools import partial, lru_cache
+from linetools.lists.linelist import LineList
 
 from wisp.inferrers import BaseInferrer
 from wisp.loss import get_loss, get_reduce, spectra_supervision_loss
@@ -371,6 +372,9 @@ class AstroInferrer(BaseInferrer):
         self.plot_global_lambdawise_spectra_loss_with_ivar = \
             self.plot_global_lambdawise_spectra_loss and \
             self.extra_args["plot_global_lambdawise_spectra_loss_with_ivar"]
+        self.plot_global_lambdawise_spectra_loss_with_lines = \
+            self.plot_global_lambdawise_spectra_loss and \
+            self.extra_args["plot_global_lambdawise_spectra_loss_with_lines"]
 
         assert not self.plot_codebook_coeff or self.qtz_spectra
         assert not self.save_spectra_latents or self.qtz_spectra
@@ -2383,9 +2387,22 @@ class AstroInferrer(BaseInferrer):
         plt.plot(discrete_emitted_wave, cts)
         plt.savefig(fname); plt.close()
 
-        if self.plot_global_lambdawise_spectra_loss_with_ivar:
-            fname = join(dir, f"model-{model_id}_global_ivar_loss{suffix}")
-            plt.plot(discrete_emitted_wave, )
+        # if self.plot_global_lambdawise_spectra_loss_with_ivar:
+        #     fname = join(dir, f"model-{model_id}_global_ivar_loss{suffix}")
+        #     plt.plot(discrete_emitted_wave)
+        #     plt.savefig(fname); plt.close()
+
+        if self.plot_global_lambdawise_spectra_loss_with_lines:
+            fname = join(dir, f"model-{model_id}_global_loss{suffix}_with_lines")
+            plt.plot(discrete_emitted_wave, discrete_losses)
+            linelist = LineList("ISM")
+            lo, hi = min(emitted_wave), max(emitted_wave)
+            for line in linelist._data:
+                line_wave = line["wrest"]
+                if lo <= line_wave <= hi:
+                    plt.axvline(x=line_wave, color="blue", linestyle="dotted", alpha=0.5)
+                    plt.text(line_wave, plt.ylim()[1]*0.9, line["name"],
+                              rotation=90, fontsize=8, alpha=0.7, ha="center")
             plt.savefig(fname); plt.close()
 
     ###########

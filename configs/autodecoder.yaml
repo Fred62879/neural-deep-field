@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    #tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'recon_spectra'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'recon_spectra'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -117,7 +117,8 @@ infer:
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: False
     plot_spectrum_under_optimal_wrong_bin: False
-    plot_global_lambdawise_spectra_loss_with_ivar: True
+    plot_global_lambdawise_spectra_loss_with_ivar: False
+    plot_global_lambdawise_spectra_loss_with_lines: True
     emitted_wave_overlap_discretization_val: 1e-1
 
     num_spectrum_per_fig: 35
@@ -130,7 +131,7 @@ infer:
 spectra_data:
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deimos] #,zcosmos]
+    spectra_data_sources: [deimos,zcosmos]
     random_permute_source_spectra: True
 
     spectra_upsample_scale: 10
@@ -138,8 +139,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 10 #25400
-    num_supervision_spectra_upper_bound: 10 #25400
+    num_gt_spectra_upper_bound: 1600 #25400
+    num_supervision_spectra_upper_bound: 1600 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02

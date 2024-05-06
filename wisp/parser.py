@@ -970,6 +970,8 @@ def define_cmd_line_args():
 
     infer_group.add_argument("--plot-global-lambdawise-spectra-loss-with-ivar",
                              action="store_true")
+    infer_group.add_argument("--plot-global-lambdawise-spectra-loss-with-lines",
+                             action="store_true")
     infer_group.add_argument("--emitted-wave-overlap-discretization-val", type=float)
 
     infer_group.add_argument("--infer-spectra-individually", action="store_true")
