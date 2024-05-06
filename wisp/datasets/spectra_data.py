@@ -1,6 +1,7 @@
 
 import csv
 import copy
+import math
 import time
 import torch
 import pandas
@@ -69,15 +70,17 @@ class SpectraData:
 
         self.load_spectra_data_from_cache = kwargs["load_spectra_data_from_cache"]
 
-        self.spectra_smooth_sigma = kwargs["spectra_smooth_sigma"]
-        self.spectra_neighbour_size = kwargs["spectra_neighbour_size"]
+        self.max_spectra_len = kwargs["max_spectra_len"]
         self.wave_discretz_interval = kwargs["trans_sample_interval"]
-        self.trans_range = self.trans_obj.get_wave_range()
-        self.process_ivar = True #kwargs["process_ivar"]
-        self.convolve_spectra = kwargs["convolve_spectra"]
+        self.spectra_neighbour_size = kwargs["spectra_neighbour_size"]
         self.average_neighbour_spectra = kwargs["average_neighbour_spectra"]
-        self.learn_spectra_within_wave_range = kwargs["learn_spectra_within_wave_range"]
 
+        self.convolve_spectra = kwargs["convolve_spectra"]
+        self.spectra_smooth_sigma = kwargs["spectra_smooth_sigma"]
+        self.spectra_upsample_scale = kwargs["spectra_upsample_scale"]
+
+        self.trans_range = self.trans_obj.get_wave_range()
+        self.learn_spectra_within_wave_range = kwargs["learn_spectra_within_wave_range"]
         self.supervision_wave_range = None if not self.learn_spectra_within_wave_range \
             else [kwargs["spectra_supervision_wave_lo"],
                   kwargs["spectra_supervision_wave_hi"]]
@@ -1037,21 +1040,13 @@ class SpectraData:
             ) # [(2,)2/3,nsmpl]
 
             gt_spectra, mask, sup_bound = process_gt_spectra(
-                spectra,
-                spectra_out_fname,
-                spectra_mask_fname,
-                spectra_sup_bound_fname,
-                df.loc[idx,"zspec"],
-                self.emitted_wave_distrib,
+                spectra, spectra_out_fname, spectra_mask_fname, spectra_sup_bound_fname,
+                df.loc[idx,"zspec"], self.emitted_wave_distrib, self.max_spectra_len,
+                self.trans_range, self.supervision_wave_range,
+                self.spectra_smooth_sigma, self.spectra_upsample_scale,
                 trans_data=self.trans_data,
-                trans_range=self.trans_range,
-                process_ivar=self.process_ivar,
                 ivar_reliable=ivar_reliable,
-                sigma=self.spectra_smooth_sigma,
-                colors=self.kwargs["plot_colors"],
-                max_spectra_len=self.kwargs["max_spectra_len"],
-                supervision_wave_range=self.supervision_wave_range,
-                upsample_scale=self.kwargs["spectra_upsample_scale"])
+                colors=self.kwargs["plot_colors"])
         else:
             if self.spectra_process_patch_info:
                 gt_spectra = np.load(spectra_out_fname)
@@ -1677,48 +1672,63 @@ def interpolate_trans(trans_data, spectra_data, bound, sup_bound, fname=None, co
     ret = np.array([trans_mask] + list(trans) + list(band_mask))
     return ret
 
+def find_invalid(arr, invalid):
+    invalid = invalid | np.isnan(arr)
+    invalid = invalid | (arr == np.inf)
+    invalid = invalid | (arr == -np.inf)
+    return invalid
+
+def filter_invalid_lambda(spectra):
+    """
+    Filter out spectra with invalid lambda values.
+    """
+    invalid = np.zeros(spectra.shape[1], dtype=np.bool) # spectra [3,nsmpls]
+    invalid = find_invalid(spectra[0], invalid)
+    spectra = spectra[:,~invalid] # dump samples with invalid lambda
+    return spectra
+
 def wave_based_sort(spectra):
-    """ Sort spectra based on wave.
+    """
+    Sort spectra based on lambda.
     """
     ids = np.argsort(spectra[0])
     return spectra[:,ids]
 
+def check_invalid_within_valid_range(valid):
+    """
+    Check if the given spectra has invalid observations within valid range
+     ( i.e. whether this happens: ivar [0,0,0,1,1,1,0,0,0,1,1,1,0,0,0] 0s in the middle).
+    @Params
+      valid: [n] Bool array indicating whether each lambda has valid observation
+    @Return
+      lo: start index of valid range (3 in ex above)
+      hi: end index of valid range (11 in ex above)
+      bool: whether ex above happens
+    """
+    ids = np.arange(len(valid))
+    valid_ids = ids[valid]
+    n_invalid_head = valid_ids[0]
+    n_invalid_tail = n - 1 - valid_ids[-1]
+    invalid_exist_within_valid_range = np.sum(valid) < n - n_invalid_head - n_invalid_tail
+    return valid_ids[0], valid_ids[-1], invalid_exist_within_valid_range
+
 def find_valid_spectra_range(spectra, ivar_reliable=True):
     invalid = np.zeros(spectra.shape[1], dtype=np.bool) # spectra [3,nsmpls]
+    invalid = find_invalid(spectra[1], invalid)
+    invalid = find_invalid(spectra[2], invalid)
+
     if ivar_reliable:
         invalid = invalid | (spectra[2] <= 0) # ivar <= 0
-    invalid = invalid | (spectra[0] < 0) # wave < 0
-    invalid = invalid | np.isnan(spectra[1])
-    invalid = invalid | (spectra[1] == np.inf) # flux
-    invalid = invalid | (spectra[1] == -np.inf)
+    invalid = invalid | (spectra[0] < 0) # wave
     return ~invalid
 
-# def check_invalid_within_valid_range(valid):
-#     """
-#     Check if the given spectra has invalid observations within valid range
-#      ( i.e. whether this happens: ivar [0,0,0,1,1,1,0,0,0,1,1,1,0,0,0] 0s in the middle).
-#     @Params
-#       valid: [n] Bool array indicating whether each lambda has valid observation
-#     @Return
-#       lo: start index of valid range (3 in ex above)
-#       hi: end index of valid range (11 in ex above)
-#       bool: whether ex above happens
-#     """
-#     ids = np.arange(len(valid))
-#     valid_ids = ids[valid]
-#     n_invalid_head = valid_ids[0]
-#     n_invalid_tail = n - 1 - valid_ids[-1]
-#     invalid_exist_within_valid_range = np.sum(valid) < n - n_invalid_head - n_invalid_tail
-#     return valid_ids[0], valid_ids[-1], invalid_exist_within_valid_range
-
-def handle_spectra_invalid_range(spectra, spectra_fname, plot, ivar_reliable=True):
+def mask_invalid_spectra(spectra, spectra_fname, ivar_reliable):
     """
-    Handle range of spectra where there are no valid observations.
+    Mask range of spectra where there are no valid observations.
     """
-    if plot:
-        plt.plot(spectra[0],spectra[1])
-        plt.savefig(spectra_fname[:-4] + "_orig.png")
-        plt.close()
+    plt.plot(spectra[0],spectra[1])
+    plt.savefig(spectra_fname[:-4] + "_orig.png")
+    plt.close()
 
     n = spectra.shape[1]
     valid = find_valid_spectra_range(spectra, ivar_reliable=ivar_reliable)
@@ -1731,22 +1741,33 @@ def handle_spectra_invalid_range(spectra, spectra_fname, plot, ivar_reliable=Tru
     valid_ids = ids[valid]
     mask = np.zeros(n)
     mask[valid] = 1
-    if plot:
-        plt.plot(spectra[0],spectra[1])
-        plt.plot(spectra[0],mask*np.max(spectra[1]))
-        plt.savefig(spectra_fname[:-4] + "_orig_w_mask.png")
-        plt.close()
+    plt.plot(spectra[0],spectra[1])
+    plt.plot(spectra[0],mask*np.max(spectra[1]))
+    plt.savefig(spectra_fname[:-4] + "_orig_w_mask.png")
+    plt.close()
 
     # drop (instead of mask) head and tail invalid range
     mask = mask[valid_ids[0]:valid_ids[-1]+1]
     spectra = spectra[:,valid_ids[0]:valid_ids[-1]+1]
-    if plot:
-        plt.plot(spectra[0],spectra[1])
-        plt.plot(spectra[0], mask*np.max(spectra[1]))
-        plt.savefig(spectra_fname[:-4] + "_orig_cut_two_ends_w_mask.png")
-        plt.close()
+    plt.plot(spectra[0],spectra[1])
+    plt.plot(spectra[0], mask*np.max(spectra[1]))
+    plt.savefig(spectra_fname[:-4] + "_orig_cut_two_ends_w_mask.png")
+    plt.close()
     mask = mask.astype(np.bool)
     return spectra, mask
+
+def pad_spectra(spectra, mask, max_len):
+    """
+    Pad spectra if shorter than max_len and update mask to 0 for padded region.
+    """
+    m, n = spectra.shape
+    new_mask = np.zeros(max_len).astype(mask.dtype)
+    new_spectra = np.full((m,max_len), -1).astype(spectra.dtype)
+    offset = max_len - n
+    lo, hi = offset//2, offset//2+n-1
+    new_mask[lo:hi+1] = mask
+    new_spectra[:,lo:hi+1] = spectra
+    return new_spectra, new_mask, (lo, hi)
 
 def resample_mask(wave, resampled_wave, mask):
     """
@@ -1780,6 +1801,7 @@ def resample_mask(wave, resampled_wave, mask):
     """
     lo_wave = wave[lo_ids]
     hi_wave = wave[hi_ids]
+    print(lo_wave, hi_wave, lo_ids, hi_ids)
     resampled_lo_ids = np.array([
         np.nonzero(resampled_wave > cur_lo_wave)[0][0] for cur_lo_wave in lo_wave])
     resampled_hi_ids = np.array([
@@ -1798,12 +1820,18 @@ def resample_mask(wave, resampled_wave, mask):
     [func(ite) for ite in zip(resampled_lo_ids, resampled_hi_ids)]
     return resampled_mask
 
-def resample_spectra(spectra, mask, upsample_scale, spectra_fname, plot):
+def resample_spectra(spectra, mask, upsample_scale, spectra_fname):
     """
     Resample spectra to be regularly sampled.
-    We upsample the input spectra to higher frequency first
+    We upsample the input spectra to a higher frequency first
       and then downsample back to (close to) the original frequency.
     """
+    freq = np.mean(spectra[0,1:] - spectra[0,:-1])
+    mean_freq = np.mean(freq)
+    if (freq - mean_freq < 1e-8).all():
+        # no resample needed
+        return spectra, mask
+
     freq = np.mean(spectra[0,1:] - spectra[0,:-1])
     n = len(spectra[0])
     new_freq = freq * upsample_scale
@@ -1826,126 +1854,79 @@ def resample_spectra(spectra, mask, upsample_scale, spectra_fname, plot):
     assert (freq - mean_freq < 1e-8).all()
     assert spectra.shape == resampled_spectra.shape
 
-    if plot:
-        plt.plot(resampled_spectra[0], resampled_spectra[1])
-        plt.plot(resampled_spectra[0], resampled_mask*np.max(resampled_spectra[1]))
-        plt.savefig(spectra_fname[:-4] + "_resampled.png")
-        plt.close()
-
-    # plt.plot(spectra[0], spectra[1])
-    # plt.savefig('tmp1.png')
-    # plt.close()
-    # plt.plot(resampled_spectra[0], resampled_spectra[1])
-    # plt.savefig('tmp2.png')
-    # plt.close()
-    # assert 0
-
+    plt.plot(resampled_spectra[0], resampled_spectra[1])
+    plt.plot(resampled_spectra[0], resampled_mask*np.max(resampled_spectra[1]))
+    plt.savefig(spectra_fname[:-4] + "_resampled.png")
+    plt.close()
     return resampled_spectra, resampled_mask
 
-# def create_spectra_mask(spectra, max_spectra_len):
-#     """
-#     Mask out invalid and padded region of spectra.
-#     """
-#     m, n = spectra.shape
-#     if n == max_spectra_len: mask = np.ones(max_spectra_len).astype(bool)
-#     else: mask = np.zeros(max_spectra_len).astype(bool)
-#     return mask
-
-def pad_spectra(spectra, mask, max_len):
+def convolve_spectra(spectra, mask, std, border, ivar_reliable):
     """
-    Pad spectra if shorter than max_len and update mask to 1 for un-padded region.
+    Smooth gt spectra flux and ivar with the given std.
+    @Param
+      bound: defines range to convolve within
+      border: if True, we add 1 padding at two ends when convolving
     """
-    m, n = spectra.shape
-    offset = max_len - n
-    ret = np.full((m,max_len),-1).astype(spectra.dtype)
-    lo, hi = offset//2, offset//2+n-1
-    mask[lo:hi+1] = 1
-    ret[:,lo:hi+1] = spectra
-    return ret, mask, (lo, hi)
-
-def clean_flux(spectra, mask):
-    """ Replace `inf` `-inf` `nan` in flux with 0 and mask out.
-    """
-    ids = np.isnan(spectra[1])
-    ids = ids | (spectra[1] == np.inf)
-    ids = ids | (spectra[1] == -np.inf)
-    mask[ids] = 0
-    spectra[1][ids] = 0
-    return spectra, mask
-
-def convolve_spectra(spectra, bound, std=5, border=True, process_ivar=False):
-    """ Smooth gt spectra flux and ivar with given std.
-        @Param
-          bound: defines range to convolve within
-          border: if True, we add 1 padding at two ends when convolving
-    """
+    n = spectra.shape[1]
     if std <= 0: return spectra
 
-    lo, hi = bound
-    n = hi - lo + 1
-
-    discret_val = np.mean(np.diff(spectra[0][lo:hi+1])) # get discretization value of lambda
+    discret_val = np.mean(np.diff(spectra[0])) # get discretization value of lambda
     std = std / discret_val
     kernel = Gaussian1DKernel(stddev=std)
-    if border:
-        nume = convolve(spectra[1][lo:hi+1], kernel) # flux
-        denom = convolve(np.ones(n), kernel)
-        spectra[1][lo:hi+1] = nume / denom
-    else:
-        spectra[1][lo:hi+1] = convolve(spectra[1][lo:hi+1], kernel)
 
-    if process_ivar:
-        mask = spectra[2][lo:hi+1] != 0
-        if sum(mask) != 0:
-            conved = 1/convolve(1/spectra[2][lo:hi+1][mask], kernel)
-            if border:
-                denom = convolve(np.ones(sum(mask)), kernel)
-                spectra[2][lo:hi+1][mask] = conved / denom
-            else: spectra[2][lo:hi+1][mask] = conved
+    conved = convolve(spectra[1], kernel, mask=1-mask)
+    if border:
+        denom = convolve(np.ones(n), kernel, mask=1-mask)
+        spectra[1] = conved / denom
+    else: spectra[1] = conved
+
+    if ivar_reliable:
+        # conved = 1 / convolve(1/spectra[2], kernel, mask=1-mask)
+        # if border:
+        #     denom = convolve(np.ones(n), kernel, mask=1-mask)
+        #     spectra[2] = conved / denom
+        # else: spectra[2] = conved
+        conved = convolve(spectra[2], kernel, mask=1-mask)
+        if border:
+            denom = convolve(np.ones(n), kernel, mask=1-mask)
+            spectra[2] = conved / denom
+        else: spectra[2] = conved
 
     return spectra
 
-def mask_spectra_range(spectra, mask, bound, trans_range, supervision_wave_range):
-    """ Mask out spectra data beyond given wave range.
-        @Param
-          spectra: spectra data [3,nsmpl] (wave,flux,ivar)
-          bound: defines range of valid spectra
-          mask: mask to be updated [nsmpl]
-          trans_range: transmission data wave range
-          supervision_wave_range: spectra supervision wave range
+def mask_spectra_range(spectra, mask, trans_range, supervision_wave_range):
     """
-    (id_lo_old, id_hi_old) = bound
-
+    Mask out spectra data beyond given wave range.
+    @Param
+      spectra: spectra data [3,nsmpl] (wave,flux,ivar)
+      bound: defines range of valid spectra
+      mask: mask to be updated [nsmpl]
+      trans_range: transmission data wave range
+      supervision_wave_range: spectra supervision wave range
+    """
     m, n = spectra.shape
     lo1, hi1 = trans_range
     lo2, hi2 = supervision_wave_range
     wave_range = (max(lo1,lo2), min(hi1,hi2))
-    (id_lo_new, id_hi_new) = get_bound_id(wave_range, spectra[0])
-
-    id_lo = max(id_lo_old, id_lo_new)
-    id_hi = min(id_hi_old, id_hi_new)
+    (id_lo, id_hi) = get_bound_id(wave_range, spectra[0])
 
     new_mask = np.zeros(n).astype(bool)
     new_mask[id_lo:id_hi+1] = 1
     sup_mask = copy.deepcopy(mask)
     sup_mask &= new_mask
     sup_bound = (id_lo, id_hi)
-    return spectra, mask, sup_mask, sup_bound
+    return spectra, sup_mask, sup_bound
 
-def normalize_spectra(spectra, bound, process_ivar=False):
-    """ Normalize flux to be in 0-1 within supervision range (defined by bound).
+def normalize_spectra(spectra, bound, ivar_reliable):
+    """
+    Normalize flux to be in 0-1 within supervision range (defined by bound).
     """
     (id_lo, id_hi) = bound
     flux = spectra[1][id_lo:id_hi+1]
     lo, hi = min(flux), max(flux)
     spectra[1] = (spectra[1] - lo) / (hi - lo)
-    # print(np.min(spectra[2]), np.max(spectra[2]))
-    if process_ivar:
-        mask = spectra[2] != 0 # ivar = 0 where err is infty
-        # spectra[2][mask] = (hi - lo)**2 / ( 1/spectra[2][mask] - lo)
-        spectra[2][mask] = (hi - lo)**2 * spectra[2][mask]
-    # print(np.min(spectra[2]), np.max(spectra[2]))
-    # assert min(spectra[2]) >= 0
+    if ivar_reliable:
+        spectra[2] = (hi - lo)**2 * spectra[2]
     return spectra
 
 def get_wave_weight(spectra, redshift, emitted_wave_distrib, bound):
@@ -1962,11 +1943,11 @@ def get_wave_weight(spectra, redshift, emitted_wave_distrib, bound):
     return weight
 
 def process_gt_spectra(
-        spectra, spectra_fname, spectra_mask_fname,
-        spectra_sup_bound_fname, redshift, emitted_wave_distrib,
-        sigma=-1, upsample_scale=10, trans_range=None, save=True, plot=True,
-        colors=None, trans_data=None, supervision_wave_range=None, max_spectra_len=-1,
-        validator=None, process_ivar=True, ivar_reliable=True
+        spectra, spectra_fname, spectra_mask_fname, spectra_sup_bound_fname,
+        redshift, emitted_wave_distrib, max_spectra_len,
+        trans_range, supervision_wave_range, sigma, upsample_scale,
+        save=True, plot=True, ivar_reliable=True,
+        colors=None, trans_data=None, validator=None,
 ):
     """ Load gt spectra wave and flux for spectra supervision and
           spectrum plotting. Also smooth the gt spectra.
@@ -1984,21 +1965,16 @@ def process_gt_spectra(
           mask:     mask out bad flux values
     """
     assert spectra.shape[1] <= max_spectra_len
+    spectra = filter_invalid_lambda(spectra)
     spectra = wave_based_sort(spectra)
-    # raise NotImplementedError()
-
-    spectra, mask = handle_spectra_invalid_range(
-        spectra, spectra_fname, plot, ivar_reliable=ivar_reliable)
-    # mask = create_spectra_mask(spectra, max_spectra_len)
-    spectra, mask = resample_spectra(spectra, mask, upsample_scale, spectra_fname, plot)
-    # spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
-    # spectra, mask = clean_flux(spectra, mask)
-    spectra = convolve_spectra(spectra, bound, std=sigma, process_ivar=process_ivar)
-    spectra, mask, sup_mask, sup_bound = mask_spectra_range(
-        spectra, mask, bound, trans_range, supervision_wave_range)
-    spectra = normalize_spectra(spectra, sup_bound, process_ivar=process_ivar)
-
+    spectra, mask = mask_invalid_spectra(spectra, spectra_fname, ivar_reliable)
+    if sigma > 0:
+        spectra, mask = resample_spectra(spectra, mask, upsample_scale, spectra_fname)
+        spectra = convolve_spectra(spectra, mask, sigma, True, ivar_reliable)
     spectra, mask, bound = pad_spectra(spectra, mask, max_spectra_len)
+    spectra, sup_mask, sup_bound = mask_spectra_range(
+        spectra, mask, trans_range, supervision_wave_range)
+    spectra = normalize_spectra(spectra, sup_bound, ivar_reliable)
     spectra = spectra.astype(np.float32)
 
     weight = get_wave_weight(spectra, redshift, emitted_wave_distrib, sup_bound)

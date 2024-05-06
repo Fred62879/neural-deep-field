@@ -2345,9 +2345,10 @@ class AstroInferrer(BaseInferrer):
         if self.plot_global_lambdawise_spectra_loss_with_ivar:
             ivar = self.spectra_ivar_g[self.spectra_masks_g][ids]
             print(ivar.shape)
-            assert (ivar != 0).all()
+            # assert (ivar >= 0).all()
             assert 0
             std = np.sqrt(ivar)
+
         # print(emitted_wave, emitted_wave.shape)
 
         lo, hi = min(emitted_wave), max(emitted_wave)
@@ -2381,10 +2382,12 @@ class AstroInferrer(BaseInferrer):
 
         fname = join(dir, f"model-{model_id}_global_loss{suffix}")
         plt.plot(discrete_emitted_wave, discrete_losses)
+        plt.xlabel("restframe lambda"); plt.ylabel(f"{suffix} loss")
         plt.savefig(fname); plt.close()
 
         fname = join(dir, f"model-{model_id}_global_counts{suffix}")
         plt.plot(discrete_emitted_wave, cts)
+        plt.xlabel("restframe lambda"); plt.ylabel(f"counts")
         plt.savefig(fname); plt.close()
 
         # if self.plot_global_lambdawise_spectra_loss_with_ivar:
@@ -2395,6 +2398,7 @@ class AstroInferrer(BaseInferrer):
         if self.plot_global_lambdawise_spectra_loss_with_lines:
             fname = join(dir, f"model-{model_id}_global_loss{suffix}_with_lines")
             plt.plot(discrete_emitted_wave, discrete_losses)
+            plt.xlabel("restframe lambda"); plt.ylabel(f"{suffix} loss")
             linelist = LineList("ISM")
             lo, hi = min(emitted_wave), max(emitted_wave)
             for line in linelist._data:

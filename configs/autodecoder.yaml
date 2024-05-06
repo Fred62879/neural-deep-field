@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-1600-spectra-pe'
+    exp_name: 'autodecoder-10-spectra-pe'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'recon_spectra'] #'plot_spectra_latents_pca'
+    # tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'recon_spectra'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -131,7 +131,7 @@ infer:
 spectra_data:
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deimos,zcosmos]
+    spectra_data_sources: [deimos] #,zcosmos]
     random_permute_source_spectra: True
 
     spectra_upsample_scale: 10
@@ -139,8 +139,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 1600 #25400
-    num_supervision_spectra_upper_bound: 1600 #25400
+    num_gt_spectra_upper_bound: 10 #25400
+    num_supervision_spectra_upper_bound: 10 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02
