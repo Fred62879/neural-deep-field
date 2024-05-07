@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-1600-spectra-pe'
+    exp_name: 'autodecoder-100-spectra-pe'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'recon_spectra'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain_infer','recon_spectra','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -85,7 +85,7 @@ trainer:
     save_data_every: -1
     save_model_every: 200
 
-    plot_l2_loss: False
+    plot_l2_loss: True
 
     resume_train: False
     resume_log_dir: ''
@@ -99,7 +99,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240422-202457_ssim_32_in_3_512_no_skip_no_regu_4k_epochs_r'
+    infer_log_dir: '20240506-173015_ssim_2k_epochs'
     infer_selected: False
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
@@ -110,15 +110,15 @@ infer:
     pretrain_infer_wave_sample_method: 'uniform_dense'
 
     plot_clipped_spectrum: True
-    plot_spectrum_with_loss: True
+    plot_spectrum_with_loss: False
     plot_spectrum_with_ivar: False
     plot_spectrum_with_lines: False
-    plot_spectrum_with_recon: True
+    plot_spectrum_with_recon: False
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: False
     plot_spectrum_under_optimal_wrong_bin: False
-    plot_global_lambdawise_spectra_loss_with_ivar: True
-    plot_global_lambdawise_spectra_loss_with_lines: True
+    plot_global_lambdawise_spectra_loss_with_ivar: False
+    plot_global_lambdawise_spectra_loss_with_lines: False
     emitted_wave_overlap_discretization_val: 1e-1
 
     num_spectrum_per_fig: 35
@@ -139,8 +139,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 1600 #25400
-    num_supervision_spectra_upper_bound: 1600 #25400
+    num_gt_spectra_upper_bound: 100 #25400
+    num_supervision_spectra_upper_bound: 100 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02

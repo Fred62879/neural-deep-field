@@ -15,6 +15,7 @@ from pathlib import Path
 from functools import partial
 from os.path import exists, join
 from torch.autograd import Variable
+from scipy.interpolate import interp1d
 from torch.utils.data import BatchSampler, \
     SequentialSampler, RandomSampler, DataLoader
 
@@ -204,6 +205,31 @@ class CodebookTrainer(BaseTrainer):
             )
             self.num_redshift_bins = len(redshift_bins)
 
+        # * weighted spectra training
+        self.use_global_spectra_loss_as_lambdawise_weights = \
+            self.extra_args["use_global_spectra_loss_as_lambdawise_weights"] and \
+            (self.mode == "sanity_check" or self.mode == "generalization")
+        self.regress_lambdawise_weights = self.extra_args["regress_lambdawise_weights"] and \
+            (self.mode == "sanity_check" or self.mode == "generalization")
+        assert not (self.use_global_spectra_loss_as_lambdawise_weights and \
+                    self.regress_lambdawise_weights)
+
+        # ** use global restframe loss
+        if self.use_global_spectra_loss_as_lambdawise_weights:
+            self.global_restframe_spectra_loss_fname = join(
+                self.log_dir, "..", self.extra_args["global_restframe_spectra_loss_fname"])
+        elif self.regress_lambdawise_weights:
+            self.regress_lambdawise_weights_share_latents = \
+                self.extra_args["regress_lambdawise_weights_share_latents"]
+            self.regress_lambdawise_weights_use_gt_bin_latent = \
+                self.regress_lambdawise_weights_share_latents and \
+                self.extra_args["regress_lambdawise_weights_use_gt_bin_latent"]
+            # before the 1st iter, we dum init optimal bin id
+            self.dum_init_optm_bin_ids = True
+            self.plot_spectra_with_weights = self.recon_spectra and \
+                self.extra_args["plot_spectrum_with_weights"]
+
+        # * negative supervision
         if self.neg_sup_optimize_alternately:
             # alternate between `latent` and `network (w or w.o codebook)`
             self.neg_sup_alternation_steps = self.extra_args["neg_sup_alternation_steps"]
@@ -227,19 +253,6 @@ class CodebookTrainer(BaseTrainer):
         self.index_latent = True # index latents as coords in model
         self.split_latent = self.extra_args["split_latent"] and \
             (self.mode == "sanity_check" or self.mode == "generalization")
-
-        self.regress_lambdawise_weights = self.extra_args["regress_lambdawise_weights"] and \
-            (self.mode == "sanity_check" or self.mode == "generalization")
-        self.regress_lambdawise_weights_share_latents = self.regress_lambdawise_weights and \
-            self.extra_args["regress_lambdawise_weights_share_latents"]
-        self.regress_lambdawise_weights_use_gt_bin_latent = \
-            self.regress_lambdawise_weights_share_latents and \
-            self.extra_args["regress_lambdawise_weights_use_gt_bin_latent"]
-        # we need optm bin ids when share latents, before the 1st iter, we need to dum init it
-        self.dum_init_optm_bin_ids = True
-
-        self.plot_spectra_with_weights = self.recon_spectra and \
-            self.regress_lambdawise_weights and self.extra_args["plot_spectrum_with_weights"]
 
         self.regularize_redshift_logits = self.extra_args["regularize_redshift_logits"]
         self.redshift_logits_regu_method = self.extra_args["redshift_logits_regu_method"]
@@ -292,7 +305,8 @@ class CodebookTrainer(BaseTrainer):
         assert not self.optimize_spectra_latents_as_logits or self.qtz_spectra
         # no pretrained latents to load
         assert not self.optimize_redshift_latents_as_logits or \
-            (self.mode == "sanity_check" or self.mode == "generalization") and self.optimize_redshift_latents
+            (self.mode == "sanity_check" or self.mode == "generalization") and \
+            self.optimize_redshift_latents
 
         self.em_alternation_steps = self.extra_args["em_alternation_steps"]
         self.em_alternation_starts_with = self.extra_args["em_alternation_starts_with"]
@@ -557,15 +571,23 @@ class CodebookTrainer(BaseTrainer):
         if self.classify_redshift:
             self.dataset.set_num_redshift_bins(self.num_redshift_bins)
 
-        if self.regress_lambdawise_weights_share_latents:
-            if self.regress_lambdawise_weights_use_gt_bin_latent:
-                Z
-            else:
-                if self.dum_init_optm_bin_ids:
-                    # we perform dum initialization only before the first iteration
-                    self.optm_bin_ids = torch.zeros(self.num_spectra).to(torch.long)
-                    self.dataset.set_hardcode_data("optm_bin_ids", self.optm_bin_ids)
-                fields.append("optm_bin_ids")
+        if self.use_global_spectra_loss_as_lambdawise_weights:
+            emitted_wave, loss = np.load(self.global_restframe_spectra_loss_fname)
+            # print(emitted_wave.shape, loss.shape)
+            global_restframe_spectra_loss = interp1d(emitted_wave, loss)
+            self.dataset.set_hardcode_data(
+                "global_restframe_spectra_loss", global_restframe_spectra_loss)
+            fields.append("global_restframe_spectra_loss")
+        elif self.regress_lambdawise_weights:
+            if self.regress_lambdawise_weights_share_latents:
+                if self.regress_lambdawise_weights_use_gt_bin_latent:
+                    raise NotImplementedError()
+                else:
+                    if self.dum_init_optm_bin_ids:
+                        # we perform dum initialization only before the first iteration
+                        self.optm_bin_ids = torch.zeros(self.num_spectra).to(torch.long)
+                        self.dataset.set_hardcode_data("optm_bin_ids", self.optm_bin_ids)
+                    fields.append("optm_bin_ids")
 
         self.dataset.set_fields(fields)
 
@@ -660,7 +682,8 @@ class CodebookTrainer(BaseTrainer):
         if self.save_data_every > -1 and self.cur_iter % self.save_data_every == 0:
             self.pre_save_data()
 
-        if self.regress_lambdawise_weights_share_latents and \
+        if self.regress_lambdawise_weights and \
+           self.regress_lambdawise_weights_share_latents and \
            not self.regress_lambdawise_weights_use_gt_bin_latent:
             self.optm_bin_ids = []
             self.dum_init_optm_bin_ids = False
@@ -1061,7 +1084,8 @@ class CodebookTrainer(BaseTrainer):
         }
         if (self.mode == "sanity_check" or self.mode == "generalization"):
             checkpoint["codebook_pretrain_total_steps"] = self.codebook_pretrain_total_steps
-        if self.regress_lambdawise_weights_share_latents and \
+        if self.regress_lambdawise_weights and \
+           self.regress_lambdawise_weights_share_latents and \
            not self.regress_lambdawise_weights_use_gt_bin_latent:
             checkpoint["optimal_bin_ids"] = self.optm_bin_ids
         torch.save(checkpoint, model_fname)
@@ -1494,9 +1518,13 @@ class CodebookTrainer(BaseTrainer):
             regularize_codebook_spectra=self.regularize_codebook_spectra,
             calculate_binwise_spectra_loss=self.calculate_binwise_spectra_loss,
             regress_lambdawise_weights_share_latents=\
+                self.regress_lambdawise_weights and \
                 self.regress_lambdawise_weights_share_latents,
             regress_lambdawise_weights_use_gt_bin_latent=\
+                self.regress_lambdawise_weights and \
                 self.regress_lambdawise_weights_use_gt_bin_latent,
+            use_global_spectra_loss_as_lambdawise_weights=\
+                self.use_global_spectra_loss_as_lambdawise_weights,
             save_spectra=True,
             save_coords=self.regularize_spectra_latents,
             save_redshift=self.save_data and self.save_redshift,

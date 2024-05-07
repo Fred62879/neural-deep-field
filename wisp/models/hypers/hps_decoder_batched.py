@@ -39,7 +39,12 @@ class HyperSpectralDecoderB(nn.Module):
         self.classify_redshift_based_on_l2 = self.classify_redshift and \
             kwargs["classify_redshift_based_on_l2"]
 
+        self.use_global_spectra_loss_as_lambdawise_weights = \
+            kwargs["use_global_spectra_loss_as_lambdawise_weights"]
         self.regress_lambdawise_weights = kwargs["regress_lambdawise_weights"]
+        self.generate_lambdawise_weights = self.regress_lambdawise_weights or \
+            self.use_global_spectra_loss_as_lambdawise_weights
+
         self.regress_lambdawise_weights_share_latents = self.regress_lambdawise_weights and \
             kwargs["regress_lambdawise_weights_share_latents"]
         self.calculate_lambdawise_spectra_loss = \
@@ -305,6 +310,43 @@ class HyperSpectralDecoderB(nn.Module):
     # Model forward
     ###############
 
+    def _generate_lambdawise_weights(
+        self, latents, optm_bin_ids, global_restframe_spectra_loss, ret
+    ):
+        """
+        @Param
+          latents [...,bsz,nsmpl,dim]
+          weights [...,bsz,nsmpl,1]
+        """
+        if self.use_global_spectra_loss_as_lambdawise_weights:
+            emitted_wave = ret["emitted_wave"]
+            print(emitted_wave.shape, emitted_wave.device)
+            sp = emitted_wave.shape
+            emitted_wave = emitted_wave.flatten()
+            print(torch.min(emitted_wave), torch.max(emitted_wave))
+            print(emitted_wave.shape)
+            global_loss = global_restframe_spectra_loss(emitted_wave.detach().cpu().numpy())
+            global_loss = torch.tensor(
+                global_loss, dtype=emitted_wave.dtype).to(emitted_wave.device)
+            print(emitted_wave.shape, global_loss.shape)
+            print(torch.min(global_loss), torch.max(global_loss))
+            weights = torch.exp(-global_loss).view(sp)
+            print(weights.shape, weights.dtype, weights.device)
+            assert 0
+        elif self.regress_lambdawise_weights:
+            if self.regress_lambdawise_weights_share_latents:
+                optm_bin_ids = create_batch_ids(optm_bin_ids)
+                weight_latents = latents[optm_bin_ids[1],optm_bin_ids[0]]
+            else: weight_latents = latents
+
+            weights = self.lambdawise_weights_decoder(weight_latents)[...,0] # [...,bsz,nsmpl]
+            weights = normalize_Linear(weights)
+            if self.regress_lambdawise_weights_share_latents and latents.ndim == 4:
+                # add extra dim for `num_of_bins`
+                weights = weights[None,...].tile(latents.shape[0],1,1) # [nbins,bsz,nsmpl]
+
+        ret["lambdawise_weights"] = weights
+
     def forward_codebook_spectra(self, codebook, full_emitted_wave, full_wave_bound, ret):
         """ @Params
               codebook: [num_embed,dim]
@@ -316,14 +358,14 @@ class HyperSpectralDecoderB(nn.Module):
         n = codebook.weight.shape[0]
         latents = self.convert(
             full_emitted_wave[None,:,None].tile(n,1,1),
-            codebook.weight[:,None], None, full_wave_bound
+            codebook.weight[:,None], None, full_wave_bound, ret
         ) # [num_embed,nsmpl,dim]
         ret["full_range_codebook_spectra"] = self.spectra_decoder(latents)[...,0]
 
     def reconstruct_spectra(
             self, input, wave, scaler, bias, redshift, wave_bound, ret, codebook,
             qtz_args, spectra_masks, spectra_loss_func, spectra_l2_loss_func, gt_spectra,
-            gt_redshift_bin_ids
+            gt_redshift_bin_ids, optm_bin_ids, global_restframe_spectra_loss
     ):
         """
         Reconstruct emitted (codebook) spectra (under possibly multiple redshift values)
@@ -349,17 +391,23 @@ class HyperSpectralDecoderB(nn.Module):
             spectra (codebook spectra) [(num_bins,)num_embed,bsz,nsmpl]
             """
             codes = codebook.weight[:,None,None].tile(1,bsz,1,1)
-            latents = self.convert(wave, codes, redshift, wave_bound)
-            codebook_spectra = self.spectra_decoder(latents)[...,0]
+            latents = self.convert(wave, codes, redshift, wave_bound, ret)
+            codebook_spectra = self.spectra_decoder(latents)[...,0] # [...,nbins,bsz,nsmpl]
+            if self.generate_lambdawise_weights:
+                self._generate_lambdawise_weights(
+                    latents, optm_bin_ids, global_restframe_spectra_loss, ret)
             spectra = self.reduce_codebook_spectra(
                 input, codebook_spectra, ret, qtz_args, spectra_masks,
-                spectra_loss_func, gt_spectra, gt_redshift_bin_ids)
+                spectra_loss_func, gt_spectra, gt_redshift_bin_ids) # [bsz,nsmpl]
         else:
-            latents = self.convert(wave, input, redshift, wave_bound) # [...,bsz,nsmpl,dim]
+            latents = self.convert(wave, input, redshift, wave_bound, ret) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
+            if self.generate_lambdawise_weights:
+                self._generate_lambdawise_weights(
+                    latents, optm_bin_ids, global_restframe_spectra_loss, ret)
             spectra = self.reduce_spectra(
                 input, spectra, ret, qtz_args, spectra_masks, spectra_loss_func,
-                spectra_l2_loss_func, gt_spectra, gt_redshift_bin_ids)
+                spectra_l2_loss_func, gt_spectra, gt_redshift_bin_ids) # [bsz,nsmpl]
 
         if self.scale:
             assert scaler is not None
@@ -372,25 +420,12 @@ class HyperSpectralDecoderB(nn.Module):
 
         return latents, spectra
 
-    def _regress_lambdawise_weights(self, latents, optm_bin_ids, ret):
-        # latents [...,bsz,nsmpl,dim], weights [...,bsz,nsmpl,1]
-        if self.regress_lambdawise_weights_share_latents:
-            optm_bin_ids = create_batch_ids(optm_bin_ids)
-            weight_latents = latents[optm_bin_ids[1],optm_bin_ids[0]]
-        else: weight_latents = latents
-
-        weights = self.lambdawise_weights_decoder(weight_latents)[...,0] # [...,bsz,nsmpl]
-        weights = normalize_Linear(weights)
-        if self.regress_lambdawise_weights_share_latents and latents.ndim == 4:
-            # add extra dim for `num_of_bins`
-            weights = weights[None,...].tile(latents.shape[0],1,1) # [nbins,bsz,nsmpl]
-        ret["lambdawise_weights"] = weights
-
     def forward(
         self, latents, wave, trans, nsmpl, full_wave_bound,
         trans_mask=None, full_emitted_wave=None, codebook=None, qtz_args=None,
         ret=None, spectra_masks=None, spectra_loss_func=None, spectra_l2_loss_func=None,
-        spectra_source_data=None, optm_bin_ids=None, gt_redshift_bin_ids=None
+        spectra_source_data=None, optm_bin_ids=None, gt_redshift_bin_ids=None,
+        global_restframe_spectra_loss=None
     ):
         """
         @Param
@@ -450,12 +485,10 @@ class HyperSpectralDecoderB(nn.Module):
             None if ret["bias"] is None else ret["bias"][:bsz],
             redshift, full_wave_bound, ret, codebook, qtz_args,
             spectra_masks, spectra_loss_func, spectra_l2_loss_func,
-            spectra_source_data, gt_redshift_bin_ids
+            spectra_source_data, gt_redshift_bin_ids, optm_bin_ids,
+            global_restframe_spectra_loss
         )
         timer.check("hps_decoder::spectra reconstruced")
-
-        if self.regress_lambdawise_weights:
-            self._regress_lambdawise_weights(latents, optm_bin_ids, ret)
 
         intensity = self.inte(spectra, trans, trans_mask, nsmpl)
 

@@ -86,7 +86,7 @@ def get_bool_calculate_lambdawise_spectra_loss(**kwargs):
     return (
         kwargs["plot_spectrum_with_loss"] or \
         kwargs["plot_spectrum_color_based_on_loss"] or \
-        kwargs["accumulate_global_lambdawise_loss"]
+        "plot_global_lambdawise_spectra_loss" in kwargs["tasks"]
     ) and (
         "sanity_check_infer" in kwargs["tasks"] or \
         "generalization_infer" in kwargs["tasks"] or \
@@ -472,6 +472,7 @@ def forward(
         calculate_lambdawise_spectra_loss=False,
         regress_lambdawise_weights_share_latents=False,
         regress_lambdawise_weights_use_gt_bin_latent=False,
+        use_global_spectra_loss_as_lambdawise_weights=False,
         save_coords=False,
         save_scaler=False,
         save_spectra=False,
@@ -583,6 +584,9 @@ def forward(
             if regress_lambdawise_weights_use_gt_bin_latent:
                 net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
             else: net_args["optm_bin_ids"] = data["optm_bin_ids"]
+        if use_global_spectra_loss_as_lambdawise_weights:
+            net_args["global_restframe_spectra_loss"] = \
+                data["global_restframe_spectra_loss"]
     else:
         raise ValueError("Unsupported space dimension.")
 

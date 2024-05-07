@@ -111,19 +111,20 @@ class CodebookPretrainNerf(BaseNeuralField):
                 if self.kwargs["calculate_binwise_spectra_loss"]:
                     channels.extend([
                         "spectra_binwise_loss","spectra_binwise_loss_l2",
-                        "spectra_all_bins","optimal_bin_ids",\
-                        "gt_redshift_bin_ids","gt_redshift_bin_masks"
+                        "spectra_all_bins","gt_redshift_bin_ids","gt_redshift_bin_masks"
                     ])
                     if self.kwargs["plot_spectrum_under_gt_bin"]:
                         channels.append("gt_bin_spectra")
 
             if self.kwargs["plot_spectrum_with_loss"] or \
                self.kwargs["plot_spectrum_color_based_on_loss"] or \
-               self.kwargs["accumulate_global_lambdawise_loss"]:
+               "plot_global_lambdawise_spectra_loss" in self.kwargs["tasks"]:
                 channels.append("spectra_lambdawise_loss")
 
-            if self.kwargs["regress_lambdawise_weights"]:
-                channels.append("lambdawise_weights")
+        if self.kwargs["regress_lambdawise_weights"]:
+            channels.extend(["lambdawise_weights","optimal_bin_ids"])
+        elif self.kwargs["use_global_spectra_loss_as_lambdawise_weights"]:
+            channels.append("global_restframe_spectra_loss")
 
         self._register_forward_function(self.pretrain, channels)
 
@@ -173,7 +174,8 @@ class CodebookPretrainNerf(BaseNeuralField):
                  spectra_l2_loss_func=None,
                  spectra_source_data=None,
                  gt_redshift_bin_ids=None,
-                 gt_redshift_bin_masks=None
+                 gt_redshift_bin_masks=None,
+                 global_restframe_spectra_loss=None
     ):
         """ Pretrain codebook.
             @Param
@@ -254,7 +256,8 @@ class CodebookPretrainNerf(BaseNeuralField):
             spectra_l2_loss_func=spectra_l2_loss_func,
             spectra_source_data=spectra_source_data,
             optm_bin_ids=optm_bin_ids,
-            gt_redshift_bin_ids=gt_redshift_bin_ids
+            gt_redshift_bin_ids=gt_redshift_bin_ids,
+            global_restframe_spectra_loss=global_restframe_spectra_loss
         )
 
         timer.check("hps decoding done")

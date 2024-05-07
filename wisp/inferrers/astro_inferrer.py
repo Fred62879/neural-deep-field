@@ -238,7 +238,7 @@ class AstroInferrer(BaseInferrer):
         # classify redshift
         self.calculate_binwise_spectra_loss = self.model_redshift and \
             self.classify_redshift and self.extra_args["calculate_binwise_spectra_loss"]
-        self.calculate_lambdawise_spectra_loss = self.model_redshift and \
+        self.calculate_lambdawise_spectra_loss = \
             get_bool_calculate_lambdawise_spectra_loss(**self.extra_args)
 
         # if we want to calculate binwise spectra loss when we do quantization
@@ -2341,16 +2341,10 @@ class AstroInferrer(BaseInferrer):
         Accumulate spectra loss under restframe for all spectra and plot.
         """
 
-        def func(emitted_wave, lambdawise_losses, suffix=""):
-            ids = np.argsort(emitted_wave)
-            emitted_wave = emitted_wave[ids]
-            lambdawise_losses = lambdawise_losses[ids]
-
+        def discretize_restframe_loss(emitted_wave, lambdawise_losses):
             lo, hi = min(emitted_wave), max(emitted_wave)
             val = self.extra_args["emitted_wave_overlap_discretization_val"]
             n_intervals = int((hi - lo) // val + 1)
-            # print(lo, hi, val, n_intervals)
-
             # bin_ids = (spectra_emitted_wave - lo) / val
             # discrete_emitted_wave = np.arange(lo, hi + val, val)
             cts, discrete_emitted_wave = np.histogram(emitted_wave, bins=n_intervals)
@@ -2363,21 +2357,28 @@ class AstroInferrer(BaseInferrer):
                 lo += ct
             discrete_losses = np.array(discrete_losses)
             discrete_emitted_wave = discrete_emitted_wave[:-1] + val / 2
+            return discrete_emitted_wave, discrete_losses
 
-            suffix += ("_" + self.extra_args["spectra_loss_cho"])
-            suffix += "_outlier" if self.extra_args["infer_outlier_only"] else ""
+        def func(emitted_wave, lambdawise_losses, suffix=""):
+            ids = np.argsort(emitted_wave)
+            emitted_wave = emitted_wave[ids]
+            lambdawise_losses = lambdawise_losses[ids]
+            emitted_wave, lambdawise_losses = discrete_emitted_wave(
+                emitted_wave, lambdawise_losses)
+
+            suffix += ("_" + self.extra_args["spectra_loss_cho"] + "_loss")
+            if self.extra_args["infer_outlier_only"]: suffix += "_outlier"
             if self.infer_selected:
-                dir = join(self.spectra_dir, "_selected_{}".format(
+                path = join(self.spectra_dir, "_selected_{}".format(
                     self.extra_args["pretrain_num_infer_upper_bound"]))
-            else: dir = self.spectra_dir
+            else: path = self.spectra_dir
 
-            fname = join(dir, f"model-{model_id}_global_loss{suffix}")
+            fname = join(path, f"model-{model_id}_global_restframe{suffix}")
             plt.plot(discrete_emitted_wave, discrete_losses)
             plt.xlabel("restframe lambda"); plt.ylabel(f"{suffix} loss")
             plt.savefig(fname); plt.close()
 
             if self.plot_global_lambdawise_spectra_loss_with_lines:
-                fname = join(dir, f"model-{model_id}_global_loss{suffix}_with_lines")
                 plt.plot(discrete_emitted_wave, discrete_losses)
                 plt.xlabel("restframe lambda"); plt.ylabel(f"{suffix} loss")
                 linelist = LineList("ISM")
@@ -2388,7 +2389,13 @@ class AstroInferrer(BaseInferrer):
                         plt.axvline(x=line_wave, color="blue", linestyle="dotted", alpha=0.5)
                         plt.text(line_wave, plt.ylim()[1]*0.9, line["name"],
                                  rotation=90, fontsize=8, alpha=0.7, ha="center")
+                fname = join(path, f"model-{model_id}_global_restframe{suffix}_with_lines")
                 plt.savefig(fname); plt.close()
+
+            to_save = np.concatenate((
+                discrete_emitted_wave[None,:], discrete_losses[None,:]), axis=0)
+            loss_cho = self.extra_args["spectra_loss_cho"]
+            np.save(join(path, f"global_restframe{suffix}.npy"), to_save)
 
         emitted_wave = self.spectra_wave_g / (1 + self.spectra_redshift_g[:,None])
 
@@ -2400,13 +2407,15 @@ class AstroInferrer(BaseInferrer):
                 masks = self.spectra_masks_g[ivar_reliable]
                 emitted_wave_i = emitted_wave[ivar_reliable]
                 lambdawise_losses = self.spectra_lambdawise_losses_g[ivar_reliable]
-                # print(emitted_wave_i.shape, masks.shape, ivar.shape, lambdawise_losses.shape)
 
-                std = np.sqrt(ivar[masks])
+                ivar = ivar[masks]
+                # print(ivar.shape)
+                # print(sum(ivar > 0))
+                assert (ivar > 0).all()
+                std = np.sqrt(ivar)
                 emitted_wave_i = emitted_wave_i[masks]
                 lambdawise_losses = lambdawise_losses[masks] * std
-                # print(emitted_wave_i.shape, lambdawise_losses.shape)
-                func(emitted_wave_i, lambdawise_losses, suffix="_ivar")
+                func(emitted_wave_i, lambdawise_losses, suffix="_ivar_scaled")
 
         emitted_wave = emitted_wave[self.spectra_masks_g]
         lambdawise_losses = self.spectra_lambdawise_losses_g[self.spectra_masks_g]

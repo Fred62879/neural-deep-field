@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-1600-spectra-pe'
+    exp_name: 'autodecoder-100-spectra-pe'
     log_fname: 'sc'
 
     tasks: ['sanity_check'] #,'recon_spectra']
-    tasks: ['sanity_check_infer','recon_spectra','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
+    #tasks: ['sanity_check_infer','recon_spectra','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -56,13 +56,15 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240422-202457_ssim_32_in_3_512_no_skip_no_regu_4k_epochs_r'
+    pretrain_log_dir: '20240506-173015_ssim_2k_epochs'
     pretrained_model_name: 'model-ep2000-bch0.pth'
 
     regularize_spectra_latents: False
     spectra_latents_regu_beta: -1
 
-    regress_lambdawise_weights: True
+    use_global_spectra_loss_as_lambdawise_weights: True
+    global_restframe_spectra_loss_fname: '20240506-173015_ssim_2k_epochs/pretrain_spectra/global_restframe_ssim1d_loss.npy'
+    regress_lambdawise_weights: False
     regress_lambdawise_weights_share_latents: True
     regress_lambdawise_weights_use_gt_bin_latent: True
     wrong_bin_regu_beta: 1
@@ -128,8 +130,6 @@ infer:
     plot_spectrum_under_gt_bin: True
     plot_spectrum_under_optimal_wrong_bin: True
 
-    plot_global_lambdawise_spectra_loss: True
-
     num_spectrum_per_fig: 35
     num_spectrum_per_row: 7
 
@@ -150,8 +150,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 1600
-    num_supervision_spectra_upper_bound: 1600
+    num_gt_spectra_upper_bound: 100
+    num_supervision_spectra_upper_bound: 100
 
     filter_redshift: False
     filter_redshift_lo: 0.02

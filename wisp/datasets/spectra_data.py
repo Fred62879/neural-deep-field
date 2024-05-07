@@ -567,7 +567,8 @@ class SpectraData:
 
         test_ids = test_ids[:self.kwargs["generalization_max_num_spectra"]]
         sup_ids = sup_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
-        self.sanity_check_ids = np.arange(self.kwargs["sanity_check_max_num_spectra"])
+        self.sanity_check_ids = np.arange(
+            min(len(sup_ids), self.kwargs["sanity_check_max_num_spectra"]))
         val_ids = sup_ids[self.sanity_check_ids]
         return test_ids, val_ids, sup_ids
 
@@ -1755,7 +1756,6 @@ def find_valid_spectra_range(spectra, spectra_fname, ivar_reliable):
     invalid = find_invalid(spectra[2], invalid)
     # ivar should >= 0 always, we set this to check if any spectra has ivar < 0
     invalid = invalid | (spectra[2] < 0)
-    # print(sum(invalid), spectra.shape)
 
     if ivar_reliable:
         obs_invalid = spectra[2] == 0
@@ -1784,7 +1784,7 @@ def mask_invalid_spectra(spectra, spectra_fname, ivar_reliable):
     # if invalid_embedded:
     #    pass # may want to print and check manually
 
-    # mask nested invalid range
+    # mask invalid range
     ids = np.arange(n)
     valid_ids = ids[valid]
     mask = np.zeros(n)
@@ -1795,8 +1795,6 @@ def mask_invalid_spectra(spectra, spectra_fname, ivar_reliable):
     plt.close()
 
     # drop (instead of mask) head and tail invalid range
-    # print(mask.shape, valid_ids.shape)
-    # print(valid_ids[0], valid_ids[-1])
     mask = mask[valid_ids[0]:valid_ids[-1]+1]
     spectra = spectra[:,valid_ids[0]:valid_ids[-1]+1]
     plt.plot(spectra[0],spectra[1])

@@ -389,6 +389,9 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--em-alternation-steps", nargs="+", type=int,
                                 help="alternately optimize each for given steps.")
 
+    pretrain_group.add_argument("--use-global-spectra-loss-as-lambdawise-weights",
+                                action="store_true")
+    pretrain_group.add_argument("--global-restframe-spectra-loss-fname", type=str)
     pretrain_group.add_argument("--regress-lambdawise-weights", action="store_true")
     pretrain_group.add_argument("--regress-lambdawise-weights-share-latents",
                                 action="store_true")

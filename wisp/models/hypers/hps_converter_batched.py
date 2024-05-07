@@ -31,6 +31,8 @@ class HyperSpectralConverter(nn.Module):
         self.combine_method = kwargs["hps_combine_method"]
 
         self.classify_redshift = get_bool_classify_redshift(**kwargs)
+        self.use_global_spectra_loss_as_lambdawise_weights = \
+            kwargs["use_global_spectra_loss_as_lambdawise_weights"]
 
         if self.encode_wave:
             self.init_encoder()
@@ -60,7 +62,7 @@ class HyperSpectralConverter(nn.Module):
         (lo, hi) = wave_bound # 3940, 10870
         return self.wave_multiplier * (wave - lo) / (hi - lo)
 
-    def shift_wave(self, wave, redshift):
+    def shift_wave(self, wave, redshift, ret):
         """ Convert observed lambda to emitted lambda.
             @Param
               wave: [bsz,nsmpl,1]
@@ -80,6 +82,9 @@ class HyperSpectralConverter(nn.Module):
         elif wave.ndim == 4:
             wave = wave.permute(3,2,0,1)
         else: raise ValueError("Wrong wave dimension when redshifting.")
+
+        if self.use_global_spectra_loss_as_lambdawise_weights:
+            ret["emitted_wave"] = wave[...,0] # [(nbins,)bsz,nsmpl]
         return wave
 
     def combine_spatial_spectral(self, spatial, spectral):
@@ -130,7 +135,7 @@ class HyperSpectralConverter(nn.Module):
             raise ValueError("Unsupported spatial-spectral combination method.")
         return latents
 
-    def forward(self, wave, latents, redshift, wave_bound):
+    def forward(self, wave, latents, redshift, wave_bound, ret):
         """ Process wave (shift, encode, if required) and
               combine with RA/DEC (original state or encoded) to hyperspectral latents.
             @Param
@@ -148,7 +153,7 @@ class HyperSpectralConverter(nn.Module):
         if redshift is None:
             if self._model_redshift:
                 warnings.warn("model redshift without providing redshift values!")
-        else: wave = self.shift_wave(wave, redshift)
+        else: wave = self.shift_wave(wave, redshift, ret)
         wave = self.linear_norm_wave(wave, wave_bound)
 
         if self.encode_wave:

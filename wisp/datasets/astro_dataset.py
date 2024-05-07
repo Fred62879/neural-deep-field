@@ -44,7 +44,7 @@ class AstroDataset(Dataset):
         if self.space_dim == 3:
             self.unbatched_fields = {
                 "idx","selected_ids","wave_data","spectra_data","redshift_data","model_data",
-                "gt_redshift_bin_ids","gt_redshift_bin_masks"
+                "gt_redshift_bin_ids","gt_redshift_bin_masks","global_restframe_spectra_loss"
             }
         else:
             self.unbatched_fields = set()
@@ -377,6 +377,9 @@ class AstroDataset(Dataset):
             self.get_gt_redshift_bin_ids(out)
         if "gt_redshift_bin_masks" in self.requested_fields:
             self.get_gt_redshift_bin_masks(out)
+        if "global_restframe_spectra_loss" in self.requested_fields:
+            out["global_restframe_spectra_loss"] = \
+                self.data["global_restframe_spectra_loss"]
 
     def index_selected_data(self, data, idx):
         """ Index data with both selected_ids and given idx
