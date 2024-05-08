@@ -285,11 +285,9 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["calculate_spectra_loss_based_on_optimal_bin"]
 
         if self.classify_redshift:
+            (lo, hi) = get_redshift_range(**self.extra_args)
             redshift_bins = init_redshift_bins(
-                self.extra_args["redshift_lo"],
-                self.extra_args["redshift_hi"],
-                self.extra_args["redshift_bin_width"]
-            )
+                lo, hi, self.extra_args["redshift_bin_width"])
             self.num_redshift_bins = len(redshift_bins)
 
         self.save_redshift = "save_redshift" in tasks and self.model_redshift
@@ -1960,9 +1958,9 @@ class AstroInferrer(BaseInferrer):
         num_bins = recon_fluxes_all.shape[0]
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
         n_figs_each = int(np.ceil(num_bins / n_spectrum_per_fig))
+        (lo, hi) = get_redshift_range(**self.extra_args)
         redshift_bins = init_redshift_bins(
-            self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
-            self.extra_args["redshift_bin_width"]).numpy()
+            lo, hi, self.extra_args["redshift_bin_width"]).numpy()
 
         def calculate_binwise_loss(gt_fluxes, recon_fluxes, masks, i):
             mask = torch.FloatTensor(masks[i]).to('cuda:0')
@@ -2128,9 +2126,9 @@ class AstroInferrer(BaseInferrer):
             # if each bin has its own set of codebook coeff, we plot that for gt bin only
             gt_redshift = torch.stack(self.gt_redshift_cl).detach().cpu().numpy()
             if ids is not None: gt_redshift = gt_redshift[ids]
+            (lo, hi) = get_redshift_range(**self.extra_args)
             gt_bin_ids = get_bin_ids(
-                self.extra_args["redshift_lo"],
-                self.extra_args["redshift_bin_width"],
+                lo, self.extra_args["redshift_bin_width"],
                 gt_redshift, add_batched_dim=True
             )
             y = codebook_coeff[gt_bin_ids[0], gt_bin_ids[1]]
@@ -2156,9 +2154,9 @@ class AstroInferrer(BaseInferrer):
         num_bins = codebook_coeff.shape[0]
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
         n_figs_each = int(np.ceil(num_bins / n_spectrum_per_fig))
+        (lo, hi) = get_redshift_range(**self.extra_args)
         redshift_bins = init_redshift_bins(
-            self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
-            self.extra_args["redshift_bin_width"]).numpy()
+            lo, hi, self.extra_args["redshift_bin_width"]).numpy()
 
         spectra_ids = np.arange(self.dataset_length)
         if self.infer_selected:
@@ -2254,9 +2252,9 @@ class AstroInferrer(BaseInferrer):
             gt_redshift = gt_redshift[ids]
             redshift_logits = redshift_logits[ids]
 
+        (lo, hi) = get_redshift_range(**self.extra_args)
         bin_centers = init_redshift_bins(
-            self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
-            self.extra_args["redshift_bin_width"])
+            lo, hi, self.extra_args["redshift_bin_width"])
 
         # n, nbins = redshift_logits.shape
         # gt_bin_ids = np.array([
@@ -2292,9 +2290,9 @@ class AstroInferrer(BaseInferrer):
             losses = losses[ids]
             gt_redshift = gt_redshift[ids]
 
+        (lo, hi) = get_redshift_range(**self.extra_args)
         bin_centers = init_redshift_bins(
-            self.extra_args["redshift_lo"], self.extra_args["redshift_hi"],
-            self.extra_args["redshift_bin_width"])
+            lo, hi, self.extra_args["redshift_bin_width"])
 
         sub_dir = join(self.redshift_dir, suffix)
         Path(sub_dir).mkdir(parents=True, exist_ok=True)
@@ -2325,14 +2323,13 @@ class AstroInferrer(BaseInferrer):
 
         suffix = "_outlier" if self.extra_args["infer_outlier_only"] else ""
         fname = join(self.redshift_dir, f"model-{model_id}_residual{suffix}")
+        (lo, hi) = get_redshift_range(**self.extra_args)
         plot_line(gt_redshift, redshift_residual, fname,
-                  xlabel="gt_redshift", ylabel="residual",
-                  x_range=[self.extra_args["redshift_lo"], self.extra_args["redshift_hi"]])
+                  xlabel="gt_redshift", ylabel="residual", x_range=[lo, hi])
 
         fname = join(self.redshift_dir, f"model-{model_id}_est{suffix}")
         plot_line(gt_redshift, est_redshift, fname,
-                  xlabel="gt redshift", ylabel="est redshift",
-                  x_range=[self.extra_args["redshift_lo"], self.extra_args["redshift_hi"]])
+                  xlabel="gt redshift", ylabel="est redshift", x_range=[lo, hi])
 
         log.info("redshift estimation residuals plotting done")
 
@@ -2340,86 +2337,108 @@ class AstroInferrer(BaseInferrer):
         """
         Accumulate spectra loss under restframe for all spectra and plot.
         """
-
-        def discretize_restframe_loss(emitted_wave, lambdawise_losses):
-            lo, hi = min(emitted_wave), max(emitted_wave)
-            val = self.extra_args["emitted_wave_overlap_discretization_val"]
-            n_intervals = int((hi - lo) // val + 1)
-            # bin_ids = (spectra_emitted_wave - lo) / val
-            # discrete_emitted_wave = np.arange(lo, hi + val, val)
-            cts, discrete_emitted_wave = np.histogram(emitted_wave, bins=n_intervals)
-
-            lo, discrete_losses = 0, []
-            for ct in cts:
-                cur_losses = lambdawise_losses[lo:lo+ct]
-                if len(cur_losses) == 0: ct = 1
-                discrete_losses.append(sum(cur_losses) / ct)
-                lo += ct
-            discrete_losses = np.array(discrete_losses)
-            discrete_emitted_wave = discrete_emitted_wave[:-1] + val / 2
-            return discrete_emitted_wave, discrete_losses
-
-        def func(emitted_wave, lambdawise_losses, suffix=""):
-            ids = np.argsort(emitted_wave)
-            emitted_wave = emitted_wave[ids]
-            lambdawise_losses = lambdawise_losses[ids]
-            emitted_wave, lambdawise_losses = discrete_emitted_wave(
-                emitted_wave, lambdawise_losses)
-
-            suffix += ("_" + self.extra_args["spectra_loss_cho"] + "_loss")
-            if self.extra_args["infer_outlier_only"]: suffix += "_outlier"
-            if self.infer_selected:
-                path = join(self.spectra_dir, "_selected_{}".format(
-                    self.extra_args["pretrain_num_infer_upper_bound"]))
-            else: path = self.spectra_dir
-
-            fname = join(path, f"model-{model_id}_global_restframe{suffix}")
-            plt.plot(discrete_emitted_wave, discrete_losses)
-            plt.xlabel("restframe lambda"); plt.ylabel(f"{suffix} loss")
-            plt.savefig(fname); plt.close()
-
-            if self.plot_global_lambdawise_spectra_loss_with_lines:
-                plt.plot(discrete_emitted_wave, discrete_losses)
-                plt.xlabel("restframe lambda"); plt.ylabel(f"{suffix} loss")
-                linelist = LineList("ISM")
-                lo, hi = min(emitted_wave), max(emitted_wave)
-                for line in linelist._data:
-                    line_wave = line["wrest"]
-                    if lo <= line_wave <= hi:
-                        plt.axvline(x=line_wave, color="blue", linestyle="dotted", alpha=0.5)
-                        plt.text(line_wave, plt.ylim()[1]*0.9, line["name"],
-                                 rotation=90, fontsize=8, alpha=0.7, ha="center")
-                fname = join(path, f"model-{model_id}_global_restframe{suffix}_with_lines")
-                plt.savefig(fname); plt.close()
-
-            to_save = np.concatenate((
-                discrete_emitted_wave[None,:], discrete_losses[None,:]), axis=0)
-            loss_cho = self.extra_args["spectra_loss_cho"]
-            np.save(join(path, f"global_restframe{suffix}.npy"), to_save)
+        if self.infer_selected:
+            path = join(self.spectra_dir, "_selected_{}".format(
+                self.extra_args["pretrain_num_infer_upper_bound"]))
+        else: path = self.spectra_dir
 
         emitted_wave = self.spectra_wave_g / (1 + self.spectra_redshift_g[:,None])
 
-        # process data
-        if self.plot_global_lambdawise_spectra_loss_with_ivar:
-            ivar_reliable = self.spectra_ivar_reliable
-            if sum(ivar_reliable) > 0:
-                ivar = self.spectra_ivar_g[ivar_reliable]
-                masks = self.spectra_masks_g[ivar_reliable]
-                emitted_wave_i = emitted_wave[ivar_reliable]
-                lambdawise_losses = self.spectra_lambdawise_losses_g[ivar_reliable]
-
-                ivar = ivar[masks]
-                # print(ivar.shape)
-                # print(sum(ivar > 0))
-                assert (ivar > 0).all()
-                std = np.sqrt(ivar)
-                emitted_wave_i = emitted_wave_i[masks]
-                lambdawise_losses = lambdawise_losses[masks] * std
-                func(emitted_wave_i, lambdawise_losses, suffix="_ivar_scaled")
+        self._save_redshift_range(path, emitted_wave)
 
         emitted_wave = emitted_wave[self.spectra_masks_g]
         lambdawise_losses = self.spectra_lambdawise_losses_g[self.spectra_masks_g]
-        func(emitted_wave, lambdawise_losses)
+        self._plot_global_restframe_spectra_loss(
+            emitted_wave, lambdawise_losses, path)
+
+        if self.plot_global_lambdawise_spectra_loss_with_ivar:
+            ivar_reliable = self.spectra_ivar_reliable
+            if sum(ivar_reliable) == 0: return
+
+            ivar = self.spectra_ivar_g[ivar_reliable]
+            masks = self.spectra_masks_g[ivar_reliable]
+            emitted_wave_i = emitted_wave[ivar_reliable]
+            lambdawise_losses = self.spectra_lambdawise_losses_g[ivar_reliable]
+
+            ivar = ivar[masks]
+            # print(ivar.shape)
+            # print(sum(ivar > 0))
+            assert (ivar > 0).all()
+            std = np.sqrt(ivar)
+            emitted_wave_i = emitted_wave_i[masks]
+            lambdawise_losses = lambdawise_losses[masks] * std
+            self._plot_global_restframe_spectra_loss(
+                emitted_wave_i, lambdawise_losses, path, suffix="_ivar_scaled")
+
+    def _save_redshift_range(self, path, emitted_wave):
+        """
+        Calculate and save range of redshift that converts supervision lambda
+          range to within the given emitted lambda range.
+        """
+        wave = self.spectra_wave_g[self.spectra_masks_g]
+        emitted_wave = emitted_wave[self.spectra_masks_g]
+        lo_wave, hi_wave = np.min(wave), np.max(wave)
+        lo_emitted_wave, hi_emitted_wave = np.min(emitted_wave), np.max(emitted_wave)
+        # print(lo_wave, hi_wave)
+        # print(lo_emitted_wave, hi_emitted_wave)
+        lo, hi = hi_wave / hi_emitted_wave - 1, lo_wave / lo_emitted_wave - 1
+        # print(lo, hi)
+        to_save = np.array([lo,hi])
+        np.save(join(path, "global_redshift_range.npy"), to_save)
+
+    def _plot_global_restframe_spectra_loss(
+            self, emitted_wave, lambdawise_losses, path, suffix=""
+    ):
+        ids = np.argsort(emitted_wave)
+        emitted_wave = emitted_wave[ids]
+        lambdawise_losses = lambdawise_losses[ids]
+        emitted_wave, lambdawise_losses = self.discretize_restframe_loss(
+            emitted_wave, lambdawise_losses)
+
+        suffix += ("_" + self.extra_args["spectra_loss_cho"] + "_loss")
+        if self.extra_args["infer_outlier_only"]: suffix += "_outlier"
+
+        fname = join(path, f"model-{model_id}_global_restframe{suffix}")
+        plt.plot(emitted_wave, lambdawise_losses)
+        plt.xlabel("restframe lambda"); plt.ylabel(f"{suffix} loss")
+        plt.savefig(fname); plt.close()
+
+        if self.plot_global_lambdawise_spectra_loss_with_lines:
+            plt.plot(emitted_wave, lambdawise_losses)
+            plt.xlabel("restframe lambda"); plt.ylabel(f"{suffix} loss")
+            linelist = LineList("ISM")
+            lo, hi = min(emitted_wave), max(emitted_wave)
+            for line in linelist._data:
+                line_wave = line["wrest"]
+                if lo <= line_wave <= hi:
+                    plt.axvline(x=line_wave, color="blue", linestyle="dotted", alpha=0.5)
+                    plt.text(line_wave, plt.ylim()[1]*0.9, line["name"],
+                             rotation=90, fontsize=8, alpha=0.7, ha="center")
+            fname = join(path, f"model-{model_id}_global_restframe{suffix}_with_lines")
+            plt.savefig(fname); plt.close()
+
+        to_save = np.concatenate((
+            emitted_wave[None,:], lambdawise_losses[None,:]), axis=0)
+        loss_cho = self.extra_args["spectra_loss_cho"]
+        np.save(join(path, f"global_restframe{suffix}.npy"), to_save)
+
+    def discretize_restframe_loss(self, emitted_wave, lambdawise_losses):
+        lo, hi = min(emitted_wave), max(emitted_wave)
+        val = self.extra_args["emitted_wave_overlap_discretization_val"]
+        n_intervals = int((hi - lo) // val + 1)
+        # bin_ids = (spectra_emitted_wave - lo) / val
+        # discrete_emitted_wave = np.arange(lo, hi + val, val)
+        cts, discrete_emitted_wave = np.histogram(emitted_wave, bins=n_intervals)
+
+        lo, discrete_losses = 0, []
+        for ct in cts:
+            cur_losses = lambdawise_losses[lo:lo+ct]
+            if len(cur_losses) == 0: ct = 1
+            discrete_losses.append(sum(cur_losses) / ct)
+            lo += ct
+        discrete_losses = np.array(discrete_losses)
+        discrete_emitted_wave = discrete_emitted_wave[:-1] + val / 2
+        return discrete_emitted_wave, discrete_losses
 
     ###########
     # utilities

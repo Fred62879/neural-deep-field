@@ -320,19 +320,16 @@ class HyperSpectralDecoderB(nn.Module):
         """
         if self.use_global_spectra_loss_as_lambdawise_weights:
             emitted_wave = ret["emitted_wave"]
-            print(emitted_wave.shape, emitted_wave.device)
+            print(emitted_wave.shape)
             sp = emitted_wave.shape
             emitted_wave = emitted_wave.flatten()
-            print(torch.min(emitted_wave), torch.max(emitted_wave))
-            print(emitted_wave.shape)
             global_loss = global_restframe_spectra_loss(emitted_wave.detach().cpu().numpy())
             global_loss = torch.tensor(
                 global_loss, dtype=emitted_wave.dtype).to(emitted_wave.device)
-            print(emitted_wave.shape, global_loss.shape)
             print(torch.min(global_loss), torch.max(global_loss))
             weights = torch.exp(-global_loss).view(sp)
-            print(weights.shape, weights.dtype, weights.device)
-            assert 0
+            print(weights.shape)
+
         elif self.regress_lambdawise_weights:
             if self.regress_lambdawise_weights_share_latents:
                 optm_bin_ids = create_batch_ids(optm_bin_ids)

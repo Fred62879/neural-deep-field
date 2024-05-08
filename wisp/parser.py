@@ -391,6 +391,10 @@ def define_cmd_line_args():
 
     pretrain_group.add_argument("--use-global-spectra-loss-as-lambdawise-weights",
                                 action="store_true")
+    pretrain_group.add_argument("--limit-redshift-to-pretrain-range", action="store_true",
+                                help="during sanity check or generalization, we limit\
+                                redshfit range to be within the redshift range of pretrain.")
+    pretrain_group.add_argument("--global-redshift-fname", type=str)
     pretrain_group.add_argument("--global-restframe-spectra-loss-fname", type=str)
     pretrain_group.add_argument("--regress-lambdawise-weights", action="store_true")
     pretrain_group.add_argument("--regress-lambdawise-weights-share-latents",

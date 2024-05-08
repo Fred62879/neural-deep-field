@@ -70,12 +70,14 @@ class HyperSpectralConverter(nn.Module):
             @Return
               emitted_wave: [(num_bins,)bsz,nsmpl,1]
         """
+        # print(torch.min(wave), torch.max(wave))
+        # print(torch.min(redshift), torch.max(redshift))
         wave = wave.permute(1,2,0)
-
         if self.classify_redshift:
             num_bins = len(redshift)
             wave = wave[...,None].tile(1,1,1,num_bins)
         wave = wave / (1 + redshift) # dont use `/=` this will change wave object
+        # print(torch.min(wave), torch.max(wave))
 
         if wave.ndim == 3:
             wave = wave.permute(2,0,1)
@@ -101,7 +103,6 @@ class HyperSpectralConverter(nn.Module):
         if spatial.ndim == 4 and self._qtz_spectra:
             num_codes = spatial.shape[0]
         if spectral.ndim == 4: num_bins = spectral.shape[0]
-        # print(spatial.shape, spectral.shape)
 
         if spatial.ndim == 3:
             if spectral.ndim == 3:

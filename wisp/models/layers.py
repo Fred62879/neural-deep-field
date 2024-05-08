@@ -343,7 +343,9 @@ class ArgMax(torch.autograd.Function):
         # print(grad_updated[9,3])
         return grad_updated
 
-def calculate_bayesian_redshift_logits(loss, mask, gt_spectra, recon_fluxes, redshift_logits, **kwargs):
+def calculate_bayesian_redshift_logits(
+    loss, mask, gt_spectra, recon_fluxes, redshift_logits, **kwargs
+):
     """ Calculate bayesian logits for redshfit classification.
         @Param
           mask:       [bsz,num_smpls]
@@ -362,49 +364,6 @@ def calculate_bayesian_redshift_logits(loss, mask, gt_spectra, recon_fluxes, red
 
     logits = redshift_logits * spectra_logits.T # [bsz,num_bins]
     logits = logits / torch.sum(logits, dim=-1)[:,None]
-
-    ## debug
-    # print(redshift_logits[2])
-    # print(spectra_logits[:,2])
-    # print(logits[2])
-    # assert 0
-    ## ends here
-
-    ## debug
-    # import numpy as np
-    # import matplotlib.pyplot as plt
-
-    # id = 2
-    # mask = mask.detach().cpu().numpy()[id]
-    # gt_spectra = gt_spectra.detach().cpu().numpy()[id]
-    # recon_fluxes = recon_fluxes.detach().cpu().numpy()[:,id]
-    # spectra_logits = spectra_logits.detach().cpu().numpy()[:,id]
-
-    # n = recon_fluxes.shape[0]
-    # n_spectrum_per_fig = 35
-    # n_spectrum_per_row = 7
-    # nrow, ncol = int(n_spectrum_per_fig / n_spectrum_per_row), n_spectrum_per_row
-    # n_figs = int(np.ceil(n / n_spectrum_per_fig))
-    # redshift_bins = init_redshift_bins(
-    #     kwargs["redshift_lo"], kwargs["redshift_hi"], kwargs["redshift_bin_width"]
-    # ).numpy()
-
-    # for i in range(n_figs):
-    #     fig, axs = plt.subplots(nrow, ncol, figsize=(5*ncol,5*nrow))
-    #     lo = i*n_spectrum_per_fig
-
-    #     hi = min(n_spectrum_per_fig, n-lo)
-    #     for j in range(hi):
-    #         axis = axs[j//n_spectrum_per_row,j%n_spectrum_per_row]
-    #         axis.plot(recon_fluxes[lo+j][mask], color='blue')
-    #         axis.plot(gt_spectra[1][mask], color='gray')
-    #         logit = np.round(spectra_logits[lo+j],5)
-    #         bin_center = np.round(redshift_bins[lo+j], 2)
-    #         axis.set_title(str(logit) + '-' + str(bin_center))
-    #     fig.tight_layout(); plt.savefig(f'{i}.png'); plt.close()
-    # assert 0
-    ## ends here
-
     return logits
 
 def calculate_spectra_loss(

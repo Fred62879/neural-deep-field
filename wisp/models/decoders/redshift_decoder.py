@@ -1,11 +1,13 @@
 
 import torch
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
+from os.path import join
 from wisp.utils import PerfTimer
-from wisp.utils.common import get_input_latent_dim, init_redshift_bins, \
-    get_bool_has_redshift_latents
+from wisp.utils.common import get_input_latent_dim, init_redshift_bins, get_exp_dir, \
+    get_bool_has_redshift_latents, get_bool_limit_redshift_range
 from wisp.models.decoders.basic_decoders import BasicDecoder
 
 
@@ -21,7 +23,7 @@ class RedshiftDecoder(nn.Module):
         self.apply_gt_redshift = kwargs["apply_gt_redshift"]
         self.redshift_model_method = kwargs["redshift_model_method"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**kwargs)
-
+        self.limit_redshift_to_pretrain_range = get_bool_limit_redshift_range(**kwargs)
         self.init_model()
 
     def init_model(self):
@@ -37,28 +39,25 @@ class RedshiftDecoder(nn.Module):
             output_dim = self.num_redshift_bins
         else: raise ValueError("Unsupported redshift modeling method!")
 
-        if not self.kwargs["optimize_redshift_latents_as_logits"]:
-            self.redshift_decoder = BasicDecoder(
-                self.input_dim, output_dim, True,
-                layer_type=self.kwargs["redshift_decod_layer_type"],
-                activation_type=self.kwargs["redshift_decod_activation_type"],
-                num_layers=self.kwargs["redshift_decod_num_hidden_layers"] + 1,
-                hidden_dim=self.kwargs["redshift_decod_hidden_dim"],
-                skip=self.kwargs["redshift_decod_skip_layers"]
-            )
-            # self.redshift_decoder.initialize_last_layer_equal()
-            # for n,p in self.redshift_decoder.lout.named_parameters(): print(n, p)
-        else: assert self.num_redshift_bins == self.kwargs["redshift_logit_latent_dim"]
+        if get_bool_has_redshift_latents(**self.kwargs):
+            if not self.kwargs["optimize_redshift_latents_as_logits"]:
+                self.redshift_decoder = BasicDecoder(
+                    self.input_dim, output_dim, True,
+                    layer_type=self.kwargs["redshift_decod_layer_type"],
+                    activation_type=self.kwargs["redshift_decod_activation_type"],
+                    num_layers=self.kwargs["redshift_decod_num_hidden_layers"] + 1,
+                    hidden_dim=self.kwargs["redshift_decod_hidden_dim"],
+                    skip=self.kwargs["redshift_decod_skip_layers"]
+                )
+                # self.redshift_decoder.initialize_last_layer_equal()
+                # for n,p in self.redshift_decoder.lout.named_parameters(): print(n, p)
+            else: assert self.num_redshift_bins == self.kwargs["redshift_logit_latent_dim"]
 
     def init_redshift_bins(self):
         if self.kwargs["use_gpu"]:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else: device = "cpu"
-        self.redshift_bin_center = init_redshift_bins(
-            self.kwargs["redshift_lo"], self.kwargs["redshift_hi"],
-            self.kwargs["redshift_bin_width"]
-        )
-        self.redshift_bin_center = self.redshift_bin_center.to(device)
+        self.redshift_bin_center = init_redshift_bins(**self.kwargs).to(device)
         self.num_redshift_bins = len(self.redshift_bin_center)
 
     def forward(self, z, ret, specz=None, redshift_latents=None, init_redshift_prob=None):

@@ -13,7 +13,7 @@ from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
 from wisp.utils.common import print_shape, get_bin_ids, \
-    create_gt_redshift_bin_masks
+    create_gt_redshift_bin_masks, get_redshift_range
 from wisp.datasets.data_utils import clip_data_to_ref_wave_range, \
     get_wave_range_fname, batch_sample_torch, get_bound_id
 
@@ -234,7 +234,9 @@ class AstroDataset(Dataset):
         if self.spectra_source == "sup":
             return self.spectra_dataset.get_supervision_redshift(idx)
         if self.spectra_source == "val":
-            return self.spectra_dataset.get_validation_redshift(idx)
+            a = self.spectra_dataset.get_validation_redshift(idx)
+            print('getter', a.shape, torch.min(a), torch.max(a))
+            return a
         if self.spectra_source == "test":
             return self.spectra_dataset.get_test_redshift(idx)
 
@@ -435,6 +437,8 @@ class AstroDataset(Dataset):
                     sup_bounds=out["spectra_sup_bounds"],
                     keep_sample_ids=True)
 
+                wave = out["spectra_source_data"][:,0]
+
                 out["spectra_masks"] = batch_sample_torch(
                     out["spectra_masks"], self.num_wave_samples,
                     sample_method=self.wave_sample_method,
@@ -541,6 +545,7 @@ class AstroDataset(Dataset):
         del out["spectra_id_map"]
 
     def get_gt_redshift_bin_ids(self, out):
+        print(out["spectra_redshift"])
         out["gt_redshift_bin_ids"] = self.create_gt_redshift_bin_ids(
             spectra_redshift=out["spectra_redshift"])
 
@@ -556,8 +561,8 @@ class AstroDataset(Dataset):
 
     def get_init_redshift_logit_bias(self, out):
         bsz = out["spectra_redshift"].shape[0]
-        n_bins = int(np.rint((
-            self.kwargs["redshift_hi"] - self.kwargs["redshift_lo"]) / self.kwargs["redshift_bin_width"]))
+        (lo, hi) = get_redshift_range(**self.kwargs)
+        n_bins = int( np.rint((hi - lo) / self.kwargs["redshift_bin_width"]))
         # ids = np.array(
         #     [get_bin_id(self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"], val)
         #      for val in out["spectra_redshift"]])
@@ -567,8 +572,7 @@ class AstroDataset(Dataset):
         # ids = np.concatenate((pos[None,:],ids[None,:]),axis=0)
         # init_probs[ ids[0,:], ids[1:,] ] = 1
         ids = get_bin_ids(
-            self.kwargs["redshift_lo"],
-            self.kwargs["redshift_bin_width"],
+            lo, self.kwargs["redshift_bin_width"],
             out["spectra_redshift"], add_batched_dim=True
         )
         init_probs[ids[0], ids[1]] = 1
@@ -581,9 +585,14 @@ class AstroDataset(Dataset):
     def create_gt_redshift_bin_ids(self, spectra_redshift=None):
         if spectra_redshift is None:
             spectra_redshift = self.get_spectra_redshift()
+        (lo, hi) = get_redshift_range(**self.kwargs)
+        print(spectra_redshift.shape, torch.min(spectra_redshift), torch.max(spectra_redshift))
+        print(lo, hi)
         gt_bin_ids = get_bin_ids(
-            self.kwargs["redshift_lo"], self.kwargs["redshift_bin_width"],
+            lo, self.kwargs["redshift_bin_width"],
             spectra_redshift.numpy(), add_batched_dim=True)
+        print(gt_bin_ids)
+        assert 0
         return torch.tensor(gt_bin_ids)
 
     def create_wrong_redshift_bin_ids(self, gt_bin_masks):

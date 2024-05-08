@@ -27,6 +27,11 @@ def get_log_dir(**kwargs):
     else: log_dir = kwargs["log_dir"]
     return log_dir
 
+def get_exp_dir(**kwargs):
+    log_dir = get_log_dir(**kwargs)
+    exp_dir = os.path.join(log_dir, kwargs["exp_name"])
+    return exp_dir
+
 def get_current_ablate_param_and_val(args):
     id = args.ablat_id
     num_vals = args.ablat_num_vals
@@ -77,6 +82,12 @@ def get_bool_regress_redshift(**kwargs):
         not kwargs["apply_gt_redshift"] and \
         kwargs["redshift_model_method"] == "regress"
 
+def get_bool_limit_redshift_range(**kwargs):
+    return ("sanity_check" in kwargs["tasks"] or \
+            "generalization" in kwargs["tasks"]
+    ) and kwargs["limit_redshift_to_pretrain_range"] and \
+    kwargs["use_global_spectra_loss_as_lambdawise_weights"]
+
 def get_bool_has_redshift_latents(**kwargs):
     """ Check whether we need an independent redshift latents.
     """
@@ -125,8 +136,32 @@ def create_gt_redshift_bin_masks(gt_redshift_bin_ids, num_bins):
     """
     bsz = gt_redshift_bin_ids.shape[-1]
     masks = np.zeros((bsz, num_bins))
+    print(gt_redshift_bin_ids)
+    print(masks.shape)
+    assert 0
     masks[gt_redshift_bin_ids[0],gt_redshift_bin_ids[1]] = 1
     return masks
+
+def get_redshift_range(**kwargs):
+    if get_bool_limit_redshift_range(**kwargs):
+        exp_dir = get_exp_dir(**kwargs)
+        global_redshift_fname = join(exp_dir, kwargs["global_redshift_fname"])
+        (lo, hi) = np.load(global_redshift_fname)
+    else: lo, hi = kwargs["redshift_lo"], kwargs["redshift_hi"]
+    return (lo, hi)
+
+def init_redshift_bins(init_np=False, **kwargs):
+    (lo, hi) = get_redshift_range(**kwargs)
+    # print('common, redshift', lo, hi)
+    if init_np: redshift_bin_center = np.arange(lo, hi, kwargs["redshift_bin_width"])
+    else:       redshift_bin_center = torch.arange(lo, hi, kwargs["redshift_bin_width"])
+    # print(redshift_bin_center[0], redshift_bin_center[-1], kwargs["redshift_bin_width"])
+    offset = kwargs["redshift_bin_width"] / 2
+    redshift_bin_center += offset
+    if redshift_bin_center[-1] > hi:
+        redshift_bin_center = redshift_bin_center[:-1]
+    # print(redshift_bin_center[0], redshift_bin_center[-1])
+    return redshift_bin_center
 
 def create_batch_ids(ids):
     """ Add batch dim id to a given list of ids.
@@ -203,13 +238,6 @@ def freeze_layers_excl(model, excls=[]):
         for excl in excls:
             if excl in n: freeze = False; break
         if freeze: p.requires_grad = False
-
-def init_redshift_bins(lo, hi, bin_width, init_np=False):
-    if init_np: redshift_bin_center = np.arange(lo, hi, bin_width)
-    else:       redshift_bin_center = torch.arange(lo, hi, bin_width)
-    offset = bin_width / 2
-    redshift_bin_center += offset
-    return redshift_bin_center
 
 def create_latent_mask(lo, hi, ndim):
     mask = torch.zeros(ndim)

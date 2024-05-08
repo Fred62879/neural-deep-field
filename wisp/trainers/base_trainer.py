@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import get_log_dir
+from wisp.utils.common import get_exp_dir
 
 
 def log_metric_to_wandb(key, _object, step):
@@ -105,12 +105,11 @@ class BaseTrainer(ABC):
         self.dataset_size = None
         self.log_dict = {}
 
+        exp_dir = get_exp_dir(**self.extra_args)
         self.log_fname = f'{datetime.now().strftime("%Y%m%d-%H%M%S")}'
         if self.extra_args["log_fname"] is not None:
             self.log_fname += "_" + self.extra_args["log_fname"]
-
-        log_dir = get_log_dir(**extra_args)
-        self.log_dir = os.path.join(log_dir, self.exp_name, self.log_fname)
+        self.log_dir = join(exp_dir, self.log_fname)
 
         # Default TensorBoard Logging
         self.writer = SummaryWriter(self.log_dir, purge_step=0)

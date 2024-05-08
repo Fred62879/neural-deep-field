@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    tasks: ['codebook_pretrain_infer','recon_spectra','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
