@@ -367,8 +367,9 @@ def calculate_bayesian_redshift_logits(
     return logits
 
 def calculate_spectra_loss(
-    loss_func, masks, gt_spectra, recon_fluxes, ret,
-    save_lambdawise_loss=False, loss_name_suffix="", **kwargs
+        loss_func, masks, gt_spectra, recon_fluxes, ret,
+        save_lambdawise_loss=False, train_with_lambdawise_weights=False,
+        loss_name_suffix="", **kwargs
 ):
     """
     Calculate spectra loss.
@@ -386,7 +387,7 @@ def calculate_spectra_loss(
     apply_gt_redshift = recon_fluxes.ndim == 2
 
     if apply_gt_redshift:
-        lambdawise_loss = loss_func(gt_spectra, recon_fluxes) # [bsz,nsmpls]
+        lambdawise_loss = loss_func(gt_spectra, recon_fluxes) # [bsz,nsmpl]
     elif brute_force:
         lambdawise_loss = loss_func(
             gt_spectra[None,:].tile(n_bins,1,1,1), recon_fluxes
@@ -396,30 +397,53 @@ def calculate_spectra_loss(
     assert recon_fluxes.shape == lambdawise_loss.shape
 
     if save_lambdawise_loss:
+        """
+        We save lambdawise loss when
+          plot spectra with lambdawise loss or
+          plot and save global restframe loss as training weights
+        Here `lambdawise_loss` may contain `nan` which will be masked out
+          in the following plotting functions.
+        Also, we save before multiplying weights as we need the original loss
+          for visualization purposes.
+        """
         nm = "spectra_lambdawise_loss" + loss_name_suffix
         if apply_gt_redshift:
             ret[nm] = lambdawise_loss
         elif brute_force:
             ret[nm] = lambdawise_loss.permute(1,0,2)
 
-    if recon_fluxes.ndim == 3: # brute forace
-        if kwargs["regress_lambdawise_weights"]:
-            weights = ret["lambdawise_weights"]
+    if apply_gt_redshift:
+        lambdawise_loss[masks == 0] = 0
+        assert not torch.isnan(lambdawise_loss).any() # [bsz,nsmpl]
+        if kwargs["spectra_loss_reduction"] == "sum":
+            spectrawise_loss = torch.sum(lambdawise_loss, dim=-1)
+        elif kwargs["spectra_loss_reduction"] == "mean":
+            masks = torch.sum(masks, dim=-1) # [bsz,]
+            assert not (masks == 0).any()
+            spectrawise_loss = (torch.sum(lambdawise_loss, dim=-1) / masks)
+        else: raise ValueError()
+        nm = "spectrawise_loss" + loss_name_suffix
+        ret[nm] = spectrawise_loss
+
+    elif brute_force:
+        if train_with_lambdawise_weights:
+            weights = ret["lambdawise_weights"] # [nbins,bsz,nsmpl]
             lambdawise_loss = lambdawise_loss * weights
-
+        """
+        From now on, `lambdawise_loss` is used only for binwise loss calculation.
+        As we still need to keep the batched shape of the tensor, we cannot directly mask
+          out `nan` which will give a flattened tensor. Thus we replace `nan` with 0.
+        """
         masks = masks[None,...].tile(n_bins,1,1)
-        lambdawise_loss = lambdawise_loss * masks # [nbins,bsz,nsmpl]
-
+        lambdawise_loss[masks == 0] = 0
+        assert not torch.isnan(lambdawise_loss).any() # [nbins,bsz,nsmpl]
         if kwargs["spectra_lambdawise_loss_reduction"] == "sum":
             binwise_loss = torch.sum(lambdawise_loss, dim=-1).T # [nbins,bsz]
         elif kwargs["spectra_lambdawise_loss_reduction"] == "mean":
-            masks = torch.sum(masks, dim=-1)
-            # print(torch.isinf(lambdawise_loss).any())
+            masks = torch.sum(masks, dim=-1) # [nbins,bsz] duplicate in dim 0
             masks[masks == 0] = 1
             binwise_loss = (torch.sum(lambdawise_loss, dim=-1) / masks).T
         else: raise ValueError()
-
-        # print(torch.isinf(binwise_loss).any())
         nm = "spectra_binwise_loss" + loss_name_suffix
         ret[nm] = binwise_loss
 

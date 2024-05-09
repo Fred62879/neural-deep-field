@@ -1,5 +1,6 @@
 
 import os
+import math
 import torch
 import pickle
 import numpy as np
@@ -10,6 +11,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 from pathlib import Path
 from os.path import exists, join
+from scipy.interpolate import interp1d
 from functools import partial, lru_cache
 from linetools.lists.linelist import LineList
 
@@ -238,8 +240,8 @@ class AstroInferrer(BaseInferrer):
         # classify redshift
         self.calculate_binwise_spectra_loss = self.model_redshift and \
             self.classify_redshift and self.extra_args["calculate_binwise_spectra_loss"]
-        self.calculate_lambdawise_spectra_loss = \
-            get_bool_calculate_lambdawise_spectra_loss(**self.extra_args)
+        self.plot_lambdawise_spectra_loss = \
+            get_bool_plot_lambdawise_spectra_loss(**self.extra_args)
 
         # if we want to calculate binwise spectra loss when we do quantization
         #  we need to perform qtz first in hyperspectral_decoder::dim_reduction
@@ -248,6 +250,25 @@ class AstroInferrer(BaseInferrer):
 
         self.classify_redshift_based_on_l2 = self.classify_redshift and \
             self.extra_args["classify_redshift_based_on_l2"]
+
+        # weighted spectra training
+        self.regress_lambdawise_weights = \
+            self.extra_args["regress_lambdawise_weights"] and \
+            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer")
+        self.use_global_spectra_loss_as_lambdawise_weights = \
+            self.extra_args["use_global_spectra_loss_as_lambdawise_weights"] and \
+            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer")
+        self.get_lambdawise_weights = \
+            self.regress_lambdawise_weights or \
+            self.use_global_spectra_loss_as_lambdawise_weights
+        assert not (self.regress_lambdawise_weights and \
+                    self.use_global_spectra_loss_as_lambdawise_weights)
+        if self.use_global_spectra_loss_as_lambdawise_weights:
+            self.global_restframe_spectra_loss_fname = join(
+                self.log_dir, "..", self.extra_args["global_restframe_spectra_loss_fname"])
+        self.limit_redshift_to_pretrain_range = \
+            self.use_global_spectra_loss_as_lambdawise_weights and \
+            self.extra_args["limit_redshift_to_pretrain_range"]
 
         self.neg_sup_wrong_redshift = \
             self.mode == "codebook_pretrain" and \
@@ -285,9 +306,7 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["calculate_spectra_loss_based_on_optimal_bin"]
 
         if self.classify_redshift:
-            (lo, hi) = get_redshift_range(**self.extra_args)
-            redshift_bins = init_redshift_bins(
-                lo, hi, self.extra_args["redshift_bin_width"])
+            redshift_bins = init_redshift_bins(**self.extra_args)
             self.num_redshift_bins = len(redshift_bins)
 
         self.save_redshift = "save_redshift" in tasks and self.model_redshift
@@ -570,6 +589,13 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.append("gt_redshift_bin_masks")
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
                 self.requested_fields.append("spectra_ivar_reliable")
+            if self.use_global_spectra_loss_as_lambdawise_weights:
+                emitted_wave, loss = np.load(self.global_restframe_spectra_loss_fname)
+                global_restframe_spectra_loss = interp1d(
+                    emitted_wave, loss, bounds_error=False, fill_value=math.nan)
+                self.dataset.set_hardcode_data(
+                    "global_restframe_spectra_loss", global_restframe_spectra_loss)
+                self.requested_fields.append("global_restframe_spectra_loss")
 
             if self.infer_selected:
                 # n = len(self._select_inferrence_ids())
@@ -1536,7 +1562,7 @@ class AstroInferrer(BaseInferrer):
         """
         loss_func, l2_loss_func = None, None
         if self.apply_gt_redshift:
-            if self.calculate_lambdawise_spectra_loss:
+            if self.plot_lambdawise_spectra_loss:
                 loss_func = self._get_spectra_loss_func(
                     self.extra_args["spectra_loss_cho"])
 
@@ -1565,9 +1591,15 @@ class AstroInferrer(BaseInferrer):
                 calculate_binwise_spectra_loss=\
                     self.calculate_binwise_spectra_loss,
                 calculate_lambdawise_spectra_loss=\
-                    self.calculate_lambdawise_spectra_loss,
+                    self.plot_lambdawise_spectra_loss,
                 regress_lambdawise_weights_share_latents= \
+                    self.regress_lambdawise_weights and \
                     self.regress_lambdawise_weights_share_latents,
+                regress_lambdawise_weights_use_gt_bin_latent= \
+                    self.regress_lambdawise_weights_share_latents and \
+                    self.regress_lambdawise_weights_use_gt_bin_latent,
+                use_global_spectra_loss_as_lambdawise_weights= \
+                    self.use_global_spectra_loss_as_lambdawise_weights,
                 save_redshift=self.save_redshift,
                 save_spectra=self.recon_spectra,
                 save_qtz_weights=self.save_qtz_weights,
@@ -1581,8 +1613,8 @@ class AstroInferrer(BaseInferrer):
                                       self.plot_optimal_wrong_bin_spectra,
                 init_redshift_prob= None if "init_redshift_prob" not in data else \
                                         data["init_redshift_prob"],
-                save_lambdawise_weights=self.regress_lambdawise_weights and \
-                    self.plot_spectra_with_weights)
+                save_lambdawise_weights= self.get_lambdawise_weights or \
+                                         self.plot_spectra_with_weights)
         return ret
 
     def collect_spectra_inferrence_data_after_each_step(self, data, ret):
@@ -1958,9 +1990,7 @@ class AstroInferrer(BaseInferrer):
         num_bins = recon_fluxes_all.shape[0]
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
         n_figs_each = int(np.ceil(num_bins / n_spectrum_per_fig))
-        (lo, hi) = get_redshift_range(**self.extra_args)
-        redshift_bins = init_redshift_bins(
-            lo, hi, self.extra_args["redshift_bin_width"]).numpy()
+        redshift_bins = init_redshift_bins(**self.extra_args).numpy()
 
         def calculate_binwise_loss(gt_fluxes, recon_fluxes, masks, i):
             mask = torch.FloatTensor(masks[i]).to('cuda:0')
@@ -2154,9 +2184,7 @@ class AstroInferrer(BaseInferrer):
         num_bins = codebook_coeff.shape[0]
         n_spectrum_per_fig = self.extra_args["num_spectrum_per_fig"]
         n_figs_each = int(np.ceil(num_bins / n_spectrum_per_fig))
-        (lo, hi) = get_redshift_range(**self.extra_args)
-        redshift_bins = init_redshift_bins(
-            lo, hi, self.extra_args["redshift_bin_width"]).numpy()
+        redshift_bins = init_redshift_bins(**self.extra_args).numpy()
 
         spectra_ids = np.arange(self.dataset_length)
         if self.infer_selected:
@@ -2252,9 +2280,7 @@ class AstroInferrer(BaseInferrer):
             gt_redshift = gt_redshift[ids]
             redshift_logits = redshift_logits[ids]
 
-        (lo, hi) = get_redshift_range(**self.extra_args)
-        bin_centers = init_redshift_bins(
-            lo, hi, self.extra_args["redshift_bin_width"])
+        bin_centers = init_redshift_bins(**self.extra_args)
 
         # n, nbins = redshift_logits.shape
         # gt_bin_ids = np.array([
@@ -2290,9 +2316,7 @@ class AstroInferrer(BaseInferrer):
             losses = losses[ids]
             gt_redshift = gt_redshift[ids]
 
-        (lo, hi) = get_redshift_range(**self.extra_args)
-        bin_centers = init_redshift_bins(
-            lo, hi, self.extra_args["redshift_bin_width"])
+        bin_centers = init_redshift_bins(**self.extra_args)
 
         sub_dir = join(self.redshift_dir, suffix)
         Path(sub_dir).mkdir(parents=True, exist_ok=True)
@@ -2343,13 +2367,12 @@ class AstroInferrer(BaseInferrer):
         else: path = self.spectra_dir
 
         emitted_wave = self.spectra_wave_g / (1 + self.spectra_redshift_g[:,None])
-
-        self._save_redshift_range(path, emitted_wave)
+        self._save_redshift_range(path, emitted_wave, self.spectra_redshift_g)
 
         emitted_wave = emitted_wave[self.spectra_masks_g]
         lambdawise_losses = self.spectra_lambdawise_losses_g[self.spectra_masks_g]
         self._plot_global_restframe_spectra_loss(
-            emitted_wave, lambdawise_losses, path)
+            model_id, emitted_wave, lambdawise_losses, path)
 
         if self.plot_global_lambdawise_spectra_loss_with_ivar:
             ivar_reliable = self.spectra_ivar_reliable
@@ -2368,26 +2391,27 @@ class AstroInferrer(BaseInferrer):
             emitted_wave_i = emitted_wave_i[masks]
             lambdawise_losses = lambdawise_losses[masks] * std
             self._plot_global_restframe_spectra_loss(
-                emitted_wave_i, lambdawise_losses, path, suffix="_ivar_scaled")
+                model_id, emitted_wave_i, lambdawise_losses, path, suffix="_ivar_scaled")
 
-    def _save_redshift_range(self, path, emitted_wave):
+    def _save_redshift_range(self, path, emitted_wave, redshift):
         """
-        Calculate and save range of redshift that converts supervision lambda
-          range to within the given emitted lambda range.
+        Save range of training redshift.
         """
-        wave = self.spectra_wave_g[self.spectra_masks_g]
-        emitted_wave = emitted_wave[self.spectra_masks_g]
-        lo_wave, hi_wave = np.min(wave), np.max(wave)
-        lo_emitted_wave, hi_emitted_wave = np.min(emitted_wave), np.max(emitted_wave)
-        # print(lo_wave, hi_wave)
-        # print(lo_emitted_wave, hi_emitted_wave)
-        lo, hi = hi_wave / hi_emitted_wave - 1, lo_wave / lo_emitted_wave - 1
-        # print(lo, hi)
+        # """
+        # Calculate and save range of redshift that converts supervision lambda
+        #   range to within the given emitted lambda range.
+        # """
+        # wave = self.spectra_wave_g[self.spectra_masks_g]
+        # emitted_wave = emitted_wave[self.spectra_masks_g]
+        # lo_wave, hi_wave = np.min(wave), np.max(wave)
+        # lo_emitted_wave, hi_emitted_wave = np.min(emitted_wave), np.max(emitted_wave)
+        # lo, hi = hi_wave / hi_emitted_wave - 1, lo_wave / lo_emitted_wave - 1
+        lo, hi = np.min(redshift), np.max(redshift)
         to_save = np.array([lo,hi])
         np.save(join(path, "global_redshift_range.npy"), to_save)
 
     def _plot_global_restframe_spectra_loss(
-            self, emitted_wave, lambdawise_losses, path, suffix=""
+            self, model_id, emitted_wave, lambdawise_losses, path, suffix=""
     ):
         ids = np.argsort(emitted_wave)
         emitted_wave = emitted_wave[ids]

@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    #tasks: ['codebook_pretrain_infer','recon_spectra','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -91,7 +91,7 @@ trainer:
     resume_log_dir: ''
     resume_model_fname: 'model-ep2000-bch0.pth'
 
-    spectra_loss_cho: l2 #ssim1d
+    spectra_loss_cho: ssim1d
     spectra_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
@@ -99,7 +99,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240506-173015_ssim_2k_epochs'
+    # infer_log_dir: '20240506-173015_ssim_2k_epochs'
     infer_selected: False
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
@@ -113,7 +113,7 @@ infer:
     plot_spectrum_with_loss: False
     plot_spectrum_with_ivar: False
     plot_spectrum_with_lines: False
-    plot_spectrum_with_recon: False
+    plot_spectrum_with_recon: True
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: False
     plot_spectrum_under_optimal_wrong_bin: False

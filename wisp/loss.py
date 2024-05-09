@@ -173,23 +173,23 @@ class spectra_supervision_loss(nn.Module):
         else:
             if gt_spectra.ndim == 3:
                 ret = self.loss_func(gt_spectra[:,1], recon_fluxes)
-            elif gt_spectra.ndim == 4: # binwise spectra loss
+            elif gt_spectra.ndim == 4:
+                # lambdawise loss for each bin of each spectra
                 ret = self.loss_func(gt_spectra[:,:,1], recon_fluxes)
             else: raise ValueError()
         assert recon_fluxes.shape == ret.shape
         return ret
 
-    def reduce(self, lambdawise_loss, reduce_func, masks):
-        """
-        @Param
-          mask: [...,bsz,num_smpls]
-        """
-        assert reduce_func is not None
-        # lambdawise_loss [bsz,nsmpl]/[nbins,bsz]/[nbins,bsz,nsmpl]
-
-        masked_loss = lambdawise_loss[masks] # [n]
-        loss = reduce_func(masked_loss, dim=-1)
-        return loss
+    # def reduce(self, lambdawise_loss, reduce_func, masks):
+    #     """
+    #     @Param
+    #       mask: [...,bsz,num_smpls]
+    #     """
+    #     assert reduce_func is not None
+    #     # lambdawise_loss [bsz,nsmpl]/[nbins,bsz]/[nbins,bsz,nsmpl]
+    #     masked_loss = lambdawise_loss[masks] # [n]
+    #     loss = reduce_func(masked_loss, dim=-1)
+    #     return loss
 
 def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     gt_pixels = gt_pixels / (torch.sum(gt_pixels, dim=-1)[...,None])

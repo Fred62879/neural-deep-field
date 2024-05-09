@@ -234,9 +234,7 @@ class AstroDataset(Dataset):
         if self.spectra_source == "sup":
             return self.spectra_dataset.get_supervision_redshift(idx)
         if self.spectra_source == "val":
-            a = self.spectra_dataset.get_validation_redshift(idx)
-            print('getter', a.shape, torch.min(a), torch.max(a))
-            return a
+            return self.spectra_dataset.get_validation_redshift(idx)
         if self.spectra_source == "test":
             return self.spectra_dataset.get_test_redshift(idx)
 
@@ -545,7 +543,6 @@ class AstroDataset(Dataset):
         del out["spectra_id_map"]
 
     def get_gt_redshift_bin_ids(self, out):
-        print(out["spectra_redshift"])
         out["gt_redshift_bin_ids"] = self.create_gt_redshift_bin_ids(
             spectra_redshift=out["spectra_redshift"])
 
@@ -586,13 +583,9 @@ class AstroDataset(Dataset):
         if spectra_redshift is None:
             spectra_redshift = self.get_spectra_redshift()
         (lo, hi) = get_redshift_range(**self.kwargs)
-        print(spectra_redshift.shape, torch.min(spectra_redshift), torch.max(spectra_redshift))
-        print(lo, hi)
         gt_bin_ids = get_bin_ids(
             lo, self.kwargs["redshift_bin_width"],
             spectra_redshift.numpy(), add_batched_dim=True)
-        print(gt_bin_ids)
-        assert 0
         return torch.tensor(gt_bin_ids)
 
     def create_wrong_redshift_bin_ids(self, gt_bin_masks):

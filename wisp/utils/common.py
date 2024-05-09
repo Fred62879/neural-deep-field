@@ -93,7 +93,7 @@ def get_bool_has_redshift_latents(**kwargs):
     """
     return get_bool_regress_redshift(**kwargs) and kwargs["split_latent"]
 
-def get_bool_calculate_lambdawise_spectra_loss(**kwargs):
+def get_bool_plot_lambdawise_spectra_loss(**kwargs):
     return (
         kwargs["plot_spectrum_with_loss"] or \
         kwargs["plot_spectrum_color_based_on_loss"] or \
@@ -102,6 +102,16 @@ def get_bool_calculate_lambdawise_spectra_loss(**kwargs):
         "sanity_check_infer" in kwargs["tasks"] or \
         "generalization_infer" in kwargs["tasks"] or \
         "codebook_pretrain_infer" in kwargs["tasks"] )
+
+def get_bool_train_with_lambdawise_spectra_loss_as_weights(**kwargs):
+    return (
+        kwargs["regress_lambdawise_weights"] or \
+        kwargs["use_global_spectra_loss_as_lambdawise_weights"]
+    ) and (
+        "sanity_check" in kwargs["tasks"] or \
+        "generalization" in kwargs["tasks"] or \
+        "sanity_check_infer" in kwargs["tasks"] or \
+        "generalization_infer" in kwargs["tasks"])
 
 def get_optimal_wrong_bin_ids(ret, data):
     """ Get id of the non-GT redshift bin that achieves the lowest spectra loss.
@@ -136,9 +146,6 @@ def create_gt_redshift_bin_masks(gt_redshift_bin_ids, num_bins):
     """
     bsz = gt_redshift_bin_ids.shape[-1]
     masks = np.zeros((bsz, num_bins))
-    print(gt_redshift_bin_ids)
-    print(masks.shape)
-    assert 0
     masks[gt_redshift_bin_ids[0],gt_redshift_bin_ids[1]] = 1
     return masks
 
@@ -152,15 +159,12 @@ def get_redshift_range(**kwargs):
 
 def init_redshift_bins(init_np=False, **kwargs):
     (lo, hi) = get_redshift_range(**kwargs)
-    # print('common, redshift', lo, hi)
     if init_np: redshift_bin_center = np.arange(lo, hi, kwargs["redshift_bin_width"])
     else:       redshift_bin_center = torch.arange(lo, hi, kwargs["redshift_bin_width"])
-    # print(redshift_bin_center[0], redshift_bin_center[-1], kwargs["redshift_bin_width"])
     offset = kwargs["redshift_bin_width"] / 2
     redshift_bin_center += offset
     if redshift_bin_center[-1] > hi:
         redshift_bin_center = redshift_bin_center[:-1]
-    # print(redshift_bin_center[0], redshift_bin_center[-1])
     return redshift_bin_center
 
 def create_batch_ids(ids):
@@ -409,8 +413,8 @@ def query_GPU_mem():
     handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
     # card id 0 hardcoded here, there is also a call to get all available card ids, so we could iterate
     info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
-    # print(f"Total memory: {info.total/1e9}GB")
-    # print(f"Free memory: {info.free/1e9}GB")
+    print(f"Total memory: {info.total/1e9}GB")
+    print(f"Free memory: {info.free/1e9}GB")
     print(f"Used memory: {info.used/1e9}GB")
     nvidia_smi.nvmlShutdown()
 
@@ -565,8 +569,6 @@ def forward(
             if "redshift_latents" in data:
                 net_args["redshift_latents"] = data["redshift_latents"]
 
-        if apply_gt_redshift:
-            net_args["specz"] = data["spectra_redshift"]
         if perform_integration:
             net_args["trans"] = data["trans"]
             net_args["nsmpl"] = data["nsmpl"]
@@ -587,34 +589,44 @@ def forward(
         if regularize_codebook_spectra:
             net_args["full_emitted_wave"] = data["full_emitted_wave"]
             requested_channels.append("full_range_codebook_spectra")
+        if save_gt_bin_spectra or optimize_bins_separately:
+            net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
+        if optimize_bins_separately:
+            net_args["gt_redshift_bin_masks"] = data["gt_redshift_bin_masks"]
+
+        if apply_gt_redshift:
+            net_args["specz"] = data["spectra_redshift"]
+            net_args["spectra_masks"] = data["spectra_masks"]
+            net_args["spectra_loss_func"] = spectra_loss_func
+            net_args["spectra_source_data"] = data["spectra_source_data"]
+            requested_channels.append("spectrawise_loss")
+
         if calculate_binwise_spectra_loss:
             net_args["spectra_masks"] = data["spectra_masks"]
             net_args["spectra_loss_func"] = spectra_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.extend(["spectra_binwise_loss","redshift_logits"])
-            if plot_l2_loss or classify_based_on_l2_loss:
+            if plot_l2_loss or classify_redshift_based_on_l2:
                 assert spectra_l2_loss_func is not None
                 net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
                 requested_channels.append("spectra_binwise_loss_l2")
+
         if calculate_lambdawise_spectra_loss:
             net_args["spectra_masks"] = data["spectra_masks"]
             net_args["spectra_loss_func"] = spectra_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.append("spectra_lambdawise_loss")
-        if save_gt_bin_spectra or optimize_bins_separately:
-            net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
-        if optimize_bins_separately:
-            net_args["gt_redshift_bin_masks"] = data["gt_redshift_bin_masks"]
-        if save_lambdawise_weights:
-            requested_channels.append("lambdawise_weights")
 
+        # train with lambdawise weights (either generate with mlp or use global loss)
         if regress_lambdawise_weights_share_latents:
             if regress_lambdawise_weights_use_gt_bin_latent:
                 net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
             else: net_args["optm_bin_ids"] = data["optm_bin_ids"]
-        if use_global_spectra_loss_as_lambdawise_weights:
+        elif use_global_spectra_loss_as_lambdawise_weights:
             net_args["global_restframe_spectra_loss"] = \
                 data["global_restframe_spectra_loss"]
+        if save_lambdawise_weights:
+            requested_channels.append("lambdawise_weights")
     else:
         raise ValueError("Unsupported space dimension.")
 
