@@ -387,10 +387,6 @@ def calculate_spectra_loss(
     apply_gt_redshift = recon_fluxes.ndim == 2
 
     if apply_gt_redshift:
-        #print(torch.isnan(gt_spectra).any(), torch.isnan(recon_fluxes).any())
-        #valid_spectra = gt_spectra[:,1]
-        #valid_spectra[masks == 0] = 0
-        #print(torch.isnan(valid_spectra).any(), torch.isnan(recon_fluxes).any())
         lambdawise_loss = loss_func(gt_spectra, recon_fluxes, masks) # [bsz,nsmpl]
     elif brute_force:
         lambdawise_loss = loss_func(
@@ -417,16 +413,7 @@ def calculate_spectra_loss(
             ret[nm] = lambdawise_loss.permute(1,0,2)
 
     if apply_gt_redshift:
-        print(masks.shape)
-        invalid = masks == 0
-        print(sum(invalid))
         lambdawise_loss[masks == 0] = 0
-        print(torch.isnan(lambdawise_loss).any())
-        # a = torch.isnan(lambdawise_loss)
-        # b = torch.sum(a, dim=-1)
-        # c = torch.where(b != 0)
-        # print(c)
-
         assert not torch.isnan(lambdawise_loss).any() # [bsz,nsmpl]
         if kwargs["spectra_loss_reduction"] == "sum":
             spectrawise_loss = torch.sum(lambdawise_loss, dim=-1)

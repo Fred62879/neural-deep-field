@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-1600-spectra-pe'
+    exp_name: 'autodecoder-800-spectra-pe'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    #tasks: ['codebook_pretrain_infer','recon_spectra','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -91,7 +91,7 @@ trainer:
     resume_log_dir: ''
     resume_model_fname: 'model-ep2000-bch0.pth'
 
-    spectra_loss_cho: l2 #ssim1d
+    spectra_loss_cho: ssim1d
     spectra_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
@@ -99,7 +99,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: '20240506-173015_ssim_2k_epochs'
+    infer_log_dir: 20240510-123933_ssim_4k_epochs_r
     infer_selected: False
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
@@ -139,8 +139,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 1600 #25400
-    num_supervision_spectra_upper_bound: 1600 #25400
+    num_gt_spectra_upper_bound: 800 #25400
+    num_supervision_spectra_upper_bound: 800 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02

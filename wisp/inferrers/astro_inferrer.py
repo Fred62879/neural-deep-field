@@ -2361,7 +2361,7 @@ class AstroInferrer(BaseInferrer):
         Accumulate spectra loss under restframe for all spectra and plot.
         """
         if self.infer_selected:
-            path = join(self.spectra_dir, "_selected_{}".format(
+            path = join(self.spectra_dir, "selected-{}".format(
                 self.extra_args["pretrain_num_infer_upper_bound"]))
         else: path = self.spectra_dir
 

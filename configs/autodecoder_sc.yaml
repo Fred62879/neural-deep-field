@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-100-spectra-pe'
+    exp_name: 'autodecoder-800-spectra-pe'
     log_fname: 'sc'
 
     tasks: ['sanity_check'] #,'recon_spectra']
-    tasks: ['sanity_check_infer','recon_spectra','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
+    #tasks: ['sanity_check_infer','recon_spectra','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -49,14 +49,14 @@ pretrain:
     spectra_latent_dim: 16
 
     sample_from_codebook_pretrain_spectra: True
-    sanity_check_max_num_spectra: 100
+    sanity_check_max_num_spectra: 200
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240506-173015_ssim_2k_epochs'
+    pretrain_log_dir: '20240510-123933_ssim_4k_epochs_r'
     pretrained_model_name: 'model-ep2000-bch0.pth'
 
     regularize_spectra_latents: False
@@ -64,8 +64,8 @@ pretrain:
 
     use_global_spectra_loss_as_lambdawise_weights: True
     limit_redshift_to_pretrain_range: False
-    global_redshift_fname: 20240506-173015_ssim_2k_epochs/pretrain_spectra/global_redshift_range.npy
-    global_restframe_spectra_loss_fname: 20240506-173015_ssim_2k_epochs/pretrain_spectra/global_restframe_ssim1d_loss.npy
+    global_redshift_fname: 20240510-123933_ssim_4k_epochs_r/pretrain_spectra/global_redshift_range.npy
+    global_restframe_spectra_loss_fname: 20240510-123933_ssim_4k_epochs_r/pretrain_spectra/global_restframe_ssim1d_loss.npy
     regress_lambdawise_weights: False
     regress_lambdawise_weights_share_latents: False
     regress_lambdawise_weights_use_gt_bin_latent: False
@@ -88,12 +88,12 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 500
+    num_epochs: 200
     batch_size: 5500
-    log_cli_every: 50
-    plot_grad_every: 50
+    log_cli_every: 20
+    plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 50
+    save_model_every: 20
 
     plot_l2_loss: True
 
@@ -152,8 +152,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 100
-    num_supervision_spectra_upper_bound: 100
+    num_gt_spectra_upper_bound: 800
+    num_supervision_spectra_upper_bound: 800
 
     filter_redshift: False
     filter_redshift_lo: 0.02

@@ -61,28 +61,18 @@ class ssim1d(nn.Module):
                  reduction="none", size_average=True, full=False
     ):
         super(ssim1d, self).__init__()
-        assert filter_size > 0 and filter_sigma > 0
+        assert reduction == "none" and filter_size > 0 and filter_sigma > 0
 
         self.full = full
-        self.reduction = reduction
         assert filter_size % 2
         self.pad = (filter_size - 1) // 2
         self.val_range = val_range
         self.filter_size = filter_size
         self.size_average = size_average
-
         self.filter = self.gaussian(filter_size, filter_sigma)
 
-    def forward(self, input, target):
-        ssim = self._forward(input, target)
-        # ssim = F.mse_loss(input, target, reduction='none')
-        if self.reduction == "none":
-            pass
-        elif self.reduction == "mean":
-            ssim = torch.mean(ssim)
-        elif self.reduction == "sum":
-            ssim = torch.sum(ssim)
-        else: raise ValueError()
+    def forward(self, input, target, mask):
+        ssim = self._forward(input, target, mask)
         return ssim
 
     def gaussian(self, size, sigma):
@@ -98,7 +88,19 @@ class ssim1d(nn.Module):
         gauss = gauss[None,None,:].cuda()
         return gauss
 
-    def _forward(self, s1, s2):
+    def _forward(self, s1, s2, masks):
+        """
+        @Param
+          s1/2: spectra flux [bsz,nsmpl]
+          mask: 0 indicates `nan` [bsz,nsmpl]
+        @Note
+          When processing spectra, we append `nan` to the end of each spectra to make
+           them the same length. When calculating ssim, valid flux values may turn to
+           `nan` ssim if there are `nan` values within the kernel range.
+          We can simply replace these `nan` with 0 which is essentially zero padding.
+        """
+        val1, val2 = self._replace_nan(s1, s2, masks)
+
         s1, s2 = s1[:,None], s2[:,None] # [bsz,1,nsmpl]
         dim4 = False
         if s1.ndim == 4:
@@ -138,8 +140,22 @@ class ssim1d(nn.Module):
         if torch.min(ssim_score) < 0 or torch.max(ssim_score) > 1.001:
             warnings.warn(f"min/max: {torch.min(ssim_score)}/{torch.max(ssim_score)}")
         if dim4: ssim_score = ssim_score.view(nbins,-1,nsmpls)
-        # print(torch.min(ssim_score), torch.max(ssim_score))
+
+        self._restore_nan(s1, s2, val1, val2, masks)
         return 1 - ssim_score
+
+    def _replace_nan(self, s1, s2, masks):
+        invalid = (masks == 0)
+        val1 = s1[invalid]
+        val2 = s2[invalid]
+        s1[invalid] = 0
+        s2[invalid] = 0
+        return val1, val2
+
+    def _restore_nan(self, s1, s2, val1, val2, masks):
+        invalid = (masks == 0)[:,None]
+        s1[invalid] = val1
+        s2[invalid] = val2
 
 class spectra_supervision_loss(nn.Module):
     def __init__(self, loss_func, weight_by_wave_coverage):
@@ -151,54 +167,43 @@ class spectra_supervision_loss(nn.Module):
         super(spectra_supervision_loss, self).__init__()
         self.loss_func = loss_func
         self.weight_by_wave_coverage = weight_by_wave_coverage
+        self.is_ssim = loss_func.__class__.__name__ == "ssim1d"
 
     def forward(self, gt_spectra, recon_fluxes, masks):
         """
         Calculate lambda-wise spectra loss
         @Param
-          gt_spectra: [...,bsz,4+2*nbanbds,num_smpls]
-                      (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
-          recon_fluxes: [...,bsz,num_smpls]
+          gt_spectra:   [(nbins,)bsz,4+2*nbanbds,num_smpls]
+                         (wave/flux/ivar/weight/trans_mask/trans(nbands)/band_mask(nbands))
+          recon_fluxes: [(nbins,)bsz,num_smpls]
         @Return
-          lambda-wise spectra loss [...,bsz,num_smpls]
+          lambda-wise spectra loss [(nbins,)bsz,num_smpls]
         """
         if self.weight_by_wave_coverage:
             if gt_spectra.ndim == 3:
                 weight = gt_spectra[:,3]
-                ret = self.loss_func(gt_spectra[:,1]*weight, recon_fluxes*weight)
-            elif gt_spectra.ndim == 4: # binwise spectra loss
+                ret = self._forward(gt_spectra[:,1]*weight, recon_fluxes*weight, masks)
+            elif gt_spectra.ndim == 4:
                 weight = gt_spectra[:,:,3]
-                ret = self.loss_func(gt_spectra[:,:,1]*weight, recon_fluxes*weight)
+                ret = self._forward(gt_spectra[:,:,1]*weight, recon_fluxes*weight, masks)
             else: raise ValueError()
         else:
             if gt_spectra.ndim == 3:
-                gt_flux = gt_spectra[:,1]
-                #print(gt_flux.shape, recon_fluxes.shape, masks.shape)
-                invalid = masks == 0
-                #print(invalid)
-                print(gt_spectra[:,1])
-                print(recon_fluxes)
-                ret = self.loss_func(gt_spectra[:,1], recon_fluxes)
-                print(ret)
-                print(ret[~invalid])
-                assert 0
+                # print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
+                ret = self._forward(gt_spectra[:,1], recon_fluxes, masks)
+                # print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
             elif gt_spectra.ndim == 4:
-                # lambdawise loss for each bin of each spectra
-                ret = self.loss_func(gt_spectra[:,:,1], recon_fluxes)
+                ret = self._forward(gt_spectra[:,:,1], recon_fluxes, masks)
             else: raise ValueError()
+
         assert recon_fluxes.shape == ret.shape
         return ret
 
-    # def reduce(self, lambdawise_loss, reduce_func, masks):
-    #     """
-    #     @Param
-    #       mask: [...,bsz,num_smpls]
-    #     """
-    #     assert reduce_func is not None
-    #     # lambdawise_loss [bsz,nsmpl]/[nbins,bsz]/[nbins,bsz,nsmpl]
-    #     masked_loss = lambdawise_loss[masks] # [n]
-    #     loss = reduce_func(masked_loss, dim=-1)
-    #     return loss
+    def _forward(self, s1, s2, masks):
+        if self.is_ssim:
+            ret = self.loss_func(s1, s2, masks)
+        else: ret = self.loss_func(s1, s2)
+        return ret
 
 def pretrain_pixel_loss(loss, gt_pixels, recon_pixels):
     gt_pixels = gt_pixels / (torch.sum(gt_pixels, dim=-1)[...,None])
