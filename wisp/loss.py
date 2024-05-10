@@ -152,7 +152,7 @@ class spectra_supervision_loss(nn.Module):
         self.loss_func = loss_func
         self.weight_by_wave_coverage = weight_by_wave_coverage
 
-    def forward(self, gt_spectra, recon_fluxes):
+    def forward(self, gt_spectra, recon_fluxes, masks):
         """
         Calculate lambda-wise spectra loss
         @Param
@@ -172,7 +172,16 @@ class spectra_supervision_loss(nn.Module):
             else: raise ValueError()
         else:
             if gt_spectra.ndim == 3:
+                gt_flux = gt_spectra[:,1]
+                #print(gt_flux.shape, recon_fluxes.shape, masks.shape)
+                invalid = masks == 0
+                #print(invalid)
+                print(gt_spectra[:,1])
+                print(recon_fluxes)
                 ret = self.loss_func(gt_spectra[:,1], recon_fluxes)
+                print(ret)
+                print(ret[~invalid])
+                assert 0
             elif gt_spectra.ndim == 4:
                 # lambdawise loss for each bin of each spectra
                 ret = self.loss_func(gt_spectra[:,:,1], recon_fluxes)

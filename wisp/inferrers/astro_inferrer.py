@@ -376,7 +376,7 @@ class AstroInferrer(BaseInferrer):
         self.plot_spectra_with_ivar = self.extra_args["plot_spectrum_with_ivar"]
         self.plot_spectra_with_loss = self.extra_args["plot_spectrum_with_loss"]
         self.plot_spectra_with_lines = self.extra_args["plot_spectrum_with_lines"]
-        self.plot_spectra_with_weights = self.regress_lambdawise_weights and \
+        self.plot_spectra_with_weights = self.get_lambdawise_weights and \
             self.extra_args["plot_spectrum_with_weights"]
         self.plot_gt_bin_spectra = not self.recon_spectra_all_bins and \
             self.extra_args["plot_spectrum_under_gt_bin"]
@@ -1613,8 +1613,7 @@ class AstroInferrer(BaseInferrer):
                                       self.plot_optimal_wrong_bin_spectra,
                 init_redshift_prob= None if "init_redshift_prob" not in data else \
                                         data["init_redshift_prob"],
-                save_lambdawise_weights= self.get_lambdawise_weights or \
-                                         self.plot_spectra_with_weights)
+                save_lambdawise_weights= self.get_lambdawise_weights)
         return ret
 
     def collect_spectra_inferrence_data_after_each_step(self, data, ret):

@@ -689,13 +689,15 @@ class SpectraData:
     def load_cached_spectra_data(self):
         """ Load spectra data (which are saved together).
         """
+        # ids = np.array([565,875]) ## delete
+        ids = np.array([875])
         self.data["emitted_wave"] = np.load(self.emitted_wave_fname)
         self.data["emitted_wave_mask"] = np.load(self.emitted_wave_mask_fname)
-        self.data["gt_spectra"] = np.load(self.gt_spectra_fname)
-        self.data["gt_spectra_mask"] = np.load(self.gt_spectra_mask_fname)
-        self.data["gt_spectra_redshift"] = np.load(self.gt_spectra_redshift_fname)
-        self.data["gt_spectra_sup_bound"] = np.load(self.gt_spectra_sup_bound_fname)
-        self.data["gt_spectra_ivar_reliable"] = np.load(self.gt_spectra_ivar_reliable_fname)
+        self.data["gt_spectra"] = np.load(self.gt_spectra_fname)[ids]
+        self.data["gt_spectra_mask"] = np.load(self.gt_spectra_mask_fname)[ids]
+        self.data["gt_spectra_redshift"] = np.load(self.gt_spectra_redshift_fname)[ids]
+        self.data["gt_spectra_sup_bound"] = np.load(self.gt_spectra_sup_bound_fname)[ids]
+        self.data["gt_spectra_ivar_reliable"] = np.load(self.gt_spectra_ivar_reliable_fname)[ids]
 
         if self.spectra_process_patch_info:
             with open(self.gt_spectra_ids_fname, "rb") as fp:
@@ -769,9 +771,16 @@ class SpectraData:
         log.info(f"found {len(df)} source spectra")
 
         upper_bound = self.kwargs["num_gt_spectra_upper_bound"]
-        df = self.load_source_metadata().iloc[:upper_bound]
+        df = self.load_source_metadata()[:upper_bound]
+        # df = df[452:]
+        # df.reset_index(inplace=True, drop=True)
         num_spectra = len(df)
         log.info(f"load {num_spectra} source spectra")
+
+        # fnames = list(df['spectra_fname_tbl'])
+        # print(fnames.index('spec1d.COS-27.061.JK_24_3740.tbl'))
+        # print(df.at[865,'spectra_fname_tbl'])
+        # assert 0
 
         emitted_wave = self.calculate_emitted_wave_range(df)
         self.data["emitted_wave"] = emitted_wave
@@ -928,13 +937,12 @@ class SpectraData:
         #     else:
         #         self.process_one_spectra(
         #             None, None, None, df, None, idx, None)
-
-        for idx in tqdm(range(num_spectra)):
-            self.process_one_spectra(
-                None, None, None, df, None, idx, None)
-
         # [ self.process_one_spectra(None, None, None, df, None, idx, None)
         #   for idx in range(num_spectra) ]
+        # for idx in tqdm(range(num_spectra)): ## delete
+        for idx in tqdm([875]):
+            print(df.at[idx,'spectra_fname_tbl'])
+            self.process_one_spectra(None, None, None, df, None, idx, None)
 
     def load_spectra_patch_wise(self, df, spectra_ids):
         """ Load pixels and coords for each spectra in patch-wise order.
@@ -1063,6 +1071,7 @@ class SpectraData:
             exists(spectra_mask_fname) and exists(spectra_sup_bound_fname)
         ivar_reliable = spectra_source != "zcosmos"
 
+        current_spectra_processed = False
         if not current_spectra_processed:
             spectra = unpack_gt_spectra(
                 spectra_in_fname, format=data_format,
@@ -1789,20 +1798,26 @@ def mask_invalid_spectra(spectra, spectra_fname, ivar_reliable):
     valid_ids = ids[valid]
     mask = np.zeros(n)
     mask[valid] = 1
+    mask = mask.astype(np.bool)
     plt.plot(spectra[0],spectra[1])
     plt.plot(spectra[0],mask*np.max(spectra[1]))
     plt.savefig(spectra_fname[:-4] + "_orig_w_mask.png")
     plt.close()
+    return spectra, mask, ivar_reliable
 
-    # drop (instead of mask) head and tail invalid range
+def drop_invalid_ends(spectra, mask, spectra_fname, suffix=""):
+    """
+    Drop head and tail invalid range.
+    """
+    ids = np.arange(spectra.shape[1])
+    valid_ids = ids[mask == 1]
     mask = mask[valid_ids[0]:valid_ids[-1]+1]
     spectra = spectra[:,valid_ids[0]:valid_ids[-1]+1]
     plt.plot(spectra[0],spectra[1])
     plt.plot(spectra[0],mask*np.max(spectra[1]))
-    plt.savefig(spectra_fname[:-4] + "_orig_cut_two_ends_w_mask.png")
+    plt.savefig(spectra_fname[:-4] + f"_{suffix}_cut_two_ends_w_mask.png")
     plt.close()
-    mask = mask.astype(np.bool)
-    return spectra, mask, ivar_reliable
+    return spectra, mask
 
 def resample_mask(wave, resampled_wave, mask):
     """
@@ -1895,7 +1910,7 @@ def resample_spectra(spectra, mask, upsample_scale, spectra_fname):
     plt.close()
     return resampled_spectra, resampled_mask
 
-def convolve_spectra(spectra, mask, std, border, ivar_reliable):
+def convolve_spectra(spectra, mask, std, border, ivar_reliable, spectra_fname):
     """
     Smooth gt spectra flux and ivar with the given std.
     @Param
@@ -1908,10 +1923,15 @@ def convolve_spectra(spectra, mask, std, border, ivar_reliable):
     discret_val = np.mean(np.diff(spectra[0])) # get discretization value of lambda
     std = std / discret_val
     kernel = Gaussian1DKernel(stddev=std)
+    conved = convolve(spectra[1], kernel, mask=1-mask)
 
-    try:
-        conved = convolve(spectra[1], kernel, mask=1-mask)
-    except RuntimeWarning:
+    # a = spectra[2] == 0
+    # plt.plot(a)
+    # plt.savefig('tmp.png')
+    # plt.close()
+
+    valid_conved = conved[mask]
+    if np.isnan(valid_conved).any():
         print(spectra_fname)
         assert 0
 
@@ -2026,6 +2046,7 @@ def process_gt_spectra(
     spectra = wave_based_sort(spectra)
     spectra, mask, ivar_reliable = mask_invalid_spectra(
         spectra, spectra_fname, ivar_reliable)
+    spectra, mask = drop_invalid_ends(spectra, mask, spectra_fname, suffix="orig")
 
     if spectra is None:
         warnings.warn(f"{spectra_fname} has no valid observations")
@@ -2034,7 +2055,8 @@ def process_gt_spectra(
 
     if sigma > 0:
         spectra, mask = resample_spectra(spectra, mask, upsample_scale, spectra_fname)
-        spectra = convolve_spectra(spectra, mask, sigma, True, ivar_reliable)
+        spectra = convolve_spectra(spectra, mask, sigma, True, ivar_reliable, spectra_fname)
+        # spectra, mask = drop_invalid_ends(spectra, mask, spectra_fname, suffix="conved")
 
     # spectra now is contiguously valid (with possibly nested invalid range)
     assert mask[0] and mask[-1]
@@ -2051,6 +2073,11 @@ def process_gt_spectra(
     interp_trans_data = interpolate_trans(
         trans_data, spectra, bound, sup_bound, fname=spectra_fname[:-4], colors=colors)
     spectra = np.concatenate((spectra, interp_trans_data), axis=0)
+
+    flux = spectra[1]
+    valid = mask == 1
+    print(np.isnan(flux[~valid]).all())
+    assert 0
 
     if save:
         np.save(spectra_fname, spectra)

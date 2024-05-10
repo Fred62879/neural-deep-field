@@ -1500,6 +1500,16 @@ class CodebookTrainer(BaseTrainer):
             steps = self.codebook_pretrain_total_steps
         else: steps = self.total_steps
 
+        #spectra = data["spectra_source_data"][:,1]
+        #masks = data["spectra_masks"]
+        #print(spectra.shape, masks.shape)
+        #spectra[masks==0] = 0
+        #print(torch.isnan(spectra).any())
+        #a = torch.isnan(spectra)
+        #b = torch.sum(a, dim=-1)
+        #c = torch.where(b != 0)
+        #print(a.shape, b.shape, c)
+
         ret = forward(
             data,
             self.train_pipeline,
