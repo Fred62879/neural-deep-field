@@ -390,7 +390,8 @@ def calculate_spectra_loss(
         lambdawise_loss = loss_func(gt_spectra, recon_fluxes, masks) # [bsz,nsmpl]
     elif brute_force:
         lambdawise_loss = loss_func(
-            gt_spectra[None,:].tile(n_bins,1,1,1), recon_fluxes, masks
+            gt_spectra[None,:].tile(n_bins,1,1,1), recon_fluxes,
+            masks[None,:].tile(n_bins,1,1)
         ) # [n_bins,bsz,nsmpls]
     else: raise ValueError()
 

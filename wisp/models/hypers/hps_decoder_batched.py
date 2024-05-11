@@ -281,10 +281,11 @@ class HyperSpectralDecoderB(nn.Module):
         if self.classify_redshift:
             ret["spectra_all_bins"] = spectra
 
-        calculate_spectra_loss(
-            spectra_loss_func, spectra_masks, gt_spectra,
-            spectra, ret, self.save_lambdawise_loss,
-            self.train_with_lambdawise_weights, **self.kwargs)
+        if spectra_loss_func is not None:
+            calculate_spectra_loss(
+                spectra_loss_func, spectra_masks, gt_spectra,
+                spectra, ret, self.save_lambdawise_loss,
+                self.train_with_lambdawise_weights, **self.kwargs)
 
         if spectra_l2_loss_func is not None:
             calculate_spectra_loss(

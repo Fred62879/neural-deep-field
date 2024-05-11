@@ -90,28 +90,40 @@ class ssim1d(nn.Module):
 
     def _forward(self, s1, s2, masks):
         """
+        Calculate the masked ssim loss between the given two spectra.
         @Param
-          s1/2: spectra flux [bsz,nsmpl]
-          mask: 0 indicates `nan` [bsz,nsmpl]
+          s1/2: spectra flux [(nbins,)bsz,nsmpl]
+          masks: 0 indicates `nan`
+                 [(nbins,)bsz,nsmpl] duplicate in dim0 if multi-bin
         @Note
           When processing spectra, we append `nan` to the end of each spectra to make
-           them the same length. When calculating ssim, valid flux values may turn to
-           `nan` ssim if there are `nan` values within the kernel range.
+           them the same length. During inferrence, we use all samples and thus will
+           involve these `nan` samples (during training, we sample only within supervision
+           range and thus no `nan` will be sampled).
+          When calculating ssim, valid flux values may turn to `nan` ssim if there are
+           `nan` values within the kernel range.
           We can simply replace these `nan` with 0 which is essentially zero padding.
         """
-        val1, val2 = self._replace_nan(s1, s2, masks)
+        # assert valid region (indicated by mask) has no nan values
+        assert not torch.isnan(s1[masks]).any() and not torch.isnan(s2[masks]).any()
 
-        s1, s2 = s1[:,None], s2[:,None] # [bsz,1,nsmpl]
-        dim4 = False
-        if s1.ndim == 4:
-            dim4 = True
-            nbins,_,bsz,nsmpls = s1.shape
-            s1 = s1.view(-1,1,nsmpls)
-            s2 = s2.view(-1,1,nsmpls)
-        bsz, channels, nsmpls = s1.shape
+        invalid, val1, val2 = self._replace_nan(s1, s2)
+
+        dim3 = False
+        if s1.ndim == 2:
+            bsz,nsmpl = s1.shape
+            s1, s2 = s1[:,None], s2[:,None] # [bsz,1,nsmpl]
+        elif s1.ndim == 3:
+            dim3 = True
+            nbins,bsz,nsmpl = s1.shape
+            s1 = s1.view(-1,1,nsmpl) # [nbins*bsz,1,nsmpl]
+            s2 = s2.view(-1,1,nsmpl)
+            # masks = masks.view(-1,1,nsmpl)
+        else: raise ValueError()
 
         # calculating the mu parameter (locally) for both signals using a gaussian filter
         # calculates the luminosity params
+        channels = s1.shape[1] # 1
         mu1 = F.conv1d(s1, self.filter, padding=self.pad, groups=channels)
         mu2 = F.conv1d(s2, self.filter, padding=self.pad, groups=channels)
         mu1_sq = mu1 ** 2
@@ -135,27 +147,42 @@ class ssim1d(nn.Module):
         denominator2 = sigma1_sq + sigma2_sq + C2
 
         ssim_score = (numerator1 * numerator2) / (denominator1 * denominator2)
-        ssim_score = ssim_score[:,0]
+        ssim_score = ssim_score[:,0] # [(nbins*)bsz,nsmpl]
         ssim_score = (ssim_score + 1) / 2
         if torch.min(ssim_score) < 0 or torch.max(ssim_score) > 1.001:
             warnings.warn(f"min/max: {torch.min(ssim_score)}/{torch.max(ssim_score)}")
-        if dim4: ssim_score = ssim_score.view(nbins,-1,nsmpls)
+        ssim_score = 1 - ssim_score # we minimize 1 - ssim (maximize ssim)
 
-        self._restore_nan(s1, s2, val1, val2, masks)
-        return 1 - ssim_score
+        if not dim3:
+            s1, s2 = s1[:,0], s2[:,0] # [bsz,nsmpl]
+        else:
+            s1 = s1.view(nbins,bsz,nsmpl)
+            s2 = s2.view(nbins,bsz,nsmpl)
+            ssim_score = ssim_score.view(nbins,bsz,nsmpl)
 
-    def _replace_nan(self, s1, s2, masks):
-        invalid = (masks == 0)
+        self._restore_nan(invalid, s1, s2, val1, val2, ssim_score, masks)
+        return ssim_score
+
+    def _replace_nan(self, s1, s2):
+        invalid = torch.isnan(s1)
+        if torch.sum(invalid) == 0:
+            return invalid, None, None
         val1 = s1[invalid]
         val2 = s2[invalid]
         s1[invalid] = 0
         s2[invalid] = 0
-        return val1, val2
+        return invalid, val1, val2
 
-    def _restore_nan(self, s1, s2, val1, val2, masks):
-        invalid = (masks == 0)[:,None]
-        s1[invalid] = val1
-        s2[invalid] = val2
+    def _restore_nan(self, invalid, s1, s2, val1, val2, ssim_score, masks):
+        """
+        Change ssim in invalid region to `nan`.
+        Restore any replaced `nan` values in the two spectra.
+        """
+        ssim_score[masks == 0] = math.nan
+        if torch.sum(invalid) > 0:
+            ssim_score[invalid] = math.nan
+            s1[invalid] = val1
+            s2[invalid] = val2
 
 class spectra_supervision_loss(nn.Module):
     def __init__(self, loss_func, weight_by_wave_coverage):
@@ -189,11 +216,13 @@ class spectra_supervision_loss(nn.Module):
             else: raise ValueError()
         else:
             if gt_spectra.ndim == 3:
-                # print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
+                #print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
                 ret = self._forward(gt_spectra[:,1], recon_fluxes, masks)
-                # print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
+                #print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
             elif gt_spectra.ndim == 4:
+                #print(torch.isnan(gt_spectra[:,:,1]).any(), torch.isnan(recon_fluxes).any())
                 ret = self._forward(gt_spectra[:,:,1], recon_fluxes, masks)
+                #print(torch.isnan(gt_spectra[:,:,1]).any(), torch.isnan(recon_fluxes).any())
             else: raise ValueError()
 
         assert recon_fluxes.shape == ret.shape
