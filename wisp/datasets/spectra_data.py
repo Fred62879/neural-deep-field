@@ -794,7 +794,7 @@ class SpectraData:
 
             header_wcs, headers = self.load_headers(df)
             spectra_ids, spectra_to_drop = self.localize_spectra(df, header_wcs, headers)
-            self.load_spectra_patch_wise(df, spectra_ids)
+            invalid_spectra = self.load_spectra_patch_wise(df, spectra_ids)
 
             if self.kwargs["spectra_drop_not_in_patch"]:
                 # drop spectra not located in specified patches
@@ -805,8 +805,10 @@ class SpectraData:
                               "world_coords_fname","spectra_fname"], inplace=True)
             df.reset_index(inplace=True, drop=True)
         else:
-            self.load_spectra_all_together(df, num_spectra)
+            invalid_spectra = self.load_spectra_all_together(df, num_spectra)
 
+        df.drop(invalid_spectra, inplace=True)
+        df.reset_index(inplace=True, drop=True)
         df.to_pickle(self.cache_metadata_table_fname)
 
     def generate_emitted_wave_mask(self, emitted_wave):
@@ -934,8 +936,11 @@ class SpectraData:
         #             None, None, None, df, None, idx, None)
         # [ self.process_one_spectra(None, None, None, df, None, idx, None)
         #   for idx in range(num_spectra) ]
+        invalid_spectra = []
         for idx in tqdm(range(num_spectra)):
-            self.process_one_spectra(None, None, None, df, None, idx, None)
+            valid = self.process_one_spectra(None, None, None, df, None, idx, None)
+            if not valid: invalid_spectra.append(idx)
+        return invalid_spectra
 
     def load_spectra_patch_wise(self, df, spectra_ids):
         """ Load pixels and coords for each spectra in patch-wise order.
@@ -1064,7 +1069,7 @@ class SpectraData:
             exists(spectra_mask_fname) and exists(spectra_sup_bound_fname)
         ivar_reliable = spectra_source != "zcosmos"
 
-        current_spectra_processed = False ## delete
+        # current_spectra_processed = False ## delete
         if not current_spectra_processed:
             spectra = unpack_gt_spectra(
                 spectra_in_fname, format=data_format,
@@ -1081,7 +1086,7 @@ class SpectraData:
                 ivar_reliable=ivar_reliable,
                 colors=self.kwargs["plot_colors"]
             )
-            if not spectra_valid: return
+            if not spectra_valid: return False
         else:
             if self.spectra_process_patch_info:
                 gt_spectra = np.load(spectra_out_fname)
@@ -1123,6 +1128,8 @@ class SpectraData:
             np.save(pixels_fname, pixels)
             np.save(img_coords_fname, img_coords)
             np.save(world_coords_fname, world_coords)
+
+        return True
 
     def load_source_metadata(self):
         df = []
@@ -2031,9 +2038,10 @@ def process_gt_spectra(
         spectra, spectra_fname, ivar_reliable)
     spectra, mask = drop_invalid_ends(spectra, mask, spectra_fname, suffix="orig")
 
-    if spectra is None:
+    if spectra is None or \
+       max(spectra[0]) <= supervision_wave_range[0] or \
+       min(spectra[0]) >= supervision_wave_range[1]:
         warnings.warn(f"{spectra_fname} has no valid observations")
-        assert 0
         return None, None, False
 
     if sigma > 0:

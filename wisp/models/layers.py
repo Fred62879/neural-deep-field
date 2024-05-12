@@ -420,7 +420,10 @@ def calculate_spectra_loss(
             spectrawise_loss = torch.sum(lambdawise_loss, dim=-1)
         elif kwargs["spectra_loss_reduction"] == "mean":
             masks = torch.sum(masks, dim=-1) # [bsz,]
-            assert not (masks == 0).any()
+            # assert not (masks == 0).any()
+            valid = masks != 0
+            masks = masks[valid]
+            lambdawise_loss = lambdawise_loss[valid]
             spectrawise_loss = (torch.sum(lambdawise_loss, dim=-1) / masks)
         else: raise ValueError()
         nm = "spectrawise_loss" + loss_name_suffix
