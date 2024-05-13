@@ -380,6 +380,8 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--pretrain-pixel-beta", type=float)
     pretrain_group.add_argument("--pretrain-redshift-beta", type=float)
 
+    pretrain_group.add_argument("--sanity-check-no-freeze", action="store_true")
+
     pretrain_group.add_argument("--pretrain-optimize-latents-alternately", action="store_true",
                                 help="optimize codebook and redshift latents alternately \
                                 in redshfit pretrain (EM).")

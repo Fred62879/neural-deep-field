@@ -211,6 +211,9 @@ class CodebookTrainer(BaseTrainer):
             (self.mode == "sanity_check" or self.mode == "generalization")
         assert not (self.regress_lambdawise_weights and \
                     self.use_global_spectra_loss_as_lambdawise_weights)
+        print(self.use_global_spectra_loss_as_lambdawise_weights)
+        if self.use_global_spectra_loss_as_lambdawise_weights:
+            log.info("train with restframe loss as weights!")
 
         # ** use global restframe loss
         if self.use_global_spectra_loss_as_lambdawise_weights:
@@ -924,7 +927,10 @@ class CodebookTrainer(BaseTrainer):
 
             # print(freeze_excls)
             # print(load_excls)
-            freeze_layers_excl(self.train_pipeline, excls=freeze_excls)
+            if self.mode == "generalization" or not self.extra_args["sanity_check_no_freeze"]:
+                freeze_layers_excl(self.train_pipeline, excls=freeze_excls)
+                log.info(f"only {freeze_excls} not frozen!")
+            else: log.info("no freeze!")
             self.load_model(self.pretrained_model_fname, excls=load_excls)
         else:
             raise ValueError()

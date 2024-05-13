@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-800-spectra-pe'
+    exp_name: 'autodecoder-dz-spectra-pe'
     log_fname: 'sc'
 
     tasks: ['sanity_check'] #,'recon_spectra']
@@ -49,29 +49,31 @@ pretrain:
     spectra_latent_dim: 16
 
     sample_from_codebook_pretrain_spectra: True
-    sanity_check_max_num_spectra: 200
+    sanity_check_max_num_spectra: 1000
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240510-173126_ssim_2k_epochs'
+    pretrain_log_dir: '20240511-222050'
     pretrained_model_name: 'model-ep2000-bch0.pth'
 
     regularize_spectra_latents: False
     spectra_latents_regu_beta: -1
 
-    use_global_spectra_loss_as_lambdawise_weights: True
+    use_global_spectra_loss_as_lambdawise_weights: False
     limit_redshift_to_pretrain_range: False
-    global_redshift_fname: 20240510-173126_ssim_2k_epochs/pretrain_spectra/global_redshift_range.npy
-    global_restframe_spectra_loss_fname: 20240510-173126_ssim_2k_epochs/pretrain_spectra/global_restframe_l2_loss.npy
+    global_redshift_fname: 20240511-222050/pretrain_spectra/global_redshift_range.npy
+    global_restframe_spectra_loss_fname: 20240511-222050/pretrain_spectra/global_restframe_l2_loss.npy
     regress_lambdawise_weights: False
     regress_lambdawise_weights_share_latents: False
     regress_lambdawise_weights_use_gt_bin_latent: False
     wrong_bin_regu_beta: 1
     lambdawise_weights_decoder_num_layers: 1
     lambdawise_weights_decoder_hidden_dim: 128
+
+    sanity_check_no_freeze: False
 
 decoder:
     decoder_activation_type: relu #gaussian
@@ -110,10 +112,10 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    #infer_log_dir: ''
+    infer_log_dir: '20240512-135828_sc_no_weight_222050'
 
-    pretrain_infer_batch_size: 1
-    pretrain_infer_use_all_wave: True
+    pretrain_infer_batch_size: 20 #1
+    pretrain_infer_use_all_wave: False
     pretrain_infer_num_wave: 200
     pretrain_infer_wave_sample_method: 'uniform_non_random'
 
@@ -152,8 +154,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 800
-    num_supervision_spectra_upper_bound: 800
+    num_gt_spectra_upper_bound: 25400
+    num_supervision_spectra_upper_bound: 25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02
