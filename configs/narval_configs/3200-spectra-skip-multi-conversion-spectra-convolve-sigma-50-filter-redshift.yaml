@@ -3,7 +3,7 @@ parent: base_narval.yaml
 global:
     use_tqdm: False
     exp_name: 'autodecoder-3200-spectra-skip-multi-conversion'
-    log_fname: 'spectra-no-convolve-l4'
+    log_fname: 'spectra-convolve-sigma-50-filter-redshift-0.02'
 
     tasks: ['codebook_pretrain']
     # tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
@@ -25,7 +25,7 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    pretrain_batch_size: 800 #100
+    pretrain_batch_size: 800
 
     spectra_latent_dim: 16
     redshift_pretrain_num_spectra: 3200
@@ -37,7 +37,7 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: ''
+    pretrain_log_dir: '20240310-172318_spectra-convolve-sigma-50'
     pretrained_model_name: 'model-ep10000-bch0.pth'
 
     regularize_spectra_latents: True
@@ -57,9 +57,9 @@ decoder:
 trainer:
     num_epochs: 5000
     batch_size: 5500
-    log_cli_every: 1000
+    log_cli_every: 500
     plot_grad_every: -1
-    save_model_every: 1000
+    save_model_every: 500
 
     apply_gt_redshift: True
     calculate_binwise_spectra_loss: False # brute force, each bin has its own spectra
@@ -71,8 +71,6 @@ trainer:
     resume_train: False
     resume_log_dir: ''
     resume_model_fname: 'model-ep10000-bch0.pth'
-
-    spectra_loss_cho: l4
 
 infer:
     infer_last_model_only: True
@@ -99,12 +97,12 @@ infer:
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:
-    convolve_spectra: False
-    spectra_smooth_sigma: 25
+    convolve_spectra: True
+    spectra_smooth_sigma: 50
 
     num_supervision_spectra_upper_bound: 3200
 
-    filter_redshift: False
+    filter_redshift: True
     filter_redshift_lo: 0.02
     filter_redshift_hi: -1
 

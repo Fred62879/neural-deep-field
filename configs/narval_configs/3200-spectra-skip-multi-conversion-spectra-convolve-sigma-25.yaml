@@ -3,11 +3,11 @@ parent: base_narval.yaml
 global:
     use_tqdm: False
     exp_name: 'autodecoder-3200-spectra-skip-multi-conversion'
-    log_fname: 'sc-spectra-convolve-sigma-25'
+    log_fname: 'spectra-convolve-sigma-25-l4'
 
-    # tasks: ['codebook_pretrain']
+    tasks: ['codebook_pretrain']
     # tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
-    tasks: ['redshift_pretrain']
+    # tasks: ['redshift_pretrain']
 
 optimizer:
     optimizer_type: 'adam'
@@ -25,7 +25,7 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    pretrain_batch_size: 100 # 800
+    pretrain_batch_size: 800 #100
 
     spectra_latent_dim: 16
     redshift_pretrain_num_spectra: 3200
@@ -37,7 +37,7 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240310-003930_spectra-convolve-sigma-25'
+    pretrain_log_dir: ''
     pretrained_model_name: 'model-ep10000-bch0.pth'
 
     regularize_spectra_latents: True
@@ -55,22 +55,24 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 500
+    num_epochs: 5000
     batch_size: 5500
-    log_cli_every: 100
+    log_cli_every: 1000
     plot_grad_every: -1
-    save_model_every: 100
+    save_model_every: 1000
 
-    apply_gt_redshift: False
-    calculate_binwise_spectra_loss: True # brute force, each bin has its own spectra
+    apply_gt_redshift: True
+    calculate_binwise_spectra_loss: False # brute force, each bin has its own spectra
 
     # if brute force, we have three choices
-    regularize_binwise_spectra_latents: False      # conflicts each other
-    optimize_latents_for_each_redshift_bin: True   #
+    regularize_binwise_spectra_latents: False     # conflicts each other
+    optimize_latents_for_each_redshift_bin: False #
 
     resume_train: False
     resume_log_dir: ''
     resume_model_fname: 'model-ep10000-bch0.pth'
+
+    spectra_loss_cho: l4
 
 infer:
     infer_last_model_only: True

@@ -170,6 +170,8 @@ pretrain:
     regularize_spectra_latents: False
     spectra_latents_regu_beta: 1000
 
+    binwise_spectra_latents_regu_beta: 4
+
     regularize_within_codebook_spectra: False
     regularize_across_codebook_spectra: False
     codebook_spectra_regu_beta: 1
@@ -186,13 +188,18 @@ pretrain:
     redshift_logit_latent_dim: 330
 
     main_train_with_pretrained_latents: False
-    redshift_pretrain_num_spectra: 100
+    sanity_check_max_num_spectra: -1
+    generalization_max_num_spectra: -1
 
     add_redshift_logit_bias: False
     plot_logits_for_gt_bin: False
     plot_individ_spectra_loss: False
 
     debug_lbfgs: False
+
+    regress_lambdawise_weights: False
+    lambdawise_weights_decoder_num_layers: 1
+    lambdawise_weights_decoder_hidden_dim: 128
 
 decoder:
     decoder_batch_norm: False
@@ -335,7 +342,7 @@ infer:
 
     infer_use_all_wave: True
     # infer_num_wave: 
-    pretrain_infer_use_all_wave: False
+    pretrain_infer_use_all_wave: True
     pretrain_infer_num_wave: 200
     pretrain_infer_wave_sample_method: 'uniform_non_random'
 
@@ -358,9 +365,9 @@ infer:
     recon_cutout_start_pos: [ [[256,256]], [[86,188]] ]
 
     # recon spectra
-    spectra_neighbour_size: 1
+    spectra_neighbour_size: -1
     flux_norm_cho: "identity"
-    average_neighbour_spectra: True
+    average_neighbour_spectra: False
     infer_spectra_individually: False
 
     num_spectrum_per_fig: 35
@@ -494,28 +501,48 @@ trans_data:
     trans_sample_interval: 10
 
 spectra_data:
-    download_source_spectra: False
-    source_spectra_fname: "source_deimos_table_v7_different_wave_range_exclude_0_flux.tbl"
-    source_spectra_link: "https://irsa.ipac.caltech.edu/data/COSMOS/spectra/deimos/spec1d_tbl"
-    spectra_data_format: "tbl"
-    spectra_data_source: "deimos"
-    max_spectra_len: 8191 # hardcoded
+    spectra_cho: v1
+    spectra_drop_not_in_patch: False
+    spectra_process_patch_info: False
+    spectra_data_sources: [zcosmos]
 
-    num_gt_spectra_upper_bound: 7000 # spectra to load
+    download_deimos_source_spectra: False
+    deimos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/deimos/spec1d_tbl
+    deimos_spectra_data_format: tbl
+    deimos_processed_spectra_cho: v7
+    deimos_source_spectra_fname: source_deimos_table_v7_different_wave_range_exclude_0_flux.tbl
+
+    download_zcosmos_source_spectra: False
+    zcosmos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/z-cosmos/DR3
+    zcosmos_spectra_data_format: tbl
+    zcosmos_processed_spectra_cho: v1
+    zcosmos_source_spectra_fname: source_zcosmos_table.fits
+
+    deep2_spectra_data_format: fits
+    deep2_processed_spectra_cho: v1
+    deep2_source_spectra_fname: source_deep2_table.tbl
+
+    deep3_spectra_data_format: fits
+    deep3_processed_spectra_cho: v1
+    deep3_source_spectra_fname: source_deep3_table.tbl
+
+    max_spectra_len: 8191 # hardcoded
+    num_gt_spectra_upper_bound: 500 #6500 # spectra to load
     num_supervision_spectra_upper_bound: 100
-    val_spectra_ratio: 1 #0.8
-    source_spectra_cho: "" #"6000_to_8000"
+    val_spectra_ratio: 0.2
+
+    sup_spectra_ratio: 0.95
+    spectra_split_ratios: [0.05,0,0.95]
 
     # **** Below fields should be modified together ****
     spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
     spectra_patches_r: ['0','1','2','3','4','5','6','7','8']
     spectra_patches_c: ['0','1','2','3','4','5','6','7','8']
+    # **************************************************
 
-    process_ivar: False
+    process_ivar: True
     convolve_spectra: True
     spectra_smooth_sigma: -1
-    processed_spectra_cho: "v7_table"
-    # **************************************************
 
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
