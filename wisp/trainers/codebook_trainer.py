@@ -211,9 +211,18 @@ class CodebookTrainer(BaseTrainer):
             (self.mode == "sanity_check" or self.mode == "generalization")
         assert not (self.regress_lambdawise_weights and \
                     self.use_global_spectra_loss_as_lambdawise_weights)
-        print(self.use_global_spectra_loss_as_lambdawise_weights)
         if self.use_global_spectra_loss_as_lambdawise_weights:
             log.info("train with restframe loss as weights!")
+        """
+        When we perform sanity check with lambdawise weights, we fine-tune the model
+          such that gt bin gets better quality spectra than that of all other wrong bins.
+        """
+        self.sanity_check_with_weights = self.mode == "sanity_check" and \
+            (self.regress_lambdawise_weights or \
+             self.use_global_spectra_loss_as_lambdawise_weights)
+        self.sanity_check_finetune = self.extra_args["sanity_check_finetune"] and \
+            self.mode == "sanity_check"
+        assert not self.sanity_check_with_weights or self.sanity_check_finetune
 
         # ** use global restframe loss
         if self.use_global_spectra_loss_as_lambdawise_weights:
@@ -585,7 +594,6 @@ class CodebookTrainer(BaseTrainer):
 
         if self.use_global_spectra_loss_as_lambdawise_weights:
             emitted_wave, loss = np.load(self.global_restframe_spectra_loss_fname)
-            # print('trainer emitted wave', np.min(emitted_wave), np.max(emitted_wave))
             global_restframe_spectra_loss = interp1d(
                 emitted_wave, loss, bounds_error=False, fill_value=math.nan)
             self.dataset.set_hardcode_data(
@@ -925,12 +933,10 @@ class CodebookTrainer(BaseTrainer):
                 if n not in nms:
                     freeze_excls.append(n)
 
-            # print(freeze_excls)
-            # print(load_excls)
-            if self.mode == "generalization" or not self.extra_args["sanity_check_no_freeze"]:
+            if self.mode == "generalization" or not self.sanity_check_finetune:
                 freeze_layers_excl(self.train_pipeline, excls=freeze_excls)
                 log.info(f"only {freeze_excls} not frozen!")
-            else: log.info("no freeze!")
+            else: log.info("no layers frozen!")
             self.load_model(self.pretrained_model_fname, excls=load_excls)
         else:
             raise ValueError()
@@ -1506,16 +1512,6 @@ class CodebookTrainer(BaseTrainer):
             steps = self.codebook_pretrain_total_steps
         else: steps = self.total_steps
 
-        #spectra = data["spectra_source_data"][:,1]
-        #masks = data["spectra_masks"]
-        #print(spectra.shape, masks.shape)
-        #spectra[masks==0] = 0
-        #print(torch.isnan(spectra).any())
-        #a = torch.isnan(spectra)
-        #b = torch.sum(a, dim=-1)
-        #c = torch.where(b != 0)
-        #print(a.shape, b.shape, c)
-
         ret = forward(
             data,
             self.train_pipeline,
@@ -1558,7 +1554,6 @@ class CodebookTrainer(BaseTrainer):
         spectra_loss, spectra_l2_loss, spectra_wrong_bin_regu = \
             self._calculate_spectra_loss(ret, data)
 
-        # ii) pixel supervision loss
         recon_loss = 0
         if self.pixel_supervision:
             gt_pixels = data["spectra_pixels"]
@@ -1567,7 +1562,6 @@ class CodebookTrainer(BaseTrainer):
             recon_loss *= extra_args["pretrain_pixel_beta"]
             self.log_dict["pixel_loss"] += recon_loss.item()
 
-        # iii)
         redshift_logits_regu = 0
         if self.regularize_redshift_logits:
             logits = ret["redshift_logits"]
@@ -1587,7 +1581,6 @@ class CodebookTrainer(BaseTrainer):
             redshift_logits_regu *= self.extra_args["redshift_logits_regu_beta"]
             self.log_dict["redshift_logits_regu"] += redshift_logits_regu.item()
 
-        # iv)
         codebook_logits_regu= 0
         if self.regularize_codebook_logits:
             codebook_logits_regu = torch.abs(
@@ -1595,7 +1588,6 @@ class CodebookTrainer(BaseTrainer):
             codebook_logits_regu *= self.extra_args["codebook_logits_regu_beta"]
             self.log_dict["codebook_logits_regu"] += codebook_logits_regu.item()
 
-        # v)
         spectra_latents_regu = 0
         if self.regularize_spectra_latents:
             # spectra_latents_regu = torch.abs(torch.mean(torch.sum(ret["coords"],dim=-1)))
@@ -1611,7 +1603,6 @@ class CodebookTrainer(BaseTrainer):
             self.log_dict["binwise_spectra_latents_regu"] += \
                 binwise_spectra_latents_regu.item()
 
-        # vi)
         codebook_spectra_regu = 0
         if self.regularize_codebook_spectra:
             sp = ret["full_range_codebook_spectra"].shape # [num_embed,nsmpl]
@@ -1701,15 +1692,18 @@ class CodebookTrainer(BaseTrainer):
                 spectra_loss = (all_bin_loss[ids[0],ids[1]]).view(bsz,-1)
                 spectra_loss = self.spectra_reduce_func(spectra_loss)
             else:
-                if self.regress_lambdawise_weights:
+                if self.sanity_check_with_weights:
                     gt_bin_loss = all_bin_loss[data["gt_redshift_bin_masks"]] # [bsz]
                     _, optimal_wrong_bin_loss = get_optimal_wrong_bin_ids(ret, data) # [bsz]
                     spectra_regu = gt_bin_loss - optimal_wrong_bin_loss
                     spectra_regu[spectra_regu < 0] = 0
                     spectra_regu = self.spectra_reduce_func(spectra_regu)
+                    spectra_regu *= self.extra_args["spectra_wrong_bin_regu_beta"]
                     self.log_dict["spectra_wrong_bin_regu"] += spectra_regu
-                    if self.regress_lambdawise_weights_share_latents:
-                        self.optm_bin_ids.extend(torch.argmin(all_bin_loss, dim=-1))
+
+                if self.regress_lambdawise_weights_share_latents:
+                    self.optm_bin_ids.extend(torch.argmin(all_bin_loss, dim=-1))
+
                 spectra_loss = self.spectra_reduce_func(all_bin_loss)
 
         if self.plot_gt_bin_loss:

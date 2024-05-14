@@ -380,7 +380,8 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--pretrain-pixel-beta", type=float)
     pretrain_group.add_argument("--pretrain-redshift-beta", type=float)
 
-    pretrain_group.add_argument("--sanity-check-no-freeze", action="store_true")
+    pretrain_group.add_argument("--sanity-check-finetune", action="store_true")
+    pretrain_group.add_argument("--spectra-wrong-bin-regu-beta", type=float)
 
     pretrain_group.add_argument("--pretrain-optimize-latents-alternately", action="store_true",
                                 help="optimize codebook and redshift latents alternately \
@@ -420,9 +421,6 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--calculate-spectra-loss-based-on-top-n-bins",
                                 action="store_true")
     pretrain_group.add_argument("--num-bins-to-calculate-spectra-loss", action="store_true")
-
-    pretrain_group.add_argument("--classify-redshift-based-on-l2", action="store_true",
-                                help="when classify bins, use l2 loss")
 
     pretrain_group.add_argument("--negative-supervise-wrong-redshift", action="store_true",
                                 help="discourage wrong redshift from generating high \
@@ -894,6 +892,9 @@ def define_cmd_line_args():
     infer_group.add_argument("--infer-log-dir", type=str)
     infer_group.add_argument("--infer-batch-size", type=int, default=4096)
     infer_group.add_argument("--pretrain-infer-batch-size", type=int, default=4096)
+
+    infer_group.add_argument("--classify-redshift-based-on-l2", action="store_true",
+                             help="when classify bins, use l2 loss")
 
     infer_group.add_argument("--infer-use-all-wave", action="store_true",
                              help="should set this to true, implementation assumes \

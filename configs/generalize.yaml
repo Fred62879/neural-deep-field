@@ -2,12 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-dz-spectra-pe'
+    exp_name: 'autodecoder-dz-spectra-pe' #-ssim-3-512-no-skip-regu-latents'
     # log_fname: ''
 
-
     tasks: ['generalization']
-    tasks: ['generalization_infer','recon_spectra','save_redshift','plot_redshift_est_stats','plot_redshift_residual'] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
+    #tasks: ['generalization_infer','recon_spectra','save_redshift','plot_redshift_est_stats','plot_redshift_residual'] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -29,10 +28,9 @@ embedder:
 pretrain:
     generalize_train_first_layer: False
 
-    pretrain_batch_size: 35
-
+    pretrain_batch_size: 10 #20
     pretrain_use_all_wave: False
-    pretrain_num_wave_samples: 100
+    pretrain_num_wave_samples: 200
     pretrain_wave_sample_method: 'uniform_dense'
 
     apply_gt_redshift: False
@@ -47,7 +45,7 @@ pretrain:
     calculate_spectra_loss_based_on_top_n_bins: False # only if we use single latent
     num_bins_to_calculate_spectra_loss: 5
 
-    classify_redshift_based_on_l2: True
+    classify_redshift_based_on_l2: False
 
     spectra_latent_dim: 16
     generalization_max_num_spectra: 100
@@ -57,11 +55,15 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240423-204114_decoder_latents_skip_all_layers_True_regularize_spectra_latents_False_decoder_num_hidden_layers_5'
-    pretrained_model_name: 'model-ep5000-bch0.pth'
+    pretrain_log_dir: '20240513-143729_ssim_5_512_regu_skip'
+    pretrained_model_name: 'model-ep2000-bch0.pth'
 
-    regularize_spectra_latents: False
-    spectra_latents_regu_beta: -1
+    regularize_spectra_latents: True
+    spectra_latents_regu_beta: 16
+
+    use_global_spectra_loss_as_lambdawise_weights: False
+    limit_redshift_to_pretrain_range: False
+    global_restframe_spectra_loss_fname: 20240513-143250_ssim_3_512_regu_no_skip/pretrain_spectra/global_restframe_l2_loss.npy
 
     regress_lambdawise_weights: False
     regress_lambdawise_weights_share_latents: False
@@ -70,12 +72,12 @@ pretrain:
 
 decoder:
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 3
+    decoder_num_hidden_layers: 5
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: False
+    decoder_latents_skip_all_layers: True
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
@@ -101,17 +103,17 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240423-175653_sc_100_spectra_163308'
+    #infer_log_dir: '20240513-174430_genlz_171326'
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: True
 
-    pretrain_infer_batch_size: 1
-    pretrain_infer_use_all_wave: True
-    pretrain_infer_num_wave: 200
-    pretrain_infer_wave_sample_method: 'uniform_non_random'
+    pretrain_infer_batch_size: 10
+    pretrain_infer_use_all_wave: False
+    pretrain_infer_num_wave: 1000
+    pretrain_infer_wave_sample_method: 'uniform_dense'
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False

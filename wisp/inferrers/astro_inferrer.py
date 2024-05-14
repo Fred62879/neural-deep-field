@@ -505,8 +505,6 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.append("spectra_redshift")
 
             if self.infer_selected:
-                # n = len(self._select_inferrence_ids())
-                # self.dataset_length = min(n, self.num_spectra)
                 self.dataset_length = min(self.num_selected, self.num_spectra)
                 self.requested_fields.append("selected_ids")
             else: self.dataset_length = self.num_spectra
@@ -598,8 +596,6 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.append("global_restframe_spectra_loss")
 
             if self.infer_selected:
-                # n = len(self._select_inferrence_ids())
-                # self.dataset_length = min(n, self.num_spectra)
                 self.dataset_length = min(self.num_selected, self.num_spectra)
                 self.requested_fields.append("selected_ids")
             else: self.dataset_length = self.num_spectra
@@ -694,8 +690,6 @@ class AstroInferrer(BaseInferrer):
                     "spectra_redshift","spectra_sup_bounds"])
 
                 if self.infer_selected:
-                    # n = len(self._select_inferrence_ids())
-                    # self.dataset_length = min(n, self.num_spectra)
                     self.dataset_length = min(self.num_selected, self.num_spectra)
                     self.requested_fields.append("selected_ids")
                 else:
@@ -1335,11 +1329,6 @@ class AstroInferrer(BaseInferrer):
             self.dataset.set_num_wave_samples(self.num_wave_samples)
             self.dataset.set_wave_sample_method(self.wave_sample_method)
 
-        # select the same random set of spectra to recon
-        # if self.infer_selected:
-            # ids = self._select_inferrence_ids()
-            # self.dataset.set_hardcode_data("selected_ids", ids)
-
         if self.classify_redshift:
             self.dataset.set_num_redshift_bins(self.num_redshift_bins)
 
@@ -1943,7 +1932,6 @@ class AstroInferrer(BaseInferrer):
             else: lambdawise_weights = None
 
             if self.infer_selected:
-                # n = len(self._select_inferrence_ids())
                 spectra_dir = join(self.spectra_dir, f"selected-{self.num_selected}")
                 Path(spectra_dir).mkdir(parents=True, exist_ok=True)
             else: spectra_dir = self.spectra_dir
@@ -2016,7 +2004,6 @@ class AstroInferrer(BaseInferrer):
 
         spectra_ids = np.arange(self.dataset_length)
         if self.infer_selected:
-            # n = len(self._select_inferrence_ids())
             spectra_dir = join(self.spectra_dir, f"selected-{self.num_selected}")
         else: spectra_dir = self.spectra_dir
 
@@ -2099,7 +2086,6 @@ class AstroInferrer(BaseInferrer):
             hi = min(lo + n_spectrum_per_fig, num_spectra)
 
             if self.infer_selected:
-                # n = len(self._select_inferrence_ids())
                 spectra_dir = join(self.spectra_dir, f"selected-{self.num_selected}")
                 Path(spectra_dir).mkdir(parents=True, exist_ok=True)
             else: spectra_dir = self.spectra_dir
@@ -2187,7 +2173,6 @@ class AstroInferrer(BaseInferrer):
 
         spectra_ids = np.arange(self.dataset_length)
         if self.infer_selected:
-            # n = len(self._select_inferrence_ids())
             codebook_coeff_dir = join(
                 self.codebook_coeff_dir, f"selected-{self.num_selected}")
         else: codebook_coeff_dir = self.codebook_coeff_dir

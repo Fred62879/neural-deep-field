@@ -1,7 +1,9 @@
 #!/bin/bash
 
-
-python app/main_astro.py --config configs/autodecoder.yaml
+python app/main_astro.py --config configs/autodecoder.yaml --ablat-id 0
+python app/main_astro.py --config configs/autodecoder.yaml --ablat-id 1
+python app/main_astro.py --config configs/autodecoder.yaml --ablat-id 2 --decoder-latents-skip-all-layers
+python app/main_astro.py --config configs/autodecoder.yaml --ablat-id 3 --decoder-latents-skip-all-layers
 
 #python app/main_astro.py --config configs/autodecoder_sc.yaml
 
