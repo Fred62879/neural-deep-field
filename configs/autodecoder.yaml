@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    #tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -134,7 +134,7 @@ spectra_data:
 
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deimos] #,zcosmos]
+    spectra_data_sources: [deimos,zcosmos]
     random_permute_source_spectra: True
 
     spectra_upsample_scale: 10
@@ -150,7 +150,7 @@ spectra_data:
     filter_redshift_hi: -1
 
 ablation:
-    perform_ablation: False
+    perform_ablation: True
     ablat_id: 0
     ablat_params: ["decoder_num_hidden_layers","regularize_spectra_latents"]
     ablat_vals: [[3,5],[True,False]]

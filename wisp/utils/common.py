@@ -48,11 +48,19 @@ def get_current_ablate_params_and_vals(args):
     """
         params[0] is combined with all values of params[1] ...
     """
-    id = args.ablat_id
-    num_vals = args.ablat_num_vals
+    if args.__class__.__name__ == "Namespace":
+        id = args.ablat_id
+        num_vals = args.ablat_num_vals
+        params = args.ablat_params
+        vals = args.ablat_vals
+    elif args.__class__.__name__ == "dict":
+        id = args["ablat_id"]
+        num_vals = args["ablat_num_vals"]
+        params = args["ablat_params"]
+        vals = args["ablat_vals"]
+    else: raise ValueError()
     n = len(num_vals)
-    params = args.ablat_params
-    vals = args.ablat_vals
+
     if n > 1: acc = [num_vals[-1]]
     else: acc = []
     for i in range(1, n-1):

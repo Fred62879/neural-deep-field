@@ -1,5 +1,7 @@
 
 import os
+import sys
+import json
 import yaml
 import torch
 import pprint
@@ -13,6 +15,34 @@ from wisp.utils.common import set_seed, default_log_setup, \
 
 
 str2optim = {m.lower(): getattr(torch.optim, m) for m in dir(torch.optim) if m[0].isupper()}
+
+def write_config_updates(fname, args):
+    """
+    python main.py --arg1=v1 --arg2=v2 --boolarg1
+    """
+    def parse_func(arg):
+        is_bool = False
+        arg_val = arg.split("=")
+        if len(arg_val) == 1:
+            arg = arg_val[0][2:]
+            val = True
+            is_bool = True
+        elif len(arg_val) == 2:
+            arg, val = arg_val[0][2:], arg_val[1]
+        else: raise ValueError()
+        updates[arg] = val
+
+    cmd_args = sys.argv[1:] # ['--arg1=v1','--arg2=v2','--boolarg1']
+    updates = {}
+    [parse_func(cmd_arg) for cmd_arg in cmd_args]
+    if "ablat-id" in updates:
+        params, vals = get_current_ablate_params_and_vals(args)
+        for param, val in zip(params, vals):
+            updates[param] = val
+            print(param, val)
+
+    with open(fname, "w") as fp:
+        json.dump(updates, fp)
 
 def parse_args():
     """ Parse all command arguments and generate all needed ones.
@@ -645,7 +675,7 @@ def define_cmd_line_args():
     data_group.add_argument("--spectra-data-sources", nargs="+", type=str)
     data_group.add_argument("--random-permute-source-spectra", action="store_true")
 
-    data_group.add_argument("--require_only_basic_spectra", action="store_true",
+    data_group.add_argument("--require-only-basic-spectra", action="store_true",
                             help="set to True if only need wave, flux, and ivar.")
 
     data_group.add_argument("--deimos-source-spectra-link", type=str)

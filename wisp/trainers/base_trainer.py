@@ -16,6 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from wisp.utils import PerfTimer
 from wisp.utils.common import get_exp_dir
+from wisp.parser import write_config_updates
 
 
 def log_metric_to_wandb(key, _object, step):
@@ -127,8 +128,11 @@ class BaseTrainer(ABC):
         self.iteration = 1
 
         # save config file to log directory
-        dst = join(self.log_dir, "config.yaml")
-        shutil.copyfile(extra_args["config"], dst)
+        fname = join(self.log_dir, "config.yaml")
+        shutil.copyfile(extra_args["config"], fname)
+
+        fname = join(self.log_dir, "updated_config.json")
+        write_config_updates(fname, extra_args)
 
     def init_dataloader(self):
         self.train_data_loader = DataLoader(self.dataset,
