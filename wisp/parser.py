@@ -645,6 +645,9 @@ def define_cmd_line_args():
     data_group.add_argument("--spectra-data-sources", nargs="+", type=str)
     data_group.add_argument("--random-permute-source-spectra", action="store_true")
 
+    data_group.add_argument("--require_only_basic_spectra", action="store_true",
+                            help="set to True if only need wave, flux, and ivar.")
+
     data_group.add_argument("--deimos-source-spectra-link", type=str)
     data_group.add_argument("--deimos-spectra-data-format", type=str)
     data_group.add_argument("--deimos-source-spectra-fname", type=str)

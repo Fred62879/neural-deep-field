@@ -130,9 +130,11 @@ infer:
     spectra_latents_plot_pca_dim: 2
 
 spectra_data:
+    require_only_basic_spectra: True
+
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deimos,zcosmos]
+    spectra_data_sources: [deimos] #,zcosmos]
     random_permute_source_spectra: True
 
     spectra_upsample_scale: 10

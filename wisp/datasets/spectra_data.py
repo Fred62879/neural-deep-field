@@ -130,7 +130,10 @@ class SpectraData:
         self.emitted_wave_mask_fname = join(cache_path, "emitted_wave_mask.npy")
         self.cache_metadata_table_fname =  join(cache_path, "processed_table.tbl")
 
-        self.gt_spectra_fname = join(cache_path, "gt_spectra.npy")
+        if self.kwargs["require_only_basic_spectra"]:
+            self.gt_spectra_fname = join(cache_path, "gt_spectra_basic.npy")
+        else: self.gt_spectra_fname = join(cache_path, "gt_spectra.npy")
+
         self.gt_spectra_mask_fname = join(cache_path, "gt_spectra_mask.npy")
         self.gt_spectra_redshift_fname = join(cache_path, "gt_spectra_redshift.npy")
         self.gt_spectra_sup_bound_fname = join(cache_path, "gt_spectra_sup_bound.npy")
@@ -689,8 +692,6 @@ class SpectraData:
     def load_cached_spectra_data(self):
         """ Load spectra data (which are saved together).
         """
-        # ids = np.array([565,875]) ## delete
-        # ids = np.array([875])
         self.data["emitted_wave"] = np.load(self.emitted_wave_fname)
         self.data["emitted_wave_mask"] = np.load(self.emitted_wave_mask_fname)
         self.data["gt_spectra"] = np.load(self.gt_spectra_fname) #[ids]
@@ -745,6 +746,9 @@ class SpectraData:
         # [n_spectra,4+2*nbands,nsmpl]
         #  (wave/flux/ivar/trans_mask/trans(nbands)/band_mask(nbands))
         self.data["gt_spectra"] = np.array(spectra).astype(np.float32)
+        if self.kwargs["require_only_basic_spectra"]:
+            self.data["gt_spectra"] = self.data["gt_spectra"][:,:3]
+
         self.data["gt_spectra_mask"] = np.array(mask).astype(bool)
         self.data["gt_spectra_sup_bound"] = np.array(sup_bound)
         self.data["gt_spectra_ivar_reliable"] = np.array(ivar_reliable)
@@ -1084,7 +1088,8 @@ class SpectraData:
                 self.spectra_smooth_sigma, self.spectra_upsample_scale,
                 trans_data=self.trans_data,
                 ivar_reliable=ivar_reliable,
-                colors=self.kwargs["plot_colors"]
+                colors=self.kwargs["plot_colors"],
+                basic_spectra=self.kwargs["require_only_basic_spectra"]
             )
             if not spectra_valid: return False
         else:
@@ -2015,6 +2020,7 @@ def process_gt_spectra(
         trans_range, supervision_wave_range, sigma, upsample_scale,
         save=True, plot=True, ivar_reliable=True,
         colors=None, trans_data=None, validator=None,
+        basic_spectra=False,
 ):
     """ Load gt spectra wave and flux for spectra supervision and
           spectrum plotting. Also smooth the gt spectra.
@@ -2056,14 +2062,16 @@ def process_gt_spectra(
         spectra, mask, trans_range, supervision_wave_range)
     spectra, mask, sup_mask = pad_spectra(spectra, mask, sup_mask, max_spectra_len)
     spectra = normalize_spectra(spectra, sup_bound, ivar_reliable)
-    spectra = spectra.astype(np.float32)
+    spectra = spectra.astype(np.float32) # [3,nsmpl]
 
-    weight = get_wave_weight(spectra, redshift, emitted_wave_distrib, sup_bound)
-    spectra = np.concatenate((spectra, weight[None,:]), axis=0)
+    if not basic_spectra:
+        raise ValueError("doesnt need below right now")
+        weight = get_wave_weight(spectra, redshift, emitted_wave_distrib, sup_bound)
+        spectra = np.concatenate((spectra, weight[None,:]), axis=0) # [4,nsmpl]
 
-    interp_trans_data = interpolate_trans(
-        trans_data, spectra, bound, sup_bound, fname=spectra_fname[:-4], colors=colors)
-    spectra = np.concatenate((spectra, interp_trans_data), axis=0)
+        interp_trans_data = interpolate_trans(
+            trans_data, spectra, bound, sup_bound, fname=spectra_fname[:-4], colors=colors)
+        spectra = np.concatenate((spectra, interp_trans_data), axis=0) # [11,nsmpl]
 
     if save:
         np.save(spectra_fname, spectra)
