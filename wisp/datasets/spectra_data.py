@@ -14,7 +14,9 @@ import matplotlib.pyplot as plt
 
 from wisp.datasets.patch_data import PatchData
 from wisp.utils.plot import plot_spectra
-from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array
+from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array, \
+    get_bool_infer_spectra_with_lambdawise_weights, \
+    get_bool_classify_redshift_based_on_l2
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
@@ -1414,14 +1416,17 @@ class SpectraData:
         if self.kwargs["plot_spectrum_with_recon"]:
             sub_dir = sub_dir + "with_recon_"
         if lambdawise_losses is not None:
-            loss_cho = self.kwargs["spectra_loss_cho"]
+            if get_bool_classify_redshift_based_on_l2: loss_cho = "l2"
+            else: loss_cho = self.kwargs["spectra_loss_cho"]
             if self.kwargs["plot_spectrum_with_loss"]:
-                sub_dir += f"with_{loss_cho}_loss_"
+                sub_dir += f"with_{loss_cho}_lambdawise_loss_"
             if self.kwargs["plot_spectrum_color_based_on_loss"]:
-                sub_dir += f"color_based_on_{loss_cho}_loss_"
+                sub_dir += f"color_based_on_{loss_cho}_lambdawise_loss_"
         if self.kwargs["spectra_loss_cho"] != "l2" and \
            self.kwargs["classify_redshift_based_on_l2"]:
             sub_dir += "based_on_l2_"
+        if get_bool_infer_spectra_with_lambdawise_weights(**self.kwargs):
+            sub_dir += "lambdawise_weighted_"
         if self.spectra_neighbour_size > 0:
             sub_dir += f"average_{self.spectra_neighbour_size}_neighbours_"
         return sub_dir

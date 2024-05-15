@@ -929,6 +929,9 @@ def define_cmd_line_args():
     infer_group.add_argument("--classify-redshift-based-on-l2", action="store_true",
                              help="when classify bins, use l2 loss")
 
+    infer_group.add_argument("--infer-use-global-loss-as-lambdawise-weights",
+                             action="store_true")
+
     infer_group.add_argument("--infer-use-all-wave", action="store_true",
                              help="should set this to true, implementation assumes \
                              infer with all lambda")

@@ -92,10 +92,17 @@ class AstroInferrer(BaseInferrer):
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
 
-        if (self.mode == "sanity_check_infer" or self.mode == "generalization_infer") and \
-           self.classify_redshift and self.extra_args["spectra_loss_cho"] != "l2" and \
-            self.extra_args["classify_redshift_based_on_l2"]:
-            self.redshift_dir = f"{self.redshift_dir}/l2_based"
+        if self.classify_redshift and \
+           (self.mode == "sanity_check_infer" or self.mode == "generalization_infer"):
+            suffix = ""
+            if self.classify_redshift_based_on_l2:
+                suffix += "l2_based_"
+            if self.extra_args["infer_use_global_loss_as_lambdawise_weights"] and \
+               not self.extra_args["use_global_spectra_loss_as_lambdawise_weights"]:
+                suffix += "weighted"
+
+            if suffix != "" and suffix[-1] == "_": suffix = suffix[:-1]
+            self.redshift_dir = f"{self.redshift_dir}/{suffix}"
             Path(self.redshift_dir).mkdir(parents=True, exist_ok=True)
 
     def init_data(self):
@@ -248,16 +255,17 @@ class AstroInferrer(BaseInferrer):
         assert not self.calculate_binwise_spectra_loss or \
             (not self.qtz or self.extra_args["spectra_batch_reduction_order"] == "qtz_first")
 
-        self.classify_redshift_based_on_l2 = self.classify_redshift and \
-            self.extra_args["classify_redshift_based_on_l2"]
+        self.classify_redshift_based_on_l2 = \
+            get_bool_classify_redshift_based_on_l2(**self.extra_args)
 
         # weighted spectra training
         self.regress_lambdawise_weights = \
             self.extra_args["regress_lambdawise_weights"] and \
             (self.mode == "sanity_check_infer" or self.mode == "generalization_infer")
         self.use_global_spectra_loss_as_lambdawise_weights = \
-            self.extra_args["use_global_spectra_loss_as_lambdawise_weights"] and \
-            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer")
+            (self.extra_args["use_global_spectra_loss_as_lambdawise_weights"] or \
+             self.extra_args["infer_use_global_loss_as_lambdawise_weights"]
+            ) and (self.mode == "sanity_check_infer" or self.mode == "generalization_infer")
         self.get_lambdawise_weights = \
             self.regress_lambdawise_weights or \
             self.use_global_spectra_loss_as_lambdawise_weights
@@ -1498,11 +1506,12 @@ class AstroInferrer(BaseInferrer):
             self.gt_redshift.extend(data["spectra_semi_sup_redshift"])
 
             if self.classify_redshift:
-                ids = torch.argmax(ret["redshift_logits"], dim=-1)
+                suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
+                redshift_logits = ret["redshift_logits{suffix}"]
+                ids = torch.argmax(redshift_logits, dim=-1)
                 argmax_redshift = ret["redshift"][ids]
+                weighted_redshift = torch.sum(ret["redshift"] * redshift_logits, dim=-1)
                 self.argmax_redshift.extend(argmax_redshift)
-                weighted_redshift = torch.sum(
-                    ret["redshift"] * ret["redshift_logits"], dim=-1)
                 self.weighted_redshift.extend(weighted_redshift)
             else:
                 self.redshift.extend(ret["redshift"])
@@ -1603,6 +1612,7 @@ class AstroInferrer(BaseInferrer):
                 init_redshift_prob= None if "init_redshift_prob" not in data else \
                                         data["init_redshift_prob"],
                 save_lambdawise_weights= self.get_lambdawise_weights)
+
         return ret
 
     def collect_spectra_inferrence_data_after_each_step(self, data, ret):
@@ -1627,12 +1637,12 @@ class AstroInferrer(BaseInferrer):
                 gt_bin_losses = self._get_gt_bin_spectra_losses(ret, data)
                 self.gt_bin_spectra_losses.extend(gt_bin_losses)
             if self.plot_optimal_wrong_bin_spectra:
-                fluxes, losses = self._get_optimal_wrong_bin_fluxes(ret, data)
+                fluxes, losses = self._get_optimal_wrong_bin_data(ret, data)
                 self.optimal_wrong_bin_fluxes.extend(fluxes)
                 self.optimal_wrong_bin_spectra_losses.extend(losses)
 
             if self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss:
-                losses = ret["spectra_lambdawise_loss"]
+                losses = self._get_lambdawise_losses(ret)
                 if self.apply_gt_redshift:
                     self.spectra_lambdawise_losses.extend(losses)
                 else:
@@ -1642,15 +1652,14 @@ class AstroInferrer(BaseInferrer):
                             data["gt_redshift_bin_masks"]] # [bsz,nsmpl]
                         lambdawise_losses.extend(gt_bin_lambadwise_losses[None,...])
                     if self.plot_optimal_wrong_bin_spectra:
-                        ids, optimal_wrong_bin_losses = \
-                            get_optimal_wrong_bin_ids(ret, data)
-                        # [bin_id,batch_id]
-                        ids = create_batch_ids(ids.detach().cpu().numpy())
+                        ids = self._get_optimal_wrong_bin_data(ret, data, get_id_only=True)
+                        ids = create_batch_ids(ids.detach().cpu().numpy()) # [bin_id,batch_id]
                         wrong_bin_lambadwise_losses = losses[ids[0],ids[1]]
                         lambdawise_losses.extend(wrong_bin_lambadwise_losses[None,...])
 
                     lambdawise_losses = torch.stack(
                         lambdawise_losses).permute(1,0,2) # [bsz,2,nsmpl]
+                    # a = torch.stack(lambdawise_losses)
                     self.spectra_lambdawise_losses.extend(lambdawise_losses)
 
             if self.plot_spectra_with_weights:
@@ -1671,14 +1680,14 @@ class AstroInferrer(BaseInferrer):
         if self.save_optimal_bin_ids:
             self.gt_bin_ids.extend(data["gt_redshift_bin_ids"][1])
             self.optimal_bin_ids.extend(ret["optimal_bin_ids"])
-            ids, _ = get_optimal_wrong_bin_ids(ret, data)
+            ids = self._get_optimal_wrong_bin_data(ret, data, get_id_only=True)
             self.optimal_wrong_bin_ids.extend(ids)
 
         if self.plot_codebook_coeff:
             self.gt_redshift_cl.extend(data["spectra_redshift"])
             self.codebook_coeff.extend(ret["codebook_logits"])
             if self.plot_optimal_wrong_bin_codebook_coeff:
-                ids, _ = get_optimal_wrong_bin_ids(ret, data)
+                ids = self._get_optimal_wrong_bin_data(ret, data, get_id_only=True)
                 self.optimal_wrong_bin_ids_cc.extend(ids)
 
         if self.plot_codebook_coeff_all_bins:
@@ -1691,12 +1700,11 @@ class AstroInferrer(BaseInferrer):
         if self.save_redshift_pre:
             self.gt_redshift.extend(data["spectra_redshift"])
             if self.classify_redshift:
-                logits = ret["redshift_logits"]
+                suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
+                logits = ret[f"redshift_logits{suffix}"]
                 ids = torch.argmax(logits, dim=-1)
-                # ids = data["gt_redshift_bin_ids"][1]
                 argmax_redshift = ret["redshift"][ids]
-                weighted_redshift = torch.sum(
-                    ret["redshift"] * ret["redshift_logits"], dim=-1)
+                weighted_redshift = torch.sum(ret["redshift"] * logits, dim=-1)
                 self.argmax_redshift.extend(argmax_redshift)
                 self.weighted_redshift.extend(weighted_redshift)
                 if self.plot_est_redshift_logits:
@@ -1707,11 +1715,12 @@ class AstroInferrer(BaseInferrer):
         elif self.save_redshift_main:
             self.gt_redshift.extend(data["spectra_semi_sup_redshift"])
             if self.classify_redshift:
-                ids = torch.argmax(ret["redshift_logits"], dim=-1)
+                suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
+                logits = ret["redshift_logits{suffix}"]
+                ids = torch.argmax(logits, dim=-1)
                 argmax_redshift = ret["redshift"][ids]
+                weighted_redshift = torch.sum(ret["redshift"] * logits, dim=-1)
                 self.argmax_redshift.extend(argmax_redshift)
-                weighted_redshift = torch.sum(
-                    ret["redshift"] * ret["redshift_logits"], dim=-1)
                 self.weighted_redshift.extend(weighted_redshift)
             else:
                 self.redshift.extend(ret["redshift"])
@@ -1720,7 +1729,7 @@ class AstroInferrer(BaseInferrer):
             self.spectra_wave_g.extend(data["spectra_source_data"][:,0])
             self.spectra_masks_g.extend(data["spectra_masks"])
             self.spectra_redshift_g.extend(data["spectra_redshift"])
-            self.spectra_lambdawise_losses_g.extend(ret["spectra_lambdawise_loss"])
+            self.spectra_lambdawise_losses_g.extend(self._get_lambdawise_losses(ret))
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
                 self.spectra_ivar_reliable.extend(data["spectra_ivar_reliable"])
                 self.spectra_ivar_g.extend(data["spectra_source_data"][:,2])
@@ -2452,15 +2461,32 @@ class AstroInferrer(BaseInferrer):
     # utilities
     ###########
 
+    def _get_lambdawise_losses(self, ret):
+        if self.classify_redshift_based_on_l2:
+            lambdawise_losses = ret["spectra_lambdawise_loss_l2"] # [bsz,nbins]
+        else: lambdawise_losses = ret["spectra_lambdawise_loss"] # [bsz,nbins]
+        return lambdawise_losses
+
+    def _get_all_bin_losses(self, ret):
+        if self.classify_redshift_based_on_l2:
+            all_bin_losses = ret["spectra_binwise_loss_l2"] # [bsz,nbins]
+        else: all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
+        return all_bin_losses
+
     def _get_gt_bin_spectra_losses(self, ret, data):
-        all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
+        all_bin_losses = self._get_all_bin_losses(ret)
         bsz = len(all_bin_losses)
         gt_bin_losses = all_bin_losses[data["gt_redshift_bin_masks"]]
         return gt_bin_losses
 
-    def _get_optimal_wrong_bin_fluxes(self, ret, data):
-        ids, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(ret, data)
+    def _get_optimal_wrong_bin_data(self, ret, data, get_id_only=False):
+        all_bin_losses = self._get_all_bin_losses(ret)
+        ids, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(
+            all_bin_losses, data["gt_redshift_bin_masks"]
+        )
         ids = create_batch_ids(ids.detach().cpu().numpy())
+        if get_id_only: return ids
+
         fluxes = ret["spectra_all_bins"] # [nbins,bsz,nsmpl]
         fluxes = fluxes[ids[1],ids[0]]
         return fluxes, optimal_wrong_bin_losses

@@ -10,7 +10,8 @@ from functools import partial
 from wisp.utils import PerfTimer
 from wisp.utils.common import create_batch_ids, get_input_latent_dim, \
     get_bool_classify_redshift, get_bool_plot_lambdawise_spectra_loss, \
-    get_bool_train_with_lambdawise_spectra_loss_as_weights
+    get_bool_classify_redshift_based_on_l2, \
+    get_bool_weight_spectra_loss_with_global_restframe_loss
 
 from wisp.models.decoders import BasicDecoder, Siren, Garf
 from wisp.models.hypers.hps_integrator import HyperSpectralIntegrator
@@ -37,15 +38,15 @@ class HyperSpectralDecoderB(nn.Module):
 
         self.apply_gt_redshift = _model_redshift and kwargs["apply_gt_redshift"]
         self.classify_redshift = _model_redshift and get_bool_classify_redshift(**kwargs)
-        self.classify_redshift_based_on_l2 = self.classify_redshift and \
-            kwargs["classify_redshift_based_on_l2"]
+        self.classify_redshift_based_on_l2 = _model_redshift and \
+            get_bool_classify_redshift_based_on_l2(**kwargs)
 
         self.plot_lambdawise_spectra_loss = \
             get_bool_plot_lambdawise_spectra_loss(**kwargs)
-        self.train_with_lambdawise_weights = \
-            get_bool_train_with_lambdawise_spectra_loss_as_weights(**kwargs)
+        self.use_lambdawise_weights = \
+            get_bool_weight_spectra_loss_with_global_restframe_loss(**kwargs)
         self.save_lambdawise_loss = self.plot_lambdawise_spectra_loss # or \
-            # self.train_with_lambdawise_weights
+            # self.use_lambdawise_weights
 
         self.init_net()
 
@@ -103,7 +104,7 @@ class HyperSpectralDecoderB(nn.Module):
                 skip_add_conversion_method=\
                     self.kwargs["decoder_latents_skip_add_conversion_method"])
 
-        if self.train_with_lambdawise_weights and self.kwargs["regress_lambdawise_weights"]:
+        if self.use_lambdawise_weights and self.kwargs["regress_lambdawise_weights"]:
             self.lambdawise_weights_decoder = BasicDecoder(
                 input_dim, 1, True,
                 num_layers=self.kwargs["lambdawise_weights_decoder_num_layers"],
@@ -211,15 +212,16 @@ class HyperSpectralDecoderB(nn.Module):
             Get argmax spectra which is for visualization only.
             Optimization requires loss of spectra under each bin.
             """
-            ret["redshift_logits"] = ret["redshift_logits"].detach()
-            ids = torch.argmax(ret["redshift_logits"], dim=-1)
-            ret["optimal_bin_ids"] = ids
-            ids = torch.tensor(
-                create_batch_ids(ids.detach().cpu().numpy()), dtype=ids.dtype
-            ).to(ids.device)
             if gt_redshift_bin_ids is not None:
                 ret["gt_bin_spectra"] = spectra[
                     gt_redshift_bin_ids[1], gt_redshift_bin_ids[0]]
+            suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
+            redshift_logits = ret[f"redshift_logits{suffix}"].detach()
+            ids = torch.argmax(redshift_logits, dim=-1)
+            ret["optimal_bin_ids"] = ids
+            ids = torch.tensor(
+                create_batch_ids(ids.cpu().numpy()), dtype=ids.dtype
+            ).to(ids.device)
             spectra = spectra[ids[1], ids[0]]
         else:
             spectra = torch.matmul(
@@ -232,7 +234,8 @@ class HyperSpectralDecoderB(nn.Module):
 
     def reduce_codebook_spectra(
             self, input, spectra, ret, qtz_args, spectra_masks,
-            spectra_loss_func, gt_spectra, gt_redshift_bin_ids
+            spectra_loss_func, spectra_l2_loss_func,
+            gt_spectra, gt_redshift_bin_ids
     ):
         """
         Reduce `codebook` (and `bin`) dim of the given spectra.
@@ -246,12 +249,21 @@ class HyperSpectralDecoderB(nn.Module):
                 ret["spectra_all_bins"] = spectra
 
                 if self.kwargs["calculate_binwise_spectra_loss"]:
-                    calculate_spectra_loss(
-                        spectra_loss_func, spectra_masks, gt_spectra,
-                        spectra, ret, self.save_lambdawise_loss,
-                        self.train_with_lambdawise_weights, **self.kwargs
-                    )
-                    calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret)
+                    if spectra_loss_func is not None:
+                        calculate_spectra_loss(
+                            spectra_loss_func, spectra_masks, gt_spectra,
+                            spectra, ret, self.save_lambdawise_loss,
+                            self.use_lambdawise_weights, **self.kwargs)
+                        calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret)
+
+                    if spectra_l2_loss_func is not None:
+                        calculate_spectra_loss(
+                            spectra_l2_loss_func, spectra_masks, gt_spectra,
+                            spectra, ret, self.save_lambdawise_loss,
+                            self.use_lambdawise_weights, suffix="_l2", **self.kwargs)
+                        calculate_redshift_logits(
+                            self.kwargs["binwise_loss_beta"], ret, suffix="_l2")
+
                 spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
 
         elif self.reduction_order == "bin_avg_first":
@@ -285,18 +297,20 @@ class HyperSpectralDecoderB(nn.Module):
             calculate_spectra_loss(
                 spectra_loss_func, spectra_masks, gt_spectra,
                 spectra, ret, self.save_lambdawise_loss,
-                self.train_with_lambdawise_weights, **self.kwargs)
+                self.use_lambdawise_weights, **self.kwargs)
 
         if spectra_l2_loss_func is not None:
             calculate_spectra_loss(
                 spectra_l2_loss_func, spectra_masks, gt_spectra,
                 spectra, ret, self.save_lambdawise_loss,
-                loss_name_suffix="_l2", **self.kwargs)
+                suffix="_l2", **self.kwargs)
 
         if self.classify_redshift:
-            calculate_redshift_logits(
-                self.kwargs["binwise_loss_beta"], ret,
-                suffix="_l2" if self.classify_redshift_based_on_l2 else "")
+            if spectra_loss_func is not None:
+                calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret)
+            if spectra_l2_loss_func is not None:
+                calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret, suffix="_l2")
+
             spectra = self.classify_redshift3D(spectra, gt_redshift_bin_ids, ret)
 
         return spectra
@@ -317,7 +331,8 @@ class HyperSpectralDecoderB(nn.Module):
         #                   show_memory=self.kwargs["show_memory"])
         # timer.reset()
         # timer.check("before")
-        if self.kwargs["use_global_spectra_loss_as_lambdawise_weights"]:
+        if self.kwargs["use_global_spectra_loss_as_lambdawise_weights"] or \
+           self.kwargs["infer_use_global_loss_as_lambdawise_weights"]:
             assert global_restframe_spectra_loss is not None
             emitted_wave = ret["emitted_wave"] # [nbins,bsz,nsmpl]
             sp = emitted_wave.shape
@@ -399,7 +414,7 @@ class HyperSpectralDecoderB(nn.Module):
             codes = codebook.weight[:,None,None].tile(1,bsz,1,1)
             latents = self.convert(wave, codes, redshift, wave_bound, ret)
             codebook_spectra = self.spectra_decoder(latents)[...,0] # [...,nbins,bsz,nsmpl]
-            if self.train_with_lambdawise_weights:
+            if self.use_lambdawise_weights:
                 self.generate_lambdawise_weights(
                     latents, optm_bin_ids, global_restframe_spectra_loss, ret)
             spectra = self.reduce_codebook_spectra(
@@ -408,7 +423,7 @@ class HyperSpectralDecoderB(nn.Module):
         else:
             latents = self.convert(wave, input, redshift, wave_bound, ret) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
-            if self.train_with_lambdawise_weights:
+            if self.use_lambdawise_weights:
                 self.generate_lambdawise_weights(
                     latents, optm_bin_ids, global_restframe_spectra_loss, ret)
             spectra = self.reduce_spectra(
@@ -481,9 +496,6 @@ class HyperSpectralDecoderB(nn.Module):
         redshift = None if ret["redshift"] is None else \
             ret["redshift"] if self.classify_redshift else ret["redshift"][:bsz]
         timer.check("hps_decoder::got redshift")
-
-        if self.classify_redshift_based_on_l2:
-            assert self.kwargs["spectra_loss_cho"] == "l2" or spectra_l2_loss_func is not None
 
         latents, spectra = self.reconstruct_spectra(
             latents, wave,

@@ -84,6 +84,10 @@ def get_bool_classify_redshift(**kwargs):
         not kwargs["apply_gt_redshift"] and \
         kwargs["redshift_model_method"] == "classification"
 
+def get_bool_classify_redshift_based_on_l2(**kwargs):
+    return get_bool_classify_redshift(**kwargs) and \
+        kwargs["classify_redshift_based_on_l2"] and kwargs["spectra_loss_cho"] != "l2"
+
 def get_bool_regress_redshift(**kwargs):
     return kwargs["space_dim"] == 3 and \
         kwargs["model_redshift"] and \
@@ -111,7 +115,7 @@ def get_bool_plot_lambdawise_spectra_loss(**kwargs):
         "generalization_infer" in kwargs["tasks"] or \
         "codebook_pretrain_infer" in kwargs["tasks"] )
 
-def get_bool_train_with_lambdawise_spectra_loss_as_weights(**kwargs):
+def get_bool_train_spectra_with_lambdawise_weights(**kwargs):
     return (
         kwargs["regress_lambdawise_weights"] or \
         kwargs["use_global_spectra_loss_as_lambdawise_weights"]
@@ -121,15 +125,28 @@ def get_bool_train_with_lambdawise_spectra_loss_as_weights(**kwargs):
         "sanity_check_infer" in kwargs["tasks"] or \
         "generalization_infer" in kwargs["tasks"])
 
-def get_optimal_wrong_bin_ids(ret, data):
-    """ Get id of the non-GT redshift bin that achieves the lowest spectra loss.
+def get_bool_infer_spectra_with_lambdawise_weights(**kwargs):
+    return (
+        kwargs["infer_use_global_loss_as_lambdawise_weights"] and \
+        not kwargs["regress_lambdawise_weights"] and \
+        not kwargs["use_global_spectra_loss_as_lambdawise_weights"]
+    ) and (
+        "sanity_check_infer" in kwargs["tasks"] or \
+        "generalization_infer" in kwargs["tasks"])
+
+def get_bool_weight_spectra_loss_with_global_restframe_loss(**kwargs):
+    return get_bool_train_spectra_with_lambdawise_weights(**kwargs) or \
+        get_bool_infer_spectra_with_lambdawise_weights(**kwargs)
+
+def get_optimal_wrong_bin_ids(all_bin_losses, gt_bin_masks):
     """
-    all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
-    val = all_bin_losses[data["gt_redshift_bin_masks"]]
-    all_bin_losses[data["gt_redshift_bin_masks"]] = float('inf')
+    Get id of the non-GT redshift bin that achieves the lowest spectra loss.
+    """
+    val = all_bin_losses[gt_bin_masks]
+    all_bin_losses[gt_bin_masks] = float('inf')
     optimal_wrong_bin_losses, optimal_wrong_bin_ids = torch.min(
         all_bin_losses, dim=-1) # ids of optimal wrong bins
-    all_bin_losses[data["gt_redshift_bin_masks"]] = val
+    all_bin_losses[gt_bin_masks] = val
     return optimal_wrong_bin_ids, optimal_wrong_bin_losses
 
 def get_bin_id(lo, bin_width, val):
@@ -621,13 +638,16 @@ def forward(
             if plot_l2_loss or classify_redshift_based_on_l2:
                 assert spectra_l2_loss_func is not None
                 net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
-                requested_channels.append("spectra_binwise_loss_l2")
+                requested_channels.extend([
+                    "spectra_binwise_loss_l2","redshift_logits_l2"])
 
         if calculate_lambdawise_spectra_loss:
             net_args["spectra_masks"] = data["spectra_masks"]
             net_args["spectra_loss_func"] = spectra_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.append("spectra_lambdawise_loss")
+            if spectra_l2_loss_func is not None:
+                requested_channels.append("spectra_lambdawise_loss_l2")
 
         # train with lambdawise weights (either generate with mlp or use global loss)
         if regress_lambdawise_weights_share_latents:

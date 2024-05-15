@@ -32,7 +32,8 @@ class HyperSpectralConverter(nn.Module):
 
         self.classify_redshift = get_bool_classify_redshift(**kwargs)
         self.use_global_spectra_loss_as_lambdawise_weights = \
-            kwargs["use_global_spectra_loss_as_lambdawise_weights"]
+            kwargs["use_global_spectra_loss_as_lambdawise_weights"] or \
+            kwargs["infer_use_global_loss_as_lambdawise_weights"]
 
         if self.encode_wave:
             self.init_encoder()

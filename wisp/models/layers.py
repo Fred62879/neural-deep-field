@@ -369,7 +369,7 @@ def calculate_bayesian_redshift_logits(
 def calculate_spectra_loss(
         loss_func, masks, gt_spectra, recon_fluxes, ret,
         save_lambdawise_loss=False, train_with_lambdawise_weights=False,
-        loss_name_suffix="", **kwargs
+        suffix="", **kwargs
 ):
     """
     Calculate spectra loss.
@@ -407,7 +407,7 @@ def calculate_spectra_loss(
         Also, we save before multiplying weights as we need the original loss
           for visualization purposes.
         """
-        nm = "spectra_lambdawise_loss" + loss_name_suffix
+        nm = f"spectra_lambdawise_loss{suffix}"
         if apply_gt_redshift:
             ret[nm] = lambdawise_loss
         elif brute_force:
@@ -426,8 +426,7 @@ def calculate_spectra_loss(
             lambdawise_loss = lambdawise_loss[valid]
             spectrawise_loss = (torch.sum(lambdawise_loss, dim=-1) / masks)
         else: raise ValueError()
-        nm = "spectrawise_loss" + loss_name_suffix
-        ret[nm] = spectrawise_loss
+        ret[f"spectrawise_loss{suffix}"] = spectrawise_loss
 
     elif brute_force:
         if train_with_lambdawise_weights:
@@ -448,12 +447,11 @@ def calculate_spectra_loss(
             masks[masks == 0] = 1
             binwise_loss = (torch.sum(lambdawise_loss, dim=-1) / masks).T
         else: raise ValueError()
-        nm = "spectra_binwise_loss" + loss_name_suffix
-        ret[nm] = binwise_loss
+        ret[f"spectra_binwise_loss{suffix}"] = binwise_loss
 
 def calculate_redshift_logits(beta, ret, suffix=""):
-    """ Calculate logits for redshift bins.
     """
-    # calculate logits for each bin as softmax of negative loss
+    Calculate logits for redshift bins as softmax of negative loss.
+    """
     logits = -ret[f"spectra_binwise_loss{suffix}"] * beta
-    ret["redshift_logits"] = F.softmax(logits, dim=-1)
+    ret[f"redshift_logits{suffix}"] = F.softmax(logits, dim=-1)

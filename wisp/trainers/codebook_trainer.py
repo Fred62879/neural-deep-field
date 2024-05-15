@@ -156,6 +156,10 @@ class CodebookTrainer(BaseTrainer):
             self.calculate_binwise_spectra_loss or \
             print("only support brute force in case of redshift classification")
 
+        self.classify_redshift_based_on_l2 = self.classify_redshift and \
+            self.extra_args["classify_redshift_based_on_l2"] and \
+            self.extra_args["spectra_loss_cho"] != "l2"
+
         self.neg_sup_wrong_redshift = \
             self.mode == "codebook_pretrain" and \
             self.calculate_binwise_spectra_loss and \
@@ -1494,6 +1498,20 @@ class CodebookTrainer(BaseTrainer):
         plt.savefig(fname + "_log10.png")
         plt.close()
 
+    def _get_all_bin_losses(self, ret):
+        if self.classify_redshift_based_on_l2:
+            all_bin_losses = ret["spectra_binwise_loss_l2"] # [bsz,nbins]
+        else: all_bin_losses = ret["spectra_binwise_loss"] # [bsz,nbins]
+        return all_bin_losses
+
+    def _get_optimal_wrong_bin_data(self, ret, data):
+        all_bin_losses = self._get_all_bin_losses(ret)
+        ids, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(
+            all_bin_losses, data["gt_redshift_bin_masks"]
+        )
+        ids = create_batch_ids(ids.detach().cpu().numpy())
+        return ids, optimal_wrong_bin_losses
+
     #############
     # Loss Helpers
     #############
@@ -1694,7 +1712,8 @@ class CodebookTrainer(BaseTrainer):
             else:
                 if self.sanity_check_with_weights:
                     gt_bin_loss = all_bin_loss[data["gt_redshift_bin_masks"]] # [bsz]
-                    _, optimal_wrong_bin_loss = get_optimal_wrong_bin_ids(ret, data) # [bsz]
+                    _, optimal_wrong_bin_loss = \
+                        self._get_optimal_wrong_bin_data(ret, data) # [bsz]
                     spectra_regu = gt_bin_loss - optimal_wrong_bin_loss
                     spectra_regu[spectra_regu < 0] = 0
                     spectra_regu = self.spectra_reduce_func(spectra_regu)
@@ -1724,7 +1743,7 @@ class CodebookTrainer(BaseTrainer):
         if self.cur_neg_sup_target == "latents":
             spectra_loss = torch.mean(ret["spectra_binwise_loss"])
             if self.extra_args["neg_sup_with_optimal_wrong_bin"]:
-                _, optimal_wrong_bin_loss = get_optimal_wrong_bin_ids(ret, data)
+                _, optimal_wrong_bin_loss = self._get_optimal_wrong_bin_data(ret, data)
                 self.log_dict["wrong_bin_loss"] += torch.mean(optimal_wrong_bin_loss).item()
             else:
                 wrong_bin_loss = all_bin_loss[~data["gt_redshift_bin_masks"]] # [n,]
@@ -1732,7 +1751,7 @@ class CodebookTrainer(BaseTrainer):
 
         elif self.cur_neg_sup_target == "net":
             if self.extra_args["neg_sup_with_optimal_wrong_bin"]:
-                _, optimal_wrong_bin_loss = get_optimal_wrong_bin_ids(ret, data)
+                _, optimal_wrong_bin_loss = self._get_optimal_wrong_bin_data(ret, data)
                 self.log_dict["wrong_bin_loss"] += \
                     torch.mean(optimal_wrong_bin_loss).item()
                 wrong_bin_loss = self.extra_args["neg_sup_constant"] - \

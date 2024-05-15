@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'autodecoder-dz-spectra-pe'
+    exp_name: 'dz-spectra-ssim-4-basic-regu-weight'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    #tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -54,8 +54,8 @@ pretrain:
     pretrain_log_dir: ''
     pretrained_model_name: 'model-ep20000-bch0.pth'
 
-    regularize_spectra_latents: False
-    spectra_latents_regu_beta: 16
+    regularize_spectra_latents: True
+    spectra_latents_regu_beta: 32
 
 decoder:
     decoder_activation_type: relu #gaussian
@@ -91,7 +91,7 @@ trainer:
     resume_log_dir: ''
     resume_model_fname: 'model-ep2000-bch0.pth'
 
-    spectra_loss_cho: ssim1d
+    spectra_loss_cho: l2 #ssim1d
     spectra_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
@@ -99,14 +99,14 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240513-143835_ssim_5_512_no_regu_skip'
+    infer_log_dir: '5-20240514-024145_ssim_5_512_skip_regu_beta_32'
     infer_selected: False
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
-    pretrain_infer_batch_size: 100
-    pretrain_infer_use_all_wave: False
+    pretrain_infer_batch_size: 1
+    pretrain_infer_use_all_wave: True
     pretrain_infer_num_wave: 1000
     pretrain_infer_wave_sample_method: 'uniform_dense'
 
@@ -150,7 +150,7 @@ spectra_data:
     filter_redshift_hi: -1
 
 ablation:
-    perform_ablation: True
+    perform_ablation: False
     ablat_id: 0
     ablat_params: ["decoder_num_hidden_layers","regularize_spectra_latents"]
     ablat_vals: [[3,5],[True,False]]
@@ -158,5 +158,3 @@ ablation:
 
     #ablat_hardcode_params: ["pretrain_log_dir"]
     #ablat_hardcode_vals: [["20240222-015410_1600-spectra-skip-same-dim_decoder_batch_norm_True","20240222-165434_1600-spectra-skip-same-dim_decoder_batch_norm_False"]]
-
-    #"20240222-165402_1600-spectra-skip_decoder_batch_norm_True","20240222-165402_1600-spectra-skip_decoder_batch_norm_False"]]

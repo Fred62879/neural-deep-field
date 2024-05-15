@@ -45,10 +45,8 @@ pretrain:
     calculate_spectra_loss_based_on_top_n_bins: False # only if we use single latent
     num_bins_to_calculate_spectra_loss: 5
 
-    classify_redshift_based_on_l2: False
-
     spectra_latent_dim: 16
-    generalization_max_num_spectra: 100
+    generalization_max_num_spectra: 200
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
@@ -58,12 +56,12 @@ pretrain:
     pretrain_log_dir: ''
     pretrained_model_name: 'model-ep2000-bch0.pth'
 
-    regularize_spectra_latents: False
-    spectra_latents_regu_beta: 16
+    regularize_spectra_latents: True
+    spectra_latents_regu_beta: 32
 
     use_global_spectra_loss_as_lambdawise_weights: False
     limit_redshift_to_pretrain_range: False
-    global_restframe_spectra_loss_fname: 20240513-143250_ssim_3_512_regu_no_skip/pretrain_spectra/global_restframe_l2_loss.npy
+    global_restframe_spectra_loss_fname: 4-20240513-143729_ssim_5_512_skip_regu_beta_16/pretrain_spectra/global_restframe_l2_loss.npy
 
     regress_lambdawise_weights: False
     regress_lambdawise_weights_share_latents: False
@@ -72,12 +70,12 @@ pretrain:
 
 decoder:
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 3
+    decoder_num_hidden_layers: 5
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: False
+    decoder_latents_skip_all_layers: True
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
@@ -103,12 +101,15 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 'x0-20240513-185827_genlz_3_512_no_skip_no_regu_222050_100_spectra_200_epochs'
+    infer_log_dir: 'x4-20240513-235956_genlz_5_512_skip_regu_beta_32_143729_200_spectra_500_epochs_98_outlier'
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: True
+
+    classify_redshift_based_on_l2: False
+    infer_use_global_loss_as_lambdawise_weights: False
 
     pretrain_infer_batch_size: 1
     pretrain_infer_use_all_wave: False
@@ -116,13 +117,13 @@ infer:
     pretrain_infer_wave_sample_method: 'uniform_dense'
 
     plot_clipped_spectrum: True
-    plot_spectrum_with_loss: False
+    plot_spectrum_with_loss: True
     plot_spectrum_with_ivar: False
     plot_spectrum_with_lines: False
     plot_spectrum_with_recon: False
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: True
-    plot_spectrum_under_optimal_wrong_bin: True
+    plot_spectrum_under_optimal_wrong_bin: False
 
     num_spectrum_per_fig: 35
     num_spectrum_per_row: 7

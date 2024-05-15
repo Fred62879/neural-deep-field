@@ -6,7 +6,7 @@ from collections import defaultdict
 
 from wisp.utils import PerfTimer
 from wisp.utils.common import get_bool_classify_redshift, \
-    get_bool_has_redshift_latents, get_bool_train_with_lambdawise_spectra_loss_as_weights
+    get_bool_has_redshift_latents, get_bool_weight_spectra_loss_with_global_restframe_loss
 
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.embedders.encoder import Encoder
@@ -109,7 +109,7 @@ class CodebookPretrainNerf(BaseNeuralField):
             if self.kwargs["apply_gt_redshift"]:
                 channels.extend(["spectrawise_loss","spectrawise_loss_l2"])
             elif get_bool_classify_redshift(**self.kwargs):
-                channels.append("redshift_logits")
+                channels.extend(["redshift_logits","redshift_logits_l2"])
                 if self.kwargs["calculate_binwise_spectra_loss"]:
                     channels.extend([
                         "spectra_binwise_loss","spectra_binwise_loss_l2",
@@ -121,9 +121,9 @@ class CodebookPretrainNerf(BaseNeuralField):
             if self.kwargs["plot_spectrum_with_loss"] or \
                self.kwargs["plot_spectrum_color_based_on_loss"] or \
                "plot_global_lambdawise_spectra_loss" in self.kwargs["tasks"]:
-                channels.append("spectra_lambdawise_loss")
+                channels.extend(["spectra_lambdawise_loss","spectra_lambdawise_loss_l2"])
 
-        if get_bool_train_with_lambdawise_spectra_loss_as_weights(**self.kwargs):
+        if get_bool_weight_spectra_loss_with_global_restframe_loss(**self.kwargs):
             channels.extend(["lambdawise_weights","optimal_bin_ids"])
         elif self.kwargs["use_global_spectra_loss_as_lambdawise_weights"]:
             channels.append("global_restframe_spectra_loss")
@@ -262,5 +262,6 @@ class CodebookPretrainNerf(BaseNeuralField):
             global_restframe_spectra_loss=global_restframe_spectra_loss
         )
 
+        # print(ret.keys())
         timer.check("hps decoding done")
         return ret
