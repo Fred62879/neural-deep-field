@@ -216,9 +216,9 @@ class spectra_supervision_loss(nn.Module):
             else: raise ValueError()
         else:
             if gt_spectra.ndim == 3:
-                #print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
+                # print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
                 ret = self._forward(gt_spectra[:,1], recon_fluxes, masks)
-                #print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
+                # print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
             elif gt_spectra.ndim == 4:
                 #print(torch.isnan(gt_spectra[:,:,1]).any(), torch.isnan(recon_fluxes).any())
                 ret = self._forward(gt_spectra[:,:,1], recon_fluxes, masks)

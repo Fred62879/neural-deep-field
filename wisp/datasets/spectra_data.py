@@ -74,6 +74,7 @@ class SpectraData:
         self.load_spectra_data_from_cache = kwargs["load_spectra_data_from_cache"]
 
         self.max_spectra_len = kwargs["max_spectra_len"]
+        self.min_num_valid_samples = kwargs["min_num_valid_samples"]
         self.wave_discretz_interval = kwargs["trans_sample_interval"]
         self.spectra_neighbour_size = kwargs["spectra_neighbour_size"]
         self.average_neighbour_spectra = kwargs["average_neighbour_spectra"]
@@ -672,12 +673,10 @@ class SpectraData:
     def correct_redshift_based_on_bins(self):
         """
         """
-        # print(self.data["gt_spectra_redshift"][:20])
         num_bins = (self.data["gt_spectra_redshift"] - self.kwargs["redshift_lo"]) // self.kwargs["redshift_bin_width"]
         num_bins = num_bins.astype(int)
         self.data["gt_spectra_redshift"] = num_bins * self.kwargs["redshift_bin_width"] + \
             self.kwargs["redshift_lo"] + self.kwargs["redshift_bin_width"] / 2
-        # print(self.data["gt_spectra_redshift"][:20])
 
     def filter_spectra_based_on_redshift(self):
         valid_ids = np.arange(len(self.data["gt_spectra_redshift"]))
@@ -732,7 +731,9 @@ class SpectraData:
             fname = join(path, df.iloc[i]["mask_fname"])
             mask.append(np.load(fname))
             fname = join(path, df.iloc[i]["spectra_fname"])
-            spectra.append(np.load(fname))
+            if self.kwargs["require_only_basic_spectra"]:
+                spectra.append(np.load(fname)[:3])
+            else: spectra.append(np.load(fname))
 
             if self.spectra_process_patch_info:
                 fname = join(self.processed_spectra_path, df.iloc[i]["pixels_fname"])
@@ -778,8 +779,6 @@ class SpectraData:
 
         upper_bound = self.kwargs["num_gt_spectra_upper_bound"]
         df = self.load_source_metadata()[:upper_bound]
-        # df = df[875:876] ## delete
-        # df.reset_index(inplace=True, drop=True)
         num_spectra = len(df)
         log.info(f"load {num_spectra} source spectra")
 
@@ -792,6 +791,11 @@ class SpectraData:
 
         df["mask_fname"] = ""
         df["sup_wave_bound"] = [(-1,-1)] * len(df)
+
+        # a = df.loc[df['spectra_fname_fits'] == 'spec1d.1150.102.12005363.fits']
+        # print(a)
+        # print('***')
+        # print(a['spectra_fname_fits'])
 
         if self.spectra_process_patch_info:
             for field in ["tract","patch","pixels_fname",
@@ -943,6 +947,7 @@ class SpectraData:
         # [ self.process_one_spectra(None, None, None, df, None, idx, None)
         #   for idx in range(num_spectra) ]
         invalid_spectra = []
+        # for idx in tqdm([24666]):
         for idx in tqdm(range(num_spectra)):
             valid = self.process_one_spectra(None, None, None, df, None, idx, None)
             if not valid: invalid_spectra.append(idx)
@@ -1086,7 +1091,7 @@ class SpectraData:
             sup_bound, ivar_reliable, spectra_valid = process_gt_spectra(
                 spectra, spectra_out_fname, spectra_mask_fname, spectra_sup_bound_fname,
                 df.loc[idx,"zspec"], self.emitted_wave_distrib, self.max_spectra_len,
-                self.trans_range, self.supervision_wave_range,
+                self.min_num_valid_samples, self.trans_range, self.supervision_wave_range,
                 self.spectra_smooth_sigma, self.spectra_upsample_scale,
                 trans_data=self.trans_data,
                 ivar_reliable=ivar_reliable,
@@ -1668,9 +1673,6 @@ def interpolate_trans(trans_data, spectra_data, bound, sup_bound, fname=None, co
 
     source_trans = trans_data[:,1:].T
     trans_wave = trans_data[:,0]
-    # print(bound, sup_bound)
-    # print(spectra_data[0], bound)
-    # print(spectra_data[0][bound[0]:bound[1]+1])
     spectra_wave = spectra_data[0][bound[0]:bound[1]+1]
 
     # clip spectra wave to be within transmission wave range
@@ -1769,7 +1771,6 @@ def check_invalid_within_valid_range(valid):
     return valid_ids[0], valid_ids[-1], invalid_exist_within_valid_range
 
 def find_valid_spectra_range(spectra, spectra_fname, ivar_reliable):
-    # print(spectra_fname)
     invalid = np.zeros(spectra.shape[1], dtype=np.bool) # spectra [3,nsmpls]
     invalid = find_invalid(spectra[1], invalid)
     invalid = find_invalid(spectra[2], invalid)
@@ -1778,11 +1779,10 @@ def find_valid_spectra_range(spectra, spectra_fname, ivar_reliable):
 
     if ivar_reliable:
         obs_invalid = spectra[2] == 0
-        # print(sum(obs_invalid), spectra.shape)
         if sum(obs_invalid) == spectra.shape[1]:
             # if ivar are all 0, we assume this ivar is unreliable but keep using the obs
             ivar_reliable = False
-            warnings.warn(f"{spectra_fname} has unreliable ivar")
+            # warnings.warn(f"{spectra_fname} has unreliable ivar")
         else: invalid = invalid | obs_invalid
     return ~invalid, ivar_reliable
 
@@ -1790,9 +1790,9 @@ def mask_invalid_spectra(spectra, spectra_fname, ivar_reliable):
     """
     Mask range of spectra where there are no valid observations.
     """
-    plt.plot(spectra[0],spectra[1])
-    plt.savefig(spectra_fname[:-4] + "_orig.png")
-    plt.close()
+    # plt.plot(spectra[0],spectra[1])
+    # plt.savefig(spectra_fname[:-4] + "_orig.png")
+    # plt.close()
 
     n = spectra.shape[1]
     valid, ivar_reliable = find_valid_spectra_range(
@@ -1809,10 +1809,10 @@ def mask_invalid_spectra(spectra, spectra_fname, ivar_reliable):
     mask = np.zeros(n)
     mask[valid] = 1
     mask = mask.astype(np.bool)
-    plt.plot(spectra[0],spectra[1])
-    plt.plot(spectra[0],mask*np.max(spectra[1]))
-    plt.savefig(spectra_fname[:-4] + "_orig_w_mask.png")
-    plt.close()
+    # plt.plot(spectra[0],spectra[1])
+    # plt.plot(spectra[0],mask*np.max(spectra[1]))
+    # plt.savefig(spectra_fname[:-4] + "_orig_w_mask.png")
+    # plt.close()
     return spectra, mask, ivar_reliable
 
 def drop_invalid_ends(spectra, mask, spectra_fname, suffix=""):
@@ -1823,10 +1823,10 @@ def drop_invalid_ends(spectra, mask, spectra_fname, suffix=""):
     valid_ids = ids[mask == 1]
     mask = mask[valid_ids[0]:valid_ids[-1]+1]
     spectra = spectra[:,valid_ids[0]:valid_ids[-1]+1]
-    plt.plot(spectra[0],spectra[1])
-    plt.plot(spectra[0],mask*np.max(spectra[1]))
-    plt.savefig(spectra_fname[:-4] + f"_{suffix}_cut_two_ends_w_mask.png")
-    plt.close()
+    # plt.plot(spectra[0],spectra[1])
+    # plt.plot(spectra[0],mask*np.max(spectra[1]))
+    # plt.savefig(spectra_fname[:-4] + f"_{suffix}_cut_two_ends_w_mask.png")
+    # plt.close()
     return spectra, mask
 
 def resample_mask(wave, resampled_wave, mask):
@@ -1914,10 +1914,10 @@ def resample_spectra(spectra, mask, upsample_scale, spectra_fname):
     assert (freq - mean_freq < 1e-8).all()
     assert spectra.shape == resampled_spectra.shape
 
-    plt.plot(resampled_spectra[0], resampled_spectra[1])
-    plt.plot(resampled_spectra[0], resampled_mask*np.max(resampled_spectra[1]))
-    plt.savefig(spectra_fname[:-4] + "_resampled.png")
-    plt.close()
+    # plt.plot(resampled_spectra[0], resampled_spectra[1])
+    # plt.plot(resampled_spectra[0], resampled_mask*np.max(resampled_spectra[1]))
+    # plt.savefig(spectra_fname[:-4] + "_resampled.png")
+    # plt.close()
     return resampled_spectra, resampled_mask
 
 def convolve_spectra(spectra, mask, std, border, ivar_reliable, spectra_fname):
@@ -1986,12 +1986,17 @@ def pad_spectra(spectra, mask, sup_mask, max_len):
     if n == max_len:
         return spectra, mask, sup_mask
 
+    #print(m, n, spectra.shape)
+    #print(spectra[:,0])
     new_mask = np.zeros(max_len).astype(mask.dtype)
     new_sup_mask = np.zeros(max_len).astype(mask.dtype)
     new_spectra = np.full((m,max_len), math.nan).astype(spectra.dtype)
     new_mask[:n] = mask
     new_sup_mask[:n] = sup_mask
     new_spectra[:,:n] = spectra
+    #print(new_sup_mask[0], new_sup_mask[1])
+    #print(new_mask[0], new_mask[1])
+    #print(new_spectra[:,0], new_spectra[:,1])
     return new_spectra, new_mask, new_sup_mask
 
 def normalize_spectra(spectra, bound, ivar_reliable):
@@ -2019,9 +2024,18 @@ def get_wave_weight(spectra, redshift, emitted_wave_distrib, bound):
     weight = weight / max(weight)
     return weight
 
+def spectra_valid(spectra, mask, supervision_wave_range):
+    if spectra is None or \
+       max(spectra[0]) <= supervision_wave_range[0] or \
+       min(spectra[0]) >= supervision_wave_range[1] or \
+       (min(spectra[1]) == max(spectra[1]) == 0) or \
+       sum(mask) == 0:
+        return False
+    return True
+
 def process_gt_spectra(
         spectra, spectra_fname, spectra_mask_fname, spectra_sup_bound_fname,
-        redshift, emitted_wave_distrib, max_spectra_len,
+        redshift, emitted_wave_distrib, max_spectra_len, min_num_valid_samples,
         trans_range, supervision_wave_range, sigma, upsample_scale,
         save=True, plot=True, ivar_reliable=True,
         colors=None, trans_data=None, validator=None,
@@ -2049,10 +2063,8 @@ def process_gt_spectra(
         spectra, spectra_fname, ivar_reliable)
     spectra, mask = drop_invalid_ends(spectra, mask, spectra_fname, suffix="orig")
 
-    if spectra is None or \
-       max(spectra[0]) <= supervision_wave_range[0] or \
-       min(spectra[0]) >= supervision_wave_range[1]:
-        warnings.warn(f"{spectra_fname} has no valid observations")
+    if not spectra_valid(spectra, mask, supervision_wave_range):
+        # warnings.warn(f"{spectra_fname} has no valid observations")
         return None, None, False
 
     if sigma > 0:
@@ -2062,9 +2074,12 @@ def process_gt_spectra(
 
     # spectra now is contiguously valid (with possibly nested invalid range)
     assert mask[0] and mask[-1]
-
     spectra, sup_mask, bound, sup_bound = mask_spectra_range(
         spectra, mask, trans_range, supervision_wave_range)
+    # spectra is marked as invalid if it has too few valid supervision samples
+    if sum(sup_mask) < min_num_valid_samples:
+        return None, None, False
+
     spectra, mask, sup_mask = pad_spectra(spectra, mask, sup_mask, max_spectra_len)
     spectra = normalize_spectra(spectra, sup_bound, ivar_reliable)
     spectra = spectra.astype(np.float32) # [3,nsmpl]

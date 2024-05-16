@@ -59,9 +59,9 @@ pretrain:
     regularize_spectra_latents: True
     spectra_latents_regu_beta: 32
 
-    use_global_spectra_loss_as_lambdawise_weights: False
+    use_global_spectra_loss_as_lambdawise_weights: True
     limit_redshift_to_pretrain_range: False
-    global_restframe_spectra_loss_fname: 4-20240513-143729_ssim_5_512_skip_regu_beta_16/pretrain_spectra/global_restframe_l2_loss.npy
+    global_restframe_spectra_loss_fname: 5-20240514-024145_ssim_5_512_skip_regu_beta_32/pretrain_spectra/global_restframe_l2_loss.npy
 
     regress_lambdawise_weights: False
     regress_lambdawise_weights_share_latents: False
@@ -101,7 +101,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 'x4-20240513-235956_genlz_5_512_skip_regu_beta_32_143729_200_spectra_500_epochs_98_outlier'
+    infer_log_dir: 'x5-20240514-202211_genlz_5_512_skip_regu_beta_32_global_weighted_024145'
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 35

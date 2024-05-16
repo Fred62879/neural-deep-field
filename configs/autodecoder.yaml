@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'dz-spectra-ssim-4-basic-regu-weight'
+    exp_name: 'deep3-deimos-spectra-ssim' #'dzdeep3-spectra-ssim' #'dz-spectra-ssim-4-basic-regu-weight'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -91,7 +91,7 @@ trainer:
     resume_log_dir: ''
     resume_model_fname: 'model-ep2000-bch0.pth'
 
-    spectra_loss_cho: l2 #ssim1d
+    spectra_loss_cho: ssim1d
     spectra_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
@@ -99,8 +99,8 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '5-20240514-024145_ssim_5_512_skip_regu_beta_32'
-    infer_selected: False
+    #infer_log_dir: ''
+    infer_selected: True
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
@@ -134,16 +134,17 @@ spectra_data:
 
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deimos,zcosmos]
+    spectra_data_sources: [deep3,deimos] #[deimos,zcosmos,deep3]
     random_permute_source_spectra: True
 
+    min_num_valid_samples: 100
     spectra_upsample_scale: 10
     convolve_spectra: True
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 25400
-    num_supervision_spectra_upper_bound: 25400
+    num_gt_spectra_upper_bound: 2000 #100000 #25400
+    num_supervision_spectra_upper_bound: 2000 #100000 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02
