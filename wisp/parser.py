@@ -698,6 +698,11 @@ def define_cmd_line_args():
     data_group.add_argument("--deep3-source-spectra-fname", type=str)
     data_group.add_argument("--deep3-processed-spectra-cho", type=str)
 
+    data_group.add_argument("--vipers-spectra-data-format", type=str)
+    data_group.add_argument("--vipers-processed-spectra-cho", type=str)
+    data_group.add_argument("--vipers-w1-source-spectra-fname", type=str)
+    data_group.add_argument("--vipers-w4-source-spectra-fname", type=str)
+
     data_group.add_argument("--max-spectra-len", type=int)
     data_group.add_argument("--min-num-valid-samples", type=int)
     data_group.add_argument("--spectra-tracts", type=str, nargs='+')

@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'deep3-deimos-spectra-ssim' #'dzdeep3-spectra-ssim' #'dz-spectra-ssim-4-basic-regu-weight'
+    exp_name: 'vipers-spectra-ssim' #'dzdeep3-spectra-ssim' #'dz-spectra-ssim-4-basic-regu-weight'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    #tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -134,7 +134,7 @@ spectra_data:
 
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deep3,deimos] #[deimos,zcosmos,deep3]
+    spectra_data_sources: [vipers_w1,vipers_w4,deep3] #,deimos,zcosmos]
     random_permute_source_spectra: True
 
     min_num_valid_samples: 100
@@ -143,8 +143,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 2000 #100000 #25400
-    num_supervision_spectra_upper_bound: 2000 #100000 #25400
+    num_gt_spectra_upper_bound: 20 #100000 #25400
+    num_supervision_spectra_upper_bound: 20 #100000 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02

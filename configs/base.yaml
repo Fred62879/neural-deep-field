@@ -526,6 +526,11 @@ spectra_data:
     deep3_processed_spectra_cho: v1
     deep3_source_spectra_fname: source_deep3_table.tbl
 
+    vipers_spectra_data_format: fits
+    vipers_processed_spectra_cho: v1
+    vipers_w1_source_spectra_fname: source_vipers_w1_table.tbl
+    vipers_w4_source_spectra_fname: source_vipers_w4_table.tbl
+
     max_spectra_len: 8191 # hardcoded
     num_gt_spectra_upper_bound: 500 #6500 # spectra to load
     num_supervision_spectra_upper_bound: 100

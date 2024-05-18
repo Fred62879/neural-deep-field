@@ -70,6 +70,8 @@ class SpectraData:
 
         self.deep2_spectra_data_format = kwargs["deep2_spectra_data_format"]
         self.deep3_spectra_data_format = kwargs["deep3_spectra_data_format"]
+        self.vipers_w1_spectra_data_format = kwargs["vipers_spectra_data_format"]
+        self.vipers_w4_spectra_data_format = kwargs["vipers_spectra_data_format"]
 
         self.load_spectra_data_from_cache = kwargs["load_spectra_data_from_cache"]
 
@@ -176,6 +178,20 @@ class SpectraData:
                 self.kwargs["deep3_processed_spectra_cho"],
                 self.kwargs["deep3_source_spectra_fname"],
                 self.deep3_spectra_data_format)
+
+        if "vipers_w1" in self.spectra_data_sources:
+            self._set_path(
+                "vipers_w1", spectra_path,
+                self.kwargs["vipers_processed_spectra_cho"],
+                self.kwargs["vipers_w1_source_spectra_fname"],
+                self.vipers_w1_spectra_data_format)
+
+        if "vipers_w4" in self.spectra_data_sources:
+            self._set_path(
+                "vipers_w4", spectra_path,
+                self.kwargs["vipers_processed_spectra_cho"],
+                self.kwargs["vipers_w4_source_spectra_fname"],
+                self.vipers_w4_spectra_data_format)
 
     def _set_path(self, data_source, spectra_path, spectra_cho,
                   source_spectra_fname, data_format
@@ -1168,6 +1184,18 @@ class SpectraData:
             cur_df = read_deep3_table(
                 self.deep3_source_metadata_table_fname,
                 format=self.deep3_spectra_data_format)
+            df.append(cur_df)
+
+        if "vipers_w1" in self.spectra_data_sources:
+            cur_df = read_vipers_table(
+                self.vipers_w1_source_metadata_table_fname,
+                format=self.vipers_w1_spectra_data_format)
+            df.append(cur_df)
+
+        if "vipers_w4" in self.spectra_data_sources:
+            cur_df = read_vipers_table(
+                self.vipers_w4_source_metadata_table_fname,
+                format=self.vipers_w4_spectra_data_format)
             df.append(cur_df)
 
         df = pandas.concat(df)
@@ -2201,6 +2229,34 @@ def read_deep3_table(fname, format):
     df["source"] = "deep3"
     return df
 
+def read_vipers_table(fname, format):
+    with open(fname, "rb") as fp:
+        df = pickle.load(fp)
+    df["ra"] = pandas.to_numeric(df["ra"])
+    df["dec"] = pandas.to_numeric(df["dec"])
+    df["zspec"] = pandas.to_numeric(df["zspec"])
+    df.dropna(subset=["zspec"], inplace=True)
+    df.reset_index(inplace=True, drop=True)
+    return df
+
+def create_viper_table(path):
+    ids, ras, decs, redshift, fnames = [], [], [], [], []
+    for fname in tqdm(os.listdir(path)):
+        hdus = fits.open(join(path, fname))
+        header = hdus[1].header
+        ids.append(header["ID"])
+        ras.append(header["RA"])
+        decs.append(header["DEC"])
+        fnames.append(fname)
+        redshift.append(header["REDSHIFT"])
+    data = np.concatenate((
+        np.array(ids)[:,None], np.array(ras)[:,None], np.array(decs)[:,None],
+        np.array(redshift)[:,None], np.array(fnames)[:,None]
+    ), axis=-1)
+    df = pandas.DataFrame(data, columns=["id","ra","dec","zspec","spectra_fname_fits"])
+    df["source"] = "vipers_w4"
+    df.to_pickle(join(path, "../source_viper_w4_table.tbl"))
+
 def read_manual_table(fname):
     data, colnames, datatypes = {}, None, None
     with open(fname) as csv_file:
@@ -2240,6 +2296,9 @@ def unpack_gt_spectra(fname, format="tbl", source="deimos", deep3_portion=None):
             hdu_id = { "Bxspf-B":1, "Bxspf-R":2 }[deep3_portion]
             hdu = fits.open(fname)[hdu_id].data
             wave, flux, ivar = hdu["LAMBDA"][0], hdu["SPEC"][0], hdu["IVAR"][0]
+        elif source == "vipers_w1" or source == "vipers_w4":
+            data = fits.open(fname)[1].data
+            wave, flux, ivar, mask = data["WAVES"], data["FLUXES"], data["NOISE"], data["MASK"]
         else:
             hdu = fits.open(fname)[1]
             header = hdu.header
