@@ -2,7 +2,7 @@ parent: base_narval.yaml
 
 global:
     use_tqdm: False
-    exp_name: 'autodecoder-dz-spectra-pe'
+    exp_name: 'vipers-spectra-ssim'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
@@ -54,20 +54,20 @@ pretrain:
     pretrain_log_dir: ''
     pretrained_model_name: 'model-ep20000-bch0.pth'
 
-    regularize_spectra_latents: False
+    regularize_spectra_latents: True
     spectra_latents_regu_beta: 32
 
 decoder:
     decoder_activation_type: relu #gaussian
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 3
+    decoder_num_hidden_layers: 5
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
     decoder_gaussian_sigma: .1
 
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: False
+    decoder_latents_skip_all_layers: True
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
@@ -78,12 +78,12 @@ decoder:
     siren_last_linear: True
 
 trainer:
-    num_epochs: 2000
+    num_epochs: 5000
     batch_size: 5500
-    log_cli_every: 200
+    log_cli_every: 500
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 200
+    save_model_every: 500
 
     plot_l2_loss: True
 
@@ -134,23 +134,24 @@ spectra_data:
 
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deimos,zcosmos]
+    spectra_data_sources: [vipers_w1,vipers_w4]
     random_permute_source_spectra: True
 
+    min_num_valid_samples: 100
     spectra_upsample_scale: 10
     convolve_spectra: True
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 25400
-    num_supervision_spectra_upper_bound: 25400
+    num_gt_spectra_upper_bound: 200000
+    num_supervision_spectra_upper_bound: 200000
 
     filter_redshift: False
     filter_redshift_lo: 0.02
     filter_redshift_hi: -1
 
 ablation:
-    perform_ablation: True
+    perform_ablation: False
     ablat_id: 0
     ablat_params: ["decoder_num_hidden_layers","regularize_spectra_latents"]
     ablat_vals: [[3,5],[True,False]]

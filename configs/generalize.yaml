@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'deep3-deimos-zcosmos-spectra-ssim' #deep3-deimos-spectra-ssim'
+    exp_name: 'vipers-spectra-ssim' #'dz-spectra-ssim-4-basic-regu-weight'
     # log_fname: ''
 
     tasks: ['generalization']
@@ -140,7 +140,7 @@ spectra_data:
 
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deep3,deimos] #,zcosmos]
+    spectra_data_sources: [vipers_w1,vipers_w4]
     random_permute_source_spectra: True
 
     min_num_valid_samples: 100
@@ -149,8 +149,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 2000 #25400
-    num_supervision_spectra_upper_bound: 2000 #25400
+    num_gt_spectra_upper_bound: 200000
+    num_supervision_spectra_upper_bound: 200000
 
     filter_redshift: False
     filter_redshift_lo: 0.02

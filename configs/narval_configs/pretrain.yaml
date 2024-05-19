@@ -2,11 +2,11 @@ parent: base_narval.yaml
 
 global:
     use_tqdm: False
-    exp_name: 'autodecoder-dz-spectra-pe'
+    exp_name: 'deep3-deimos-zcosmos-spectra-ssim'
     # log_fname: ''
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
-    tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    #tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -26,7 +26,7 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    pretrain_batch_size: 20000
+    pretrain_batch_size: 18000
 
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 100
@@ -54,20 +54,20 @@ pretrain:
     pretrain_log_dir: ''
     pretrained_model_name: 'model-ep20000-bch0.pth'
 
-    regularize_spectra_latents: False
-    spectra_latents_regu_beta: 16
+    regularize_spectra_latents: True
+    spectra_latents_regu_beta: 32
 
 decoder:
     decoder_activation_type: relu #gaussian
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 3
+    decoder_num_hidden_layers: 5
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
     decoder_gaussian_sigma: .1
 
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: False
+    decoder_latents_skip_all_layers: True
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
@@ -87,11 +87,11 @@ trainer:
 
     plot_l2_loss: True
 
-    resume_train: False
-    resume_log_dir: ''
-    resume_model_fname: 'model-ep2000-bch0.pth'
+    resume_train: True
+    resume_log_dir: '20240517-092437'
+    resume_model_fname: 'model-ep1000-bch0.pth'
 
-    spectra_loss_cho: l2 #ssim1d
+    spectra_loss_cho: ssim1d
     spectra_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
@@ -134,16 +134,17 @@ spectra_data:
 
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deimos,zcosmos]
+    spectra_data_sources: [deep3,deimos,zcosmos]
     random_permute_source_spectra: True
 
+    min_num_valid_samples: 100
     spectra_upsample_scale: 10
     convolve_spectra: True
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 25400
-    num_supervision_spectra_upper_bound: 25400
+    num_gt_spectra_upper_bound: 100000 #25400
+    num_supervision_spectra_upper_bound: 100000 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02
