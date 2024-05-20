@@ -34,7 +34,7 @@ from collections import defaultdict
 from functools import partial, reduce
 from scipy.interpolate import interp1d
 from scipy.ndimage import gaussian_filter1d
-#from linetools.lists.linelist import LineList
+from linetools.lists.linelist import LineList
 from astropy.convolution import convolve, Gaussian1DKernel
 from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
@@ -963,7 +963,6 @@ class SpectraData:
         # [ self.process_one_spectra(None, None, None, df, None, idx, None)
         #   for idx in range(num_spectra) ]
         invalid_spectra = []
-        # for idx in tqdm([24666]):
         for idx in tqdm(range(num_spectra)):
             valid = self.process_one_spectra(None, None, None, df, None, idx, None)
             if not valid: invalid_spectra.append(idx)
@@ -1847,6 +1846,7 @@ def drop_invalid_ends(spectra, mask, spectra_fname, suffix=""):
     """
     Drop head and tail invalid range.
     """
+    if spectra is None: return None, None
     ids = np.arange(spectra.shape[1])
     valid_ids = ids[mask == 1]
     mask = mask[valid_ids[0]:valid_ids[-1]+1]

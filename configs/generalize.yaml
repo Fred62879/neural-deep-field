@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['generalization']
-    #tasks: ['generalization_infer','recon_spectra','save_redshift','plot_redshift_est_stats','plot_redshift_residual'] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
+    tasks: ['generalization_infer','recon_spectra','save_redshift','plot_redshift_est_stats','plot_redshift_residual'] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -46,14 +46,14 @@ pretrain:
     num_bins_to_calculate_spectra_loss: 5
 
     spectra_latent_dim: 16
-    generalization_max_num_spectra: 200
+    generalization_max_num_spectra: 500
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240517-092437'
+    pretrain_log_dir: ''
     pretrained_model_name: 'model-ep1000-bch0.pth'
 
     regularize_spectra_latents: True
@@ -80,11 +80,11 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 200
+    num_epochs: 500
     batch_size: 5500
-    log_cli_every: 20
+    log_cli_every: 50
     plot_grad_every: -1
-    save_model_every: 20
+    save_model_every: 50
 
     plot_l2_loss: True
 
@@ -117,13 +117,13 @@ infer:
     pretrain_infer_wave_sample_method: 'uniform_dense'
 
     plot_clipped_spectrum: True
-    plot_spectrum_with_loss: True
+    plot_spectrum_with_loss: False
     plot_spectrum_with_ivar: False
     plot_spectrum_with_lines: False
     plot_spectrum_with_recon: False
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: True
-    plot_spectrum_under_optimal_wrong_bin: False
+    plot_spectrum_under_optimal_wrong_bin: True
 
     num_spectrum_per_fig: 35
     num_spectrum_per_row: 7
