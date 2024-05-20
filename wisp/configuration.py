@@ -39,6 +39,7 @@ def get_pretrain_pipelines(pipelines, tasks, args):
            "save_redshift" in tasks or "plot_redshift_logits" in tasks or \
            "plot_codebook_coeff" in tasks or "plot_binwise_spectra_loss" in tasks or \
            "plot_codebook_coeff_all_bins" in tasks or \
+           "save_lambdawise_spectra_loss" in tasks or \
            "plot_global_lambdawise_spectra_loss" in tasks:
             spectra_nef = CodebookPretrainNerf(**vars(args))
             pipelines["spectra_infer"] = AstroPipeline(spectra_nef)

@@ -115,6 +115,13 @@ def get_bool_plot_lambdawise_spectra_loss(**kwargs):
         "generalization_infer" in kwargs["tasks"] or \
         "codebook_pretrain_infer" in kwargs["tasks"] )
 
+def get_bool_save_lambdawise_spectra_loss(**kwargs):
+    return (
+        "save_lambdawise_spectra_loss" in kwargs["tasks"]
+    ) and (
+        "sanity_check_infer" in kwargs["tasks"] or \
+        "generalization_infer" in kwargs["tasks"])
+
 def get_bool_train_spectra_with_lambdawise_weights(**kwargs):
     return (
         kwargs["regress_lambdawise_weights"] or \

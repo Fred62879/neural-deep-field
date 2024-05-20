@@ -80,12 +80,13 @@ class AstroInferrer(BaseInferrer):
                 ["model_dir","recon_dir","recon_synthetic_dir","metric_dir",
                  "zoomed_recon_dir","scaler_dir","pixel_distrib_dir","qtz_weights_dir",
                  "embed_map_dir","latents_dir","redshift_dir","latent_embed_dir","spectra_dir",
-                 "codebook_coeff_dir","spectra_latents_dir",
+                 "codebook_coeff_dir","spectra_latents_dir","spectra_lambdawise_loss_dir",
                  "codebook_spectra_dir", "codebook_spectra_individ_dir"],
                 ["models","recons","recon_synthetic","metrics",
                  "zoomed_recon","scaler","pixel_distrib","qtz_weights",
                  "embed_map","latents","redshift","latent_embed",f"{prefix}_spectra",
                  f"{prefix}_codebook_coeff",f"{prefix}_spectra_latents",
+                 f"{prefix}_spectra_lambdawise_loss",
                  f"{prefix}_codebook_spectra",f"{prefix}_codebook_spectra_individ"]
         ):
             path = join(self.log_dir, cur_pname)
@@ -143,7 +144,7 @@ class AstroInferrer(BaseInferrer):
         self.full_pipeline = self.pipelines["full"]
         log.info(self.full_pipeline)
         if self.recon_spectra or self.recon_spectra_all_bins or self.recon_redshift or \
-           self.plot_global_lambdawise_spectra_loss:
+           self.plot_global_lambdawise_spectra_loss or self.save_lambdawise_spectra_loss:
             self.spectra_infer_pipeline = self.pipelines["spectra_infer"]
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
             self.codebook_spectra_infer_pipeline = self.pipelines["codebook_spectra_infer"]
@@ -249,6 +250,8 @@ class AstroInferrer(BaseInferrer):
             self.classify_redshift and self.extra_args["calculate_binwise_spectra_loss"]
         self.plot_lambdawise_spectra_loss = \
             get_bool_plot_lambdawise_spectra_loss(**self.extra_args)
+        self.save_lambdawise_spectra_loss = \
+            get_bool_save_lambdawise_spectra_loss(**self.extra_args)
 
         # if we want to calculate binwise spectra loss when we do quantization
         #  we need to perform qtz first in hyperspectral_decoder::dim_reduction
@@ -453,7 +456,7 @@ class AstroInferrer(BaseInferrer):
             self.group_tasks.append("infer_all_coords_full_model")
 
         if self.recon_spectra or self.recon_redshift or self.recon_spectra_all_bins or \
-           self.plot_global_lambdawise_spectra_loss:
+           self.plot_global_lambdawise_spectra_loss or self.save_lambdawise_spectra_loss:
            self.group_tasks.append("infer_selected_coords_partial_model")
 
         if self.recon_codebook_spectra or self.recon_codebook_spectra_individ:
@@ -995,6 +998,9 @@ class AstroInferrer(BaseInferrer):
             if self.plot_spectra_color_based_on_loss or self.plot_spectra_with_loss:
                 self.spectra_lambdawise_losses = []
 
+        if self.save_lambdawise_spectra_loss:
+            self.spectra_lambdawise_losses_s = []
+
         if self.plot_global_lambdawise_spectra_loss:
             self.spectra_wave_g = []
             self.spectra_masks_g = []
@@ -1078,6 +1084,7 @@ class AstroInferrer(BaseInferrer):
                 self.save_qtz_weights,
                 self.save_optimal_bin_ids,
                 self.save_spectra_latents,
+                self.save_lambdawise_spectra_loss,
                 self.plot_redshift_est_stats,
                 self.plot_est_redshift_logits,
                 self.plot_binwise_spectra_loss,
@@ -1093,6 +1100,7 @@ class AstroInferrer(BaseInferrer):
             self._save_qtz_weights,
             self._save_optimal_bin_ids,
             self._save_spectra_latents,
+            self._save_lambdawise_spectra_loss,
             self._plot_redshift_est_stats,
             self._plot_est_redshift_logits,
             self._plot_binwise_spectra_loss,
@@ -1584,12 +1592,13 @@ class AstroInferrer(BaseInferrer):
                 index_latent=self.index_latent,
                 split_latent=self.split_latent,
                 apply_gt_redshift=self.apply_gt_redshift,
-                classify_redshift_based_on_l2=\
+                classify_redshift_based_on_l2= \
                     self.classify_redshift_based_on_l2,
-                calculate_binwise_spectra_loss=\
+                calculate_binwise_spectra_loss= \
                     self.calculate_binwise_spectra_loss,
-                calculate_lambdawise_spectra_loss=\
-                    self.plot_lambdawise_spectra_loss,
+                calculate_lambdawise_spectra_loss= \
+                    self.plot_lambdawise_spectra_loss or \
+                    self.save_lambdawise_spectra_loss,
                 regress_lambdawise_weights_share_latents= \
                     self.regress_lambdawise_weights and \
                     self.regress_lambdawise_weights_share_latents,
@@ -1682,6 +1691,9 @@ class AstroInferrer(BaseInferrer):
             self.optimal_bin_ids.extend(ret["optimal_bin_ids"])
             ids = self._get_optimal_wrong_bin_data(ret, data, get_id_only=True)
             self.optimal_wrong_bin_ids.extend(ids)
+
+        if self.save_lambdawise_spectra_loss:
+            self.spectra_lambdawise_losses_s.extend(ret["spectra_lambdawise_loss"])
 
         if self.plot_codebook_coeff:
             self.gt_redshift_cl.extend(data["spectra_redshift"])
@@ -1786,6 +1798,10 @@ class AstroInferrer(BaseInferrer):
             if self.plot_spectra_with_weights:
                 self.spectra_lambdawise_weights = torch.stack(
                     self.spectra_lambdawise_weights).detach().cpu().numpy()
+
+        if self.save_lambdawise_spectra_loss:
+            self.spectra_lambdawise_losses_s = torch.stack(
+                self.spectra_lambdawise_losses_s).detach().cpu().numpy()
 
         if self.plot_global_lambdawise_spectra_loss:
             self.spectra_wave_g = torch.stack(
@@ -1944,15 +1960,6 @@ class AstroInferrer(BaseInferrer):
                 spectra_dir = join(self.spectra_dir, f"selected-{self.num_selected}")
                 Path(spectra_dir).mkdir(parents=True, exist_ok=True)
             else: spectra_dir = self.spectra_dir
-
-            # print(lambdawise_weights.shape)
-            # print(np.sum(lambdawise_weights, axis=-1))
-            # print(lambdawise_weights[0])
-            # import matplotlib.pyplot as plt
-            # plt.plot(lambdawise_weights[0])
-            # plt.savefig('tmp.png')
-            # plt.close()
-            # assert 0
 
             cur_metrics = self.dataset.plot_spectrum(
                 spectra_dir, fname,
@@ -2227,6 +2234,11 @@ class AstroInferrer(BaseInferrer):
         spectra_latents = torch.stack(self.spectra_latents).detach().cpu().numpy()
         fname = join(self.spectra_latents_dir, f"model-{model_id}_logits")
         np.save(fname, spectra_latents)
+
+    def _save_lambdawise_spectra_loss(self, model_id, suffix=""):
+        fname = join(self.spectra_lambdawise_loss_dir,
+                     f"model-{model_id}_lambdawise_losses{suffix}")
+        np.save(fname, self.spectra_lambdawise_losses_s) # [bsz,nbins,nsmpl]
 
     # def _save_pixel_value(self, model_id):
     #     self.recon_pixels = self.trans_obj.integrate(recon_fluxes)

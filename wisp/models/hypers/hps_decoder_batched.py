@@ -10,7 +10,7 @@ from functools import partial
 from wisp.utils import PerfTimer
 from wisp.utils.common import create_batch_ids, get_input_latent_dim, \
     get_bool_classify_redshift, get_bool_plot_lambdawise_spectra_loss, \
-    get_bool_classify_redshift_based_on_l2, \
+    get_bool_save_lambdawise_spectra_loss, get_bool_classify_redshift_based_on_l2, \
     get_bool_weight_spectra_loss_with_global_restframe_loss
 
 from wisp.models.decoders import BasicDecoder, Siren, Garf
@@ -43,10 +43,12 @@ class HyperSpectralDecoderB(nn.Module):
 
         self.plot_lambdawise_spectra_loss = \
             get_bool_plot_lambdawise_spectra_loss(**kwargs)
+        self.save_lambdawise_spectra_loss = \
+            get_bool_save_lambdawise_spectra_loss(**kwargs)
         self.use_lambdawise_weights = \
             get_bool_weight_spectra_loss_with_global_restframe_loss(**kwargs)
-        self.save_lambdawise_loss = self.plot_lambdawise_spectra_loss # or \
-            # self.use_lambdawise_weights
+        self.save_lambdawise_loss = self.plot_lambdawise_spectra_loss or \
+            self.save_lambdawise_spectra_loss
 
         self.init_net()
 

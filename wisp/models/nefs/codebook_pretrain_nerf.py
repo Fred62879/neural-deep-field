@@ -6,7 +6,8 @@ from collections import defaultdict
 
 from wisp.utils import PerfTimer
 from wisp.utils.common import get_bool_classify_redshift, \
-    get_bool_has_redshift_latents, get_bool_weight_spectra_loss_with_global_restframe_loss
+    get_bool_has_redshift_latents, get_bool_weight_spectra_loss_with_global_restframe_loss, \
+    get_bool_save_lambdawise_spectra_loss
 
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.embedders.encoder import Encoder
@@ -17,16 +18,16 @@ from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 class CodebookPretrainNerf(BaseNeuralField):
     def __init__(self, codebook_pretrain_pixel_supervision=False, **kwargs):
-        self.kwargs = kwargs
-
-        super(CodebookPretrainNerf, self).__init__()
-
         assert kwargs["model_redshift"], "we must model redshift during pretrain"
 
+        self.kwargs = kwargs
         self.split_latents = kwargs["split_latent"]
         self.use_latents_as_coords = kwargs["use_latents_as_coords"]
         self.pixel_supervision = codebook_pretrain_pixel_supervision
         self.has_redshift_latents = get_bool_has_redshift_latents(**kwargs)
+        self.save_lambdawise_spectra_loss = get_bool_save_lambdawise_spectra_loss(**kwargs)
+
+        super(CodebookPretrainNerf, self).__init__()
 
         self.init_model()
 
@@ -118,7 +119,8 @@ class CodebookPretrainNerf(BaseNeuralField):
                     if self.kwargs["plot_spectrum_under_gt_bin"]:
                         channels.append("gt_bin_spectra")
 
-            if self.kwargs["plot_spectrum_with_loss"] or \
+            if self.save_lambdawise_spectra_loss or \
+               self.kwargs["plot_spectrum_with_loss"] or \
                self.kwargs["plot_spectrum_color_based_on_loss"] or \
                "plot_global_lambdawise_spectra_loss" in self.kwargs["tasks"]:
                 channels.extend(["spectra_lambdawise_loss","spectra_lambdawise_loss_l2"])
