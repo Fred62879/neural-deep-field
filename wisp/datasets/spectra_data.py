@@ -34,7 +34,7 @@ from collections import defaultdict
 from functools import partial, reduce
 from scipy.interpolate import interp1d
 from scipy.ndimage import gaussian_filter1d
-from linetools.lists.linelist import LineList
+#from linetools.lists.linelist import LineList
 from astropy.convolution import convolve, Gaussian1DKernel
 from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool

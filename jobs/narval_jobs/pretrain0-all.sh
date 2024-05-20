@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --array=4
+#SBATCH --array=0-3,5
 #SBATCH --time=16:00:00
 #SBATCH --gres=gpu:a100:1
 #SBATCH --nodes=1

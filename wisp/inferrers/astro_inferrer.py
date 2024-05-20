@@ -13,7 +13,7 @@ from pathlib import Path
 from os.path import exists, join
 from scipy.interpolate import interp1d
 from functools import partial, lru_cache
-from linetools.lists.linelist import LineList
+#from linetools.lists.linelist import LineList
 
 from wisp.inferrers import BaseInferrer
 from wisp.loss import get_loss, get_reduce, spectra_supervision_loss

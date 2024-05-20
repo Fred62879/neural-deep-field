@@ -1,7 +1,7 @@
 parent: base_narval.yaml
 
 global:
-    use_tqdm: True
+    use_tqdm: False
     exp_name: 'vdz-spectra-ssim'
     #log_fname: ''
 
@@ -28,7 +28,7 @@ embedder:
 pretrain:
     generalize_train_first_layer: False
 
-    pretrain_batch_size: 75
+    pretrain_batch_size: 50
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 100
     pretrain_wave_sample_method: 'uniform_dense'
@@ -156,11 +156,11 @@ spectra_data:
     filter_redshift_hi: -1
 
 ablation:
-    perform_ablation: False
+    perform_ablation: True
     ablat_id: 0
-    ablat_params: ["regularize_spectra_latents",'spectra_latents_regu_beta']
-    ablat_vals: [[True,False]]
-    ablat_num_vals: [2,2]
+    ablat_params: ["decoder_num_hidden_layers","decoder_hidden_dim","spectra_latents_regu_beta"]
+    ablat_vals: [[5,7],[128,512],[16,32,64]]
+    ablat_num_vals: [2,2,3]
 
-    #ablat_hardcode_params: ['pretrain_log_dir']
-    #ablat_hardcode_vals: [['20240513-143729_decoder_num_hidden_layers_5_regularize_spectra_latents_True','20240513-143729_decoder_num_hidden_layers_5_regularize_spectra_latents_True','20240513-143835_decoder_num_hidden_layers_5_regularize_spectra_latents_False','20240513-143835_decoder_num_hidden_layers_5_regularize_spectra_latents_False']]
+    ablat_hardcode_params: ['pretrain_log_dir']
+    ablat_hardcode_vals: [['20240519-172805_pretrain_skip_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_16','20240519-172801_pretrain_skip_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_32','20240519-172807_pretrain_skip_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_64','20240519-172811_pretrain_skip_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_16','20240519-172808_pretrain_skip_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_32','20240519-172809_pretrain_skip_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_64','20240519-172812_pretrain_skip_decoder_num_hidden_layers_7_decoder_hidden_dim_128_spectra_latents_regu_beta_16','20240519-172806_pretrain_skip_decoder_num_hidden_layers_7_decoder_hidden_dim_128_spectra_latents_regu_beta_32','20240519-172815_pretrain_skip_decoder_num_hidden_layers_7_decoder_hidden_dim_128_spectra_latents_regu_beta_64','20240519-172815_pretrain_skip_decoder_num_hidden_layers_7_decoder_hidden_dim_512_spectra_latents_regu_beta_16','20240519-151249_pretrain_skip_decoder_num_hidden_layers_7_decoder_hidden_dim_512_spectra_latents_regu_beta_32','20240519-172816_pretrain_skip_decoder_num_hidden_layers_7_decoder_hidden_dim_512_spectra_latents_regu_beta_64']]

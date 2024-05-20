@@ -2,8 +2,8 @@ parent: base_narval.yaml
 
 global:
     use_tqdm: False
-    exp_name: 'vipers-spectra-ssim'
-    # log_fname: ''
+    exp_name: 'vdz-spectra-ssim'
+    log_fname: 'pretrain_skip'
 
     tasks: ['codebook_pretrain'] #,'recon_spectra']
     #tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
@@ -26,7 +26,7 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    pretrain_batch_size: 20000
+    pretrain_batch_size: 18000
 
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 100
@@ -55,12 +55,12 @@ pretrain:
     pretrained_model_name: 'model-ep20000-bch0.pth'
 
     regularize_spectra_latents: True
-    spectra_latents_regu_beta: 32
+    spectra_latents_regu_beta: -1
 
 decoder:
     decoder_activation_type: relu #gaussian
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 5
+    decoder_num_hidden_layers: 3
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
@@ -89,7 +89,7 @@ trainer:
 
     resume_train: False
     resume_log_dir: ''
-    resume_model_fname: 'model-ep2000-bch0.pth'
+    resume_model_fname: 'model-ep1000-bch0.pth'
 
     spectra_loss_cho: ssim1d
     spectra_loss_reduction: mean
@@ -134,7 +134,7 @@ spectra_data:
 
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [vipers_w1,vipers_w4]
+    spectra_data_sources: [vipers_w1,vipers_w4,deimos,zcosmos]
     random_permute_source_spectra: True
 
     min_num_valid_samples: 100
@@ -151,11 +151,11 @@ spectra_data:
     filter_redshift_hi: -1
 
 ablation:
-    perform_ablation: False
+    perform_ablation: True
     ablat_id: 0
-    ablat_params: ["decoder_num_hidden_layers","regularize_spectra_latents"]
-    ablat_vals: [[3,5],[True,False]]
-    ablat_num_vals: [2,2]
+    ablat_params: ["decoder_num_hidden_layers","decoder_hidden_dim","spectra_latents_regu_beta"]
+    ablat_vals: [[5,7],[128,512],[16,32,64]]
+    ablat_num_vals: [2,2,3]
 
     #ablat_hardcode_params: ["pretrain_log_dir"]
     #ablat_hardcode_vals: [["20240222-015410_1600-spectra-skip-same-dim_decoder_batch_norm_True","20240222-165434_1600-spectra-skip-same-dim_decoder_batch_norm_False"]]
