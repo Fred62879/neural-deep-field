@@ -360,11 +360,6 @@ class AstroDataset(Dataset):
             out["idx"] = idx
         if "selected_ids" in self.requested_fields:
             out["selected_ids"] = self.data["selected_ids"]
-        # self.get_debug_data(out)
-        # if "model_data" in self.requested_fields:
-        #     self.get_model_data(out)
-        # if self.kwargs["plot_logits_for_gt_bin"]:
-        #     self.get_gt_redshift_bin_ids(out)
         if self.kwargs["add_redshift_logit_bias"]:
             self.get_init_redshift_logit_bias(out)
         if "wave_data" in self.requested_fields:
@@ -395,18 +390,6 @@ class AstroDataset(Dataset):
             assert "selected_ids" in self.data
             data = data[self.data["selected_ids"]]
         return data[idx]
-
-    # def get_debug_data(self, out):
-    #     if self.kwargs["plot_logits_for_gt_bin"]:
-    #         self.get_gt_redshift_bin_ids(out)
-    #     if self.kwargs["add_redshift_logit_bias"]:
-    #         self.get_init_redshift_logit_bias(out)
-
-    # def get_model_data(self, out):
-    #     if "scaler_latents" in self.data:
-    #         out["scaler_latents"] = self.data["scaler_latents"]
-    #     if "redshift_latents" in self.data:
-    #         out["redshift_latents"] = self.data["redshift_latents"]
 
     def get_wave_data(self, batch_size, out):
         """ Get wave (lambda and transmission) data depending on data source.

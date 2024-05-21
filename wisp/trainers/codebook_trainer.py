@@ -92,19 +92,23 @@ class CodebookTrainer(BaseTrainer):
             self.mode = "codebook_pretrain"
         elif "sanity_check" in tasks:
             self.mode = "sanity_check"
+        elif "redshift_classification_train" in tasks:
+            self.mode = "redshift_classification_train"
         elif "generalization" in tasks:
             self.mode = "generalization"
+        elif "redshift_classification_genlz" in tasks:
+            self.mode = "redshift_classification_genlz"
         else: raise ValueError("Invalid mode!")
 
         self.generalize_train_first_layer = self.mode == "generalization" and \
             self.extra_args["generalize_train_first_layer"]
 
-        if self.mode == "generalization":
-            self.num_spectra = self.dataset.get_num_test_spectra()
-        elif self.mode == "sanity_check":
-            self.num_spectra = self.dataset.get_num_validation_spectra()
-        elif self.mode == "codebook_pretrain":
+        if self.mode == "codebook_pretrain":
             self.num_spectra = self.dataset.get_num_supervision_spectra()
+        elif self.mode == "sanity_check" or self.mode == "redshift_classification_train":
+            self.num_spectra = self.dataset.get_num_validation_spectra()
+        elif self.mode == "generalization" or self.mode == "redshift_classification_genlz":
+            self.num_spectra = self.dataset.get_num_test_spectra()
         else: raise ValueError("Invalid mode!")
 
         # quantization setups
@@ -177,19 +181,20 @@ class CodebookTrainer(BaseTrainer):
                    self.neg_sup_wrong_redshift
 
         # sanity check & generalization mandates brute force
-        assert not (self.mode == "sanity_check" or self.mode == "generalization") or \
-            self.calculate_binwise_spectra_loss
+        self.brute_force = self.mode == "sanity_check" or \
+            self.mode == "generalization" or \
+            self.mode == "redshift_classification_train" or \
+            self.mode == "redshift_classification_genlz"
+
+        assert not self.brute_force or self.calculate_binwise_spectra_loss
         # three different brute force strategies during sc & generalization
-        self.regularize_binwise_spectra_latents = \
-            (self.mode == "sanity_check" or self.mode == "generalization") and \
+        self.regularize_binwise_spectra_latents = self.brute_force and \
             self.calculate_binwise_spectra_loss and \
             self.extra_args["regularize_binwise_spectra_latents"]
-        self.optimize_latents_for_each_redshift_bin = \
-            (self.mode == "sanity_check" or self.mode == "generalization") and \
+        self.optimize_latents_for_each_redshift_bin = self.brute_force and \
             self.calculate_binwise_spectra_loss and \
             self.extra_args["optimize_latents_for_each_redshift_bin"]
-        self.optimize_one_latent_for_all_redshift_bins = \
-            (self.mode == "sanity_check" or self.mode == "generalization") and \
+        self.optimize_one_latent_for_all_redshift_bins = self.brute_force and \
             self.calculate_binwise_spectra_loss and \
             not self.regularize_binwise_spectra_latents and \
             not self.extra_args["optimize_latents_for_each_redshift_bin"]
@@ -207,12 +212,10 @@ class CodebookTrainer(BaseTrainer):
             self.num_redshift_bins = len(redshift_bins)
 
         # * weighted spectra training
-        self.regress_lambdawise_weights = \
-            self.extra_args["regress_lambdawise_weights"] and \
-            (self.mode == "sanity_check" or self.mode == "generalization")
-        self.use_global_spectra_loss_as_lambdawise_weights = \
-            self.extra_args["use_global_spectra_loss_as_lambdawise_weights"] and \
-            (self.mode == "sanity_check" or self.mode == "generalization")
+        self.regress_lambdawise_weights = self.brute_force and \
+            self.extra_args["regress_lambdawise_weights"]
+        self.use_global_spectra_loss_as_lambdawise_weights = self.brute_force and \
+            self.extra_args["use_global_spectra_loss_as_lambdawise_weights"]
         assert not (self.regress_lambdawise_weights and \
                     self.use_global_spectra_loss_as_lambdawise_weights)
         if self.use_global_spectra_loss_as_lambdawise_weights:
@@ -268,14 +271,12 @@ class CodebookTrainer(BaseTrainer):
         self.plot_loss = self.extra_args["plot_loss"]
         self.plot_l2_loss = self.extra_args["plot_l2_loss"] and \
             self.extra_args["spectra_loss_cho"] == "ssim1d"
-        self.plot_gt_bin_loss = self.calculate_binwise_spectra_loss and \
-            (self.mode == "sanity_check" or self.mode == "generalization")
+        self.plot_gt_bin_loss = self.calculate_binwise_spectra_loss and self.brute_force
         self.plot_individ_spectra_loss = self.apply_gt_redshift and \
             self.extra_args["plot_individ_spectra_loss"]
 
         self.index_latent = True # index latents as coords in model
-        self.split_latent = self.extra_args["split_latent"] and \
-            (self.mode == "sanity_check" or self.mode == "generalization")
+        self.split_latent = self.extra_args["split_latent"] and self.brute_force
 
         self.regularize_redshift_logits = self.extra_args["regularize_redshift_logits"]
         self.redshift_logits_regu_method = self.extra_args["redshift_logits_regu_method"]
@@ -295,19 +296,15 @@ class CodebookTrainer(BaseTrainer):
             self.regularize_across_codebook_spectra <= 1
 
         self.optimize_spectra_latents = self.extra_args["optimize_spectra_latents"]
-        self.optimize_redshift_latents = \
-            self.has_redshift_latents and \
-            self.extra_args["optimize_redshift_latents"] and \
-            (self.mode == "sanity_check" or self.mode == "generalization")
+        self.optimize_redshift_latents = self.has_redshift_latents and \
+            self.extra_args["optimize_redshift_latents"] and self.brute_force
 
         # latents are optimized as codebook coefficients
         self.optimize_spectra_latents_as_logits = \
             self.extra_args["optimize_spectra_latents_as_logits"]
-        self.optimize_redshift_latents_as_logits = \
-            self.has_redshift_latents and \
+        self.optimize_redshift_latents_as_logits = self.has_redshift_latents and \
             self.optimize_redshift_latents and \
-            self.extra_args["optimize_redshift_latents_as_logits"] and \
-            (self.mode == "sanity_check" or self.mode == "generalization")
+            self.extra_args["optimize_redshift_latents_as_logits"] and self.brute_force
 
         self.load_pretrained_spectra_latents = \
             self.extra_args["load_pretrained_spectra_latents"]
@@ -316,8 +313,7 @@ class CodebookTrainer(BaseTrainer):
         self.optimize_gt_bin_only = self.extra_args["optimize_gt_bin_only"]
         self.dont_optimize_gt_bin = self.extra_args["dont_optimize_gt_bin"]
         self.optimize_bins_separately = self.optimize_gt_bin_only or self.dont_optimize_gt_bin
-        assert not self.load_pretrained_spectra_latents or \
-            (self.mode == "sanity_check" or self.mode == "generalization")
+        assert not self.load_pretrained_spectra_latents or self.brute_force
         assert not self.load_pretrained_spectra_latents_to_gt_bin_only or \
             self.load_pretrained_spectra_latents
         assert not self.optimize_bins_separately or \
@@ -380,8 +376,7 @@ class CodebookTrainer(BaseTrainer):
             if self.plot_gt_bin_loss:
                 self.gt_bin_l2_loss_fname = join(self.loss_dir, "gt_bin_l2_loss")
 
-        if (self.mode == "sanity_check" or self.mode == "generalization"):
-            # redshift pretrain use pretrained model from codebook pretrain
+        if self.mode == "sanity_check" or self.mode == "generalization":
             _, self.pretrained_model_fname = get_pretrained_model_fname(
                 self.log_dir,
                 self.extra_args["pretrain_log_dir"],
@@ -508,7 +503,7 @@ class CodebookTrainer(BaseTrainer):
     def init_optimizer(self):
         if self.mode == "codebook_pretrain":
             latents, net_params = self._assign_codebook_pretrain_optimization_params()
-        elif (self.mode == "sanity_check" or self.mode == "generalization"):
+        elif self.brute_force:
             if self.optimize_latents_alternately:
                 spectra_latents, redshift_latents, net_params = \
                     self._assign_redshift_pretrain_optimization_params()
@@ -522,7 +517,7 @@ class CodebookTrainer(BaseTrainer):
             optms = { "latents": latents_optm, "net": net_optm }
 
         elif self.optimize_latents_alternately:
-            assert (self.mode == "sanity_check" or self.mode == "generalization")
+            assert self.brute_force
             if self.use_lbfgs:
                 raise NotImplementedError()
             else:
@@ -567,9 +562,9 @@ class CodebookTrainer(BaseTrainer):
 
         # set spectra data source
         # tmp: in sanity check mode, we manually change sup_id and val_id in spectra_data
-        if self.mode == "generalization":
+        if self.mode == "generalization" or self.mode == "redshift_classification_genlz":
             self.dataset.set_spectra_source("test")
-        elif self.mode == "sanity_check":
+        elif self.mode == "sanity_check" or self.mode == "redshift_classification_train":
             self.dataset.set_spectra_source("val")
         else: self.dataset.set_spectra_source("sup")
 
@@ -866,7 +861,7 @@ class CodebookTrainer(BaseTrainer):
             assert not self.split_latent
             latents = self.init_pretrain_spectra_latents()
             redshift_latents = None
-        elif (self.mode == "sanity_check" or self.mode == "generalization"):
+        elif self.brute_force:
             latents = self.init_redshift_pretrain_spectra_latents()
             if not self.has_redshift_latents:
                 redshift_latents = None
@@ -881,9 +876,9 @@ class CodebookTrainer(BaseTrainer):
             Note: if we also resume, then `resume_train` should overwrite model states
                   i.e. `resume_train` called after this func
         """
-        if self.mode == "codebook_pretrain":
+        if self.mode == "codebook_pretrain" or self.mode == "redshift_classification_train":
             pass
-        elif (self.mode == "sanity_check" or self.mode == "generalization"):
+        elif self.mode == "sanity_check" or self.mode == "generalization":
             load_excls, freeze_excls = [], []
 
             # we load latents in `init_latents` only
@@ -1071,28 +1066,29 @@ class CodebookTrainer(BaseTrainer):
         return latents
 
     def load_model(self, model_fname, excls=[]):
-        assert(exists(model_fname))
         log.info(f"saved model found, loading {model_fname}")
         checkpoint = torch.load(model_fname)
-        # print(checkpoint["model_state_dict"].keys())
         load_pretrained_model_weights(
             self.train_pipeline, checkpoint["model_state_dict"], excls=excls)
 
-        if (self.mode == "sanity_check" or self.mode == "generalization"):
-            # total steps of pretrain used only when we do temperaturized qtz
-            # this value should not change as we freeze codebook & qtz operation together
-            # Note: in case where we resume during sanity check, it would be wrong if we
-            #       use `total_steps` here which is the steps of the previous sanity check
-            #       instead we want to use the `total_steps` of the pretrain from which we
-            #       perform the previous (very first) sanity check
+        self.codebook_pretrain_total_steps = 0
+        if self.mode == "sanity_check" or self.mode == "generalization":
+            """
+            `pretrain_total_steps` is needed only when we do temperaturized quantization.
+            After codebook pretrain, we only have `total_steps` in the saved model and we
+              use it for the current (very first) sanity check run.
+            After the first sanity check, we save `total_steps` of codebook pretrain as
+              `codebook_pretrain_total_steps` in the saved model. And `total_steps` in
+              saved model now is the total iterations of the sanity check run.
+            """
             if "codebook_pretrain_total_steps" not in checkpoint:
+                # first sanity check
                 self.codebook_pretrain_total_steps = checkpoint["total_steps"]
-                # self.codebook_pretrain_total_steps = checkpoint["iterations"]
             else:
+                # resume from previous sanity check
                 self.codebook_pretrain_total_steps = \
                     checkpoint["codebook_pretrain_total_steps"]
 
-        else: self.codebook_pretrain_total_steps = 0
         self.train_pipeline.train()
         return checkpoint
 
@@ -1108,7 +1104,7 @@ class CodebookTrainer(BaseTrainer):
             "model_state_dict": self.train_pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
         }
-        if (self.mode == "sanity_check" or self.mode == "generalization"):
+        if self.brute_force:
             checkpoint["codebook_pretrain_total_steps"] = self.codebook_pretrain_total_steps
         if self.regress_lambdawise_weights and \
            self.regress_lambdawise_weights_share_latents and \
@@ -1526,7 +1522,7 @@ class CodebookTrainer(BaseTrainer):
             spectra_l2_loss_func = self.spectra_l2_loss_func
         else: spectra_l2_loss_func = None
 
-        if (self.mode == "sanity_check" or self.mode == "generalization"):
+        if self.brute_force:
             steps = self.codebook_pretrain_total_steps
         else: steps = self.total_steps
 
