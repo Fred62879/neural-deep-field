@@ -13,7 +13,7 @@ from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
 from wisp.utils.common import print_shape, get_bin_ids, \
-    create_gt_redshift_bin_masks, get_redshift_range
+    create_gt_redshift_bin_masks, get_redshift_range, has_common
 from wisp.datasets.data_utils import clip_data_to_ref_wave_range, \
     get_wave_range_fname, batch_sample_torch, get_bound_id
 
@@ -54,11 +54,14 @@ class AstroDataset(Dataset):
             Load only needed data based on given tasks (in kwargs).
         """
         self.data = {}
+
         self.trans_dataset = TransData(self.device, **self.kwargs)
         self.spectra_dataset = SpectraData(self.trans_dataset, self.device, **self.kwargs)
-        self.fits_dataset = FitsData(self.device, self.spectra_dataset, **self.kwargs)
-        self.mask_dataset = MaskData(self.fits_dataset, self.device, **self.kwargs)
         self.spectra_dataset.finalize_spectra()
+
+        if has_common(self.kwargs["tasks"], ["main_train"]):
+            self.fits_dataset = FitsData(self.device, self.spectra_dataset, **self.kwargs)
+            self.mask_dataset = MaskData(self.fits_dataset, self.device, **self.kwargs)
 
         wave_range_fname = get_wave_range_fname(**self.kwargs)
         self.data["wave_range"] = np.load(wave_range_fname)

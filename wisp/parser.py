@@ -181,6 +181,7 @@ def define_cmd_line_args():
     global_group.add_argument("--verbose", action="store_true")
     global_group.add_argument("--use-gpu", action="store_true")
     global_group.add_argument("--use-tqdm", action="store_true")
+    global_group.add_argument("--on-cc", action="store_true")
     global_group.add_argument("--on-cedar", action="store_true")
     global_group.add_argument("--on-graham", action="store_true")
     global_group.add_argument("--on-narval", action="store_true")
@@ -604,8 +605,10 @@ def define_cmd_line_args():
                             help="Dataset class to use")
 
     data_group.add_argument("--dataset-path", type=str, help="Path to the dataset")
+    data_group.add_argument("--cc-dataset-path", type=str, help="Path to the dataset")
     data_group.add_argument("--cedar-dataset-path", type=str, help="Path to the dataset")
     data_group.add_argument("--sockeye-dataset-path", type=str, help="Path to the dataset")
+    data_group.add_argument("--cc-input-fits-path", type=str,help="Path to the dataset")
     data_group.add_argument("--cedar-input-fits-path", type=str, help="Path to the dataset")
     data_group.add_argument("--narval-input-fits-path", type=str, help="Path to the dataset")
     data_group.add_argument("--graham-input-fits-path", type=str, help="Path to the dataset")
@@ -794,6 +797,7 @@ def define_cmd_line_args():
     train_group.add_argument("--trainer-type", type=str, help="Trainer class to use")
     train_group.add_argument("--log-dir", type=str, default="_results/logs/runs/",
                              help="Log file directory for checkpoints.")
+    train_group.add_argument("--cc-log-dir", type=str)
     train_group.add_argument("--cedar-log-dir", type=str)
     train_group.add_argument("--sockeye-log-dir", type=str)
 
