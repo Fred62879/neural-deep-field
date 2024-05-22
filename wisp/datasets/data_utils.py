@@ -41,6 +41,8 @@ def patch_exists(path, tract, patch):
     return exists(fname)
 
 def get_log_dir(**kwargs):
+    if kwarg["on_cc"]:
+        return kwargs["cc_log_dir"]
     if kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
         return kwargs["cedar_log_dir"]
     if kwargs["on_sockeye"]:
@@ -48,7 +50,9 @@ def get_log_dir(**kwargs):
     return kwargs["log_dir"]
 
 def get_dataset_path(**kwargs):
-    if kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
+    if kwargs["on_cc"]:
+        dataset_path = kwargs["cc_dataset_path"]
+    elif kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
         dataset_path = kwargs["cedar_dataset_path"]
     elif kwargs["on_sockeye"]:
         dataset_path = kwargs["sockeye_dataset_path"]
@@ -56,7 +60,11 @@ def get_dataset_path(**kwargs):
     return dataset_path
 
 def get_img_data_path(local_dataset_path, **kwargs):
-    if kwargs["on_cedar"]:
+    if kwargs["on_cc"]:
+        input_patch_path = kwargs["cc_input_fits_path"]
+        _, img_data_path = set_input_path(
+	    local_dataset_path, kwargs["sensor_collection_name"])
+    elif kwargs["on_cedar"]:
         input_patch_path = kwargs["cedar_input_fits_path"]
         _, img_data_path = set_input_path(
             local_dataset_path, kwargs["sensor_collection_name"])
@@ -78,7 +86,9 @@ def get_img_data_path(local_dataset_path, **kwargs):
     return input_patch_path, img_data_path
 
 def get_wave_range_fname(**kwargs):
-    if kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
+    if kwargs["on_cc"]:
+        dataset_path = kwargs["cc_dataset_path"]
+    elif kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
         dataset_path = kwargs["cedar_dataset_path"]
     elif kwargs["on_sockeye"]:
         dataset_path = kwargs["sockeye_dataset_path"]
