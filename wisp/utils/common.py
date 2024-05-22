@@ -19,6 +19,9 @@ from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
 
+def has_common(list1, list2):
+    return len(list(  set(list1) & set(list2) )) != 0
+
 def get_log_dir(**kwargs):
     if kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
         log_dir = kwargs["cedar_log_dir"]

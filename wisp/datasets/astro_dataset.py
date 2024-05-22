@@ -83,9 +83,11 @@ class AstroDataset(Dataset):
 
     def set_mode(self, mode):
         """
-        Possible modes: ["codebook_pretrain","sanity_check","generalization",
-                         "main_train","codebook_pretrain_infer","sanity_check_infer",
-                         "generalization_infer","main_infer","test"]
+        Possible modes: ["main_train","codebook_pretrain","sanity_check","generalization",
+                         "redshift_classification_train","redshift_classification_genlz",
+                         "main_infer","codebook_pretrain_infer","sanity_check_infer",
+                         "generalization_infer","redshift_classification_train_infer",
+                         "redshift_classification_genlz_infer","test"]
         """
         self.mode = mode
 
@@ -99,9 +101,6 @@ class AstroDataset(Dataset):
 
     def set_fields(self, fields):
         self.requested_fields = set(fields)
-
-    # def set_wave_range(self, lo, hi):
-    #     self.wave_range = (lo, hi)
 
     def set_wave_source(self, wave_source):
         """ Set dataset source of wave that controls:
@@ -339,10 +338,10 @@ class AstroDataset(Dataset):
             data = self.get_spectra_redshift()
         elif field == "spectra_sup_bounds":
             data = self.get_spectra_sup_bounds()
-        elif field == "spectra_ivar_reliable":
-            data = self.get_spectra_ivar_reliable()
         elif field == "spectra_source_data":
             data = self.get_spectra_source_data()
+        elif field == "spectra_ivar_reliable":
+            data = self.get_spectra_ivar_reliable()
 
         # elif field == "masks":
         #     data = self.mask_dataset.get_mask()

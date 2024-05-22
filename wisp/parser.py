@@ -516,6 +516,8 @@ def define_cmd_line_args():
 
     pretrain_group.add_argument("--pretrain-log-dir", type=str)
     pretrain_group.add_argument("--pretrained-model-name", type=str)
+    pretrain_group.add_argument("--pre-classification-log-dir", type=str)
+    pretrain_group.add_argument("--pre-classification-fname-prefix", type=str)
 
     pretrain_group.add_argument("--pretrain-use-all-wave", action="store_true")
     pretrain_group.add_argument("--pretrain-wave-sample-method", type=str, default="uniform")

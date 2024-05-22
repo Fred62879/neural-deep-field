@@ -546,10 +546,12 @@ class CodebookTrainer(BaseTrainer):
         """ Configure dataset with selected fields and set length accordingly.
         """
         self.dataset.set_mode(self.mode)
+        fields = ["spectra_sup_bounds"]
 
-        # set required fields from dataset
-        fields = ["wave_data","spectra_source_data","spectra_sup_bounds",
-                  "spectra_masks","spectra_redshift"]
+        if self.mode != "redshift_classification_train" and \
+           self.mdoe != "redshift_classification_genlz":
+            fields.extend([
+                "wave_data","spectra_source_data","spectra_masks","spectra_redshift"])
 
         # todo, codebook pretrain "coords" not handled
         if self.pixel_supervision:
@@ -575,10 +577,6 @@ class CodebookTrainer(BaseTrainer):
         if self.sample_wave:
             self.dataset.set_num_wave_samples(self.extra_args["pretrain_num_wave_samples"])
             self.dataset.set_wave_sample_method(self.extra_args["pretrain_wave_sample_method"])
-        # if self.train_within_wave_range:
-        #     self.dataset.set_wave_range(
-        #         self.extra_args["spectra_supervision_wave_lo"],
-        #         self.extra_args["spectra_supervision_wave_hi"])
 
         self.dataset.set_length(self.num_spectra)
         if self.extra_args["infer_selected"]:
@@ -591,6 +589,7 @@ class CodebookTrainer(BaseTrainer):
         if self.classify_redshift:
             self.dataset.set_num_redshift_bins(self.num_redshift_bins)
 
+        # weighted spectra training
         if self.use_global_spectra_loss_as_lambdawise_weights:
             emitted_wave, loss = np.load(self.global_restframe_spectra_loss_fname)
             global_restframe_spectra_loss = interp1d(
@@ -609,6 +608,19 @@ class CodebookTrainer(BaseTrainer):
                         self.optm_bin_ids = torch.zeros(self.num_spectra).to(torch.long)
                         self.dataset.set_hardcode_data("optm_bin_ids", self.optm_bin_ids)
                     fields.append("optm_bin_ids")
+
+        # train classifier on top of trained model to predict redshift
+        if self.mode == "redshift_classification_train" or \
+           self.mode == "redshift_classification_genlz":
+            dir = join(self.log_dir, "..", self.extra_args["pre_classification_log_dir"])
+            prefix = self.extra_args["pre_classification_fname_prefix"]
+            wave_fname = join(dir, f"{prefix}_wave.npy")
+            gt_bin_fname = join(dir, f"{prefix}_gt_bin_ids.npy")
+            loss_fname = join(dir, f"{prefix}_lambdawise_losses.npy")
+            self.dataset.set_hardcode_data("spectra_wave",np.load(wave_fname))
+            self.dataset.set_hardcode_data("gt_redshift_bin_ids",np.load(gt_bin_fname))
+            self.dataset.set_hardcode_data("spectra_lambdawise_losses",np.load(loss_fname))
+            fields.extend(["spectra_wave","gt_redshift_bin_ids","spectra_lambdawise_losses"])
 
         self.dataset.set_fields(fields)
 

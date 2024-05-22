@@ -12,7 +12,7 @@ if __name__ == "__main__":
 
     from wisp.configuration import *
     from wisp.parser import parse_args
-    from wisp.utils.common import query_GPU_mem
+    from wisp.utils.common import query_GPU_mem, has_common
     from wisp.trainers import AstroTrainer, CodebookTrainer
 
     args, args_str = parse_args()
@@ -33,7 +33,7 @@ if __name__ == "__main__":
         )
         trainer.train()
 
-    if ("generalization" in tasks or "sanity_check" in tasks) and args.pretrain_codebook:
+    if has_common(tasks, ["sanity_check","generalization","redshift_classification_train","redshift_classification_genlz"]) and args.pretrain_codebook:
         optim_cls, optim_params = get_optimizer_from_config(args)
         trainer_cls = CodebookTrainerDebug if args.debug_lbfgs else CodebookTrainer
         trainer = get_trainer_from_config(

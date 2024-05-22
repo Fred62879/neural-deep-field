@@ -54,8 +54,10 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240518-093832_ssim_4500_epochs'
-    pretrained_model_name: 'model-ep4500-bch0.pth'
+    pretrain_log_dir: 20240518-093832_ssim_4500_epochs
+    pretrained_model_name: model-ep4500-bch0.pth
+    pre_classification_log_dir: 20240519-220446_sc_200_spectra_200_epochs_093822/val_spectra_lambdawise_loss
+    pre_classification_fname_prefix: model-0
 
     regularize_spectra_latents: True
     spectra_latents_regu_beta: 32

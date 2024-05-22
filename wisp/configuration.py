@@ -12,6 +12,7 @@ from wisp.inferrers import *
 from wisp.models.nefs import *
 from wisp.datasets.transforms import *
 from wisp.models import AstroPipeline
+from wisp.utils.common import has_common
 
 
 str2optim = {m.lower(): getattr(torch.optim, m) for m in dir(torch.optim) if m[0].isupper()}
@@ -20,7 +21,7 @@ def register_class(cls, name):
     globals()[name] = cls
 
 def get_pretrain_pipelines(pipelines, tasks, args):
-    if "codebook_pretrain" in tasks or "sanity_check" in tasks or "generalization" in tasks:
+    if has_common(tasks, ["codebook_pretrain","sanity_check","generalization","redshift_classification_train","redshift_classification_genlz"] ):
         pretrain_nef = CodebookPretrainNerf(
             codebook_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
             **vars(args)
