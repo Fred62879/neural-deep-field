@@ -41,7 +41,7 @@ def patch_exists(path, tract, patch):
     return exists(fname)
 
 def get_log_dir(**kwargs):
-    if kwarg["on_cc"]:
+    if kwargs["on_cc"]:
         return kwargs["cc_log_dir"]
     if kwargs["on_cedar"] or kwargs["on_graham"] or kwargs["on_narval"]:
         return kwargs["cedar_log_dir"]

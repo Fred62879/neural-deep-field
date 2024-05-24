@@ -144,7 +144,7 @@ class BaseTrainer(ABC):
         """ Default initialization for the optimizer.
         """
         params_dict = { name : param
-                        for name, param in self.pipeline.nef.named_parameters() }
+                        for name, param in self.pipeline.model.named_parameters() }
         params = []
         decoder_params = []
         grid_params = []

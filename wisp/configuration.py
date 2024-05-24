@@ -11,8 +11,8 @@ from wisp.trainers import *
 from wisp.inferrers import *
 from wisp.models.nefs import *
 from wisp.datasets.transforms import *
-from wisp.models import AstroPipeline
 from wisp.utils.common import has_common
+from wisp.models import AstroPipeline, RedshiftClassifier
 
 
 str2optim = {m.lower(): getattr(torch.optim, m) for m in dir(torch.optim) if m[0].isupper()}
@@ -21,15 +21,18 @@ def register_class(cls, name):
     globals()[name] = cls
 
 def get_pretrain_pipelines(pipelines, tasks, args):
-    if has_common(tasks, ["codebook_pretrain","sanity_check","generalization","redshift_classification_train","redshift_classification_genlz"] ):
+    if has_common(tasks, ["codebook_pretrain","sanity_check","generalization"] ):
         pretrain_nef = CodebookPretrainNerf(
             codebook_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
             **vars(args)
         )
         pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
 
-    if "codebook_pretrain_infer" in tasks or "sanity_check_infer" in tasks or \
-       "generalization_infer" in tasks:
+    elif has_common(tasks, ["redshift_classification_train","redshift_classification_genlz"]):
+        classifier = RedshiftClassifier(**vars(args))
+        pipelines["redshift_classifier"] = AstroPipeline(classifier)
+
+    elif has_common(tasks, ["codebook_pretrain_infer","sanity_check_infer","generalization_infer"]):
         pretrain_nef = CodebookPretrainNerf(
             codebook_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
             **vars(args)
@@ -52,7 +55,6 @@ def get_pretrain_pipelines(pipelines, tasks, args):
         elif "recon_codebook_spectra_individ" in tasks:
             codebook_spectra_nef = CodebookPretrainNerf(**vars(args))
             pipelines["codebook_spectra_infer"] = AstroPipeline(codebook_spectra_nef)
-
     return pipelines
 
 def get_main_train_pipelines(pipelines, tasks, args):

@@ -271,7 +271,8 @@ class CodebookTrainer(BaseTrainer):
         self.plot_loss = self.extra_args["plot_loss"]
         self.plot_l2_loss = self.extra_args["plot_l2_loss"] and \
             self.extra_args["spectra_loss_cho"] == "ssim1d"
-        self.plot_gt_bin_loss = self.calculate_binwise_spectra_loss and self.brute_force
+        self.plot_gt_bin_loss = self.extra_args["plot_gt_bin_loss"] and \
+            self.calculate_binwise_spectra_loss and self.brute_force
         self.plot_individ_spectra_loss = self.apply_gt_redshift and \
             self.extra_args["plot_individ_spectra_loss"]
 
@@ -403,34 +404,37 @@ class CodebookTrainer(BaseTrainer):
 
     def init_net(self):
         self.train_pipeline = self.pipeline[0]
-        self.train_pipeline.set_batch_reduction_order(
-            self.extra_args["spectra_batch_reduction_order"])
+        if self.qtz:
+            self.train_pipeline.set_batch_reduction_order(
+                self.extra_args["spectra_batch_reduction_order"])
 
-        # latents here are used to
-        #  EITHER generate codebook coefficients (no softmax applied) in codebook qtz setting
-        #  OR concatenate with lambda to be directly decoded as spectra in autodecoder setting
-        latents, redshift_latents = self.init_latents()
+        if self.mode != "redshift_classification_train" and \
+           self.mode != "redshift_classification_genlz":
+            # latents here are used to
+            #  EITHER generate codebook coefficients (no softmax applied) in codebook qtz setting
+            #  OR concatenate with lambda to be directly decoded as spectra in autodecoder setting
+            latents, redshift_latents = self.init_latents()
 
-        if self.optimize_bins_separately:
-            raise NotImplementedError()
-            gt_bin_latents, wrong_bin_latents = latents
-            self.train_pipeline.set_gt_bin_latents(gt_bin_latents)
-            self.train_pipeline.set_wrong_bin_latents(wrong_bin_latents)
-            self.train_pipeline.combine_latents_all_bins(
-                self.gt_redshift_bin_ids,
-                self.wrong_redshift_bin_ids,
-                self.gt_redshift_bin_masks)
-        elif self.regularize_binwise_spectra_latents:
-            base_latents, addup_latents = latents
-            self.train_pipeline.set_base_latents(base_latents)
-            self.train_pipeline.set_addup_latents(addup_latents)
-            # self.train_pipeline.add_latents()
-        else:
-            self.train_pipeline.set_latents(latents)
+            if self.optimize_bins_separately:
+                raise NotImplementedError()
+                gt_bin_latents, wrong_bin_latents = latents
+                self.train_pipeline.set_gt_bin_latents(gt_bin_latents)
+                self.train_pipeline.set_wrong_bin_latents(wrong_bin_latents)
+                self.train_pipeline.combine_latents_all_bins(
+                    self.gt_redshift_bin_ids,
+                    self.wrong_redshift_bin_ids,
+                    self.gt_redshift_bin_masks)
+            elif self.regularize_binwise_spectra_latents:
+                base_latents, addup_latents = latents
+                self.train_pipeline.set_base_latents(base_latents)
+                self.train_pipeline.set_addup_latents(addup_latents)
+                # self.train_pipeline.add_latents()
+            else:
+                self.train_pipeline.set_latents(latents)
 
-        if redshift_latents is not None:
-            self.train_pipeline.set_redshift_latents(redshift_latents)
-        self.freeze_and_load()
+            if redshift_latents is not None:
+                self.train_pipeline.set_redshift_latents(redshift_latents)
+                self.freeze_and_load()
 
         log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(
@@ -549,7 +553,7 @@ class CodebookTrainer(BaseTrainer):
         fields = ["spectra_sup_bounds"]
 
         if self.mode != "redshift_classification_train" and \
-           self.mdoe != "redshift_classification_genlz":
+           self.mode != "redshift_classification_genlz":
             fields.extend([
                 "wave_data","spectra_source_data","spectra_masks","spectra_redshift"])
 
@@ -618,9 +622,9 @@ class CodebookTrainer(BaseTrainer):
             gt_bin_fname = join(dir, f"{prefix}_gt_bin_ids.npy")
             loss_fname = join(dir, f"{prefix}_lambdawise_losses.npy")
             self.dataset.set_hardcode_data("spectra_wave",np.load(wave_fname))
-            self.dataset.set_hardcode_data("gt_redshift_bin_ids",np.load(gt_bin_fname))
+            self.dataset.set_hardcode_data("gt_redshift_bin_ids_b",np.load(gt_bin_fname).T)
             self.dataset.set_hardcode_data("spectra_lambdawise_losses",np.load(loss_fname))
-            fields.extend(["spectra_wave","gt_redshift_bin_ids","spectra_lambdawise_losses"])
+            fields.extend(["spectra_wave","gt_redshift_bin_ids_b","spectra_lambdawise_losses"])
 
         self.dataset.set_fields(fields)
 
@@ -654,7 +658,7 @@ class CodebookTrainer(BaseTrainer):
 
         # for n, p in self.train_pipeline.named_parameters():
             # print(n, p.requires_grad)
-            # if n == 'nef.latents': # print(p.shape) print(p[:2,0])
+            # if n == 'model.latents': # print(p.shape) print(p[:2,0])
 
         if self.extra_args["resume_train"]:
             self.resume_train()
@@ -662,7 +666,7 @@ class CodebookTrainer(BaseTrainer):
         # check model state (frozen or not)
         # for n, p in self.train_pipeline.named_parameters():
             # print(n, p.requires_grad)
-            # if n == 'nef.latents': #print(p.shape)print(p[:2,0])
+            # if n == 'model.latents': #print(p.shape)print(p[:2,0])
 
     def end_train(self):
         self.writer.close()
@@ -806,11 +810,11 @@ class CodebookTrainer(BaseTrainer):
         if self._plot_grad_now():
             plot_grad_flow(self.params_dict.items(), self.grad_fname)
 
-        # print(self.train_pipeline.nef.latents[0,74:77])
+        # print(self.train_pipeline.model.latents[0,74:77])
         if not self.use_lbfgs:
             self.optimizer.step(target=self._get_optm_target())
             self.timer.check("stepped")
-        # print(self.train_pipeline.nef.latents[0,74:77])
+        # print(self.train_pipeline.model.latents[0,74:77])
 
         return ret
 
@@ -894,13 +898,13 @@ class CodebookTrainer(BaseTrainer):
             load_excls, freeze_excls = [], []
 
             # we load latents in `init_latents` only
-            load_excls.append("nef.latents")
+            load_excls.append("model.latents")
 
             if self.optimize_spectra_latents:
                 if self.regularize_binwise_spectra_latents:
-                    freeze_excls.extend(["nef.base_latents","nef.addup_latents"])
+                    freeze_excls.extend(["model.base_latents","model.addup_latents"])
                 else:
-                    freeze_excls.append("nef.latents")
+                    freeze_excls.append("model.latents")
 
             if self.optimize_spectra_latents_as_logits:
                 pass # directly optimize latents as coefficients
@@ -915,11 +919,11 @@ class CodebookTrainer(BaseTrainer):
             if self.classify_redshift:
                 if self.optimize_redshift_latents_as_logits:
                     # directly optimize logits
-                    freeze_excls.append("nef.redshift_latents")
+                    freeze_excls.append("model.redshift_latents")
                 else:
                     # optimize an autodecoder
                     freeze_excls.append("redshift_decoder")
-                    freeze_excls.append("nef.redshift_latents")
+                    freeze_excls.append("model.redshift_latents")
 
             if self.generalize_train_first_layer:
                 assert(exists(self.pretrained_model_fname))
@@ -997,11 +1001,11 @@ class CodebookTrainer(BaseTrainer):
             assert self.mode == "sanity_check"
             # checkpoint comes from codebook pretrain (use sup spectra)
             checkpoint = torch.load(self.pretrained_model_fname)
-            assert checkpoint["model_state_dict"]["nef.latents"].shape[-1] == sp_z_dim
+            assert checkpoint["model_state_dict"]["model.latents"].shape[-1] == sp_z_dim
 
             # sanity check use permuted sup spectra
             permute_ids = self.dataset.get_sanity_check_spectra_ids()
-            pretrained = checkpoint["model_state_dict"]["nef.latents"][permute_ids].detach()
+            pretrained = checkpoint["model_state_dict"]["model.latents"][permute_ids].detach()
 
             if self.optimize_latents_for_each_redshift_bin:
                 if pretrained.ndim == 3:
@@ -1854,11 +1858,11 @@ class CodebookTrainer(BaseTrainer):
 
     def _toggle_net_grad(self, on_off):
         for n,p in self.train_pipeline.named_parameters():
-            if n != "nef.latents": p.requires_grad = on_off == "on"
+            if n != "model.latents": p.requires_grad = on_off == "on"
 
     def _toggle_spectra_latents_grad(self, on_off):
         for n,p in self.train_pipeline.named_parameters():
-            if n == "nef.latents": p.requires_grad = on_off == "on"
+            if n == "model.latents": p.requires_grad = on_off == "on"
 
     def _get_optm_target(self):
         """ Get the current optimization target when doing alternate optimization.
@@ -1897,7 +1901,7 @@ class CodebookTrainer(BaseTrainer):
         """
         net_params, spectra_latents = [], None
         for name in self.params_dict:
-            if name == "nef.latents":
+            if name == "model.latents":
                 spectra_latents = self.params_dict[name]
             else: net_params.append(self.params_dict[name])
 
@@ -1914,17 +1918,17 @@ class CodebookTrainer(BaseTrainer):
         codebook_logit_params, redshift_logit_params = [], []
 
         for name in self.params_dict:
-            if name == "nef.latents":
+            if name == "model.latents":
                 spectra_latents = self.params_dict[name]
-            elif name == "nef.base_latents":
+            elif name == "model.base_latents":
                 base_spectra_latents = self.params_dict[name]
-            elif name == "nef.addup_latents":
+            elif name == "model.addup_latents":
                 addup_spectra_latents = self.params_dict[name]
-            elif name == "nef.gt_bin_latents":
+            elif name == "model.gt_bin_latents":
                 gt_bin_spectra_latents = self.params_dict[name]
-            elif name == "nef.wrong_bin_latents":
+            elif name == "model.wrong_bin_latents":
                 wrong_bin_spectra_latents = self.params_dict[name]
-            elif name == "nef.redshift_latents":
+            elif name == "model.redshift_latents":
                 redshift_latents = self.params_dict[name]
             elif "redshift_decoder" in name:
                 redshift_logit_params.append(self.params_dict[name])

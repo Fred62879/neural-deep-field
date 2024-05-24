@@ -99,6 +99,7 @@ trainer:
     save_model_every: 20
 
     plot_l2_loss: True
+    plot_gt_bin_loss: False
 
     resume_train: False
     resume_log_dir: ''

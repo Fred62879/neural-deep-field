@@ -6,7 +6,7 @@ global:
     # log_fname: ''
 
     tasks: ['generalization']
-    tasks: ['generalization_infer','save_redshift'] #,'plot_redshift_est_stats','plot_redshift_residual'] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
+    tasks: ['generalization_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_stats','plot_redshift_residual'] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -57,11 +57,11 @@ pretrain:
     pretrained_model_name: 'model-ep1000-bch0.pth'
 
     regularize_spectra_latents: True
-    spectra_latents_regu_beta: 32
+    spectra_latents_regu_beta: 16
 
     use_global_spectra_loss_as_lambdawise_weights: False
     limit_redshift_to_pretrain_range: False
-    # global_restframe_spectra_loss_fname: /pretrain_spectra/global_restframe_l2_loss.npy
+    global_restframe_spectra_loss_fname: 33-20240519-183652_pretrain_3_layers_no_skip_decoder_hidden_dim_512_spectra_latents_regu_beta_16/pretrain_spectra/global_restframe_l2_loss.npy
 
     regress_lambdawise_weights: False
     regress_lambdawise_weights_share_latents: False
@@ -70,12 +70,12 @@ pretrain:
 
 decoder:
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 5
+    decoder_num_hidden_layers: 3
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_all_layers: False
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
@@ -101,7 +101,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 'nan'
+    infer_log_dir: 'g33-20240520-172853_decoder_hidden_dim_512_spectra_latents_regu_beta_16_995_outliers'
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 35
@@ -109,7 +109,7 @@ infer:
     infer_outlier_only: True
 
     classify_redshift_based_on_l2: False
-    infer_use_global_loss_as_lambdawise_weights: False
+    infer_use_global_loss_as_lambdawise_weights: True
 
     pretrain_infer_batch_size: 1
     pretrain_infer_use_all_wave: False
@@ -157,11 +157,11 @@ spectra_data:
     filter_redshift_hi: -1
 
 ablation:
-    perform_ablation: True
+    perform_ablation: False
     ablat_id: 0
     ablat_params: ["decoder_num_hidden_layers","decoder_hidden_dim","spectra_latents_regu_beta"]
     ablat_vals: [[5,7],[128,512],[16,32,64]]
     ablat_num_vals: [2,2,3]
 
-    ablat_hardcode_params: [infer_log_dir]
-    ablat_hardcode_vals: [[g50-20240520-192125_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_16,g51-20240520-192125_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_32,g52-20240520-192127_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_64,g53-20240520-192125_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_16,g54-20240520-192127_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_32,g55-20240520-192126_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_64,g70-20240520-194521_decoder_num_hidden_layers_7_decoder_hidden_dim_128_spectra_latents_regu_beta_16,g71-20240520-194521_decoder_num_hidden_layers_7_decoder_hidden_dim_128_spectra_latents_regu_beta_32,g72-20240520-194529_decoder_num_hidden_layers_7_decoder_hidden_dim_128_spectra_latents_regu_beta_64,g73-20240520-194529_decoder_num_hidden_layers_7_decoder_hidden_dim_512_spectra_latents_regu_beta_16,g74-20240520-194521_decoder_num_hidden_layers_7_decoder_hidden_dim_512_spectra_latents_regu_beta_32,g75-20240520-194526_decoder_num_hidden_layers_7_decoder_hidden_dim_512_spectra_latents_regu_beta_64]]
+    # ablat_hardcode_params: [infer_log_dir]
+    # ablat_hardcode_vals: [[20240521-155106_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_16,20240521-155108_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_32,20240521-155113_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_64,20240521-155112_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_16,20240521-155106_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_32,20240521-160307_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_64]]

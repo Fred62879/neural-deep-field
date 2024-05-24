@@ -809,10 +809,10 @@ class AstroInferrer(BaseInferrer):
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
         if self.pretrain_infer:
             # self._set_coords_from_checkpoint(checkpoint)
-            self.full_pipeline.set_latents(checkpoint["model_state_dict"]["nef.latents"])
+            self.full_pipeline.set_latents(checkpoint["model_state_dict"]["model.latents"])
             if not self.apply_gt_redshift and self.split_latent:
                 self.full_pipeline.set_redshift_latents(
-                    checkpoint["model_state_dict"]["nef.redshift_latents"])
+                    checkpoint["model_state_dict"]["model.redshift_latents"])
 
         self.infer_all_coords(model_id, checkpoint)
 
@@ -1053,13 +1053,13 @@ class AstroInferrer(BaseInferrer):
         if self.pretrain_infer:
             if self.regularize_binwise_spectra_latents:
                 self.spectra_infer_pipeline.set_base_latents(
-                    checkpoint["model_state_dict"]["nef.base_latents"])
+                    checkpoint["model_state_dict"]["model.base_latents"])
                 self.spectra_infer_pipeline.set_addup_latents(
-                    checkpoint["model_state_dict"]["nef.addup_latents"])
+                    checkpoint["model_state_dict"]["model.addup_latents"])
                 # self.spectra_infer_pipeline.add_latents()
             else:
                 self.spectra_infer_pipeline.set_latents(
-                    checkpoint["model_state_dict"]["nef.latents"])
+                    checkpoint["model_state_dict"]["model.latents"])
 
                 if self.regress_lambdawise_weights_share_latents:
                     optm_bin_ids = checkpoint["optimal_bin_ids"]
@@ -1070,7 +1070,7 @@ class AstroInferrer(BaseInferrer):
 
             if self.has_redshift_latents:
                 self.spectra_infer_pipeline.set_redshift_latents(
-                    checkpoint["model_state_dict"]["nef.redshift_latents"])
+                    checkpoint["model_state_dict"]["model.redshift_latents"])
 
         self.infer_spectra(model_id, checkpoint)
 
@@ -1135,10 +1135,10 @@ class AstroInferrer(BaseInferrer):
             self._set_coords_from_checkpoint(checkpoint)
         elif self.recon_codebook_spectra_individ and self.pretrain_infer:
             self.codebook_spectra_infer_pipeline.set_latents(
-                checkpoint["model_state_dict"]["nef.latents"])
+                checkpoint["model_state_dict"]["model.latents"])
             if not self.apply_gt_redshift and self.split_latent:
                 self.codebook_spectra_infer_pipeline.set_redshift_latents(
-                    checkpoint["model_state_dict"]["nef.redshift_latents"])
+                    checkpoint["model_state_dict"]["model.redshift_latents"])
 
         self.infer_codebook_spectra(model_id, checkpoint)
 
@@ -1433,7 +1433,7 @@ class AstroInferrer(BaseInferrer):
             for model_id, model_fname in enumerate(self.selected_model_fnames):
                 model_fname = join(self.model_dir, model_fname)
                 checkpoint = torch.load(model_fname)
-                latents = checkpoint["model_state_dict"]["nef.latents"]
+                latents = checkpoint["model_state_dict"]["model.latents"]
                 all_latents.append(latents.detach().cpu().numpy())
             all_latents = np.array(all_latents) # [nmodels,nspectra,dim]
             if ids is not None:
@@ -1443,7 +1443,7 @@ class AstroInferrer(BaseInferrer):
             model_fname = self.selected_model_fnames[model_id]
             model_fname = join(self.model_dir, model_fname)
             checkpoint = torch.load(model_fname)
-            latents = checkpoint["model_state_dict"]["nef.latents"]
+            latents = checkpoint["model_state_dict"]["model.latents"]
             all_latents = latents.detach().cpu().numpy() # [bsz,nbins,dim]
 
         # index gt bin latents only

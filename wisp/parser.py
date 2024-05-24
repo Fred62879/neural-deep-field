@@ -803,6 +803,7 @@ def define_cmd_line_args():
 
     train_group.add_argument("--plot-loss", action="store_true")
     train_group.add_argument("--plot-l2-loss", action="store_true")
+    train_group.add_argument("--plot-gt-bin-loss", action="store_true")
     train_group.add_argument("--using-wandb", action="store_true")
     train_group.add_argument("--step-based-sample-w-replace", action="store_true")
     train_group.add_argument("--step-based-sample-wo-replace", action="store_true")

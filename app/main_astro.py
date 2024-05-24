@@ -33,7 +33,7 @@ if __name__ == "__main__":
         )
         trainer.train()
 
-    if has_common(tasks, ["sanity_check","generalization","redshift_classification_train","redshift_classification_genlz"]) and args.pretrain_codebook:
+    elif has_common(tasks, ["sanity_check","generalization"]) and args.pretrain_codebook:
         optim_cls, optim_params = get_optimizer_from_config(args)
         trainer_cls = CodebookTrainerDebug if args.debug_lbfgs else CodebookTrainer
         trainer = get_trainer_from_config(
@@ -43,34 +43,44 @@ if __name__ == "__main__":
         )
         trainer.train()
 
-    if "train" in tasks:
+    elif has_common(tasks, ["redshift_classification_train","redshift_classification_genlz"]):
+        optim_cls, optim_params = get_optimizer_from_config(args)
+        trainer = get_trainer_from_config(
+            CodebookTrainer, [ pipelines["redshift_classifier"] ],
+            dataset, optim_cls, optim_params, device, args
+        )
+        trainer.train()
+
+    elif "train" in tasks:
         optim_cls, optim_params = get_optimizer_from_config(args)
         trainer = get_trainer_from_config(
             AstroTrainer, pipelines["full"], dataset, optim_cls, optim_params, device, args)
         trainer.train()
 
-    if "codebook_pretrain_infer" in tasks and args.pretrain_codebook:
+    elif "codebook_pretrain_infer" in tasks and args.pretrain_codebook:
         # infer for pretrained model (recon gt spectra & codebook spectra ect.)
         inferrer = get_inferrer_from_config(
             pipelines, dataset, device, "codebook_pretrain_infer", args)
         inferrer.infer()
 
-    if "sanity_check_infer" in tasks and args.pretrain_codebook:
+    elif "sanity_check_infer" in tasks and args.pretrain_codebook:
         # infer for pretrained model (recon gt spectra & codebook spectra ect.)
         inferrer = get_inferrer_from_config(
             pipelines, dataset, device, "sanity_check_infer", args)
         inferrer.infer()
 
-    if "generalization_infer" in tasks and args.pretrain_codebook:
+    elif "generalization_infer" in tasks and args.pretrain_codebook:
         # infer for pretrained model (recon gt spectra & codebook spectra ect.)
         inferrer = get_inferrer_from_config(
             pipelines, dataset, device, "generalization_infer", args)
         inferrer.infer()
 
-    if "main_infer" in tasks:
+    elif "main_infer" in tasks:
         inferrer = get_inferrer_from_config(pipelines, dataset, device, "main_infer", args)
         inferrer.infer()
 
-    if "test" in tasks:
+    elif "test" in tasks:
         inferrer = get_inferrer_from_config(pipelines, dataset, device, "test", args)
         inferrer.infer()
+
+    else: raise ValueError("unsupported task")
