@@ -2,11 +2,14 @@ parent: base_cc.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'vdz-spectra-ssim' #'dzdeep3-spectra-ssim' #'dz-spectra-ssim-4-basic-regu-weight'
-    # log_fname: ''
+    exp_name: 'dz-spectra-ssim'
+    log_fname: 'pretrain'
+    show_memory: False
+    activate_model_timer: False
+    activate_trainer_timer: False
 
-    tasks: ['codebook_pretrain'] #,'recon_spectra']
-    #tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain']
+    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -26,7 +29,7 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    pretrain_batch_size: 50000
+    pretrain_batch_size: 2540
 
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 100
@@ -55,7 +58,7 @@ pretrain:
     pretrained_model_name: 'model-ep20000-bch0.pth'
 
     regularize_spectra_latents: True
-    spectra_latents_regu_beta: 32
+    spectra_latents_regu_beta: 16
 
 decoder:
     decoder_activation_type: relu #gaussian
@@ -78,18 +81,18 @@ decoder:
     siren_last_linear: True
 
 trainer:
-    num_epochs: 2000
+    num_epochs: 5000
     batch_size: 5500
-    log_cli_every: 200
+    log_cli_every: 500
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 200
+    save_model_every: 500
 
     plot_l2_loss: True
 
     resume_train: False
     resume_log_dir: ''
-    resume_model_fname: 'model-ep2000-bch0.pth'
+    resume_model_fname: 'model-ep1500-bch0.pth'
 
     spectra_loss_cho: ssim1d
     spectra_loss_reduction: mean
@@ -99,13 +102,13 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    #infer_log_dir: ''
+    # infer_log_dir: ''
     infer_selected: True
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
-    pretrain_infer_batch_size: 1
+    pretrain_infer_batch_size: 10
     pretrain_infer_use_all_wave: True
     pretrain_infer_num_wave: 1000
     pretrain_infer_wave_sample_method: 'uniform_dense'
@@ -125,8 +128,6 @@ infer:
     num_spectrum_per_fig: 35
     num_spectrum_per_row: 7
 
-    sanity_check_plot_same_pca_dim_as_pretrain: True
-    pretrain_pca_dim_fname: '' #/latents/2-dim/selected_axes.npy'
     spectra_latents_plot_pca_dim: 2
 
 spectra_data:
@@ -134,8 +135,11 @@ spectra_data:
 
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [vipers_w1,vipers_w4,deimos,zcosmos]
+    spectra_data_sources: [deimos,zcosmos] #vipers_w1,vipers_w4]
     random_permute_source_spectra: True
+
+    spectra_supervision_wave_lo: 5000
+    spectra_supervision_wave_hi: 9000
 
     min_num_valid_samples: 100
     spectra_upsample_scale: 10
@@ -143,8 +147,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 200000
-    num_supervision_spectra_upper_bound: 200000
+    num_gt_spectra_upper_bound: 25400
+    num_supervision_spectra_upper_bound: 25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02
@@ -153,9 +157,9 @@ spectra_data:
 ablation:
     perform_ablation: False
     ablat_id: 0
-    ablat_params: ["decoder_num_hidden_layers","regularize_spectra_latents"]
-    ablat_vals: [[3,5],[True,False]]
-    ablat_num_vals: [2,2]
+    ablat_params: ["decoder_num_hidden_layers","decoder_hidden_dim","spectra_latents_regu_beta"]
+    ablat_vals: [[5,7],[128,512],[16,32,64]]
+    ablat_num_vals: [2,2,3]
 
-    #ablat_hardcode_params: ["pretrain_log_dir"]
-    #ablat_hardcode_vals: [["20240222-015410_1600-spectra-skip-same-dim_decoder_batch_norm_True","20240222-165434_1600-spectra-skip-same-dim_decoder_batch_norm_False"]]
+    # ablat_hardcode_params: [infer_log_dir]
+    # ablat_hardcode_vals: [[]]
