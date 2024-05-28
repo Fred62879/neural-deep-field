@@ -534,6 +534,7 @@ def forward(
         codebook_pretrain=False,
         spectra_supervision=False,
         perform_integration=False,
+        classification_mode=False,
         trans_sample_method="none",
         optimize_bins_separately=False,
         redshift_supervision_train=False,
@@ -551,6 +552,7 @@ def forward(
         save_codebook=False,
         save_redshift=False,
         save_embed_ids=False,
+        save_intensity=False,
         save_qtz_weights=False,
         save_codebook_loss=False,
         save_gt_bin_spectra=False,
@@ -560,28 +562,24 @@ def forward(
         save_spectra_latents=False,
         save_codebook_spectra=False,
         save_spectra_all_bins=False,
-        save_lambdawise_weights=False,
-        init_redshift_prob=None, # debug
+        save_lambdawise_weights=False
 ):
     net_args, requested_channels = {}, []
-
     if "coords" in data:
         net_args["coords"] = data["coords"]
-    else: net_args["coords"] = None
-
-    net_args["init_redshift_prob"] = init_redshift_prob # debug
+    # else: net_args["coords"] = None
 
     if space_dim == 2:
+        assert save_pixel_val
         requested_channels = ["intensity"]
-
     elif space_dim == 3:
-        requested_channels = ["intensity"]
         if save_coords: requested_channels.append("coords")
         if save_scaler: requested_channels.append("scaler")
         if save_spectra: requested_channels.append("spectra")
         if save_latents: requested_channels.append("latents")
         if save_codebook: requested_channels.append("codebook")
         if save_redshift: requested_channels.append("redshift")
+        if save_intensity: requested_channels.append("intensity")
         if save_embed_ids: requested_channels.append("min_embed_ids")
         if save_qtz_weights: requested_channels.append("qtz_weights")
         if save_codebook_loss: requested_channels.append("codebook_loss")
@@ -673,11 +671,14 @@ def forward(
                 data["global_restframe_spectra_loss"]
         if save_lambdawise_weights:
             requested_channels.append("lambdawise_weights")
+
+        if classification_mode:
+            net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses"]
     else:
         raise ValueError("Unsupported space dimension.")
 
-    # print(requested_channels)
     requested_channels = set(requested_channels)
+    # print(requested_channels, net_args.keys())
     return pipeline(channels=requested_channels, **net_args)
 
 def load_layer_weights(checkpoint, layer_identifier):

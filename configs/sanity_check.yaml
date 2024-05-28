@@ -113,7 +113,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: '20240512-135828_sc_no_weight_222050'
+    infer_log_dir: '20240519-220446_sc_200_spectra_200_epochs_093822'
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -123,10 +123,10 @@ infer:
     classify_redshift_based_on_l2: False
     infer_use_global_loss_as_lambdawise_weights: True
 
-    pretrain_infer_batch_size: 5
+    pretrain_infer_batch_size: 100
     pretrain_infer_use_all_wave: False
-    pretrain_infer_num_wave: 1000
-    pretrain_infer_wave_sample_method: 'uniform_dense'
+    pretrain_infer_num_wave: 280
+    pretrain_infer_wave_sample_method: 'uniform_dense_no_upper_bound'
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False

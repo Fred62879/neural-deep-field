@@ -14,7 +14,7 @@ from wisp.models.hypers import HyperSpectralDecoder, HyperSpectralDecoderB
 from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
-class RedshiftClassifier():
+class RedshiftClassifier(nn.Module):
     def __init__(self, **kwargs):
         super(RedshiftClassifier, self).__init__()
         assert kwargs["model_redshift"], "we must model redshift during pretrain"
@@ -40,18 +40,9 @@ class RedshiftClassifier():
         output_dim = 1
         self.decoder = BasicDecoder(
             input_dim, output_dim, True,
-            num_layers=self.kwargs["decoder_num_hidden_layers"] + 1,
-            hidden_dim=self.kwargs["decoder_hidden_dim"],
-            batch_norm=self.kwargs["decoder_batch_norm"],
-            layer_type=self.kwargs["decoder_layer_type"],
-            activation_type=self.kwargs["decoder_activation_type"],
-            skip=self.kwargs["decoder_skip_layers"],
-            skip_method=self.kwargs["decoder_latents_skip_method"],
-            skip_all_layers=self.kwargs["decoder_latents_skip_all_layers"],
-            activate_before_skip=self.kwargs["decoder_activate_before_latents_skip"],
-            skip_add_conversion_method=\
-                self.kwargs["decoder_latents_skip_add_conversion_method"]
-        )
+            num_layers=self.kwargs["classifier_decoder_num_hidden_layers"] + 1,
+            hidden_dim=self.kwargs["classifier_decoder_hidden_dim"],
+            batch_norm=self.kwargs["classifier_decoder_batch_norm"])
 
     def index_latents(self, data, selected_ids, idx):
         ret = data
@@ -61,7 +52,14 @@ class RedshiftClassifier():
             ret = ret[idx]
         return ret
 
-    def forward(self, lambdawise_losses, wave, idx=None, selected_ids=None):
-        print(lambdawise_losses.shape, wave.shape)
-
+    def forward(
+            self, channels, wave, wave_range, spectra_lambdawise_losses,
+            idx=None, selected_ids=None
+    ):
+        """
+        @Params
+          wave: [bsz,nsmpl]
+          spectra_lambdawise_losses: [bsz,nbins,nsmpl]
+        """
+        print(spectra_lambdawise_losses.shape, wave.shape)
         assert 0

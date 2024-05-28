@@ -185,15 +185,55 @@ def batch_sample_torch(
     else:
         if sample_method == "uniform":
             sample_ids = torch.zeros(sp[0], nsmpl).uniform_(0, sp[-1]).to(torch.long)
-        elif sample_method == "uniform_dense":
+        elif sample_method == "rand_dense":
+            """
+            densely sample within defined range (lo~hi) (with replacement)
+            may result in duplicate samples
+            """
             assert sup_bounds is not None
             lo, hi = sup_bounds[:,0], sup_bounds[:,1]
             sample_ids = torch.rand(sp[0], nsmpl) # uniform random number [0,1)
             sample_ids = sample_ids * (hi - lo)[:,None] + lo[:,None] # sacle to given range
             sample_ids = sample_ids.to(torch.long)
-            # print(torch.min(sample_ids, dim=-1)[0])
-            # print(torch.max(sample_ids, dim=-1)[0])
+            sample_ids, _ = torch.sort(sample_ids, dim=-1)
+            print(sample_ids[0])
+            assert 0
+        elif sample_method == "uniform_dense":
+            """
+            densely sample within defined range (lo~hi)
+            """
+            raise NotImplementedError()
+            assert sup_bounds is not None
+            lo, hi = sup_bounds[:,0], sup_bounds[:,1]
+            sample_ids = torch.rand(sp[0], nsmpl) # uniform random number [0,1)
+            sample_ids = sample_ids * (hi - lo)[:,None] + lo[:,None] # sacle to given range
+            sample_ids = sample_ids.to(torch.long)
+            sample_ids, _ = torch.sort(sample_ids, dim=-1)
+            print(sample_ids[0])
+            assert 0
+        elif sample_method == "uniform_dense_no_upper_bound":
+            """
+            densely sample within defined range (lo~?) (without replacement)
+            if #samples within range < #samples needed, extend hi bound s.t. no duplicates
+            """
+            assert sup_bounds is not None
+            lo, hi = sup_bounds[:,0], sup_bounds[:,1]
+            short = (hi - lo + 1) < nsmpl
+            hi[short] = nsmpl - 1 + lo[short]
+            step = (hi - lo + 1) // (nsmpl - 1)
+            sample_ids = torch.arange(lo, hi+1)
+            print(sample_ids)
+            sample_ids = torch.randperm(ids)
+            print(sample_ids)
+            # sample_ids = torch.rand(sp[0], nsmpl) # uniform random number [0,1)
+            # sample_ids = sample_ids * (hi - lo)[:,None] + lo[:,None] # sacle to given range
+            sample_ids = sample_ids[:,None] + lo[:,None]
+            sample_ids = sample_ids.to(torch.long)
+            sample_ids, _ = torch.sort(sample_ids, dim=-1)
+            print(sample_ids[0])
+            assert 0
         elif sample_method == "uniform_non_random":
+            # sample with even step, same ids for each batch sample
             step = sp[-1] // nsmpl
             sample_ids = torch.arange(0, sp[-1], step)
         elif sample_method == "importance":

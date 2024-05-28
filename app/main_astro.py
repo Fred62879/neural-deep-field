@@ -16,6 +16,7 @@ if __name__ == "__main__":
     from wisp.trainers import AstroTrainer, CodebookTrainer
 
     args, args_str = parse_args()
+    args.wave_embed_dim = args.spectra_latent_dim
 
     if args.use_gpu:
         query_GPU_mem()

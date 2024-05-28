@@ -106,9 +106,12 @@ class BaseNeuralField(nn.Module):
                 If channels is a set, will return a dictionary of channels.
                 If channels is None, will return a dictionary of all channels.
         """
-        if not (isinstance(channels, str) or isinstance(channels, list) or isinstance(channels, set) or channels is None):
+        if not (isinstance(channels, str) or isinstance(channels, list) or \
+                isinstance(channels, set) or channels is None
+        ):
             raise Exception(f"Channels type invalid, got {type(channels)}." \
-                             "Make sure your arguments for the nef are provided as keyword arguments.")
+                             "Make sure your arguments for the nef are provided \
+                             as keyword arguments.")
         if channels is None:
             requested_channels = self.get_supported_channels()
         elif isinstance(channels, str):
@@ -118,7 +121,8 @@ class BaseNeuralField(nn.Module):
 
         unsupported_channels = requested_channels - self.get_supported_channels()
         if unsupported_channels:
-            raise Exception(f"Channels {unsupported_channels} are not supported in {self.__class__.__name__}")
+            raise Exception(f"Channels {unsupported_channels} are not supported \
+                              in {self.__class__.__name__}")
 
         return_dict = {}
         for fn in self._forward_functions:

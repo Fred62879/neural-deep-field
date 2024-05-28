@@ -6,7 +6,7 @@ tqdm
 Pillow
 scipy==1.5.2
 scikit-learn
-torch
+torch==1.13.0
 nvidia-ml-py3
 tifffile==2022.10.10
 networkx==3.0

@@ -372,6 +372,12 @@ def define_cmd_line_args():
     decoder_group.add_argument("--decoder-latents-skip-method", nargs="+")
     decoder_group.add_argument("--decoder-latents-skip-add-conversion-method", nargs="+")
 
+    decoder_group.add_argument("--classifier-decoder-num-hidden-layers", type=int, default=1,
+                               help="Number of layers for the decoder")
+    decoder_group.add_argument("--classifier-decoder-hidden-dim", type=int, default=128,
+                               help="Network width")
+    decoder_group.add_argument("--classifier-decoder-batch-norm", action="store_true")
+
     decoder_group.add_argument("--siren-seed", type=int, default=1)
     decoder_group.add_argument("--siren-first-w0", type=int, default=30)
     decoder_group.add_argument("--siren-hidden-w0", type=int, default=30)

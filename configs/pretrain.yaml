@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'dz-spectra-ssim'
-    # log_fname: ''
+    exp_name: 'dz-spectra' #'vdz-spectra-ssim-latents-dim-regu-beta'
+    log_fname: 'pretrain'
 
     tasks: ['codebook_pretrain']
-    # tasks: ['codebook_pretrain_infer','plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -91,7 +91,7 @@ trainer:
     resume_log_dir: ''
     resume_model_fname: 'model-ep2000-bch0.pth'
 
-    spectra_loss_cho: l2 #ssim1d
+    spectra_loss_cho: ssim1d
     spectra_loss_reduction: mean
     spectra_ssim_loss_filter_size: 9
     spectra_ssim_loss_filter_sigma: 5
@@ -99,8 +99,8 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '33-20240519-183652_pretrain_3_layers_no_skip_decoder_hidden_dim_512_spectra_latents_regu_beta_16'
-    infer_selected: False
+    infer_log_dir: '20240527-194507_pretrain_1k_spectra_5k_9k_wave_cc'
+    infer_selected: True
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
@@ -144,8 +144,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 25400
-    num_supervision_spectra_upper_bound: 25400
+    num_gt_spectra_upper_bound: 1000 #25400
+    num_supervision_spectra_upper_bound: 1000 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02
@@ -154,9 +154,9 @@ spectra_data:
 ablation:
     perform_ablation: False
     ablat_id: 0
-    ablat_params: ["decoder_num_hidden_layers","decoder_hidden_dim","spectra_latents_regu_beta"]
-    ablat_vals: [[5,7],[128,512],[16,32,64]]
-    ablat_num_vals: [2,2,3]
+    ablat_params: ["spectra_latents_regu_beta","spectra_latent_dim"]
+    ablat_vals: [[4,8,16],[16,32,64]]
+    ablat_num_vals: [3,3]
 
     # ablat_hardcode_params: [infer_log_dir]
-    # ablat_hardcode_vals: [[]]
+    # ablat_hardcode_vals: [[30-20240523-231831_pretrain_3_layers_spectra_latents_regu_beta_4_spectra_latent_dim_16,31-20240523-231839_pretrain_3_layers_spectra_latents_regu_beta_4_spectra_latent_dim_32,32-20240523-231832_pretrain_3_layers_spectra_latents_regu_beta_4_spectra_latent_dim_64]]

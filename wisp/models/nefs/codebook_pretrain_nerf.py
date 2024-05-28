@@ -166,7 +166,8 @@ class CodebookPretrainNerf(BaseNeuralField):
             ret = ret[idx]
         return ret
 
-    def pretrain(self, coords, wave, wave_range,
+    def pretrain(self, wave, wave_range,
+                 coords=None,
                  trans=None, trans_mask=None, nsmpl=None,
                  full_emitted_wave=None,
                  qtz_args=None, specz=None,

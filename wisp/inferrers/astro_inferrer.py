@@ -1622,8 +1622,6 @@ class AstroInferrer(BaseInferrer):
                 save_spectra_latents=self.save_spectra_latents,
                 save_spectra_all_bins=self.recon_spectra_all_bins or \
                                       self.plot_optimal_wrong_bin_spectra,
-                init_redshift_prob= None if "init_redshift_prob" not in data else \
-                                        data["init_redshift_prob"],
                 save_lambdawise_weights= self.get_lambdawise_weights)
 
         return ret
@@ -1636,7 +1634,7 @@ class AstroInferrer(BaseInferrer):
             self.spectra_masks.extend(data["spectra_masks"])
 
         if self.recon_spectra:
-            fluxes = ret["intensity"]
+            fluxes = ret["spectra"]
             if fluxes.ndim == 3: # bandwise
                 fluxes = fluxes.flatten(1,2) # [bsz,nsmpl]
             self.recon_fluxes.extend(fluxes)
@@ -1698,6 +1696,10 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_lambdawise_spectra_loss:
             self.spectra_wave_s.extend(data["wave"][...,0]) # [bsz,nsmpls]
+            a = data["wave"][...,0]
+            print(a[0,:100])
+            print(a[1,:100])
+            assert 0
             self.gt_bin_ids_s.extend(data["gt_redshift_bin_ids"].T) # [bsz,2]
             self.spectra_lambdawise_losses_s.extend(ret["spectra_lambdawise_loss"])
 

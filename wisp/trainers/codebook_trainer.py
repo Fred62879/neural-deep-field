@@ -100,6 +100,11 @@ class CodebookTrainer(BaseTrainer):
             self.mode = "redshift_classification_genlz"
         else: raise ValueError("Invalid mode!")
 
+        self.pre_classification_mode = self.mode == "sanity_check" or \
+            self.mode == "generalization"
+        self.classification_mode = self.mode == "redshift_classification_train" or \
+            self.mode == "redshift_classification_genlz"
+
         self.generalize_train_first_layer = self.mode == "generalization" and \
             self.extra_args["generalize_train_first_layer"]
 
@@ -151,14 +156,12 @@ class CodebookTrainer(BaseTrainer):
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
         # classify redshift
         self.calculate_binwise_spectra_loss = self.model_redshift and \
-            self.classify_redshift and self.extra_args["calculate_binwise_spectra_loss"]
+            self.classify_redshift and self.extra_args["calculate_binwise_spectra_loss"] and \
+            not self.classification_mode
         # if we want to calculate binwise spectra loss when we do quantization
         #  we need to perform qtz first in hyperspectral_decoder::dim_reduction
         assert not self.calculate_binwise_spectra_loss or \
             (not self.qtz or self.extra_args["spectra_batch_reduction_order"] == "qtz_first")
-        assert not self.classify_redshift or \
-            self.calculate_binwise_spectra_loss or \
-            print("only support brute force in case of redshift classification")
 
         self.classify_redshift_based_on_l2 = self.classify_redshift and \
             self.extra_args["classify_redshift_based_on_l2"] and \
@@ -182,11 +185,8 @@ class CodebookTrainer(BaseTrainer):
 
         # sanity check & generalization mandates brute force
         self.brute_force = self.mode == "sanity_check" or \
-            self.mode == "generalization" or \
-            self.mode == "redshift_classification_train" or \
-            self.mode == "redshift_classification_genlz"
+            self.mode == "generalization" or self.classification_mode
 
-        assert not self.brute_force or self.calculate_binwise_spectra_loss
         # three different brute force strategies during sc & generalization
         self.regularize_binwise_spectra_latents = self.brute_force and \
             self.calculate_binwise_spectra_loss and \
@@ -283,7 +283,8 @@ class CodebookTrainer(BaseTrainer):
         self.redshift_logits_regu_method = self.extra_args["redshift_logits_regu_method"]
         self.regularize_codebook_logits = self.qtz_spectra and \
             self.extra_args["regularize_codebook_logits"]
-        self.regularize_spectra_latents = self.extra_args["regularize_spectra_latents"]
+        self.regularize_spectra_latents = self.extra_args["regularize_spectra_latents"] and \
+            not self.classification_mode
         self.regularize_within_codebook_spectra = self.qtz_spectra and \
             self.extra_args["regularize_within_codebook_spectra"]
         self.regularize_across_codebook_spectra = self.qtz_spectra and \
@@ -506,42 +507,58 @@ class CodebookTrainer(BaseTrainer):
 
     def init_optimizer(self):
         if self.mode == "codebook_pretrain":
-            latents, net_params = self._assign_codebook_pretrain_optimization_params()
-        elif self.brute_force:
+            latents, net_params = self._assign_pretrain_optimization_params()
+            if self.neg_sup_optimize_alternately:
+                assert not self.use_lbfgs
+                latents_optm = self.optim_cls(latents, **self.optim_params)
+                net_optm = self.optim_cls(net_params, **self.optim_params)
+                optms = { "latents": latents_optm, "net": net_optm }
+            else:
+                if self.use_lbfgs:
+                    assert len(net_params) == 0
+                    params = {
+                        "lr": self.extra_args["redshift_latents_lr"],
+                        "max_iter": 4,
+                        "history_size": 10
+                    }
+                    optms = { "latents_optimizer": torch.optim.LBFGS(latents, **params) }
+                else:
+                    net_params.extend(latents)
+                    optms = { "all_params": self.optim_cls(net_params, **self.optim_params) }
+
+        elif self.pre_classification_mode:
             if self.optimize_latents_alternately:
                 spectra_latents, redshift_latents, net_params = \
-                    self._assign_redshift_pretrain_optimization_params()
-            else: latents, net_params = self._assign_redshift_pretrain_optimization_params()
-        else: raise ValueError()
-
-        if self.neg_sup_optimize_alternately:
-            assert self.mode == "codebook_pretrain" and not self.use_lbfgs
-            latents_optm = self.optim_cls(latents, **self.optim_params)
-            net_optm = self.optim_cls(net_params, **self.optim_params)
-            optms = { "latents": latents_optm, "net": net_optm }
-
-        elif self.optimize_latents_alternately:
-            assert self.brute_force
-            if self.use_lbfgs:
-                raise NotImplementedError()
+                    self._assign_brute_force_optimization_params()
+                if self.use_lbfgs:
+                    raise NotImplementedError()
+                else:
+                    redshift_latents_optm = self.optim_cls(
+                        redshift_latents, **self.optim_params)
+                    spectra_latents_optm = self.optim_cls(
+                        spectra_latents, **self.optim_params)
+                    optms = {
+                        "redshift_latents": redshift_latents_optm,
+                        "spectra_latents": spectra_latents_optm }
             else:
-                redshift_latents_optm = self.optim_cls(redshift_latents, **self.optim_params)
-                spectra_latents_optm = self.optim_cls(spectra_latents, **self.optim_params)
-                optms = {
-                    "redshift_latents": redshift_latents_optm,
-                    "spectra_latents": spectra_latents_optm }
+                latents, net_params = self._assign_brute_force_optimization_params()
+                if self.use_lbfgs:
+                    assert len(net_params) == 0
+                    params = {
+                        "lr": self.extra_args["redshift_latents_lr"],
+                        "max_iter": 4,
+                        "history_size": 10
+                    }
+                    optms = { "latents_optimizer": torch.optim.LBFGS(latents, **params) }
+                else:
+                    net_params.extend(latents)
+                    optms = { "all_params": self.optim_cls(net_params, **self.optim_params) }
+
+        elif self.classification_mode:
+            net_params = self._assign_classification_optimization_params()
+            optms = { "all_params": self.optim_cls(net_params, **self.optim_params) }
         else:
-            if self.use_lbfgs:
-                assert len(net_params) == 0
-                params = {
-                    "lr": self.extra_args["redshift_latents_lr"],
-                    "max_iter": 4,
-                    "history_size": 10
-                }
-                optms = { "latents_optimizer": torch.optim.LBFGS(latents, **params) }
-            else:
-                net_params.extend(latents)
-                optms = { "all_params": self.optim_cls(net_params, **self.optim_params) }
+            raise ValueError()
 
         self.optimizer = multi_optimizer(**optms)
         if self.verbose: log.info(self.optimizer)
@@ -552,8 +569,7 @@ class CodebookTrainer(BaseTrainer):
         self.dataset.set_mode(self.mode)
         fields = ["spectra_sup_bounds"]
 
-        if self.mode != "redshift_classification_train" and \
-           self.mode != "redshift_classification_genlz":
+        if not self.classification_mode:
             fields.extend([
                 "wave_data","spectra_source_data","spectra_masks","spectra_redshift"])
 
@@ -614,17 +630,17 @@ class CodebookTrainer(BaseTrainer):
                     fields.append("optm_bin_ids")
 
         # train classifier on top of trained model to predict redshift
-        if self.mode == "redshift_classification_train" or \
-           self.mode == "redshift_classification_genlz":
+        if self.classification_mode:
             dir = join(self.log_dir, "..", self.extra_args["pre_classification_log_dir"])
             prefix = self.extra_args["pre_classification_fname_prefix"]
             wave_fname = join(dir, f"{prefix}_wave.npy")
             gt_bin_fname = join(dir, f"{prefix}_gt_bin_ids.npy")
             loss_fname = join(dir, f"{prefix}_lambdawise_losses.npy")
-            self.dataset.set_hardcode_data("spectra_wave",np.load(wave_fname))
+            self.dataset.set_hardcode_data("wave",np.load(wave_fname))
             self.dataset.set_hardcode_data("gt_redshift_bin_ids_b",np.load(gt_bin_fname).T)
             self.dataset.set_hardcode_data("spectra_lambdawise_losses",np.load(loss_fname))
-            fields.extend(["spectra_wave","gt_redshift_bin_ids_b","spectra_lambdawise_losses"])
+            fields.extend(["wave","wave_range","gt_redshift_bin_ids_b",
+                           "spectra_lambdawise_losses"])
 
         self.dataset.set_fields(fields)
 
@@ -1557,6 +1573,7 @@ class CodebookTrainer(BaseTrainer):
             apply_gt_redshift=self.apply_gt_redshift,
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
+            classification_mode=self.classification_mode,
             optimize_bins_separately=self.optimize_bins_separately,
             regularize_codebook_spectra=self.regularize_codebook_spectra,
             calculate_binwise_spectra_loss=self.calculate_binwise_spectra_loss,
@@ -1568,12 +1585,13 @@ class CodebookTrainer(BaseTrainer):
                 self.regress_lambdawise_weights_use_gt_bin_latent,
             use_global_spectra_loss_as_lambdawise_weights=\
                 self.use_global_spectra_loss_as_lambdawise_weights,
-            save_spectra=True,
+            save_spectra=not self.classification_mode,
             save_coords=self.regularize_spectra_latents,
             save_redshift=self.save_data and self.save_redshift,
             save_qtz_weights=self.save_data and self.save_qtz_weights,
             save_redshift_logits=self.regularize_redshift_logits or \
-                                 (self.save_data and self.classify_redshift),
+                                 (self.save_data and self.classify_redshift) or \
+                                 self.classification_mode,
             save_codebook_logits=self.regularize_codebook_logits or \
                                  (self.save_data and self.plot_codebook_logits),
             save_codebook_spectra=self.save_data and self.recon_codebook_spectra_individ,
@@ -1896,7 +1914,7 @@ class CodebookTrainer(BaseTrainer):
                 if residu < self.neg_sup_alternation_steps[0] else "net"
         else: raise ValueError()
 
-    def _assign_codebook_pretrain_optimization_params(self):
+    def _assign_pretrain_optimization_params(self):
         """ Configure optimization parameters for codebook pretrain.
         """
         net_params, spectra_latents = [], None
@@ -1911,7 +1929,13 @@ class CodebookTrainer(BaseTrainer):
                                  "lr": self.extra_args["codebook_pretrain_lr"]})
         return latents_group, net_params_group
 
-    def _assign_redshift_pretrain_optimization_params(self):
+    def _assign_classification_optimization_params(self):
+        model_params = []
+        for name in self.params_dict:
+            model_params.append(self.params_dict[name])
+        return model_params
+
+    def _assign_brute_force_optimization_params(self):
         spectra_latents, redshift_latents = None, None
         base_spectra_latents, addup_spectra_latents = None, None
         gt_bin_spectra_latents, wrong_bin_spectra_latents  = None, None

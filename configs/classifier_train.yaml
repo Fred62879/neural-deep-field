@@ -90,6 +90,10 @@ decoder:
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
+    classifier_decoder_batch_norm: False
+    classifier_decoder_num_hidden_layers: 5
+    classifier_decoder_hidden_dim: 512
+
 trainer:
     num_epochs: 200
     batch_size: 5500
@@ -124,9 +128,9 @@ infer:
     classify_redshift_based_on_l2: False
     infer_use_global_loss_as_lambdawise_weights: True
 
-    pretrain_infer_batch_size: 5
+    pretrain_infer_batch_size: 25
     pretrain_infer_use_all_wave: False
-    pretrain_infer_num_wave: 1000
+    pretrain_infer_num_wave: 200
     pretrain_infer_wave_sample_method: 'uniform_dense'
 
     plot_clipped_spectrum: True

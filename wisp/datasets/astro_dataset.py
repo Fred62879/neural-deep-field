@@ -44,7 +44,8 @@ class AstroDataset(Dataset):
         if self.space_dim == 3:
             self.unbatched_fields = {
                 "idx","selected_ids","wave_data","spectra_data","redshift_data","model_data",
-                "gt_redshift_bin_ids","gt_redshift_bin_masks","global_restframe_spectra_loss"
+                "gt_redshift_bin_ids","gt_redshift_bin_masks","global_restframe_spectra_loss",
+                "wave_range"
             }
         else:
             self.unbatched_fields = set()
@@ -362,6 +363,8 @@ class AstroDataset(Dataset):
             out["idx"] = idx
         if "selected_ids" in self.requested_fields:
             out["selected_ids"] = self.data["selected_ids"]
+        if "wave_range" in self.requested_fields:
+            out["wave_range"] = self.get_wave_range()
         if self.kwargs["add_redshift_logit_bias"]:
             self.get_init_redshift_logit_bias(out)
         if "wave_data" in self.requested_fields:
