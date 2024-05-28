@@ -435,7 +435,7 @@ class CodebookTrainer(BaseTrainer):
 
             if redshift_latents is not None:
                 self.train_pipeline.set_redshift_latents(redshift_latents)
-                self.freeze_and_load()
+            self.freeze_and_load()
 
         log.info(self.train_pipeline)
         log.info("Total number of parameters: {}".format(

@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'dz-spectra' #'vdz-spectra-ssim-latents-dim-regu-beta'
+    exp_name: 'dz-spectra-ssim' #'vdz-spectra-ssim-latents-dim-regu-beta'
     log_fname: 'pretrain'
 
     tasks: ['codebook_pretrain']
-    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    #tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -29,7 +29,7 @@ pretrain:
     pretrain_batch_size: 10000
 
     pretrain_use_all_wave: False
-    pretrain_num_wave_samples: 100
+    pretrain_num_wave_samples: 200
     pretrain_wave_sample_method: 'uniform_dense'
 
     apply_gt_redshift: True
@@ -135,8 +135,8 @@ spectra_data:
     spectra_data_sources: [deimos,zcosmos] #vipers_w1,vipers_w4]
     random_permute_source_spectra: True
 
-    spectra_supervision_wave_lo: 5000
-    spectra_supervision_wave_hi: 9000
+    spectra_supervision_wave_lo: 6000
+    spectra_supervision_wave_hi: 8000
 
     min_num_valid_samples: 100
     spectra_upsample_scale: 10

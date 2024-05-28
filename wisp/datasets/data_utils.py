@@ -175,16 +175,17 @@ def batch_sample_torch(
       sample_ids: [nsmpl,2]
     """
     sp = data.shape
+    bsz = sp[0]
     batches_share_ids = sample_method == "uniform_non_random"
 
     if sample_ids is not None:
         if batches_share_ids:
             nsmpl = int(sp[-1] / (sp[-1] // nsmpl)) + 1
             assert list(sample_ids.shape) == [nsmpl]
-        else: assert list(sample_ids.shape) == [sp[0], nsmpl, 2]
+        else: assert list(sample_ids.shape) == [bsz, nsmpl, 2]
     else:
         if sample_method == "uniform":
-            sample_ids = torch.zeros(sp[0], nsmpl).uniform_(0, sp[-1]).to(torch.long)
+            sample_ids = torch.zeros(bsz, nsmpl).uniform_(0, sp[-1]).to(torch.long)
         elif sample_method == "rand_dense":
             """
             densely sample within defined range (lo~hi) (with replacement)
@@ -192,46 +193,30 @@ def batch_sample_torch(
             """
             assert sup_bounds is not None
             lo, hi = sup_bounds[:,0], sup_bounds[:,1]
-            sample_ids = torch.rand(sp[0], nsmpl) # uniform random number [0,1)
+            sample_ids = torch.rand(bsz, nsmpl) # uniform random number [0,1)
             sample_ids = sample_ids * (hi - lo)[:,None] + lo[:,None] # sacle to given range
             sample_ids = sample_ids.to(torch.long)
             sample_ids, _ = torch.sort(sample_ids, dim=-1)
-            print(sample_ids[0])
-            assert 0
         elif sample_method == "uniform_dense":
             """
-            densely sample within defined range (lo~hi)
-            """
-            raise NotImplementedError()
-            assert sup_bounds is not None
-            lo, hi = sup_bounds[:,0], sup_bounds[:,1]
-            sample_ids = torch.rand(sp[0], nsmpl) # uniform random number [0,1)
-            sample_ids = sample_ids * (hi - lo)[:,None] + lo[:,None] # sacle to given range
-            sample_ids = sample_ids.to(torch.long)
-            sample_ids, _ = torch.sort(sample_ids, dim=-1)
-            print(sample_ids[0])
-            assert 0
-        elif sample_method == "uniform_dense_no_upper_bound":
-            """
-            densely sample within defined range (lo~?) (without replacement)
+            densely sample within defined range (lo~?) with even step (without replacement)
             if #samples within range < #samples needed, extend hi bound s.t. no duplicates
             """
             assert sup_bounds is not None
-            lo, hi = sup_bounds[:,0], sup_bounds[:,1]
+            lo, hi = sup_bounds[:,0:1], sup_bounds[:,1:] # [bsz,1]
+            # extend upper bound for those without enough samples within range
             short = (hi - lo + 1) < nsmpl
-            hi[short] = nsmpl - 1 + lo[short]
-            step = (hi - lo + 1) // (nsmpl - 1)
-            sample_ids = torch.arange(lo, hi+1)
-            print(sample_ids)
-            sample_ids = torch.randperm(ids)
-            print(sample_ids)
-            # sample_ids = torch.rand(sp[0], nsmpl) # uniform random number [0,1)
-            # sample_ids = sample_ids * (hi - lo)[:,None] + lo[:,None] # sacle to given range
-            sample_ids = sample_ids[:,None] + lo[:,None]
+            hi[short] = nsmpl - 1 + lo[short] # hi-lo >= nsmpl
+            # uniformly get #nsmpl samples within [0,1]
+            step = 1 / (nsmpl - 1) # (hi-lo) * step >= 1
+            sample_ids = torch.arange(0, 1 + step, step)[:nsmpl]
+            sample_ids = sample_ids[None,:].tile(bsz,1) # [bsz,nsmpl]
+            # scale to given range (lo/hi)
+            sample_ids = sample_ids * (hi - lo) + lo
+            # print(sample_ids[0])
+            # round down, since (hi-lo)*step>=1, no duplicates
             sample_ids = sample_ids.to(torch.long)
-            sample_ids, _ = torch.sort(sample_ids, dim=-1)
-            print(sample_ids[0])
-            assert 0
+            # print(sample_ids[0])
         elif sample_method == "uniform_non_random":
             # sample with even step, same ids for each batch sample
             step = sp[-1] // nsmpl
@@ -245,7 +230,7 @@ def batch_sample_torch(
             sample_ids, _ = torch.sort(sample_ids, dim=-1)
 
         if not batches_share_ids:
-            row_ids = torch.repeat_interleave(torch.arange(sp[0]), nsmpl).view(sp[0],nsmpl)
+            row_ids = torch.repeat_interleave(torch.arange(bsz), nsmpl).view(bsz,nsmpl)
             sample_ids = torch.cat((row_ids[...,None],sample_ids[...,None]), dim=-1)
 
     # print(data.shape, sample_ids.shape)

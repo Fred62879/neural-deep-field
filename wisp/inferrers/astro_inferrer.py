@@ -1696,10 +1696,6 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_lambdawise_spectra_loss:
             self.spectra_wave_s.extend(data["wave"][...,0]) # [bsz,nsmpls]
-            a = data["wave"][...,0]
-            print(a[0,:100])
-            print(a[1,:100])
-            assert 0
             self.gt_bin_ids_s.extend(data["gt_redshift_bin_ids"].T) # [bsz,2]
             self.spectra_lambdawise_losses_s.extend(ret["spectra_lambdawise_loss"])
 

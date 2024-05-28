@@ -417,11 +417,13 @@ class AstroDataset(Dataset):
             if self.sample_wave:
                 # sample from spectra data (wave, flux, ivar, and interpolated trans)
                 # sample_ids [bsz,nsmpl,2]
+                # print(out["spectra_source_data"][0,0])
                 out["spectra_source_data"], sample_ids = batch_sample_torch(
                     out["spectra_source_data"], self.num_wave_samples,
                     sample_method=self.wave_sample_method,
                     sup_bounds=out["spectra_sup_bounds"],
                     keep_sample_ids=True)
+                # print(out["spectra_source_data"][0,0])
 
                 wave = out["spectra_source_data"][:,0]
 
