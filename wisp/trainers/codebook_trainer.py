@@ -155,12 +155,11 @@ class CodebookTrainer(BaseTrainer):
         # regress redshift
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
         # classify redshift
-        self.calculate_binwise_spectra_loss = self.model_redshift and \
-            self.classify_redshift and self.extra_args["calculate_binwise_spectra_loss"] and \
-            not self.classification_mode
+        self.brute_force = self.model_redshift and self.classify_redshift and \
+            self.extra_args["calculate_binwise_spectra_loss"]
         # if we want to calculate binwise spectra loss when we do quantization
         #  we need to perform qtz first in hyperspectral_decoder::dim_reduction
-        assert not self.calculate_binwise_spectra_loss or \
+        assert not self.brute_force or \
             (not self.qtz or self.extra_args["spectra_batch_reduction_order"] == "qtz_first")
 
         self.classify_redshift_based_on_l2 = self.classify_redshift and \
@@ -168,8 +167,7 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["spectra_loss_cho"] != "l2"
 
         self.neg_sup_wrong_redshift = \
-            self.mode == "codebook_pretrain" and \
-            self.calculate_binwise_spectra_loss and \
+            self.mode == "codebook_pretrain" and self.brute_force and \
             self.extra_args["negative_supervise_wrong_redshift"]
         self.neg_sup_optimize_alternately = \
             self.neg_sup_wrong_redshift and \
@@ -177,12 +175,11 @@ class CodebookTrainer(BaseTrainer):
 
         # pretrain mandates either apply gt redshift directly or brute force
         assert not self.mode == "codebook_pretrain" or (
-            self.apply_gt_redshift or self.calculate_binwise_spectra_loss)
+            self.apply_gt_redshift or self.brute_force)
         # brute force during pretrain mandates negative supervision
         assert not(self.mode == "codebook_pretrain" and
-                   self.calculate_binwise_spectra_loss) or \
+                   self.brute_force) or \
                    self.neg_sup_wrong_redshift
-
         # sanity check & generalization mandates brute force
         assert not (self.mode == "sanity_check" or \
                     self.mode == "generalization" or self.classification_mode) or \
@@ -190,13 +187,13 @@ class CodebookTrainer(BaseTrainer):
 
         # three different brute force strategies during sc & generalization
         self.regularize_binwise_spectra_latents = self.brute_force and \
-            self.calculate_binwise_spectra_loss and \
+            self.brute_force and \
             self.extra_args["regularize_binwise_spectra_latents"]
         self.optimize_latents_for_each_redshift_bin = self.brute_force and \
-            self.calculate_binwise_spectra_loss and \
+            self.brute_force and \
             self.extra_args["optimize_latents_for_each_redshift_bin"]
         self.optimize_one_latent_for_all_redshift_bins = self.brute_force and \
-            self.calculate_binwise_spectra_loss and \
+            self.brute_force and \
             not self.regularize_binwise_spectra_latents and \
             not self.extra_args["optimize_latents_for_each_redshift_bin"]
         self.calculate_spectra_loss_based_on_optimal_bin = \
@@ -273,7 +270,7 @@ class CodebookTrainer(BaseTrainer):
         self.plot_l2_loss = self.extra_args["plot_l2_loss"] and \
             self.extra_args["spectra_loss_cho"] == "ssim1d"
         self.plot_gt_bin_loss = self.extra_args["plot_gt_bin_loss"] and \
-            self.calculate_binwise_spectra_loss and self.brute_force
+            self.brute_force and self.brute_force
         self.plot_individ_spectra_loss = self.apply_gt_redshift and \
             self.extra_args["plot_individ_spectra_loss"]
 
@@ -1256,7 +1253,7 @@ class CodebookTrainer(BaseTrainer):
             self.est_redshift = []
             if self.classify_redshift:
                 self.redshift_logits = []
-                if self.calculate_binwise_spectra_loss:
+                if self.brute_force:
                     self.binwise_loss = []
         if self.save_qtz_weights:
             self.qtz_weights = []
@@ -1322,7 +1319,7 @@ class CodebookTrainer(BaseTrainer):
             if self.classify_redshift:
                 self._plot_redshift_logits()
                 self._log_redshift_residual_outlier()
-                if self.calculate_binwise_spectra_loss:
+                if self.brute_force:
                     self._plot_binwise_spectra_loss()
 
     def _save_redshift(self):
@@ -1590,7 +1587,7 @@ class CodebookTrainer(BaseTrainer):
             classification_mode=self.classification_mode,
             optimize_bins_separately=self.optimize_bins_separately,
             regularize_codebook_spectra=self.regularize_codebook_spectra,
-            calculate_binwise_spectra_loss=self.calculate_binwise_spectra_loss,
+            calculate_binwise_spectra_loss=self.brute_force,
             regress_lambdawise_weights_share_latents=\
                 self.regress_lambdawise_weights and \
                 self.regress_lambdawise_weights_share_latents,
@@ -1711,7 +1708,7 @@ class CodebookTrainer(BaseTrainer):
             weight[gt==1.] = self.num_redshift_bins
             spectra_loss = (spectra_loss * weight).mean()
 
-        elif self.calculate_binwise_spectra_loss:
+        elif self.brute_force:
             if self.neg_sup_wrong_redshift:
                 spectra_loss = self._calculate_neg_sup_loss(ret, data)
             else:
