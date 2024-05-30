@@ -94,7 +94,7 @@ class AstroInferrer(BaseInferrer):
             Path(path).mkdir(parents=True, exist_ok=True)
 
         if self.classify_redshift and \
-           (self.mode == "sanity_check_infer" or self.mode == "generalization_infer"):
+           (self.sanity_check_infer or self.generalization_infer):
             suffix = ""
             if self.classify_redshift_based_on_l2:
                 suffix += "l2_based_"
@@ -107,27 +107,27 @@ class AstroInferrer(BaseInferrer):
             Path(self.redshift_dir).mkdir(parents=True, exist_ok=True)
 
     def init_data(self):
-        if self.mode == "codebook_pretrain_infer" or \
-           self.mode == "sanity_check_infer" or \
-           self.mode == "generalization_infer":
+        if self.spectra_train_infer:
             self.batch_size = self.extra_args["pretrain_infer_batch_size"]
 
-            if self.mode == "sanity_check_infer":
+            if self.sanity_check_infer or \
+               self.redshift_classification_sc_infer:
                 self.dataset.set_spectra_source("val")
                 self.num_spectra = self.dataset.get_num_validation_spectra()
-            elif self.mode == "generalization_infer":
+            elif self.generalization_infer or \
+                 self.redshift_classification_genlz_infer:
                 self.dataset.set_spectra_source("test")
                 self.num_spectra = self.dataset.get_num_test_spectra()
             else:
                 self.dataset.set_spectra_source("sup")
                 self.num_spectra = self.dataset.get_num_supervision_spectra()
 
-        elif self.mode == "main_infer":
+        elif self.img_train_infer:
             self.batch_size = self.extra_args["infer_batch_size"]
             self.dataset.set_spectra_source("val")
             self.num_spectra = self.dataset.get_num_validation_spectra()
 
-        elif self.mode == "test":
+        elif self.test:
             self.batch_size = self.extra_args["infer_batch_size"]
             self.dataset.set_spectra_source("test")
             self.num_spectra = self.dataset.get_num_test_spectra()
@@ -200,13 +200,17 @@ class AstroInferrer(BaseInferrer):
         tasks = set(self.extra_args["tasks"])
 
         self.test = self.mode == "test"
-        self.main_infer = self.mode == "main_infer"
+        self.img_train_infer = self.mode == "main_infer"
         self.codebook_pretrain_infer = self.mode == "codebook_pretrain_infer"
         self.sanity_check_infer = self.mode == "sanity_check_infer"
         self.generalization_infer = self.mode == "generalization_infer"
-        self.pretrain_infer = self.codebook_pretrain_infer or \
-            self.sanity_check_infer or self.generalization_infer
-        assert sum([self.test,self.main_infer,self.pretrain_infer]) == 1
+        self.clsfy_sc_infer = self.mode == "redshift_classification_sc_infer"
+        self.clsfy_genlz_infer = self.mode == "redshift_classification_genlz_infer"
+
+        self.spectra_train_infer = self.codebook_pretrain_infer or \
+            self.sanity_check_infer or self.generalization_infer or \
+            self.clsfy_sc_infer or self.clsfy_genlz_infer
+        assert sum([self.test,self.img_train_infer,self.spectra_train_infer]) == 1
 
         # quantization setups
         assert not self.extra_args["temped_qtz"]
@@ -246,7 +250,7 @@ class AstroInferrer(BaseInferrer):
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
 
         # classify redshift
-        self.calculate_binwise_spectra_loss = self.model_redshift and \
+        self.brute_force = self.model_redshift and \
             self.classify_redshift and self.extra_args["calculate_binwise_spectra_loss"]
         self.plot_lambdawise_spectra_loss = \
             get_bool_plot_lambdawise_spectra_loss(**self.extra_args)
@@ -255,7 +259,7 @@ class AstroInferrer(BaseInferrer):
 
         # if we want to calculate binwise spectra loss when we do quantization
         #  we need to perform qtz first in hyperspectral_decoder::dim_reduction
-        assert not self.calculate_binwise_spectra_loss or \
+        assert not self.brute_force or \
             (not self.qtz or self.extra_args["spectra_batch_reduction_order"] == "qtz_first")
 
         self.classify_redshift_based_on_l2 = \
@@ -264,11 +268,11 @@ class AstroInferrer(BaseInferrer):
         # weighted spectra training
         self.regress_lambdawise_weights = \
             self.extra_args["regress_lambdawise_weights"] and \
-            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer")
+            (self.sanity_check_infer or self.generalization_infer)
         self.use_global_spectra_loss_as_lambdawise_weights = \
             (self.extra_args["use_global_spectra_loss_as_lambdawise_weights"] or \
              self.extra_args["infer_use_global_loss_as_lambdawise_weights"]
-            ) and (self.mode == "sanity_check_infer" or self.mode == "generalization_infer")
+            ) and (self.sanity_check_infer or self.generalization_infer)
         self.get_lambdawise_weights = \
             self.regress_lambdawise_weights or \
             self.use_global_spectra_loss_as_lambdawise_weights
@@ -283,33 +287,33 @@ class AstroInferrer(BaseInferrer):
 
         self.neg_sup_wrong_redshift = \
             self.mode == "codebook_pretrain" and \
-            self.calculate_binwise_spectra_loss and \
+            self.brute_force and \
             self.extra_args["negative_supervise_wrong_redshift"]
 
         # pretrain infer mandates either apply gt redshift directly or brute force
         assert not self.codebook_pretrain_infer or (
-            self.apply_gt_redshift or self.calculate_binwise_spectra_loss)
+            self.apply_gt_redshift or self.brute_force)
         # brute force during pretrain mandates negative supervision
         assert not(self.codebook_pretrain_infer and \
-                   self.calculate_binwise_spectra_loss) or \
+                   self.brute_force) or \
                    self.neg_sup_wrong_redshift
 
         # sanity check & generalization mandates brute force
         assert not \
-            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer") or \
-            self.calculate_binwise_spectra_loss
+            (self.sanity_check_infer or self.generalization_infer) or \
+            self.brute_force
         # three different brute force strategies during sc & generalization
         self.regularize_binwise_spectra_latents = \
-            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer") and \
-            self.calculate_binwise_spectra_loss and \
+            (self.sanity_check_infer or self.generalization_infer) and \
+            self.brute_force and \
             self.extra_args["regularize_binwise_spectra_latents"]
         self.optimize_latents_for_each_redshift_bin = \
-            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer") and \
-            self.calculate_binwise_spectra_loss and \
+            (self.sanity_check_infer or self.generalization_infer) and \
+            self.brute_force and \
             self.extra_args["optimize_latents_for_each_redshift_bin"]
         self.optimize_one_latent_for_all_redshift_bins = \
-            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer") and \
-            self.calculate_binwise_spectra_loss and \
+            (self.sanity_check_infer or self.generalization_infer) and \
+            self.brute_force and \
             not self.regularize_binwise_spectra_latents and \
             not self.extra_args["optimize_latents_for_each_redshift_bin"]
         self.calculate_spectra_loss_based_on_optimal_bin = \
@@ -321,12 +325,12 @@ class AstroInferrer(BaseInferrer):
             self.num_redshift_bins = len(redshift_bins)
 
         self.save_redshift = "save_redshift" in tasks and self.model_redshift
-        self.save_redshift_pre = self.save_redshift and self.pretrain_infer
-        self.save_redshift_main = self.save_redshift and self.main_infer
+        self.save_redshift_pre = self.save_redshift and self.spectra_train_infer
+        self.save_redshift_main = self.save_redshift and self.img_train_infer
         self.save_redshift_test = self.save_redshift and self.test
 
         self.regress_lambdawise_weights = self.extra_args["regress_lambdawise_weights"] and \
-            (self.mode == "sanity_check_infer" or self.mode == "generalization_infer")
+            (self.sanity_check_infer or self.generalization_infer)
         self.regress_lambdawise_weights_share_latents = self.regress_lambdawise_weights and \
             self.extra_args["regress_lambdawise_weights_share_latents"]
 
@@ -339,10 +343,10 @@ class AstroInferrer(BaseInferrer):
         self.recon_synthetic_band = "recon_synthetic_band" in tasks
 
         if "recon_img" in tasks:
-            if self.pretrain_infer:
+            if self.spectra_train_infer:
                 self.recon_img_sup_spectra = \
                     self.extra_args["pretrain_pixel_supervision"]
-            elif self.main_infer:
+            elif self.img_train_infer:
                 if self.recon_spectra_pixels_only:
                     self.recon_img_val_spectra = True
                 else: self.recon_img_all_pixels = True
@@ -358,10 +362,10 @@ class AstroInferrer(BaseInferrer):
         self.plot_latent_embed = "plot_latent_embed" in tasks and self.qtz
         self.save_qtz_weights = "save_qtz_weights" in tasks and \
             ((self.qtz_latent and self.qtz_strategy == "soft") or self.qtz_spectra)
-        self.save_qtz_w_main = self.save_qtz_weights and self.main_infer
-        self.save_qtz_w_pre = self.save_qtz_weights and self.pretrain_infer
+        self.save_qtz_w_main = self.save_qtz_weights and self.img_train_infer
+        self.save_qtz_w_pre = self.save_qtz_weights and self.spectra_train_infer
         self.save_scaler = "save_scaler" in tasks and self.generate_scaler and \
-            self.qtz and self.main_infer
+            self.qtz and self.img_train_infer
 
         # ii) infer selected coords using partial model
         self.recon_spectra = "recon_spectra" in tasks
@@ -411,18 +415,18 @@ class AstroInferrer(BaseInferrer):
         assert not self.plot_est_redshift_logits or (
             self.classify_redshift and self.save_redshift)
         assert not self.plot_redshift_est_residuals or self.save_redshift
-        assert not self.save_optimal_bin_ids or self.calculate_binwise_spectra_loss
-        assert not self.plot_gt_bin_spectra or self.calculate_binwise_spectra_loss
-        assert not self.plot_binwise_spectra_loss or self.calculate_binwise_spectra_loss
-        assert not self.plot_optimal_wrong_bin_spectra or self.calculate_binwise_spectra_loss
-        assert not self.plot_optimal_wrong_bin_codebook_coeff or self.calculate_binwise_spectra_loss
+        assert not self.save_optimal_bin_ids or self.brute_force
+        assert not self.plot_gt_bin_spectra or self.brute_force
+        assert not self.plot_binwise_spectra_loss or self.brute_force
+        assert not self.plot_optimal_wrong_bin_spectra or self.brute_force
+        assert not self.plot_optimal_wrong_bin_codebook_coeff or self.brute_force
         assert not self.plot_codebook_coeff_all_bins or (
-            self.qtz_spectra and self.calculate_binwise_spectra_loss)
+            self.qtz_spectra and self.brute_force)
         assert sum([self.recon_spectra, self.recon_spectra_all_bins]) <= 1
         assert self.extra_args["calculate_redshift_est_stats_based_on"] == "residuals"
 
         assert not self.plot_global_lambdawise_spectra_loss or \
-            (self.mode == "codebook_pretrain_infer" or self.mode == "sanity_check_infer")
+            (self.codebook_pretrain_infer or self.sanity_check_infer)
 
         self.recon_redshift = self.save_redshift or \
             self.save_optimal_bin_ids or \
@@ -470,7 +474,7 @@ class AstroInferrer(BaseInferrer):
         self.infer_outlier_only = self.extra_args["infer_outlier_only"]
         assert sum([self.infer_selected, self.infer_outlier_only]) <= 1
         assert not self.infer_outlier_only or (
-            self.save_redshift_pre and self.calculate_binwise_spectra_loss), \
+            self.save_redshift_pre and self.brute_force), \
             "we need to infer redshift to find outlier!"
 
         # set all grouped tasks to False, only required tasks will be toggled afterwards
@@ -495,7 +499,7 @@ class AstroInferrer(BaseInferrer):
 
         self.requested_fields = []
 
-        if self.pretrain_infer:
+        if self.spectra_train_infer:
             assert (
                 not (self.sanity_check_infer or self.generalization_infer) or \
                 self.infer_selected), \
@@ -520,7 +524,7 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.append("selected_ids")
             else: self.dataset_length = self.num_spectra
 
-        elif self.main_infer:
+        elif self.img_train_infer:
             self.requested_fields.append("coords")
             self.wave_source = "trans"
 
@@ -571,30 +575,35 @@ class AstroInferrer(BaseInferrer):
             log.info(f"zscale metrics: {np.round(self.metrics_zscale[:,-1,0], 3)}")
 
     def pre_inferrence_selected_coords_partial_model(self):
-        """ Spectra reconstruction.
+        """
+        Configure the dataset depending on the current inferrence tasks.
         """
         self.use_all_wave = True
         self.perform_integration = False
-
         self.requested_fields = []
 
-        if self.pretrain_infer:
-            self.coords_source = None
+        if self.spectra_train_infer:
+            self.requested_fields.append("spectra_sup_bounds")
+            if self.clsfy_sc_infer or self.clsfy_genlz_infer:
+                self.requested_fields.extend([
+                    "wave","wave_range","gt_redshift_bin_masks_b",
+                    "spectra_masks_b","spectra_lambdawise_losses"])
+            else:
+                self.requested_fields.extend([
+                    "idx","spectra_source_data","spectra_masks","spectra_redshift"])
+
             self.wave_source = "spectra"
+            self.coords_source = None
             self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
             if not self.use_all_wave:
                 self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
                 self.wave_sample_method = self.extra_args["pretrain_infer_wave_sample_method"]
 
-            self.requested_fields.extend([
-                "idx","spectra_source_data","spectra_masks",
-                "spectra_redshift","spectra_sup_bounds"]
-            )
-            if self.plot_gt_bin_spectra or self.plot_optimal_wrong_bin_spectra or \
-               self.recon_spectra_all_bins:
+            if self.recon_spectra_all_bins or \
+               self.plot_gt_bin_spectra or self.plot_optimal_wrong_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_ids")
-            if self.neg_sup_wrong_redshift or self.plot_gt_bin_spectra or \
-               self.plot_optimal_wrong_bin_spectra:
+            if self.neg_sup_wrong_redshift or \
+               self.plot_gt_bin_spectra or self.plot_optimal_wrong_bin_spectra:
                 self.requested_fields.append("gt_redshift_bin_masks")
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
                 self.requested_fields.append("spectra_ivar_reliable")
@@ -615,7 +624,7 @@ class AstroInferrer(BaseInferrer):
             else: self.dataset_length = self.num_spectra
             self.num_spectra = self.dataset_length
 
-        elif self.main_infer:
+        elif self.img_train_infer:
             self.requested_fields.append("coords")
 
             self.wave_source = "trans"
@@ -628,7 +637,6 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.append("spectra_redshift")
 
         elif self.test:
-            assert 0
             # todo: replace with patch-wise test spectra
             self.wave_source = "trans"
             self.coords_source = "spectra_test"
@@ -678,7 +686,7 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             self.wave_source = "full_spectra"
         elif self.recon_codebook_spectra_individ:
-            if self.pretrain_infer:
+            if self.spectra_train_infer:
                 self.wave_source = "spectra"
                 self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
                 self.num_wave_samples = self.extra_args["pretrain_infer_num_wave"]
@@ -697,7 +705,7 @@ class AstroInferrer(BaseInferrer):
             #     self.requested_fields.append("spectra_masks")
 
         elif self.recon_codebook_spectra_individ:
-            if self.pretrain_infer:
+            if self.spectra_train_infer:
                 self.coords_source = None
                 self.requested_fields.extend([
                     "idx","spectra_source_data","spectra_masks",
@@ -710,7 +718,7 @@ class AstroInferrer(BaseInferrer):
                     input("plot codebook spectra for all spectra, press Enter to confirm...")
                     self.dataset_length = self.num_spectra
 
-            elif self.main_infer:
+            elif self.img_train_infer:
                 self.coords_source = "spectra_valid"
                 self._set_coords_from_spectra_source(
                     self.dataset.get_validation_spectra_coords()
@@ -808,7 +816,7 @@ class AstroInferrer(BaseInferrer):
             self.gt_redshift_l = []
 
     def run_checkpoint_all_coords_full_model(self, model_id, checkpoint):
-        if self.pretrain_infer:
+        if self.spectra_train_infer:
             # self._set_coords_from_checkpoint(checkpoint)
             self.full_pipeline.set_latents(checkpoint["model_state_dict"]["model.latents"])
             if not self.apply_gt_redshift and self.split_latent:
@@ -883,7 +891,7 @@ class AstroInferrer(BaseInferrer):
             plot_latent_embed(self.latents, self.embed, model_id, self.latent_embed_dir)
 
         if self.plot_embed_map:
-            if self.pretrain_infer:
+            if self.spectra_train_infer:
                 self.embed_ids = torch.stack(self.embed_ids).detach().cpu().numpy()
                 log.info(f"embed ids: {self.embed_ids}")
             else:
@@ -951,7 +959,7 @@ class AstroInferrer(BaseInferrer):
             }
             _, _ = self.dataset.restore_evaluate_tiles(self.scalers, **re_args)
 
-            if self.main_infer:
+            if self.img_train_infer:
                 log_data(self, "scalers", mask=self.val_spectra_map)
 
         if self.save_qtz_w_pre:
@@ -1053,7 +1061,7 @@ class AstroInferrer(BaseInferrer):
         if self.save_spectra_latents: self.spectra_latents = []
 
     def run_checkpoint_selected_coords_partial_model(self, model_id, checkpoint):
-        if self.pretrain_infer:
+        if self.spectra_train_infer:
             if self.regularize_binwise_spectra_latents:
                 self.spectra_infer_pipeline.set_base_latents(
                     checkpoint["model_state_dict"]["model.base_latents"])
@@ -1129,14 +1137,14 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             self.spectra_wave_c = []
             self.spectra_masks_c = []
-        if self.recon_codebook_spectra_individ and self.pretrain_infer:
+        if self.recon_codebook_spectra_individ and self.spectra_train_infer:
             self.spectra_wave_ci = []
             self.spectra_masks_ci = []
 
     def run_checkpoint_hardcode_coords_modified_model(self, model_id, checkpoint):
         if self.recon_codebook_spectra:
             self._set_coords_from_checkpoint(checkpoint)
-        elif self.recon_codebook_spectra_individ and self.pretrain_infer:
+        elif self.recon_codebook_spectra_individ and self.spectra_train_infer:
             self.codebook_spectra_infer_pipeline.set_latents(
                 checkpoint["model_state_dict"]["model.latents"])
             if not self.apply_gt_redshift and self.split_latent:
@@ -1164,7 +1172,7 @@ class AstroInferrer(BaseInferrer):
                 str(self.extra_args["codebook_spectra_plot_wave_hi"])
 
         elif self.recon_codebook_spectra_individ:
-            if self.pretrain_infer:
+            if self.spectra_train_infer:
                 spectra_wave = torch.stack(self.spectra_wave_ci).view(
                     self.dataset_length, -1).detach().cpu().numpy()
                 spectra_masks = torch.stack(self.spectra_masks_ci).bool().view(
@@ -1317,7 +1325,7 @@ class AstroInferrer(BaseInferrer):
                     self.spectra_masks_c.extend(data["spectra_masks"])
 
                 elif self.recon_codebook_spectra_individ:
-                    if self.pretrain_infer:
+                    if self.spectra_train_infer:
                         self.spectra_wave_ci.extend(data["wave"])
                         self.spectra_masks_ci.extend(data["spectra_masks"])
                         # self.redshift.extend(data["spectra_redshift"])
@@ -1359,7 +1367,7 @@ class AstroInferrer(BaseInferrer):
     def _select_inferrence_ids(self):
         fname = join(self.log_dir, "..", self.extra_args["spectra_inferrence_id_fname"])
         if exists(fname) and fname[-3:] == "npy":
-            if self.mode == "codebook_pretrain_infer":
+            if self.codebook_pretrain_infer:
                 """
                 During sanity check, we sample from supervision spectra.
                 The sampled spectra have ids under context of all sanity check spectra.
@@ -1450,7 +1458,7 @@ class AstroInferrer(BaseInferrer):
             all_latents = latents.detach().cpu().numpy() # [bsz,nbins,dim]
 
         # index gt bin latents only
-        if self.mode == "sanity_check_infer" or self.mode == "generalization_infer":
+        if self.sanity_check_infer or self.generalization_infer:
             gt_bin_ids = self.dataset.create_gt_redshift_bin_ids()
             if all_models_together:
                 all_latents = all_latents[:,gt_bin_ids[0],gt_bin_ids[1],:]
@@ -1460,7 +1468,7 @@ class AstroInferrer(BaseInferrer):
                 all_latents = all_latents[ids]
 
         # select pca latent dim
-        if self.mode == "sanity_check_infer" or self.mode == "generalization_infer":
+        if self.sanity_check_infer or self.generalization_infer:
             assert self.extra_args["sanity_check_plot_same_pca_dim_as_pretrain"]
             fname = join(self.log_dir, "..", self.extra_args["pretrain_pca_dim_fname"])
             assert exists(fname)
@@ -1474,7 +1482,7 @@ class AstroInferrer(BaseInferrer):
         latents_path = join(self.latents_dir, f"{ndim}-dim")
         Path(latents_path).mkdir(parents=True, exist_ok=True)
 
-        if self.mode == "codebook_pretrain_infer":
+        if self.codebook_pretrain_infer:
             fname = join(self.latents_dir, f"{ndim}-dim", "selected_axes.npy")
             np.save(fname, selected_axes)
 
@@ -1579,7 +1587,7 @@ class AstroInferrer(BaseInferrer):
                 loss_func = self._get_spectra_loss_func(
                     self.extra_args["spectra_loss_cho"])
 
-        elif self.calculate_binwise_spectra_loss:
+        elif self.brute_force:
             self.spectra_infer_pipeline.set_batch_reduction_order("qtz_first")
             loss_func = self._get_spectra_loss_func(
                 self.extra_args["spectra_loss_cho"])
@@ -1602,7 +1610,7 @@ class AstroInferrer(BaseInferrer):
                 classify_redshift_based_on_l2= \
                     self.classify_redshift_based_on_l2,
                 calculate_binwise_spectra_loss= \
-                    self.calculate_binwise_spectra_loss,
+                    self.brute_force,
                 calculate_lambdawise_spectra_loss= \
                     self.plot_lambdawise_spectra_loss or \
                     self.save_lambdawise_spectra_loss,
@@ -1756,7 +1764,7 @@ class AstroInferrer(BaseInferrer):
                 self.spectra_ivar_g.extend(data["spectra_source_data"][:,2])
 
     def collect_spectra_inferrence_data_after_each_epoch(self):
-        if self.pretrain_infer:
+        if self.spectra_train_infer:
             self.collect_pretrain_spectra_inferrence_data_after_each_epoch()
         else:
             self.collect_main_train_spectra_inferrence_data_after_each_epoch()
@@ -1835,7 +1843,7 @@ class AstroInferrer(BaseInferrer):
                 self.spectra_ivar_reliable = np.array(self.spectra_ivar_reliable)
 
     def collect_main_train_spectra_inferrence_data_after_each_epoch(self):
-        if self.main_infer:
+        if self.img_train_infer:
             if self.recon_spectra_pixels_only:
                 # todo: adapt to patch-wise inferrence
                 num_spectra = self.dataset.get_num_validation_spectra()
@@ -2046,7 +2054,7 @@ class AstroInferrer(BaseInferrer):
             titles = redshift_bins
 
             # calculate spectra loss under each redshift bin
-            if self.calculate_binwise_spectra_loss:
+            if self.brute_force:
                 # loss = calculate_loss(i); print(loss) #;assert 0
                 losses = calculate_binwise_loss(
                     self.gt_fluxes, recon_fluxes_all, self.recon_masks, i)
@@ -2169,7 +2177,7 @@ class AstroInferrer(BaseInferrer):
         np.save(fname, codebook_coeff)
 
         y, y2 = codebook_coeff, None
-        if self.calculate_binwise_spectra_loss:
+        if self.brute_force:
             # if self.optimize_latents_for_each_redshift_bin:
             # if each bin has its own set of codebook coeff, we plot that for gt bin only
             gt_redshift = torch.stack(self.gt_redshift_cl).detach().cpu().numpy()
@@ -2271,7 +2279,7 @@ class AstroInferrer(BaseInferrer):
 
     # def _save_pixel_value(self, model_id):
     #     self.recon_pixels = self.trans_obj.integrate(recon_fluxes)
-    #     if self.pretrain_infer:
+    #     if self.spectra_train_infer:
     #         self.gt_pixels = self.dataset.get_supervision_spectra_pixels().numpy()
     #     else: self.gt_pixels = self.dataset.get_supervision_validation_pixels().numpy()
     #     self.gt_pixels = self.gt_pixels[:,0]
@@ -2327,7 +2335,7 @@ class AstroInferrer(BaseInferrer):
         # gt_logits = np.zeros(redshift_logits.shape)
         # gt_logits[gt_bin_ids[0,:], gt_bin_ids[1,:]] = 0.1
 
-        if self.calculate_binwise_spectra_loss:
+        if self.brute_force:
             sub_dir = join(
                 self.redshift_dir, "beta-"+str(self.extra_args["binwise_loss_beta"])+suffix)
         else: sub_dir = join(self.redshift_dir, suffix)

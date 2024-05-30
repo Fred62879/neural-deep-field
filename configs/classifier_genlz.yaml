@@ -5,8 +5,8 @@ global:
     exp_name: 'vipers-spectra-ssim'
     log_fname: 'clsfy'
 
-    tasks: ['redshift_classification_train']
-    tasks: ['redshift_classification_sc_infer','recon_spectra','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
+    tasks: ['redshift_classification_genlz']
+    tasks: ['redshift_classification_genlz_infer','recon_spectra','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'

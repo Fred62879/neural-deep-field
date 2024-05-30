@@ -184,8 +184,9 @@ class CodebookTrainer(BaseTrainer):
                    self.neg_sup_wrong_redshift
 
         # sanity check & generalization mandates brute force
-        self.brute_force = self.mode == "sanity_check" or \
-            self.mode == "generalization" or self.classification_mode
+        assert not (self.mode == "sanity_check" or \
+                    self.mode == "generalization" or self.classification_mode) or \
+                    self.brute_force
 
         # three different brute force strategies during sc & generalization
         self.regularize_binwise_spectra_latents = self.brute_force and \
@@ -572,11 +573,15 @@ class CodebookTrainer(BaseTrainer):
         """ Configure dataset with selected fields and set length accordingly.
         """
         self.dataset.set_mode(self.mode)
-        fields = ["spectra_sup_bounds"]
 
-        if not self.classification_mode:
-            fields.extend([
-                "wave_data","spectra_source_data","spectra_masks","spectra_redshift"])
+        fields = ["spectra_sup_bounds"]
+        if self.classification_mode:
+            # add "spectra_loss_data" to fields if want to sample wave/mask/loss
+            fields.extend(["wave","wave_range","gt_redshift_bin_masks_b",
+                           "spectra_masks_b","spectra_lambdawise_losses"])
+        else:
+            fields.extend(["wave_data","spectra_source_data",
+                           "spectra_masks","spectra_redshift"])
 
         # todo, codebook pretrain "coords" not handled
         if self.pixel_supervision:
@@ -647,10 +652,8 @@ class CodebookTrainer(BaseTrainer):
             self.dataset.set_hardcode_data("spectra_masks_b",np.load(masks_fname))
             self.dataset.set_hardcode_data("spectra_lambdawise_losses",np.load(loss_fname))
             # self.dataset.set_hardcode_data("gt_redshift_bin_ids_b",np.load(gt_bin_fname).T)
-            self.dataset.set_hardcode_data("gt_redshift_bin_masks_b",np.load(gt_bin_masks_fname).T)
-            fields.extend(["wave_range","gt_redshift_bin_masks_b", #"gt_redshift_bin_ids_b",
-                           "wave","spectra_masks_b","spectra_lambdawise_losses"])
-            # add "spectra_loss_data" to fields if want to sample wave/mask/loss
+            self.dataset.set_hardcode_data(
+                "gt_redshift_bin_masks_b",np.load(gt_bin_masks_fname).T)
 
         self.dataset.set_fields(fields)
 
