@@ -1,18 +1,12 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import get_bool_classify_redshift, \
-    get_bool_has_redshift_latents, get_bool_weight_spectra_loss_with_global_restframe_loss, \
-    get_bool_save_lambdawise_spectra_loss
 
-from wisp.models.nefs import BaseNeuralField
+from wisp.models.decoders import BasicDecoder
 from wisp.models.embedders.encoder import Encoder
-from wisp.models.decoders import BasicDecoder, SpatialDecoder
-from wisp.models.hypers import HyperSpectralDecoder, HyperSpectralDecoderB
-from wisp.models.layers import get_layer_class, init_codebook, Quantization
-
 
 class RedshiftClassifier(nn.Module):
     def __init__(self, **kwargs):
@@ -36,7 +30,8 @@ class RedshiftClassifier(nn.Module):
             embedder_args=embedder_args,
             **self.kwargs)
 
-        input_dim = 2 * self.kwargs["wave_embed_dim"]
+        # input_dim = 2 * self.kwargs["wave_embed_dim"]
+        input_dim = self.kwargs["classifier_decoder_input_dim"]
         output_dim = 1
         self.decoder = BasicDecoder(
             input_dim, output_dim, True,
@@ -53,13 +48,25 @@ class RedshiftClassifier(nn.Module):
         return ret
 
     def forward(
-            self, channels, wave, wave_range, spectra_lambdawise_losses,
-            idx=None, selected_ids=None
+            self, channels, wave, wave_range, spectra_masks,
+            spectra_lambdawise_losses, idx=None, selected_ids=None
     ):
         """
         @Params
           wave: [bsz,nsmpl]
+          spectra_masks: [bsz,nsmpl]
           spectra_lambdawise_losses: [bsz,nbins,nsmpl]
+        @Return
+          logits: [bsz*nsmpl]
         """
-        print(spectra_lambdawise_losses.shape, wave.shape)
-        assert 0
+        ret = {}
+        # todo: incorporate spectra mask into forward
+        # print(spectra_masks.shape, spectra_lambdawise_losses.shape, wave.shape)
+        # print(wave[0])
+        # pe_wave = self.encoder(wave)
+        # pe_losses = self.encoder(spetra_lambdawise_losses)
+        # print(pe_wave.shape, pe_losses.shape)
+        logits = self.decoder(spectra_lambdawise_losses).flatten()
+        # logits = F.sigmoid(logits)
+        ret["redshift_logits"] = logits
+        return ret

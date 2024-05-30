@@ -599,7 +599,8 @@ class AstroInferrer(BaseInferrer):
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
                 self.requested_fields.append("spectra_ivar_reliable")
             if self.save_lambdawise_spectra_loss:
-                self.requested_fields.append("gt_redshift_bin_ids")
+                # self.requested_fields.append("gt_redshift_bin_ids")
+                self.requested_fields.append("gt_redshift_bin_masks")
             if self.use_global_spectra_loss_as_lambdawise_weights:
                 emitted_wave, loss = np.load(self.global_restframe_spectra_loss_fname)
                 global_restframe_spectra_loss = interp1d(
@@ -1001,8 +1002,10 @@ class AstroInferrer(BaseInferrer):
                 self.spectra_lambdawise_losses = []
 
         if self.save_lambdawise_spectra_loss:
+            # self.gt_bin_ids_s = []
+            self.gt_bin_masks_s = []
             self.spectra_wave_s = []
-            self.gt_bin_ids_s = []
+            self.spectra_masks_s = []
             self.spectra_lambdawise_losses_s = []
 
         if self.plot_global_lambdawise_spectra_loss:
@@ -1696,7 +1699,9 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_lambdawise_spectra_loss:
             self.spectra_wave_s.extend(data["wave"][...,0]) # [bsz,nsmpls]
-            self.gt_bin_ids_s.extend(data["gt_redshift_bin_ids"].T) # [bsz,2]
+            self.spectra_masks_s.extend(data["spectra_masks"]) # [bsz,nsmpls]
+            # self.gt_bin_ids_s.extend(data["gt_redshift_bin_ids"].T) # [bsz,2]
+            self.gt_bin_masks_s.extend(data["gt_redshift_bin_masks"]) # [bsz,nbins]
             self.spectra_lambdawise_losses_s.extend(ret["spectra_lambdawise_loss"])
 
         if self.plot_codebook_coeff:
@@ -1804,10 +1809,14 @@ class AstroInferrer(BaseInferrer):
                     self.spectra_lambdawise_weights).detach().cpu().numpy()
 
         if self.save_lambdawise_spectra_loss:
-            self.gt_bin_ids_s = torch.stack(
-                self.gt_bin_ids_s).detach().cpu().numpy().T # [2,bsz]
+            # self.gt_bin_ids_s = torch.stack(
+            #     self.gt_bin_ids_s).detach().cpu().numpy().T # [2,bsz]
+            self.gt_bin_masks_s = torch.stack(
+                self.gt_bin_masks_s).detach().cpu().numpy().T # [2,bsz]
             self.spectra_wave_s = torch.stack(
                 self.spectra_wave_s).detach().cpu().numpy() # [bsz,nsmpl]
+            self.spectra_masks_s = torch.stack(
+                self.spectra_masks_s).detach().cpu().numpy() # [bsz,nsmpl]
             self.spectra_lambdawise_losses_s = torch.stack(
                 self.spectra_lambdawise_losses_s).detach().cpu().numpy() # [bsz,nbins,nsmpl]
 
@@ -2248,8 +2257,14 @@ class AstroInferrer(BaseInferrer):
                      f"model-{model_id}_wave{suffix}")
         np.save(fname, self.spectra_wave_s)
         fname = join(self.spectra_lambdawise_loss_dir,
-                     f"model-{model_id}_gt_bin_ids{suffix}")
-        np.save(fname, self.gt_bin_ids_s)
+                     f"model-{model_id}_spectra_masks{suffix}")
+        np.save(fname, self.spectra_masks_s)
+        # fname = join(self.spectra_lambdawise_loss_dir,
+        #              f"model-{model_id}_gt_bin_ids{suffix}")
+        # np.save(fname, self.gt_bin_ids_s)
+        fname = join(self.spectra_lambdawise_loss_dir,
+                     f"model-{model_id}_gt_bin_masks{suffix}")
+        np.save(fname, self.gt_bin_masks_s)
         fname = join(self.spectra_lambdawise_loss_dir,
                      f"model-{model_id}_lambdawise_losses{suffix}")
         np.save(fname, self.spectra_lambdawise_losses_s) # [bsz,nbins,nsmpl]

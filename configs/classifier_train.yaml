@@ -90,6 +90,7 @@ decoder:
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
+    classifier_decoder_input_dim: 280 # same as `pretrain_infer_num_samples` in `sanity_check.yaml`
     classifier_decoder_batch_norm: False
     classifier_decoder_num_hidden_layers: 5
     classifier_decoder_hidden_dim: 512
@@ -102,7 +103,7 @@ trainer:
     save_data_every: -1
     save_model_every: 20
 
-    plot_l2_loss: True
+    plot_l2_loss: False
     plot_gt_bin_loss: False
 
     resume_train: False

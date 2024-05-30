@@ -372,6 +372,7 @@ def define_cmd_line_args():
     decoder_group.add_argument("--decoder-latents-skip-method", nargs="+")
     decoder_group.add_argument("--decoder-latents-skip-add-conversion-method", nargs="+")
 
+    decoder_group.add_argument("--classifier-decoder-input-dim", type=int)
     decoder_group.add_argument("--classifier-decoder-num-hidden-layers", type=int, default=1,
                                help="Number of layers for the decoder")
     decoder_group.add_argument("--classifier-decoder-hidden-dim", type=int, default=128,

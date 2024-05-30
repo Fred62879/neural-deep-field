@@ -45,7 +45,7 @@ class AstroDataset(Dataset):
             self.unbatched_fields = {
                 "idx","selected_ids","wave_data","spectra_data","redshift_data","model_data",
                 "gt_redshift_bin_ids","gt_redshift_bin_masks","global_restframe_spectra_loss",
-                "wave_range"
+                "wave_range","spectra_loss_data"
             }
         else:
             self.unbatched_fields = set()
@@ -373,6 +373,8 @@ class AstroDataset(Dataset):
             self.get_spectra_data(out)
         if "redshift_data" in self.requested_fields:
             self.get_redshift_data(out)
+        if "spectra_loss_data" in self.requested_fields:
+            self.get_spectra_loss_data(len(idx), out)
         if "gt_redshift_bin_ids" in self.requested_fields:
             self.get_gt_redshift_bin_ids(out)
         if "gt_redshift_bin_masks" in self.requested_fields:
@@ -396,6 +398,30 @@ class AstroDataset(Dataset):
             data = data[self.data["selected_ids"]]
         return data[idx]
 
+    def get_spectra_loss_data(self, batch_size, out):
+        """
+        Do batch sampling for spectra loss data (`spetctra_wave`, `spectra_lambdawise_losses`).
+        """
+        # print(out["wave"][0], out["wave"].shape)
+        out["wave"], sample_ids = batch_sample_torch(
+            torch.FloatTensor(out["wave"]),
+            self.num_wave_samples,
+            sample_method=self.wave_sample_method,
+            keep_sample_ids=True)
+        # print(out["wave"][0], out["wave"].shape)
+
+        out["spectra_masks_b"] = batch_sample_torch(
+            torch.tensor(out["spectra_masks_b"]).to(bool),
+            self.num_wave_samples,
+            sample_method=self.wave_sample_method,
+            sample_ids=sample_ids)
+
+        out["spectra_lambdawise_losses"] = batch_sample_torch(
+            torch.FloatTensor(out["spectra_lambdawise_losses"]),
+            self.num_wave_samples,
+            sample_method=self.wave_sample_method,
+            sample_ids=sample_ids)
+
     def get_wave_data(self, batch_size, out):
         """ Get wave (lambda and transmission) data depending on data source.
         """
@@ -417,13 +443,11 @@ class AstroDataset(Dataset):
             if self.sample_wave:
                 # sample from spectra data (wave, flux, ivar, and interpolated trans)
                 # sample_ids [bsz,nsmpl,2]
-                # print(out["spectra_source_data"][0,0])
                 out["spectra_source_data"], sample_ids = batch_sample_torch(
                     out["spectra_source_data"], self.num_wave_samples,
                     sample_method=self.wave_sample_method,
                     sup_bounds=out["spectra_sup_bounds"],
                     keep_sample_ids=True)
-                # print(out["spectra_source_data"][0,0])
 
                 wave = out["spectra_source_data"][:,0]
 

@@ -673,6 +673,7 @@ def forward(
             requested_channels.append("lambdawise_weights")
 
         if classification_mode:
+            net_args["spectra_masks"] = data["spectra_masks_b"]
             net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses"]
     else:
         raise ValueError("Unsupported space dimension.")

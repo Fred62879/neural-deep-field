@@ -458,6 +458,11 @@ class CodebookTrainer(BaseTrainer):
             self.init_dataloader()
 
     def init_loss(self):
+        if self.classification_mode:
+            # self.bce_loss = nn.BCEWithLogitsLoss(weight=self.num_redshift_bins)
+            self.bce_loss = nn.BCEWithLogitsLoss(reduction='none')
+            return
+
         if self.plot_individ_spectra_loss:
             # if we need loss for each spectra in a batch
             #   we don't reduce when calculating spectra loss
@@ -634,13 +639,18 @@ class CodebookTrainer(BaseTrainer):
             dir = join(self.log_dir, "..", self.extra_args["pre_classification_log_dir"])
             prefix = self.extra_args["pre_classification_fname_prefix"]
             wave_fname = join(dir, f"{prefix}_wave.npy")
-            gt_bin_fname = join(dir, f"{prefix}_gt_bin_ids.npy")
+            masks_fname = join(dir, f"{prefix}_spectra_masks.npy")
+            # gt_bin_fname = join(dir, f"{prefix}_gt_bin_ids.npy")
             loss_fname = join(dir, f"{prefix}_lambdawise_losses.npy")
+            gt_bin_masks_fname = join(dir, f"{prefix}_gt_bin_masks.npy")
             self.dataset.set_hardcode_data("wave",np.load(wave_fname))
-            self.dataset.set_hardcode_data("gt_redshift_bin_ids_b",np.load(gt_bin_fname).T)
+            self.dataset.set_hardcode_data("spectra_masks_b",np.load(masks_fname))
             self.dataset.set_hardcode_data("spectra_lambdawise_losses",np.load(loss_fname))
-            fields.extend(["wave","wave_range","gt_redshift_bin_ids_b",
-                           "spectra_lambdawise_losses"])
+            # self.dataset.set_hardcode_data("gt_redshift_bin_ids_b",np.load(gt_bin_fname).T)
+            self.dataset.set_hardcode_data("gt_redshift_bin_masks_b",np.load(gt_bin_masks_fname).T)
+            fields.extend(["wave_range","gt_redshift_bin_masks_b", #"gt_redshift_bin_ids_b",
+                           "wave","spectra_masks_b","spectra_lambdawise_losses"])
+            # add "spectra_loss_data" to fields if want to sample wave/mask/loss
 
         self.dataset.set_fields(fields)
 
@@ -1549,10 +1559,11 @@ class CodebookTrainer(BaseTrainer):
         add_to_device(data, self.gpu_fields, self.device)
         self.timer.check("added to gpu")
 
-        spectra_loss_func = self.spectra_loss_func
-        if self.plot_l2_loss:
-            spectra_l2_loss_func = self.spectra_l2_loss_func
-        else: spectra_l2_loss_func = None
+        spectra_loss_func, spectra_l2_loss_func = None, None
+        if not self.classification_mode:
+            spectra_loss_func = self.spectra_loss_func
+            if self.plot_l2_loss:
+                spectra_l2_loss_func = self.spectra_l2_loss_func
 
         if self.brute_force:
             steps = self.codebook_pretrain_total_steps
@@ -1686,7 +1697,18 @@ class CodebookTrainer(BaseTrainer):
     def _calculate_spectra_loss(self, ret, data):
         spectra_wrong_bin_regu, spectra_l2_loss = 0, None
 
-        if self.calculate_binwise_spectra_loss:
+        if self.classification_mode:
+            # print(ret["redshift_logits"].shape)
+            # print(data["spectra_masks_b"].shape, data["gt_redshift_bin_masks_b"].shape)
+            est = ret["redshift_logits"]
+            gt = data["gt_redshift_bin_masks_b"].flatten().to(torch.float32) # bool to float
+
+            spectra_loss = self.bce_loss(est, gt)
+            weight = torch.ones_like(spectra_loss)
+            weight[gt==1.] = self.num_redshift_bins
+            spectra_loss = (spectra_loss * weight).mean()
+
+        elif self.calculate_binwise_spectra_loss:
             if self.neg_sup_wrong_redshift:
                 spectra_loss = self._calculate_neg_sup_loss(ret, data)
             else:
