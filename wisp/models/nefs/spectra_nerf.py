@@ -16,23 +16,23 @@ from wisp.models.hypers import HyperSpectralDecoder, HyperSpectralDecoderB
 from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
-class CodebookPretrainNerf(BaseNeuralField):
-    def __init__(self, codebook_pretrain_pixel_supervision=False, **kwargs):
+class SpectraNerf(BaseNeuralField):
+    def __init__(self, spectra_pretrain_pixel_supervision=False, **kwargs):
         assert kwargs["model_redshift"], "we must model redshift during pretrain"
 
         self.kwargs = kwargs
         self.split_latents = kwargs["split_latent"]
         self.use_latents_as_coords = kwargs["use_latents_as_coords"]
-        self.pixel_supervision = codebook_pretrain_pixel_supervision
+        self.pixel_supervision = spectra_pretrain_pixel_supervision
         self.has_redshift_latents = get_bool_has_redshift_latents(**kwargs)
         self.save_lambdawise_spectra_loss = get_bool_save_lambdawise_spectra_loss(**kwargs)
 
-        super(CodebookPretrainNerf, self).__init__()
+        super(SpectraNerf, self).__init__()
 
         self.init_model()
 
     def get_nef_type(self):
-        return "codebook_pretrain"
+        return "spectra_pretrain"
 
     def get_addup_latents(self):
         return self.addup_latents

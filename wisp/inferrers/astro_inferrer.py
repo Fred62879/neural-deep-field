@@ -72,7 +72,7 @@ class AstroInferrer(BaseInferrer):
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         if self.verbose: log.info(f"logging to {self.log_dir}")
         prefix = {
-            "codebook_pretrain_infer":"pretrain",
+            "spectra_pretrain_infer":"pretrain",
             "sanity_check_infer":"val",
             "generalization_infer":"test",
             "main_infer":"val","test":"test",
@@ -207,13 +207,13 @@ class AstroInferrer(BaseInferrer):
 
         self.test = self.mode == "test"
         self.img_train_infer = self.mode == "main_infer"
-        self.codebook_pretrain_infer = self.mode == "codebook_pretrain_infer"
+        self.spectra_pretrain_infer = self.mode == "spectra_pretrain_infer"
         self.sanity_check_infer = self.mode == "sanity_check_infer"
         self.generalization_infer = self.mode == "generalization_infer"
         self.clsfy_sc_infer = self.mode == "redshift_classification_sc_infer"
         self.clsfy_genlz_infer = self.mode == "redshift_classification_genlz_infer"
 
-        self.spectra_train_infer = self.codebook_pretrain_infer or \
+        self.spectra_train_infer = self.spectra_pretrain_infer or \
             self.sanity_check_infer or self.generalization_infer or \
             self.clsfy_sc_infer or self.clsfy_genlz_infer
         assert sum([self.test,self.img_train_infer,self.spectra_train_infer]) == 1
@@ -294,15 +294,15 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["limit_redshift_to_pretrain_range"]
 
         self.neg_sup_wrong_redshift = \
-            self.mode == "codebook_pretrain" and \
+            self.mode == "spectra_pretrain" and \
             self.brute_force and \
             self.extra_args["negative_supervise_wrong_redshift"]
 
         # pretrain infer mandates either apply gt redshift directly or brute force
-        assert not self.codebook_pretrain_infer or (
+        assert not self.spectra_pretrain_infer or (
             self.apply_gt_redshift or self.brute_force)
         # brute force during pretrain mandates negative supervision
-        assert not(self.codebook_pretrain_infer and \
+        assert not(self.spectra_pretrain_infer and \
                    self.brute_force) or \
                    self.neg_sup_wrong_redshift
 
@@ -438,7 +438,7 @@ class AstroInferrer(BaseInferrer):
         assert self.extra_args["calculate_redshift_est_stats_based_on"] == "residuals"
 
         assert not self.plot_global_lambdawise_spectra_loss or \
-            (self.codebook_pretrain_infer or self.sanity_check_infer)
+            (self.spectra_pretrain_infer or self.sanity_check_infer)
 
         self.recon_redshift = self.save_redshift or \
             self.save_optimal_bin_ids or \
@@ -1400,7 +1400,7 @@ class AstroInferrer(BaseInferrer):
     def _select_inferrence_ids(self):
         fname = join(self.log_dir, "..", self.extra_args["spectra_inferrence_id_fname"])
         if exists(fname) and fname[-3:] == "npy":
-            if self.codebook_pretrain_infer:
+            if self.spectra_pretrain_infer:
                 """
                 During sanity check, we sample from supervision spectra.
                 The sampled spectra have ids under context of all sanity check spectra.
@@ -1515,7 +1515,7 @@ class AstroInferrer(BaseInferrer):
         latents_path = join(self.latents_dir, f"{ndim}-dim")
         Path(latents_path).mkdir(parents=True, exist_ok=True)
 
-        if self.codebook_pretrain_infer:
+        if self.spectra_pretrain_infer:
             fname = join(self.latents_dir, f"{ndim}-dim", "selected_axes.npy")
             np.save(fname, selected_axes)
 

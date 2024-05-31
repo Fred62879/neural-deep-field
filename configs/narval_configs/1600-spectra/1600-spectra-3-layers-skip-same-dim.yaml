@@ -5,8 +5,8 @@ global:
     exp_name: 'autodecoder-1600-spectra'
     log_fname: 'sc_1600_spectra_1k_epochs_skip_same_dim_004806' #'3_layers_16_dim_16_regu_beta_skip_same_dim'
 
-    tasks: ['codebook_pretrain']
-    #tasks: ['codebook_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
+    tasks: ['spectra_pretrain']
+    #tasks: ['spectra_pretrain_infer','plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
     tasks: ['redshift_pretrain']
     #tasks: ['redshift_pretrain_infer','save_redshift','recon_spectra'] #'plot_redshift_logits','plot_redshift_residual'] #'plot_spectra_latents_pca'
 
@@ -17,7 +17,7 @@ optimizer:
     b2: 0.999
     lr: 1e-4
     spectra_latents_lr: 1e-3
-    codebook_pretrain_lr: 1e-3
+    spectra_pretrain_lr: 1e-3
     weight_decay: 1e-5
 
     sgd_momentum: 0.9

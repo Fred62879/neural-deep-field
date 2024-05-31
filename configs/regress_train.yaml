@@ -3,10 +3,10 @@ parent: base.yaml
 global:
     use_tqdm: True
     exp_name: 'dz-spectra-ssim'
-    log_fname: 'pretrain'
+    log_fname: 'regress_train'
 
     tasks: ['spectra_pretrain']
-    tasks: ['spectra_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    #tasks: ['spectra_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -33,7 +33,8 @@ pretrain:
     pretrain_num_wave_samples: 200
     pretrain_wave_sample_method: uniform_dense
 
-    apply_gt_redshift: True
+    redshift_model_method: regression
+
     regularize_spectra_latents: True
     spectra_latents_regu_beta: 16
 

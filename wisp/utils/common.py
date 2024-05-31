@@ -95,6 +95,12 @@ def get_bool_encode_coords(**kwargs):
         ( kwargs["pretrain_codebook"] and \
           kwargs["main_train_with_pretrained_latents"] )
 
+def get_bool_regress_redshift(**kwargs):
+    return kwargs["space_dim"] == 3 and \
+        kwargs["model_redshift"] and \
+        not kwargs["apply_gt_redshift"] and \
+        kwargs["redshift_model_method"] == "regress"
+
 def get_bool_classify_redshift(**kwargs):
     return kwargs["space_dim"] == 3 and \
         kwargs["model_redshift"] and \
@@ -104,12 +110,6 @@ def get_bool_classify_redshift(**kwargs):
 def get_bool_classify_redshift_based_on_l2(**kwargs):
     return get_bool_classify_redshift(**kwargs) and \
         kwargs["classify_redshift_based_on_l2"] and kwargs["spectra_loss_cho"] != "l2"
-
-def get_bool_regress_redshift(**kwargs):
-    return kwargs["space_dim"] == 3 and \
-        kwargs["model_redshift"] and \
-        not kwargs["apply_gt_redshift"] and \
-        kwargs["redshift_model_method"] == "regress"
 
 def get_bool_limit_redshift_range(**kwargs):
     return ("sanity_check" in kwargs["tasks"] or \
@@ -130,7 +130,7 @@ def get_bool_plot_lambdawise_spectra_loss(**kwargs):
     ) and (
         "sanity_check_infer" in kwargs["tasks"] or \
         "generalization_infer" in kwargs["tasks"] or \
-        "codebook_pretrain_infer" in kwargs["tasks"] )
+        "spectra_pretrain_infer" in kwargs["tasks"] )
 
 def get_bool_save_lambdawise_spectra_loss(**kwargs):
     return (
@@ -405,8 +405,8 @@ def get_input_latent_dim(**kwargs):
     """ Get the dimension of the input RA/DEC coordinate for MLP.
     """
     if kwargs["pretrain_codebook"] and \
-       ("codebook_pretrain" in kwargs["tasks"] or \
-        "codebook_pretrain_infer" in kwargs["tasks"] or \
+       ("spectra_pretrain" in kwargs["tasks"] or \
+        "spectra_pretrain_infer" in kwargs["tasks"] or \
         "sanity_check" in kwargs["tasks"] or \
         "sanity_check_infer" in kwargs["tasks"] or \
         "generalization" in kwargs["tasks"] or \
@@ -541,7 +541,7 @@ def forward(
         split_latent=False,
         plot_l2_loss=False,
         apply_gt_redshift=False,
-        codebook_pretrain=False,
+        spectra_pretrain=False,
         spectra_supervision=False,
         perform_integration=False,
         classification_mode=False,

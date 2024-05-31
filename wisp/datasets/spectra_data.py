@@ -667,7 +667,7 @@ class SpectraData:
         """
         Update validation spectra for sanity check or add more spectra for generalization.
         """
-        # if self.kwargs["sample_from_codebook_pretrain_spectra"]:
+        # if self.kwargs["sample_from_pretrain_spectra"]:
         #     # select spectra for redshift pretrain from spectra used for codebook pretrain
         #     indices = np.arange(len(supervision_ids))
         #     # np.random.seed(self.kwargs["seed"])

@@ -21,9 +21,9 @@ def register_class(cls, name):
     globals()[name] = cls
 
 def get_pretrain_pipelines(pipelines, tasks, args):
-    if has_common(tasks, ["codebook_pretrain","sanity_check","generalization"] ):
+    if has_common(tasks, ["spectra_pretrain","sanity_check","generalization"] ):
         pretrain_nef = CodebookPretrainNerf(
-            codebook_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
+            spectra_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
             **vars(args)
         )
         pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
@@ -36,10 +36,10 @@ def get_pretrain_pipelines(pipelines, tasks, args):
         pipelines["redshift_classifier"] = AstroPipeline(classifier)
 
     elif has_common(
-            tasks, ["codebook_pretrain_infer","sanity_check_infer","generalization_infer"]
+            tasks, ["spectra_pretrain_infer","sanity_check_infer","generalization_infer"]
     ):
         pretrain_nef = CodebookPretrainNerf(
-            codebook_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
+            spectra_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
             **vars(args)
         )
         pipelines["full"] = AstroPipeline(pretrain_nef)

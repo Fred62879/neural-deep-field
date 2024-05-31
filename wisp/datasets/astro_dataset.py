@@ -87,9 +87,9 @@ class AstroDataset(Dataset):
 
     def set_mode(self, mode):
         """
-        Possible modes: ["main_train","codebook_pretrain","sanity_check","generalization",
+        Possible modes: ["main_train","spectra_pretrain","sanity_check","generalization",
                          "redshift_classification_train","redshift_classification_genlz",
-                         "main_infer","codebook_pretrain_infer","sanity_check_infer",
+                         "main_infer","spectra_pretrain_infer","sanity_check_infer",
                          "generalization_infer","redshift_classification_train_infer",
                          "redshift_classification_genlz_infer","test"]
         """
@@ -391,7 +391,7 @@ class AstroDataset(Dataset):
                idx: dataset index (batch index)
         """
         if self.infer_selected:
-            assert self.mode == "codebook_pretrain_infer" or \
+            assert self.mode == "spectra_pretrain_infer" or \
                 self.mode == "sanity_check_infer" or \
                 self.mode == "generalization_infer"
             assert "selected_ids" in self.data
@@ -468,7 +468,7 @@ class AstroDataset(Dataset):
 
             out["wave"] = out["spectra_source_data"][:,0][...,None] # [bsz,nsmpl,1]
 
-            if self.mode == "codebook_pretrain" and (
+            if self.mode == "spectra_pretrain" and (
                     self.kwargs["regularize_within_codebook_spectra"] or \
                     self.kwargs["regularize_across_codebook_spectra"]
             ):

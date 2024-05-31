@@ -128,7 +128,7 @@ class BaseInferrer(ABC):
     def infer(self):
         """ Perform each inferrence task (one at a time) using all selected models.
         """
-        if self.mode == "codebook_pretrain_infer" or \
+        if self.mode == "spectra_pretrain_infer" or \
            self.mode == "sanity_check_infer" or \
            self.mode == "generalization_infer" or \
            self.mode == "redshift_classification_sc_infer" or \

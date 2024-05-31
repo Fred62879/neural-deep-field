@@ -726,9 +726,8 @@ def define_cmd_line_args():
                             help="0- divide with max, 1-divide with sum")
     data_group.add_argument("--trans-norm-cho",type=str)
 
-    data_group.add_argument("--sample-from-codebook-pretrain-spectra", action="store_true",
-                            help="sample spectra for redshift pretrain from spectra \
-                            used for codebook pretrain.")
+    data_group.add_argument("--sample-from-pretrain-spectra", action="store_true",
+                            help="sample spectra for sanity check from pretrain spectra.")
     data_group.add_argument("--sanity-check-max-num-spectra", type=int,
                             help="num of spectra used for redshift pretrain, used to \
                             sample a subset of spectra from codebook pretrain spectra.")
@@ -784,7 +783,7 @@ def define_cmd_line_args():
     optim_group.add_argument("--codebook-lr", type=float, default=0.0001)
     optim_group.add_argument("--spectra-latents-lr", type=float, default=0.001)
     optim_group.add_argument("--redshift-latents-lr", type=float, default=0.001)
-    optim_group.add_argument("--codebook-pretrain-lr", type=float, default=0.0001)
+    optim_group.add_argument("--spectra-pretrain-lr", type=float, default=0.0001)
 
     optim_group.add_argument("--weight-decay", type=float, default=0, help="Weight decay.")
     optim_group.add_argument("--grid-lr-weight", type=float, default=100.0,

@@ -5,8 +5,8 @@ global:
     exp_name: 'autodecoder-3200-spectra-multi-conversion'
     log_fname: 'convolve-sigma-50'
 
-    tasks: ['codebook_pretrain']
-    tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
+    tasks: ['spectra_pretrain']
+    tasks: ['spectra_pretrain_infer','recon_spectra'] #'plot_spectra_latents_pca'] #'save_redshift','plot_redshift_residual','plot_redshift_logits']
 
 optimizer:
     optimizer_type: 'adam'
@@ -15,7 +15,7 @@ optimizer:
     b2: 0.999
     lr: 1e-4
     spectra_latents_lr: 1e-3
-    codebook_pretrain_lr: 1e-3
+    spectra_pretrain_lr: 1e-3
     weight_decay: 1e-5
 
     sgd_momentum: 0.9

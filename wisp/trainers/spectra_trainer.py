@@ -30,9 +30,7 @@ from wisp.utils.plot import plot_grad_flow, plot_multiple, \
 from wisp.loss import get_loss, get_reduce, spectra_supervision_loss, pretrain_pixel_loss
 
 
-class CodebookTrainer(BaseTrainer):
-    """ Trainer class for codebook pretraining.
-    """
+class SpectraTrainer(BaseTrainer):
     def __init__(self, pipeline, dataset, optim_cls, optim_params, device, **extra_args):
         super().__init__(pipeline, dataset, optim_cls, optim_params, device, **extra_args)
 
@@ -88,8 +86,8 @@ class CodebookTrainer(BaseTrainer):
         self.plot_codebook_logits = "plot_codebook_logits" in tasks
         self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ" in tasks
 
-        if "codebook_pretrain" in tasks:
-            self.mode = "codebook_pretrain"
+        if "spectra_pretrain" in tasks:
+            self.mode = "spectra_pretrain"
         elif "sanity_check" in tasks:
             self.mode = "sanity_check"
         elif "redshift_classification_train" in tasks:
@@ -105,7 +103,7 @@ class CodebookTrainer(BaseTrainer):
         self.generalize_train_first_layer = self.mode == "generalization" and \
             self.extra_args["generalize_train_first_layer"]
 
-        if self.mode == "codebook_pretrain":
+        if self.mode == "spectra_pretrain":
             self.num_spectra = self.dataset.get_num_supervision_spectra()
         elif self.mode == "sanity_check" or self.mode == "redshift_classification_train":
             self.num_spectra = self.dataset.get_num_validation_spectra()
@@ -167,17 +165,17 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["spectra_loss_cho"] != "l2"
 
         self.neg_sup_wrong_redshift = \
-            self.mode == "codebook_pretrain" and self.brute_force and \
+            self.mode == "spectra_pretrain" and self.brute_force and \
             self.extra_args["negative_supervise_wrong_redshift"]
         self.neg_sup_optimize_alternately = \
             self.neg_sup_wrong_redshift and \
             self.extra_args["neg_sup_optimize_alternately"]
 
         # pretrain mandates either apply gt redshift directly or brute force
-        assert not self.mode == "codebook_pretrain" or (
+        assert not self.mode == "spectra_pretrain" or (
             self.apply_gt_redshift or self.brute_force)
         # brute force during pretrain mandates negative supervision
-        assert not(self.mode == "codebook_pretrain" and
+        assert not(self.mode == "spectra_pretrain" and
                    self.brute_force) or \
                    self.neg_sup_wrong_redshift
         # sanity check & generalization mandates brute force
@@ -287,7 +285,7 @@ class CodebookTrainer(BaseTrainer):
             self.extra_args["regularize_within_codebook_spectra"]
         self.regularize_across_codebook_spectra = self.qtz_spectra and \
             self.extra_args["regularize_across_codebook_spectra"]
-        self.regularize_codebook_spectra = self.mode == "codebook_pretrain" and \
+        self.regularize_codebook_spectra = self.mode == "spectra_pretrain" and \
             (self.regularize_within_codebook_spectra or self.regularize_across_codebook_spectra)
         assert not self.regularize_redshift_logits or \
             (self.classify_redshift and \
@@ -508,7 +506,7 @@ class CodebookTrainer(BaseTrainer):
         )
 
     def init_optimizer(self):
-        if self.mode == "codebook_pretrain":
+        if self.mode == "spectra_pretrain":
             latents, net_params = self._assign_pretrain_optimization_params()
             if self.neg_sup_optimize_alternately:
                 assert not self.use_lbfgs
@@ -662,7 +660,7 @@ class CodebookTrainer(BaseTrainer):
 
         # total steps of pretrain used only when we do temperaturized qtz
         # this value should not change as we freeze codebook & qtz operation together
-        self.codebook_pretrain_total_steps = 0
+        self.spectra_pretrain_total_steps = 0
 
         if self.plot_loss:
             self.loss = []
@@ -898,7 +896,7 @@ class CodebookTrainer(BaseTrainer):
     #############
 
     def init_latents(self):
-        if self.mode == "codebook_pretrain":
+        if self.mode == "spectra_pretrain":
             assert not self.split_latent
             latents = self.init_pretrain_spectra_latents()
             redshift_latents = None
@@ -917,7 +915,7 @@ class CodebookTrainer(BaseTrainer):
             Note: if we also resume, then `resume_train` should overwrite model states
                   i.e. `resume_train` called after this func
         """
-        if self.mode == "codebook_pretrain" or self.mode == "redshift_classification_train":
+        if self.mode == "spectra_pretrain" or self.mode == "redshift_classification_train":
             pass
         elif self.mode == "sanity_check" or self.mode == "generalization":
             load_excls, freeze_excls = [], []
@@ -1112,23 +1110,23 @@ class CodebookTrainer(BaseTrainer):
         load_pretrained_model_weights(
             self.train_pipeline, checkpoint["model_state_dict"], excls=excls)
 
-        self.codebook_pretrain_total_steps = 0
+        self.spectra_pretrain_total_steps = 0
         if self.mode == "sanity_check" or self.mode == "generalization":
             """
             `pretrain_total_steps` is needed only when we do temperaturized quantization.
             After codebook pretrain, we only have `total_steps` in the saved model and we
               use it for the current (very first) sanity check run.
             After the first sanity check, we save `total_steps` of codebook pretrain as
-              `codebook_pretrain_total_steps` in the saved model. And `total_steps` in
+              `spectra_pretrain_total_steps` in the saved model. And `total_steps` in
               saved model now is the total iterations of the sanity check run.
             """
-            if "codebook_pretrain_total_steps" not in checkpoint:
+            if "spectra_pretrain_total_steps" not in checkpoint:
                 # first sanity check
-                self.codebook_pretrain_total_steps = checkpoint["total_steps"]
+                self.spectra_pretrain_total_steps = checkpoint["total_steps"]
             else:
                 # resume from previous sanity check
-                self.codebook_pretrain_total_steps = \
-                    checkpoint["codebook_pretrain_total_steps"]
+                self.spectra_pretrain_total_steps = \
+                    checkpoint["spectra_pretrain_total_steps"]
 
         self.train_pipeline.train()
         return checkpoint
@@ -1146,7 +1144,7 @@ class CodebookTrainer(BaseTrainer):
             "optimizer_state_dict": self.optimizer.state_dict()
         }
         if self.brute_force:
-            checkpoint["codebook_pretrain_total_steps"] = self.codebook_pretrain_total_steps
+            checkpoint["spectra_pretrain_total_steps"] = self.spectra_pretrain_total_steps
         if self.regress_lambdawise_weights and \
            self.regress_lambdawise_weights_share_latents and \
            not self.regress_lambdawise_weights_use_gt_bin_latent:
@@ -1281,7 +1279,8 @@ class CodebookTrainer(BaseTrainer):
         self.set_num_batches()
         self.init_dataloader()
         self.reset_data_iterator()
-        warnings.warn("dataloader state is modified in codebook_trainer, ensure this is for validation purpose only!")
+        warnings.warn("dataloader state is modified in spectra trainer, \
+        ensure this is for validation purpose only!")
 
     def post_save_data(self):
         """ Save data locally and restore trainer state.
@@ -1296,7 +1295,8 @@ class CodebookTrainer(BaseTrainer):
         self.set_num_batches()
         self.init_dataloader()
         self.reset_data_iterator()
-        warnings.warn("dataloader state is modified in codebook_trainer, ensure this is for validation purpose only!")
+        warnings.warn("dataloader state is modified in spectra trainer, \
+        ensure this is for validation purpose only!")
 
     def _plot_grad_now(self):
         return self.plot_grad_every != -1 and \
@@ -1565,7 +1565,7 @@ class CodebookTrainer(BaseTrainer):
                 spectra_l2_loss_func = self.spectra_l2_loss_func
 
         if self.brute_force:
-            steps = self.codebook_pretrain_total_steps
+            steps = self.spectra_pretrain_total_steps
         else: steps = self.total_steps
 
         ret = forward(
@@ -1947,7 +1947,7 @@ class CodebookTrainer(BaseTrainer):
         latents_group, net_params_group = [], []
         self._add_spectra_latents(spectra_latents, latents_group)
         net_params_group.append({"params": net_params,
-                                 "lr": self.extra_args["codebook_pretrain_lr"]})
+                                 "lr": self.extra_args["spectra_pretrain_lr"]})
         return latents_group, net_params_group
 
     def _assign_classification_optimization_params(self):
@@ -2020,7 +2020,7 @@ class CodebookTrainer(BaseTrainer):
         else:
             if self.extra_args["optimize_codebook_logits_mlp"]:
                 net_params_group.append({"params": codebook_logit_params,
-                                         "lr": self.extra_args["codebook_pretrain_lr"]})
+                                         "lr": self.extra_args["spectra_pretrain_lr"]})
 
         if self.optimize_latents_alternately:
             return spectra_latents_group, redshift_latents_group, net_params_group
@@ -2050,7 +2050,7 @@ class CodebookTrainer(BaseTrainer):
                                       "lr": self.extra_args["redshift_latents_lr"]})
             if self.optimize_redshift_logits_mlp:
                 net_params_group.append({"params": redshift_logit_params,
-                                         "lr": self.extra_args["codebook_pretrain_lr"]})
+                                         "lr": self.extra_args["spectra_pretrain_lr"]})
 
     def validate(self):
         pass

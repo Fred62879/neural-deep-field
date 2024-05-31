@@ -16,7 +16,7 @@ optimizer:
     b2: 0.999
     lr: 1e-4
     spectra_latents_lr: 1e-3
-    codebook_pretrain_lr: 1e-3
+    spectra_pretrain_lr: 1e-3
     weight_decay: 1e-5
 
     sgd_momentum: 0.9
@@ -89,7 +89,7 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    sample_from_codebook_pretrain_spectra: True
+    sample_from_spectra_pretrain_spectra: True
     sanity_check_max_num_spectra: 200
     generalization_max_num_spectra: 500
     num_gt_spectra_upper_bound: 200000
