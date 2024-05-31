@@ -209,7 +209,7 @@ class HyperSpectralDecoderB(nn.Module):
         @Return
           spectra [bsz,nsmpl]
         """
-        if self.kwargs["calculate_binwise_spectra_loss"]:
+        if self.kwargs["brute_force_redshift"]:
             """
             Get argmax spectra which is for visualization only.
             Optimization requires loss of spectra under each bin.
@@ -250,7 +250,7 @@ class HyperSpectralDecoderB(nn.Module):
             if self.classify_redshift:
                 ret["spectra_all_bins"] = spectra
 
-                if self.kwargs["calculate_binwise_spectra_loss"]:
+                if self.kwargs["brute_force_redshift"]:
                     if spectra_loss_func is not None:
                         calculate_spectra_loss(
                             spectra_loss_func, spectra_masks, gt_spectra,

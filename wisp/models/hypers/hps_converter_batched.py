@@ -23,7 +23,7 @@ class HyperSpectralConverter(nn.Module):
         self._model_redshift = _model_redshift
         self.wave_multiplier = kwargs["wave_multiplier"]
         self.optimize_one_latent_for_all_redshift_bins = \
-            kwargs["calculate_binwise_spectra_loss"] and \
+            kwargs["brute_force_redshift"] and \
             not kwargs["optimize_latents_for_each_redshift_bin"]
 
         self.encode_wave = kwargs["encode_wave"]

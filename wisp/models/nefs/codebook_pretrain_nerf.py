@@ -111,7 +111,7 @@ class CodebookPretrainNerf(BaseNeuralField):
                 channels.extend(["spectrawise_loss","spectrawise_loss_l2"])
             elif get_bool_classify_redshift(**self.kwargs):
                 channels.extend(["redshift_logits","redshift_logits_l2"])
-                if self.kwargs["calculate_binwise_spectra_loss"]:
+                if self.kwargs["brute_force_redshift"]:
                     channels.extend([
                         "spectra_binwise_loss","spectra_binwise_loss_l2",
                         "spectra_all_bins","gt_redshift_bin_ids","gt_redshift_bin_masks"

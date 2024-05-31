@@ -39,6 +39,16 @@ def get_exp_dir(**kwargs):
     exp_dir = os.path.join(log_dir, kwargs["exp_name"])
     return exp_dir
 
+def get_redshift_classification_data_dir(mode, **kwargs):
+    if mode == "redshift_classification_sc_infer":
+        log_dir = join(kwargs["redshift_classification_sc_data_dir"],
+                       "val_spectra_lambdawise_loss")
+    elif mode == "redshift_classification_genlz_infer":
+        log_dir = join(kwargs["redshift_classification_genlz_data_dir"],
+                       "test_spectra_lambdawise_loss")
+    else: raise ValueError()
+    return log_dir
+
 def get_current_ablate_param_and_val(args):
     id = args.ablat_id
     num_vals = args.ablat_num_vals
@@ -720,6 +730,8 @@ def load_pretrained_model_weights(model, pretrained_state, shared_layer_names=No
 def load_model_weights(model, pretrained_state):
     cur_state = model.state_dict()
     pretrained_dict = {k: v for k, v in pretrained_state.items() if k in cur_state}
+    # for n,p in pretrained_state.items(): print(n, p.shape)
+    # for n,p in model.named_parameters(): print(n, p.shape)
     model.load_state_dict(pretrained_dict)
 
 def load_embed(pretrained_state, transpose=True, tensor=False):

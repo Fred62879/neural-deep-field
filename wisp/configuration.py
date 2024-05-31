@@ -28,11 +28,16 @@ def get_pretrain_pipelines(pipelines, tasks, args):
         )
         pipelines["codebook_net"] = AstroPipeline(pretrain_nef)
 
-    elif has_common(tasks, ["redshift_classification_train","redshift_classification_genlz"]):
+    elif has_common(
+            tasks, ["redshift_classification_train","redshift_classification_genlz",
+                    "redshift_classification_sc_infer","redshift_classification_genlz_infer"]
+    ):
         classifier = RedshiftClassifier(**vars(args))
         pipelines["redshift_classifier"] = AstroPipeline(classifier)
 
-    elif has_common(tasks, ["codebook_pretrain_infer","sanity_check_infer","generalization_infer"]):
+    elif has_common(
+            tasks, ["codebook_pretrain_infer","sanity_check_infer","generalization_infer"]
+    ):
         pretrain_nef = CodebookPretrainNerf(
             codebook_pretrain_pixel_supervision=args.pretrain_pixel_supervision,
             **vars(args)

@@ -17,18 +17,17 @@ class RedshiftClassifier(nn.Module):
         self.init_model()
 
     def init_model(self):
-        embedder_args = (
-            1, self.kwargs["wave_embed_dim"],
-            self.kwargs["wave_embed_omega"],
-            self.kwargs["wave_embed_sigma"],
-            self.kwargs["wave_embed_bias"],
-            self.kwargs["wave_embed_seed"])
-
-        self.encoder = Encoder(
-            input_dim=1,
-            encode_method=self.kwargs["wave_encode_method"],
-            embedder_args=embedder_args,
-            **self.kwargs)
+        # embedder_args = (
+        #     1, self.kwargs["wave_embed_dim"],
+        #     self.kwargs["wave_embed_omega"],
+        #     self.kwargs["wave_embed_sigma"],
+        #     self.kwargs["wave_embed_bias"],
+        #     self.kwargs["wave_embed_seed"])
+        # self.encoder = Encoder(
+        #     input_dim=1,
+        #     encode_method=self.kwargs["wave_encode_method"],
+        #     embedder_args=embedder_args,
+        #     **self.kwargs)
 
         # input_dim = 2 * self.kwargs["wave_embed_dim"]
         input_dim = self.kwargs["classifier_decoder_input_dim"]

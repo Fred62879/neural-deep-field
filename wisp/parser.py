@@ -232,12 +232,8 @@ def define_cmd_line_args():
     debug_group.add_argument("--add-redshift-logit-bias", action="store_true")
     debug_group.add_argument("--plot-logits-for-gt-bin", action="store_true")
     debug_group.add_argument("--plot-individ-spectra-loss", action="store_true")
-    # debug_group.add_argument("--calculate-bin-wise-spectra-loss", action="store_true")
 
     debug_group.add_argument("--generalize-train-first-layer", action="store_true")
-    debug_group.add_argument("--sample-from-codebook-pretrain-spectra", action="store_true",
-                             help="sample spectra for redshift pretrain from spectra \
-                             used for codebook pretrain.")
     debug_group.add_argument("--add-validation-spectra-not-in-supervision", action="store_true")
     debug_group.add_argument("--num-extra-validation-spectra", type=int)
 
@@ -444,13 +440,11 @@ def define_cmd_line_args():
                                 action="store_true")
     pretrain_group.add_argument("--wrong-bin-regu-beta", type=int)
 
-    # redshift generation strategy
     pretrain_group.add_argument("--apply-gt-redshift", action="store_true",
                                 help="apply gt redshift instead of generating redshift.")
-    pretrain_group.add_argument("--calculate-binwise-spectra-loss", action="store_true",
-                                help="brute force, generate spectra for each bin individually.")
-    pretrain_group.add_argument("--optimize-latents-for-each-redshift-bin",
-                                action="store_true",
+    pretrain_group.add_argument("--brute-force-redshift", action="store_true")
+
+    pretrain_group.add_argument("--optimize-latents-for-each-redshift-bin",action="store_true",
                                 help="if brute force, we may assign each bin with a latent.")
 
     pretrain_group.add_argument("--calculate-spectra-loss-based-on-optimal-bin",
@@ -524,8 +518,6 @@ def define_cmd_line_args():
 
     pretrain_group.add_argument("--pretrain-log-dir", type=str)
     pretrain_group.add_argument("--pretrained-model-name", type=str)
-    pretrain_group.add_argument("--pre-classification-log-dir", type=str)
-    pretrain_group.add_argument("--pre-classification-fname-prefix", type=str)
 
     pretrain_group.add_argument("--pretrain-use-all-wave", action="store_true")
     pretrain_group.add_argument("--pretrain-wave-sample-method", type=str, default="uniform")
@@ -536,11 +528,6 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--pretrain-with-coords", action="store_true",
                                 help="performe pretraining with 2d coords instead of \
                                 optimizing latent variables")
-
-    pretrain_group.add_argument("--sanity-check-max-num-spectra", type=int,
-                                help="num of spectra used for redshift pretrain, used to \
-                                sample a subset of spectra from codebook pretrain spectra.")
-    pretrain_group.add_argument("--generalization-max-num-spectra", type=int)
 
     pretrain_group.add_argument("--use-latents-as-coords", action="store_true",
                                 help="pass latents as coords to model.")
@@ -739,6 +726,13 @@ def define_cmd_line_args():
                             help="0- divide with max, 1-divide with sum")
     data_group.add_argument("--trans-norm-cho",type=str)
 
+    data_group.add_argument("--sample-from-codebook-pretrain-spectra", action="store_true",
+                            help="sample spectra for redshift pretrain from spectra \
+                            used for codebook pretrain.")
+    data_group.add_argument("--sanity-check-max-num-spectra", type=int,
+                            help="num of spectra used for redshift pretrain, used to \
+                            sample a subset of spectra from codebook pretrain spectra.")
+    data_group.add_argument("--generalization-max-num-spectra", type=int)
     data_group.add_argument("--num-gt-spectra-upper-bound", type=int)
     data_group.add_argument("--num-supervision-spectra-upper-bound", type=int,
                              help="upper bound# of gt spectra used for supervision \
@@ -771,6 +765,10 @@ def define_cmd_line_args():
     data_group.add_argument("--filter-redshift-lo", type=float,
                             help="Min value of redshift interval.")
     data_group.add_argument("--filter-redshift-hi", type=float)
+
+    data_group.add_argument("--redshift-classification-sc-data-dir", type=str)
+    data_group.add_argument("--redshift-classification-genlz-data-dir", type=str)
+    data_group.add_argument("--redshift-classification-data-fname-prefix", type=str)
 
     ###################
     # Arguments for optimizer

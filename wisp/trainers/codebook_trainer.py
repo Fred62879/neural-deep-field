@@ -96,14 +96,11 @@ class CodebookTrainer(BaseTrainer):
             self.mode = "redshift_classification_train"
         elif "generalization" in tasks:
             self.mode = "generalization"
-        elif "redshift_classification_genlz" in tasks:
-            self.mode = "redshift_classification_genlz"
         else: raise ValueError("Invalid mode!")
 
         self.pre_classification_mode = self.mode == "sanity_check" or \
             self.mode == "generalization"
-        self.classification_mode = self.mode == "redshift_classification_train" or \
-            self.mode == "redshift_classification_genlz"
+        self.classification_mode = self.mode == "redshift_classification_train"
 
         self.generalize_train_first_layer = self.mode == "generalization" and \
             self.extra_args["generalize_train_first_layer"]
@@ -112,7 +109,7 @@ class CodebookTrainer(BaseTrainer):
             self.num_spectra = self.dataset.get_num_supervision_spectra()
         elif self.mode == "sanity_check" or self.mode == "redshift_classification_train":
             self.num_spectra = self.dataset.get_num_validation_spectra()
-        elif self.mode == "generalization" or self.mode == "redshift_classification_genlz":
+        elif self.mode == "generalization":
             self.num_spectra = self.dataset.get_num_test_spectra()
         else: raise ValueError("Invalid mode!")
 
@@ -138,7 +135,7 @@ class CodebookTrainer(BaseTrainer):
           |_apply_gt_redshift
           |_regress_redshift
           |_classify_redshift
-                |_brute_force (calculate_binwise_spectra_loss)
+                |_brute_force
                     |_neg_sup_wrong_redshift                            |-pretrain
                     |_regularize_binwise_spectra_latents               -
                     |_optimize_latents_for_each_redshift_bin            |- sanity check OR
@@ -155,8 +152,11 @@ class CodebookTrainer(BaseTrainer):
         # regress redshift
         self.has_redshift_latents = get_bool_has_redshift_latents(**self.extra_args)
         # classify redshift
-        self.brute_force = self.model_redshift and self.classify_redshift and \
-            self.extra_args["calculate_binwise_spectra_loss"]
+        self.brute_force = self.model_redshift and \
+            self.classify_redshift and self.extra_args["brute_force_redshift"]
+
+        self.calculate_binwise_spectra_loss = self.brute_force and \
+            not self.classification_mode
         # if we want to calculate binwise spectra loss when we do quantization
         #  we need to perform qtz first in hyperspectral_decoder::dim_reduction
         assert not self.brute_force or \
@@ -407,8 +407,7 @@ class CodebookTrainer(BaseTrainer):
             self.train_pipeline.set_batch_reduction_order(
                 self.extra_args["spectra_batch_reduction_order"])
 
-        if self.mode != "redshift_classification_train" and \
-           self.mode != "redshift_classification_genlz":
+        if self.mode != "redshift_classification_train":
             # latents here are used to
             #  EITHER generate codebook coefficients (no softmax applied) in codebook qtz setting
             #  OR concatenate with lambda to be directly decoded as spectra in autodecoder setting
@@ -591,7 +590,7 @@ class CodebookTrainer(BaseTrainer):
 
         # set spectra data source
         # tmp: in sanity check mode, we manually change sup_id and val_id in spectra_data
-        if self.mode == "generalization" or self.mode == "redshift_classification_genlz":
+        if self.mode == "generalization":
             self.dataset.set_spectra_source("test")
         elif self.mode == "sanity_check" or self.mode == "redshift_classification_train":
             self.dataset.set_spectra_source("val")
@@ -1587,7 +1586,7 @@ class CodebookTrainer(BaseTrainer):
             classification_mode=self.classification_mode,
             optimize_bins_separately=self.optimize_bins_separately,
             regularize_codebook_spectra=self.regularize_codebook_spectra,
-            calculate_binwise_spectra_loss=self.brute_force,
+            calculate_binwise_spectra_loss= self.calculate_binwise_spectra_loss,
             regress_lambdawise_weights_share_latents=\
                 self.regress_lambdawise_weights and \
                 self.regress_lambdawise_weights_share_latents,

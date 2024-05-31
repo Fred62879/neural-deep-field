@@ -25,6 +25,10 @@ if __name__ == "__main__":
     dataset = get_dataset_from_config(args)
     device, pipelines = get_pipelines_from_config(args, tasks=tasks)
 
+    def infer(mode):
+        inferrer = get_inferrer_from_config(pipelines, dataset, device, mode, args)
+        inferrer.infer()
+
     if "codebook_pretrain" in tasks and args.pretrain_codebook:
         optim_cls, optim_params = get_optimizer_from_config(args)
         trainer = get_trainer_from_config(
@@ -58,30 +62,18 @@ if __name__ == "__main__":
             AstroTrainer, pipelines["full"], dataset, optim_cls, optim_params, device, args)
         trainer.train()
 
-    elif "codebook_pretrain_infer" in tasks and args.pretrain_codebook:
-        # infer for pretrained model (recon gt spectra & codebook spectra ect.)
-        inferrer = get_inferrer_from_config(
-            pipelines, dataset, device, "codebook_pretrain_infer", args)
-        inferrer.infer()
-
-    elif "sanity_check_infer" in tasks and args.pretrain_codebook:
-        # infer for pretrained model (recon gt spectra & codebook spectra ect.)
-        inferrer = get_inferrer_from_config(
-            pipelines, dataset, device, "sanity_check_infer", args)
-        inferrer.infer()
-
-    elif "generalization_infer" in tasks and args.pretrain_codebook:
-        # infer for pretrained model (recon gt spectra & codebook spectra ect.)
-        inferrer = get_inferrer_from_config(
-            pipelines, dataset, device, "generalization_infer", args)
-        inferrer.infer()
-
+    elif "redshift_classification_sc_infer" in tasks:
+        infer("redshift_classification_sc_infer")
+    elif "redshift_classification_genlz_infer" in tasks:
+        infer("redshift_classification_genlz_infer")
+    elif "codebook_pretrain_infer" in tasks:
+        infer("codebook_pretrain_infer")
+    elif "sanity_check_infer" in tasks:
+        infer("sanity_checl_infer")
+    elif "generalization_infer" in tasks:
+        infer("generalization_infer")
     elif "main_infer" in tasks:
-        inferrer = get_inferrer_from_config(pipelines, dataset, device, "main_infer", args)
-        inferrer.infer()
-
+        infer("main_infer")
     elif "test" in tasks:
-        inferrer = get_inferrer_from_config(pipelines, dataset, device, "test", args)
-        inferrer.infer()
-
+        infer("test")
     else: raise ValueError("unsupported task")
