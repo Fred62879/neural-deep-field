@@ -62,7 +62,7 @@ trainer:
 
     apply_gt_redshift: False                     # |_these options conflict each other
     optimize_spectra_for_each_redshift_bin: True # |
-    calculate_binwise_spectra_loss: True         # | these two should True or False together
+    brute_force_redshift: True         # | these two should True or False together
 
     resume_train: False
     resume_log_dir: ''

@@ -1,0 +1,100 @@
+parent: base.yaml
+
+global:
+    use_tqdm: True
+    exp_name: 'vipers-spectra-ssim'
+    log_fname: 'clsfy' 
+
+    tasks: ['redshift_classification_train']
+    tasks: ['redshift_classification_sc_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']
+    tasks: ['redshift_classification_genlz_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']
+
+optimizer:
+    optimizer_type: 'adam'
+
+    b1: 0.5
+    b2: 0.999
+    lr: 1e-4
+    spectra_latents_lr: 1e-3
+    codebook_pretrain_lr: 1e-3
+    weight_decay: 1e-5
+
+    sgd_momentum: 0.9
+
+pretrain:
+    pretrain_batch_size: 25
+    
+    brute_force_redshift: True
+    optimize_latents_for_each_redshift_bin: True
+
+decoder:
+    classifier_decoder_input_dim: 280
+    classifier_decoder_batch_norm: False
+    classifier_decoder_num_hidden_layers: 5
+    classifier_decoder_hidden_dim: 512
+
+trainer:
+    num_epochs: 200
+    log_cli_every: 20
+    plot_grad_every: -1
+    save_data_every: -1
+    save_model_every: 20
+
+    resume_train: False
+    resume_log_dir: ''
+    resume_model_fname: 'model-ep800-bch0.pth'
+
+infer:
+    infer_last_model_only: True
+
+    infer_log_dir: '20240530-135514_clsfy'
+
+    infer_selected: False
+    pretrain_num_infer_upper_bound: 100
+    infer_outlier_only: False
+
+    pretrain_infer_batch_size: 25
+
+    plot_clipped_spectrum: True
+    plot_spectrum_with_loss: False
+    plot_spectrum_with_ivar: False
+    plot_spectrum_with_lines: False
+    plot_spectrum_with_recon: False
+    plot_spectrum_with_weights: True
+    plot_spectrum_color_based_on_loss: False
+    plot_spectrum_under_gt_bin: True
+    plot_spectrum_under_optimal_wrong_bin: True
+
+    num_spectrum_per_fig: 35
+    num_spectrum_per_row: 7
+
+    log_redshift_est_stats: False
+    log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
+
+spectra_data:
+    require_only_basic_spectra: True
+
+    redshift_classification_sc_data_dir: 20240519-220446_sc_200_spectra_200_epochs_093822
+    redshift_classification_genlz_data_dir: 20240518-234700_genlz_500_spectra_500_epochs_0938382
+    redshift_classification_data_fname_prefix: model-0
+
+    spectra_cho: v1
+    spectra_process_patch_info: False
+    spectra_data_sources: [vipers_w1,vipers_w4]
+    random_permute_source_spectra: True
+
+    min_num_valid_samples: 100
+    spectra_upsample_scale: 10
+    convolve_spectra: True
+    process_ivar: True
+    spectra_smooth_sigma: 15
+
+    sample_from_codebook_pretrain_spectra: True
+    sanity_check_max_num_spectra: 200
+    generalization_max_num_spectra: 500
+    num_gt_spectra_upper_bound: 200000
+    num_supervision_spectra_upper_bound: 200000
+
+    filter_redshift: False
+    filter_redshift_lo: 0.02
+    filter_redshift_hi: -1

@@ -152,7 +152,7 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    calculate_binwise_spectra_loss: True
+    brute_force_redshift: True
     binwise_loss_beta: 50
     use_binwise_spectra_loss_as_redshift_logits: False
 

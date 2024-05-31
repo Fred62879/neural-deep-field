@@ -62,7 +62,7 @@ trainer:
     save_model_every: 500
 
     apply_gt_redshift: True
-    calculate_binwise_spectra_loss: False # brute force, each bin has its own spectra
+    brute_force_redshift: False # brute force, each bin has its own spectra
 
     # if brute force, we have three choices
     regularize_binwise_spectra_latents: False     # conflicts each other

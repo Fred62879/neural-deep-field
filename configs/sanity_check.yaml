@@ -33,7 +33,7 @@ pretrain:
     pretrain_wave_sample_method: 'uniform_dense'
     
     apply_gt_redshift: False
-    calculate_binwise_spectra_loss: True # brute force, each bin has its own spectra
+    brute_force_redshift: True # brute force, each bin has its own spectra
 
     # if brute force, we have three choices
     regularize_binwise_spectra_latents: False     # conflicts each other
@@ -45,9 +45,6 @@ pretrain:
     num_bins_to_calculate_spectra_loss: 5
 
     spectra_latent_dim: 16
-
-    sample_from_codebook_pretrain_spectra: True
-    sanity_check_max_num_spectra: 200
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
@@ -162,6 +159,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
+    sample_from_codebook_pretrain_spectra: True
+    sanity_check_max_num_spectra: 200
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 
