@@ -5,8 +5,8 @@ global:
     exp_name: 'dz-spectra-ssim'
     log_fname: 'regress_train'
 
-    tasks: ['spectra_pretrain']
-    #tasks: ['spectra_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    tasks: ['train','redshift_pretrain']
+    #tasks: ['infer','redshift_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -28,48 +28,29 @@ embedder:
 pretrain:
     pretrain_batch_size: 10000
 
-    spectra_latent_dim: 16
-    pretrain_use_all_wave: False
-    pretrain_num_wave_samples: 200
-    pretrain_wave_sample_method: uniform_dense
+    pretrain_use_all_wave: True
+    pretrain_num_wave_samples: -1
 
+    model_redshift: True
     redshift_model_method: regression
 
-    regularize_spectra_latents: True
-    spectra_latents_regu_beta: 16
-
 decoder:
-    decoder_activation_type: relu
-    decoder_batch_norm: False
-    decoder_num_hidden_layers: 3
-    decoder_hidden_dim: 512
-    decoder_skip_layers: []
-
-    decoder_gaussian_sigma: .1
-
-    decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: False
-    decoder_latents_skip_method: 'add'
-    decoder_latents_skip_add_conversion_method: 'multi_conversion'
+    regressor_decoder_input_dim: 280
+    regressor_decoder_batch_norm: False
+    regressor_decoder_num_hidden_layers: 5
+    regressor_decoder_hidden_dim: 512
 
 trainer:
-    num_epochs: 3000
+    num_epochs: 2000
     batch_size: 5500
-    log_cli_every: 300
+    log_cli_every: 200
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 300
+    save_model_every: 200
 
-    plot_l2_loss: True
-
-    resume_train: True
-    resume_log_dir: '20240528-141030_pretrain_1k_spectra_5k_epochs_5k_9k_wave_r'
+    resume_train: False
+    resume_log_dir: ''
     resume_model_fname: 'model-ep3000-bch0.pth'
-
-    spectra_loss_cho: ssim1d
-    spectra_loss_reduction: mean
-    spectra_ssim_loss_filter_size: 9
-    spectra_ssim_loss_filter_sigma: 5
 
 infer:
     infer_last_model_only: True
@@ -82,8 +63,6 @@ infer:
 
     pretrain_infer_batch_size: 10
     pretrain_infer_use_all_wave: True
-    pretrain_infer_num_wave: 1000
-    pretrain_infer_wave_sample_method: 'uniform_dense'
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False
@@ -118,6 +97,8 @@ spectra_data:
     convolve_spectra: True
     process_ivar: True
     spectra_smooth_sigma: 15
+
+    redshift_regress_spectra_sample_method: uniform_dense
 
     num_gt_spectra_upper_bound: 1000 #25400
     num_supervision_spectra_upper_bound: 1000 #25400

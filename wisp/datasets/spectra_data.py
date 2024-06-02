@@ -16,12 +16,12 @@ from wisp.datasets.patch_data import PatchData
 from wisp.utils.plot import plot_spectra
 from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array, \
     get_bool_infer_spectra_with_lambdawise_weights, \
-    get_bool_classify_redshift_based_on_l2
+    get_bool_classify_redshift_based_on_l2, get_bool_regress_redshift
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
     get_coords_norm_range_fname, add_dummy_dim, wave_within_bound, \
-    get_dataset_path, get_img_data_path
+    get_dataset_path, get_img_data_path, batch_sample_torch
 
 from tqdm import tqdm
 from pathlib import Path
@@ -231,6 +231,7 @@ class SpectraData:
         self.load_gt_spectra_data()
         self.set_wave_range()
         self.transform_data()
+        self.sample_spectra()
 
     def finalize_spectra(self):
         """ Finalize spectra data processing.
@@ -534,7 +535,6 @@ class SpectraData:
             exists(self.gt_spectra_pixels_fname) and \
             exists(self.gt_spectra_img_coords_fname) and \
             exists(self.gt_spectra_world_coords_fname))
-        # print(spectra_data_cached, patch_info_cached)
 
         if self.load_spectra_data_from_cache and spectra_data_cached and patch_info_cached:
             self.load_cached_spectra_data()
@@ -542,14 +542,10 @@ class SpectraData:
             self.process_spectra()
             self.gather_processed_spectra()
 
-        # print(len(self.data["gt_spectra"]))
         if self.kwargs["filter_redshift"]:
             self.filter_spectra_based_on_redshift()
-        # print(len(self.data["gt_spectra"]))
-
         if self.kwargs["correct_gt_redshift_based_on_redshift_bin"]:
             self.correct_redshift_based_on_bins()
-
         self.num_gt_spectra = len(self.data["gt_spectra"])
 
     #############
@@ -686,6 +682,30 @@ class SpectraData:
 
         return validation_ids
 
+    def sample_spectra(self):
+        """
+        In case of redshift regression where we treat the sample dim as latent dim,
+          ([bsz,1,nsmpl]) we need to sample spectra data properly s.t. there are
+          as few invalid samples as possible.
+        """
+        if not get_bool_regress_redshift(**self.kwargs): return
+
+        num_wave_samples = self.kwargs["regressor_decoder_input_dim"]
+        sample_method = self.kwargs["redshift_regress_spectra_sample_method"]
+
+        self.data["gt_spectra"], sample_ids = batch_sample_torch(
+            self.data["gt_spectra"], num_wave_samples,
+            sample_method=sample_method, keep_sample_ids=True)
+
+        # print(self.data["gt_spectra"].shape)
+        # print(self.data["gt_spectra"][0:2,0:2])
+
+        for key in ["gt_spectra_mask"]:
+            # print(key, self.data[key].shape)
+            self.data[key] = batch_sample_torch(
+                self.data[key], num_wave_samples, sample_method=sample_method)
+            # print(key, self.data[key].shape)
+
     def correct_redshift_based_on_bins(self):
         """
         """
@@ -807,11 +827,6 @@ class SpectraData:
 
         df["mask_fname"] = ""
         df["sup_wave_bound"] = [(-1,-1)] * len(df)
-
-        # a = df.loc[df['spectra_fname_fits'] == 'spec1d.1150.102.12005363.fits']
-        # print(a)
-        # print('***')
-        # print(a['spectra_fname_fits'])
 
         if self.spectra_process_patch_info:
             for field in ["tract","patch","pixels_fname",
@@ -1889,7 +1904,6 @@ def resample_mask(wave, resampled_wave, mask):
     """
     lo_wave = wave[lo_ids]
     hi_wave = wave[hi_ids]
-    # print(lo_wave, hi_wave, lo_ids, hi_ids)
     resampled_lo_ids = np.array([
         np.nonzero(resampled_wave > cur_lo_wave)[0][0] for cur_lo_wave in lo_wave])
     resampled_hi_ids = np.array([
@@ -2014,17 +2028,12 @@ def pad_spectra(spectra, mask, sup_mask, max_len):
     if n == max_len:
         return spectra, mask, sup_mask
 
-    #print(m, n, spectra.shape)
-    #print(spectra[:,0])
     new_mask = np.zeros(max_len).astype(mask.dtype)
     new_sup_mask = np.zeros(max_len).astype(mask.dtype)
     new_spectra = np.full((m,max_len), math.nan).astype(spectra.dtype)
     new_mask[:n] = mask
     new_sup_mask[:n] = sup_mask
     new_spectra[:,:n] = spectra
-    #print(new_sup_mask[0], new_sup_mask[1])
-    #print(new_mask[0], new_mask[1])
-    #print(new_spectra[:,0], new_spectra[:,1])
     return new_spectra, new_mask, new_sup_mask
 
 def normalize_spectra(spectra, bound, ivar_reliable):
@@ -2321,7 +2330,6 @@ def download_data_parallel(http_prefix, local_path, fnames):
     out_fnames = [f"{local_path}/{fname}" for fname in fnames]
     inputs = zip(urls, out_fnames)
     cpus = cpu_count()
-    print(urls[0])
     assert 0
     results = ThreadPool(cpus - 1).imap_unordered(download_from_url, inputs)
     for result in results:

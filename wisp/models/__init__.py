@@ -1,3 +1,4 @@
 
 from .astro_pipeline import AstroPipeline
-from .classifier import RedshiftClassifier
+from .redshift_regressor import RedshiftRegressor
+from .redshift_classifier import RedshiftClassifier

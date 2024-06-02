@@ -18,11 +18,12 @@ from itertools import accumulate
 from collections import defaultdict
 from astropy.coordinates import SkyCoord
 
-def has_common(list1, list2):
-    return len(list(  set(list1) & set(list2) )) != 0
 
 def has_common(list1, list2):
-    return len(list(  set(list1) & set(list2) )) != 0
+    return len(list( set(list1) & set(list2) )) != 0
+
+def find_common(list1, list2):
+    return list( set(list1) & set(list2) )
 
 def get_log_dir(**kwargs):
     if kwargs["on_cc"]:
@@ -98,8 +99,7 @@ def get_bool_encode_coords(**kwargs):
 def get_bool_regress_redshift(**kwargs):
     return kwargs["space_dim"] == 3 and \
         kwargs["model_redshift"] and \
-        not kwargs["apply_gt_redshift"] and \
-        kwargs["redshift_model_method"] == "regress"
+        kwargs["redshift_model_method"] == "regression"
 
 def get_bool_classify_redshift(**kwargs):
     return kwargs["space_dim"] == 3 and \
@@ -540,8 +540,8 @@ def forward(
         index_latent=False,
         split_latent=False,
         plot_l2_loss=False,
+        regress_redshift=False,
         apply_gt_redshift=False,
-        spectra_pretrain=False,
         spectra_supervision=False,
         perform_integration=False,
         classification_mode=False,
@@ -577,7 +577,6 @@ def forward(
     net_args, requested_channels = {}, []
     if "coords" in data:
         net_args["coords"] = data["coords"]
-    # else: net_args["coords"] = None
 
     if space_dim == 2:
         assert save_pixel_val
@@ -601,7 +600,8 @@ def forward(
         if save_codebook_spectra: requested_channels.append("codebook_spectra")
         if save_spectra_all_bins: requested_channels.append("spectra_all_bins")
 
-        net_args["wave"] = data["wave"]
+        if "wave" in net_args:
+            net_args["wave"] = data["wave"]
         net_args["wave_range"] = data["wave_range"] # linear normalization
 
         if index_latent:
@@ -685,6 +685,11 @@ def forward(
         if classification_mode:
             net_args["spectra_masks"] = data["spectra_masks_b"]
             net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses"]
+
+        if regress_redshift:
+            requested_channels.append("redshift")
+            net_args["spectra_masks"] = data["spectra_masks"]
+            net_args["spectra_source_data"] = data["spectra_source_data"]
     else:
         raise ValueError("Unsupported space dimension.")
 

@@ -17,13 +17,12 @@ from wisp.models.layers import get_layer_class, init_codebook, Quantization
 
 
 class SpectraNerf(BaseNeuralField):
-    def __init__(self, spectra_pretrain_pixel_supervision=False, **kwargs):
+    def __init__(self, **kwargs):
         assert kwargs["model_redshift"], "we must model redshift during pretrain"
-
         self.kwargs = kwargs
         self.split_latents = kwargs["split_latent"]
         self.use_latents_as_coords = kwargs["use_latents_as_coords"]
-        self.pixel_supervision = spectra_pretrain_pixel_supervision
+        self.pixel_supervision = kwargs["pretrain_pixel_supervision"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**kwargs)
         self.save_lambdawise_spectra_loss = get_bool_save_lambdawise_spectra_loss(**kwargs)
 

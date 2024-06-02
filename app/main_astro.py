@@ -1,7 +1,6 @@
 
 if __name__ == "__main__":
 
-
     import os
     from pathlib import Path
     import sys
@@ -17,60 +16,21 @@ if __name__ == "__main__":
 
     args, args_str = parse_args()
     args.wave_embed_dim = args.spectra_latent_dim
-
-    if args.use_gpu:
-        query_GPU_mem()
+    if args.use_gpu: query_GPU_mem()
 
     tasks = set(args.tasks)
-    dataset = get_dataset_from_config(args)
-    device, pipelines = get_pipelines_from_config(args, tasks=tasks)
+    device = get_device_from_config(args)
+    dataset = get_dataset_from_config(device, args)
 
-    def infer(mode):
-        inferrer = get_inferrer_from_config(pipelines, dataset, device, mode, args)
+    if "train" in tasks:
+        optim_cls, optim_params = get_optimizer_from_config(args)
+        pipeline = get_train_pipeline_from_config(device, tasks, args)
+        trainer = get_trainer_from_config(
+            pipeline, dataset, optim_cls, optim_params, device, tasks, args)
+        trainer.train()
+    elif "infer" in tasks:
+        pipelines = get_infer_pipelines_from_config(device, tasks, args)
+        inferrer = get_inferrer_from_config(pipelines, dataset, device, tasks, args)
         inferrer.infer()
-
-    if "spectra_pretrain" in tasks and args.pretrain_codebook:
-        optim_cls, optim_params = get_optimizer_from_config(args)
-        trainer = get_trainer_from_config(
-            SpectraTrainer, [ pipelines["codebook_net"] ],
-            dataset, optim_cls, optim_params, device, args
-        )
-        trainer.train()
-
-    elif has_common(tasks, ["sanity_check","generalization"]) and args.pretrain_codebook:
-        optim_cls, optim_params = get_optimizer_from_config(args)
-        trainer = get_trainer_from_config(
-            SpectraTrainer, [ pipelines["codebook_net"] ],
-            dataset, optim_cls, optim_params, device, args
-        )
-        trainer.train()
-
-    elif has_common(tasks, ["redshift_classification_train","redshift_classification_genlz"]):
-        optim_cls, optim_params = get_optimizer_from_config(args)
-        trainer = get_trainer_from_config(
-            SpectraTrainer, [ pipelines["redshift_classifier"] ],
-            dataset, optim_cls, optim_params, device, args
-        )
-        trainer.train()
-
-    elif "train" in tasks:
-        optim_cls, optim_params = get_optimizer_from_config(args)
-        trainer = get_trainer_from_config(
-            AstroTrainer, pipelines["full"], dataset, optim_cls, optim_params, device, args)
-        trainer.train()
-
-    elif "redshift_classification_sc_infer" in tasks:
-        infer("redshift_classification_sc_infer")
-    elif "redshift_classification_genlz_infer" in tasks:
-        infer("redshift_classification_genlz_infer")
-    elif "spectra_pretrain_infer" in tasks:
-        infer("spectra_pretrain_infer")
-    elif "sanity_check_infer" in tasks:
-        infer("sanity_checl_infer")
-    elif "generalization_infer" in tasks:
-        infer("generalization_infer")
-    elif "main_infer" in tasks:
-        infer("main_infer")
-    elif "test" in tasks:
-        infer("test")
-    else: raise ValueError("unsupported task")
+    else:
+        raise ValueError()

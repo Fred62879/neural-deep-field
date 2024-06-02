@@ -368,6 +368,13 @@ def define_cmd_line_args():
     decoder_group.add_argument("--decoder-latents-skip-method", nargs="+")
     decoder_group.add_argument("--decoder-latents-skip-add-conversion-method", nargs="+")
 
+    decoder_group.add_argument("--regressor-decoder-input-dim", type=int)
+    decoder_group.add_argument("--regressor-decoder-num-hidden-layers", type=int, default=1,
+                               help="Number of layers for the decoder")
+    decoder_group.add_argument("--regressor-decoder-hidden-dim", type=int, default=128,
+                               help="Network width")
+    decoder_group.add_argument("--regressor-decoder-batch-norm", action="store_true")
+
     decoder_group.add_argument("--classifier-decoder-input-dim", type=int)
     decoder_group.add_argument("--classifier-decoder-num-hidden-layers", type=int, default=1,
                                help="Number of layers for the decoder")
@@ -768,6 +775,8 @@ def define_cmd_line_args():
     data_group.add_argument("--redshift-classification-sc-data-dir", type=str)
     data_group.add_argument("--redshift-classification-genlz-data-dir", type=str)
     data_group.add_argument("--redshift-classification-data-fname-prefix", type=str)
+
+    data_group.add_argument("--redshift-regress-spectra-sample-method", type=str)
 
     ###################
     # Arguments for optimizer

@@ -43,10 +43,9 @@ class AstroDataset(Dataset):
 
         if self.space_dim == 3:
             self.unbatched_fields = {
-                "idx","selected_ids","wave_data","spectra_data","redshift_data","model_data",
-                "gt_redshift_bin_ids","gt_redshift_bin_masks","global_restframe_spectra_loss",
-                "wave_range","spectra_loss_data"
-            }
+                "idx","selected_ids","wave_data","wave_range",
+                "model_data","redshift_data","spectra_data","spectra_loss_data",
+                "gt_redshift_bin_ids","gt_redshift_bin_masks","global_restframe_spectra_loss"}
         else:
             self.unbatched_fields = set()
 
@@ -88,10 +87,10 @@ class AstroDataset(Dataset):
     def set_mode(self, mode):
         """
         Possible modes: ["main_train","spectra_pretrain","sanity_check","generalization",
-                         "redshift_classification_train","redshift_classification_genlz",
+                         "redshift_classification_train","redshift_pretrain",
                          "main_infer","spectra_pretrain_infer","sanity_check_infer",
                          "generalization_infer","redshift_classification_train_infer",
-                         "redshift_classification_genlz_infer","test"]
+                         "redshift_classification_genlz_infer","redshift_pretrain_infer","test"]
         """
         self.mode = mode
 
@@ -364,7 +363,7 @@ class AstroDataset(Dataset):
         if "selected_ids" in self.requested_fields:
             out["selected_ids"] = self.data["selected_ids"]
         if "wave_range" in self.requested_fields:
-            out["wave_range"] = self.get_wave_range()
+            out["wave_range"] = self.data["wave_range"]
         if self.kwargs["add_redshift_logit_bias"]:
             self.get_init_redshift_logit_bias(out)
         if "wave_data" in self.requested_fields:
@@ -400,15 +399,14 @@ class AstroDataset(Dataset):
 
     def get_spectra_loss_data(self, batch_size, out):
         """
+        Currently NOT is use.
         Do batch sampling for spectra loss data (`spetctra_wave`, `spectra_lambdawise_losses`).
         """
-        # print(out["wave"][0], out["wave"].shape)
         out["wave"], sample_ids = batch_sample_torch(
             torch.FloatTensor(out["wave"]),
             self.num_wave_samples,
             sample_method=self.wave_sample_method,
             keep_sample_ids=True)
-        # print(out["wave"][0], out["wave"].shape)
 
         out["spectra_masks_b"] = batch_sample_torch(
             torch.tensor(out["spectra_masks_b"]).to(bool),
@@ -425,7 +423,7 @@ class AstroDataset(Dataset):
     def get_wave_data(self, batch_size, out):
         """ Get wave (lambda and transmission) data depending on data source.
         """
-        out["wave_range"] = self.get_wave_range()
+        out["wave_range"] = self.data["wave_range"]
 
         if self.wave_source == "full_spectra":
             # for codebook spectra recon (according to emitted wave)
