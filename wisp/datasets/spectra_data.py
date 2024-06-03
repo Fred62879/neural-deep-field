@@ -684,27 +684,28 @@ class SpectraData:
 
     def sample_spectra(self):
         """
-        In case of redshift regression where we treat the sample dim as latent dim,
-          ([bsz,1,nsmpl]) we need to sample spectra data properly s.t. there are
-          as few invalid samples as possible.
+        In case of redshift regression we sample the source spectra when initializing.
+          During training, we use all samples and don't do sampling anymore.
+        Note, during regression, we treat each spectra as a latent. Thus the sample dim
+          becomes the latent dim ([bsz,1,nsmpl]). We need to sample spectra data properly
+          s.t. there are as few invalid samples as possible.
         """
         if not get_bool_regress_redshift(**self.kwargs): return
 
         num_wave_samples = self.kwargs["regressor_decoder_input_dim"]
         sample_method = self.kwargs["redshift_regress_spectra_sample_method"]
+        sup_bounds = self.data["gt_spectra_sup_bound"]
 
+        # print(self.data["gt_spectra"][0:2,0])
         self.data["gt_spectra"], sample_ids = batch_sample_torch(
-            self.data["gt_spectra"], num_wave_samples,
-            sample_method=sample_method, keep_sample_ids=True)
-
-        # print(self.data["gt_spectra"].shape)
-        # print(self.data["gt_spectra"][0:2,0:2])
+            self.data["gt_spectra"], num_wave_samples, sample_method=sample_method,
+            sup_bounds=sup_bounds, keep_sample_ids=True)
+        # print(self.data["gt_spectra"][0:2,0])
 
         for key in ["gt_spectra_mask"]:
-            # print(key, self.data[key].shape)
             self.data[key] = batch_sample_torch(
-                self.data[key], num_wave_samples, sample_method=sample_method)
-            # print(key, self.data[key].shape)
+                self.data[key], num_wave_samples, sample_ids=sample_ids,
+                sample_method=sample_method)
 
     def correct_redshift_based_on_bins(self):
         """

@@ -132,7 +132,9 @@ class BaseInferrer(ABC):
            self.mode == "sanity_check_infer" or \
            self.mode == "generalization_infer" or \
            self.mode == "redshift_classification_sc_infer" or \
-           self.mode == "redshift_classification_genlz_infer":
+           self.mode == "redshift_classification_genlz_infer" or \
+           self.mode == "redshift_pretrain_infer" or \
+           self.mode == "redshift_test_infer":
             self.infer_all_models()
         else:
             for i, (tract, patch) in enumerate(zip(

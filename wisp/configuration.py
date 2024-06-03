@@ -12,7 +12,7 @@ from wisp.trainers import *
 from wisp.inferrers import *
 from wisp.models.nefs import *
 from wisp.datasets.transforms import *
-from wisp.utils.common import has_common
+from wisp.utils.common import has_common, find_common
 
 
 str2optim = {m.lower(): getattr(torch.optim, m) for m in dir(torch.optim) if m[0].isupper()}
@@ -54,7 +54,10 @@ def get_trainer_from_config(pipeline, dataset, optim_cls, optim_params, device, 
     return trainer
 
 def get_inferrer_from_config(pipelines, dataset, device, tasks, args):
-    infer_tasks = ["main_infer","test","spectra_pretrain_infer","sanity_check_infer","generalization_infer","redshift_classification_sc_infer","redshift_classification_genlz_infer"]
+    infer_tasks = ["main_infer","test","spectra_pretrain_infer","sanity_check_infer",
+                   "generalization_infer","redshift_classification_sc_infer",
+                   "redshift_classification_genlz_infer",
+                   "redshift_pretrain_infer","redshift_test_infer"]
     cur_infer_task = find_common(tasks, infer_tasks)[0]
     inferrer = globals()[args.inferrer_type](
         pipelines, dataset, device, mode=cur_infer_task, **vars(args))
@@ -93,7 +96,7 @@ def get_infer_pipelines_from_config(device, tasks, args):
                 AstroHyperSpectralNerf(integrate=False, **vars(args)))
 
     elif "redshift_pretrain_infer" in tasks:
-        pipeline = AstroPipeline(RedshiftRegressor(**vars(args)))
+        pipelines["redshift_regressor"] = AstroPipeline(RedshiftRegressor(**vars(args)))
 
     elif has_common(
         tasks, ["spectra_pretrain_infer","sanity_check_infer","generalization_infer"]
@@ -117,7 +120,7 @@ def get_infer_pipelines_from_config(device, tasks, args):
     elif has_common(
         tasks, ["redshift_classification_sc_infer","redshift_classification_genlz_infer"]
     ):
-        pipeline = AstroPipeline(RedshiftClassifier(**vars(args)))
+        pipelines["redshift_classifier"] = AstroPipeline(RedshiftClassifier(**vars(args)))
 
     for _, pipeline in pipelines.items(): pipeline.to(device)
     return pipelines

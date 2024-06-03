@@ -59,17 +59,9 @@ class RedshiftRegressor(nn.Module):
         ret = {}
         wave = spectra_source_data[:,0]
         spectra = spectra_source_data[:,1]
-        print(spectra.shape)
-        print(wave[0])
-        print(spectra[0])
-        assert 0
+        # print(torch.sum(spectra_masks, dim=-1))
         # print(wave.shape, spectra.shape, spectra_masks.shape)
-        # todo: incorporate spectra mask into forward
-        # print(spectra_masks.shape, spectra_lambdawise_losses.shape, wave.shape)
-        # print(wave[0])
-        # pe_wave = self.encoder(wave)
-        # pe_losses = self.encoder(spetra_lambdawise_losses)
-        # print(pe_wave.shape, pe_losses.shape)
-        redshift = self.decoder(spectra).flatten()
+        # todo: incorporate spectra mask into forward?
+        redshift = self.decoder(spectra * spectra_masks).flatten()
         ret["redshift"] = redshift
         return ret

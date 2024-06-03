@@ -460,7 +460,7 @@ class SpectraTrainer(BaseTrainer):
             # self.bce_loss = nn.BCEWithLogitsLoss(weight=self.num_redshift_bins)
             self.bce_loss = nn.BCEWithLogitsLoss(reduction="none")
         elif self.regress_redshift:
-            self.redshift_loss = nn.MSELoss(reduction="none")
+            self.redshift_loss = nn.MSELoss(reduction="mean")
         else:
             if self.plot_individ_spectra_loss:
                 # if we need loss for each spectra in a batch
@@ -1716,11 +1716,9 @@ class SpectraTrainer(BaseTrainer):
             spectra_loss = (spectra_loss * weight).mean()
 
         elif self.regress_redshift:
-            print(ret["redshift"].shape, data["spectra_redshift"].shape)
-            print(ret["redshift"])
-            print(data["spectra_redshift"])
+            # print(ret["redshift"].shape, data["spectra_redshift"].shape)
+            # print(ret["redshift"], data["spectra_redshift"])
             spectra_loss = self.redshift_loss(ret["redshift"], data["spectra_redshift"])
-            assert 0
 
         elif self.brute_force:
             if self.neg_sup_wrong_redshift:

@@ -263,7 +263,7 @@ trainer:
     cedar_log_dir: '/home/fred862/scratch/vision/data/pdr3/output'
     sockeye_log_dir: '/arc/project/pr-kmyi-1/fred/data/pdr3/output'
 
-    plot_loss: False
+    plot_loss: True
     plot_gt_bin_loss: False
     pixel_loss_cho: l1
     pixel_loss_reduction: none

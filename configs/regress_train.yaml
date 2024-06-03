@@ -6,7 +6,8 @@ global:
     log_fname: 'regress_train'
 
     tasks: ['train','redshift_pretrain']
-    #tasks: ['infer','redshift_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    tasks: ['infer','redshift_pretrain_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
+    # tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
 
 optimizer:
     optimizer_type: 'adam'
@@ -56,7 +57,7 @@ infer:
     infer_last_model_only: True
 
     # infer_log_dir: ''
-    infer_selected: True
+    infer_selected: False
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
