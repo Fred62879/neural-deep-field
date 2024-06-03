@@ -95,7 +95,7 @@ def get_infer_pipelines_from_config(device, tasks, args):
             pipelines["codebook_spectra_infer"] = AstroPipeline(
                 AstroHyperSpectralNerf(integrate=False, **vars(args)))
 
-    elif "redshift_pretrain_infer" in tasks:
+    elif "redshift_pretrain_infer" in tasks or "redshift_test_infer" in tasks:
         pipelines["redshift_regressor"] = AstroPipeline(RedshiftRegressor(**vars(args)))
 
     elif has_common(

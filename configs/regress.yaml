@@ -7,7 +7,7 @@ global:
 
     tasks: ['train','redshift_pretrain']
     tasks: ['infer','redshift_pretrain_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
-    # tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
+    tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
 
 optimizer:
     optimizer_type: 'adam'
