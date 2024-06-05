@@ -8,8 +8,8 @@ global:
     activate_model_timer: False
     activate_trainer_timer: False
 
-    tasks: ['spectra_pretrain']
-    tasks: ['spectra_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    tasks: ['codebook_pretrain']
+    #tasks: ['codebook_pretrain_infer','recon_spectra'] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -29,7 +29,7 @@ embedder:
     wave_embed_dim: 16
 
 pretrain:
-    pretrain_batch_size: 2540
+    pretrain_batch_size: 5000 #4826
 
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 100
@@ -58,12 +58,12 @@ pretrain:
     pretrained_model_name: 'model-ep20000-bch0.pth'
 
     regularize_spectra_latents: True
-    spectra_latents_regu_beta: 16
+    spectra_latents_regu_beta: 4
 
 decoder:
     decoder_activation_type: relu #gaussian
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 5
+    decoder_num_hidden_layers: 7
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
@@ -81,12 +81,12 @@ decoder:
     siren_last_linear: True
 
 trainer:
-    num_epochs: 5000
+    num_epochs: 6000
     batch_size: 5500
-    log_cli_every: 500
+    log_cli_every: 600
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 500
+    save_model_every: 600
 
     plot_l2_loss: True
 
@@ -110,7 +110,7 @@ infer:
 
     pretrain_infer_batch_size: 10
     pretrain_infer_use_all_wave: True
-    pretrain_infer_num_wave: 1000
+    pretrain_infer_num_wave: 200
     pretrain_infer_wave_sample_method: 'uniform_dense'
 
     plot_clipped_spectrum: True
@@ -155,11 +155,11 @@ spectra_data:
     filter_redshift_hi: -1
 
 ablation:
-    perform_ablation: False
+    perform_ablation: True
     ablat_id: 0
-    ablat_params: ["decoder_num_hidden_layers","decoder_hidden_dim","spectra_latents_regu_beta"]
-    ablat_vals: [[5,7],[128,512],[16,32,64]]
-    ablat_num_vals: [2,2,3]
+    ablat_params: ["decoder_num_hidden_layers","spectra_latent_dim"]
+    ablat_vals: [[5,7],[8,16,32]]
+    ablat_num_vals: [2,3]
 
     # ablat_hardcode_params: [infer_log_dir]
     # ablat_hardcode_vals: [[]]

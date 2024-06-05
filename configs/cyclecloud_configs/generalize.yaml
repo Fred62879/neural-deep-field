@@ -6,7 +6,7 @@ global:
     log_fname: 'genlz'
 
     tasks: ['generalization']
-    tasks: ['generalization_infer','recon_spectra','save_redshift'] #,'plot_redshift_est_stats','plot_redshift_residual'] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
+    tasks: ['generalization_infer','recon_spectra','save_redshift','plot_redshift_est_stats','plot_redshift_residual'] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: 'adam'
@@ -28,9 +28,9 @@ embedder:
 pretrain:
     generalize_train_first_layer: False
 
-    pretrain_batch_size: 50
+    pretrain_batch_size: 100
     pretrain_use_all_wave: False
-    pretrain_num_wave_samples: 200
+    pretrain_num_wave_samples: 100
     pretrain_wave_sample_method: 'uniform_dense'
 
     apply_gt_redshift: False
@@ -46,22 +46,22 @@ pretrain:
     num_bins_to_calculate_spectra_loss: 5
 
     spectra_latent_dim: 16
-    generalization_max_num_spectra: 100
+    generalization_max_num_spectra: 1000
 
     load_pretrained_spectra_latents: False
     load_pretrained_spectra_latents_to_gt_bin_only: False
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: '20240527-233949_pretrain_25400_spectra_5k_epochs'
-    pretrained_model_name: 'model-ep5000-bch0.pth'
+    pretrain_log_dir: 'nan'
+    pretrained_model_name: 'model-ep6000-bch0.pth'
 
     regularize_spectra_latents: True
-    spectra_latents_regu_beta: 32
+    spectra_latents_regu_beta: 4
 
     use_global_spectra_loss_as_lambdawise_weights: False
     limit_redshift_to_pretrain_range: False
-    global_restframe_spectra_loss_fname: 33-20240519-183652_pretrain_3_layers_no_skip_decoder_hidden_dim_512_spectra_latents_regu_beta_16/pretrain_spectra/global_restframe_l2_loss.npy
+    global_restframe_spectra_loss_fname: '/pretrain_spectra/global_restframe_l2_loss.npy'
 
     regress_lambdawise_weights: False
     regress_lambdawise_weights_share_latents: False
@@ -80,11 +80,11 @@ decoder:
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
 trainer:
-    num_epochs: 200
+    num_epochs: 500
     batch_size: 5500
-    log_cli_every: 20
+    log_cli_every: 50
     plot_grad_every: -1
-    save_model_every: 20
+    save_model_every: 50
 
     plot_l2_loss: True
 
@@ -111,9 +111,9 @@ infer:
     classify_redshift_based_on_l2: False
     infer_use_global_loss_as_lambdawise_weights: False
 
-    pretrain_infer_batch_size: 1
+    pretrain_infer_batch_size: 200
     pretrain_infer_use_all_wave: False
-    pretrain_infer_num_wave: 1000
+    pretrain_infer_num_wave: 100
     pretrain_infer_wave_sample_method: 'uniform_dense'
 
     plot_clipped_spectrum: True
@@ -160,11 +160,14 @@ spectra_data:
     filter_redshift_hi: -1
 
 ablation:
-    perform_ablation: False
+    perform_ablation: True
     ablat_id: 0
-    ablat_params: ["decoder_num_hidden_layers","decoder_hidden_dim","spectra_latents_regu_beta"]
-    ablat_vals: [[5,7],[128,512],[16,32,64]]
-    ablat_num_vals: [2,2,3]
+    ablat_params: ["decoder_num_hidden_layers","spectra_latent_dim"]
+    ablat_vals: [[5,7],[8,16,32]]
+    ablat_num_vals: [2,3]
 
-    # ablat_hardcode_params: [infer_log_dir]
-    # ablat_hardcode_vals: [[20240521-155106_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_16,20240521-155108_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_32,20240521-155113_decoder_num_hidden_layers_5_decoder_hidden_dim_128_spectra_latents_regu_beta_64,20240521-155112_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_16,20240521-155106_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_32,20240521-160307_decoder_num_hidden_layers_5_decoder_hidden_dim_512_spectra_latents_regu_beta_64]]
+    # ablat_hardcode_params: [pretrain_log_dir]
+    # ablat_hardcode_vals: [[20240528-215551_pretrain_decoder_num_hidden_layers_5_spectra_latent_dim_8,20240528-215954_pretrain_decoder_num_hidden_layers_5_spectra_latent_dim_16,20240528-215954_pretrain_decoder_num_hidden_layers_5_spectra_latent_dim_32,20240528-220125_pretrain_decoder_num_hidden_layers_7_spectra_latent_dim_8,20240528-220127_pretrain_decoder_num_hidden_layers_7_spectra_latent_dim_16,20240528-220127_pretrain_decoder_num_hidden_layers_7_spectra_latent_dim_32]]
+
+    ablat_hardcode_params: [infer_log_dir]
+    ablat_hardcode_vals: [[20240529-031658_genlz_decoder_num_hidden_layers_5_spectra_latent_dim_8,20240529-031658_genlz_decoder_num_hidden_layers_5_spectra_latent_dim_16,20240529-031658_genlz_decoder_num_hidden_layers_5_spectra_latent_dim_32,20240529-031358_genlz_decoder_num_hidden_layers_7_spectra_latent_dim_8,20240529-031356_genlz_decoder_num_hidden_layers_7_spectra_latent_dim_16,20240529-031358_genlz_decoder_num_hidden_layers_7_spectra_latent_dim_32]]
