@@ -1180,7 +1180,7 @@ class SpectraTrainer(BaseTrainer):
             if self.plot_loss:
                 if exists(self.resume_loss_fname):
                     self.loss = list(np.load(self.resume_loss_fname))
-                if exists(self.resume_l2_loss_fname):
+                if self.plot_l2_loss and exists(self.resume_l2_loss_fname):
                     self.l2_loss = list(np.load(self.resume_l2_loss_fname))
                 if self.plot_gt_bin_loss:
                     if exists(self.resume_gt_bin_loss_fname):

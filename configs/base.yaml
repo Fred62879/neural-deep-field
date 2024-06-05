@@ -435,7 +435,10 @@ dataset:
     sockeye_input_fits_path: '/arc/project/pr-kmyi-1/fred/data/pdr3/input/pdr3_dud'
     narval_input_fits_path: '/home/fred862/projects/def-kyi-ab/fred862/astro/hsc/pdr3_dud'
 
+    calculate_wave_range_based_on_trans: False
+    calculate_wave_range_based_on_spectra: False
     wave_range_fname: 'wave_range0.npy'
+
     coords_type: "img"
     normalize_coords: True
     gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)

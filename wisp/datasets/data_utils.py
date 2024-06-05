@@ -85,6 +85,26 @@ def get_img_data_path(local_dataset_path, **kwargs):
             local_dataset_path, kwargs["sensor_collection_name"])
     return input_patch_path, img_data_path
 
+def set_wave_range(data, **kwargs):
+    """ Set wave range used for linear normalization.
+        Note if the wave range used to normalize transmission wave and
+          the spectra wave should be the same.
+    """
+    if kwargs["calculate_wave_range_based_on_spectra"]:
+        if kwargs["learn_spectra_within_wave_range"]:
+            wave_range = [kwargs["spectra_supervision_wave_lo"],
+                          kwargs["spectra_supervision_wave_hi"]]
+        else:
+            wave = np.array(data["gt_spectra"][:,0])
+            wave_range = np.array([
+                int(np.floor(np.min(wave))), int(np.ceil(np.max(wave))) ])
+    elif kwargs["calculate_wave_range_based_on_trans"]:
+        if self.kwargs["trans_sample_method"] == "hardcode":
+            wave_range = (min(data["hdcd_wave"]), max(data["hdcd_wave"]))
+        else: wave_range = (min(data["full_wave"]), max(data["full_wave"]))
+    else: raise ValueError()
+    return wave_range
+
 def get_wave_range_fname(**kwargs):
     if kwargs["on_cc"]:
         dataset_path = kwargs["cc_dataset_path"]

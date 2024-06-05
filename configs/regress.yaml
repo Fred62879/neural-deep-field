@@ -7,7 +7,7 @@ global:
 
     tasks: ['train','redshift_pretrain']
     tasks: ['infer','redshift_pretrain_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
-    tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
+    #tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
 
 optimizer:
     optimizer_type: 'adam'
@@ -20,11 +20,6 @@ optimizer:
     weight_decay: 1e-5
 
     sgd_momentum: 0.9
-
-embedder:
-    encode_wave: True
-    wave_encode_method: positional_encoding
-    wave_embed_dim: 16
 
 pretrain:
     pretrain_batch_size: 10000
@@ -42,16 +37,16 @@ decoder:
     regressor_decoder_hidden_dim: 512
 
 trainer:
-    num_epochs: 2000
+    num_epochs: 40000
     batch_size: 5500
-    log_cli_every: 200
+    log_cli_every: 4000
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 200
+    save_model_every: 4000
 
-    resume_train: False
-    resume_log_dir: ''
-    resume_model_fname: 'model-ep3000-bch0.pth'
+    resume_train: True
+    resume_log_dir: 20240605-124627_regress_train_1k_spectra_10k_epochs
+    resume_model_fname: 'model-ep10000-bch0.pth'
 
 infer:
     infer_last_model_only: True
@@ -82,6 +77,11 @@ infer:
 
     spectra_latents_plot_pca_dim: 2
 
+dataset:
+    calculate_wave_range_based_on_trans: False
+    calculate_wave_range_based_on_spectra: True
+    wave_range_fname: wave_range_spectra_5k_to_9k.npy
+
 spectra_data:
     require_only_basic_spectra: True
 
@@ -90,6 +90,7 @@ spectra_data:
     spectra_data_sources: [deimos,zcosmos] #vipers_w1,vipers_w4]
     random_permute_source_spectra: True
 
+    wave_range_fname: wave_range_spectra_5k_to_9k.npy
     spectra_supervision_wave_lo: 5000
     spectra_supervision_wave_hi: 9000
 

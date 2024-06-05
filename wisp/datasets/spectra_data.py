@@ -21,7 +21,7 @@ from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
     get_coords_norm_range_fname, add_dummy_dim, wave_within_bound, \
-    get_dataset_path, get_img_data_path, batch_sample_torch
+    get_dataset_path, get_img_data_path, batch_sample_torch, set_wave_range
 
 from tqdm import tqdm
 from pathlib import Path
@@ -504,12 +504,12 @@ class SpectraData:
             Note if the wave range used to normalize transmission wave and
               the spectra wave should be the same.
         """
-        if exists(self.wave_range_fname): return
-        wave = np.array(self.data["gt_spectra"][:,0])
-        self.data["wave_range"] = np.array([
-            int(np.floor(np.min(wave))), int(np.ceil(np.max(wave)))
-        ])
-        np.save(self.wave_range_fname, self.data["wave_range"])
+        if exists(self.wave_range_fname):
+            wave_range = np.load(self.wave_range_fname)
+        else:
+            wave_range = set_wave_range(**self.kwargs)
+            np.save(self.wave_range_fname, wave_range)
+        self.data["wave_range"] = wave_range
 
     def load_gt_spectra_data(self):
         """ Load gt spectra data.

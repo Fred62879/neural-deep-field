@@ -13,7 +13,8 @@ from scipy.interpolate import interp1d
 
 from wisp.utils.plot import plot_save
 from wisp.utils.numerical import normalize_data
-from wisp.datasets.data_utils import get_wave_range_fname, get_bound_id, get_dataset_path
+from wisp.datasets.data_utils import get_wave_range_fname, get_bound_id, get_dataset_path, \
+    set_wave_range
 
 
 class TransData:
@@ -249,10 +250,7 @@ class TransData:
         if exists(self.wave_range_fname):
             wave_range = np.load(self.wave_range_fname)
         else:
-            if self.kwargs["trans_sample_method"] == "hardcode":
-                wave_range = (min(self.data["hdcd_wave"]), max(self.data["hdcd_wave"]))
-            else:
-                wave_range = (min(self.data["full_wave"]), max(self.data["full_wave"]))
+            wave_range = set_wave_range(self.data, **self.kwargs)
             np.save(self.wave_range_fname, wave_range)
         self.data["wave_range"] = wave_range
 

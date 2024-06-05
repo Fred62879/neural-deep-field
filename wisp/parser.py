@@ -382,6 +382,10 @@ def define_cmd_line_args():
                                help="Network width")
     decoder_group.add_argument("--classifier-decoder-batch-norm", action="store_true")
 
+    decoder_group.add_argument("--classify-based-on-loss", action="store_true")
+    decoder_group.add_argument("--classify-concat-spectra", action="store_true")
+    decoder_group.add_argument("--classify-based-on-wave-loss", action="store_true")
+
     decoder_group.add_argument("--siren-seed", type=int, default=1)
     decoder_group.add_argument("--siren-first-w0", type=int, default=30)
     decoder_group.add_argument("--siren-hidden-w0", type=int, default=30)
@@ -621,6 +625,8 @@ def define_cmd_line_args():
 
     # Astro Dataset
     data_group.add_argument("--space-dim", type=int)
+    data_group.add_argument("--calculate-wave-range-based-on-trans", action="store_true")
+    data_group.add_argument("--calculate-wave-range-based-on-spectra", action="store_true")
     data_group.add_argument("--wave-range-fname", type=str,
                             help="fname of lambda range used for linear normalization.")
     # fits data

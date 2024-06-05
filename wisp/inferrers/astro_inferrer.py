@@ -86,16 +86,14 @@ class AstroInferrer(BaseInferrer):
                 ["model_dir","recon_dir","recon_synthetic_dir","metric_dir",
                  "zoomed_recon_dir","scaler_dir","pixel_distrib_dir","qtz_weights_dir",
                  "embed_map_dir","latents_dir","redshift_dir","latent_embed_dir","spectra_dir",
-                 "codebook_coeff_dir","spectra_latents_dir","spectra_lambdawise_loss_dir",
-                 "codebook_spectra_dir", "codebook_spectra_individ_dir",
-                 "redshift_classification_data_dir"],
+                 "codebook_coeff_dir","spectra_latents_dir","redshift_classification_data_dir",
+                 "codebook_spectra_dir", "codebook_spectra_individ_dir"],
                 ["models","recons","recon_synthetic","metrics",
                  "zoomed_recon","scaler","pixel_distrib","qtz_weights",
                  "embed_map","latents",f"{prefix}_redshift","latent_embed",f"{prefix}_spectra",
                  f"{prefix}_codebook_coeff",f"{prefix}_spectra_latents",
-                 f"{prefix}_spectra_lambdawise_loss",
-                 f"{prefix}_codebook_spectra",f"{prefix}_codebook_spectra_individ",
-                 f"{prefix}_redshift_classification_data"]
+                 f"{prefix}_redshift_classification_data",
+                 f"{prefix}_codebook_spectra",f"{prefix}_codebook_spectra_individ"]
         ):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)

@@ -107,6 +107,11 @@ infer:
 
     spectra_latents_plot_pca_dim: 2
 
+dataset:
+    calculate_wave_range_based_on_trans: False
+    calculate_wave_range_based_on_spectra: True
+    wave_range_fname: wave_range_spectra_5k_to_9k.npy
+
 spectra_data:
     require_only_basic_spectra: True
 
@@ -115,6 +120,7 @@ spectra_data:
     spectra_data_sources: [deimos,zcosmos] #vipers_w1,vipers_w4]
     random_permute_source_spectra: True
 
+    wave_range_fname: wave_range_spectra_5k_to_9k.npy
     spectra_supervision_wave_lo: 5000
     spectra_supervision_wave_hi: 9000
 
