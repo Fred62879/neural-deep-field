@@ -5,9 +5,9 @@ global:
     exp_name: 'vipers-spectra-ssim'
     log_fname: 'clsfy' 
 
-    tasks: ['redshift_classification_train']
-    tasks: ['redshift_classification_sc_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']
-    tasks: ['redshift_classification_genlz_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats'] #'plot_est_redshift_logits']
+    tasks: [train,redshift_classification_train]
+    tasks: [infer,redshift_classification_sc_infer,save_redshift,plot_redshift_est_residuals,plot_redshift_est_stats] #plot_est_redshift_logits]
+    tasks: [infer,redshift_classification_genlz_infer,save_redshift,plot_redshift_est_residuals,plot_redshift_est_stats] #plot_est_redshift_logits]
 
 optimizer:
     optimizer_type: 'adam'
@@ -23,7 +23,8 @@ optimizer:
 
 pretrain:
     pretrain_batch_size: 25
-    
+
+    model_redshift: True
     brute_force_redshift: True
     optimize_latents_for_each_redshift_bin: True
 
@@ -34,11 +35,11 @@ decoder:
     classifier_decoder_hidden_dim: 512
 
 trainer:
-    num_epochs: 200
-    log_cli_every: 20
+    num_epochs: 2000
+    log_cli_every: 200
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 20
+    save_model_every: 200
 
     resume_train: False
     resume_log_dir: ''
@@ -47,7 +48,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: '20240530-135514_clsfy'
+    # infer_log_dir: ''
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -89,7 +90,7 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    sample_from_spectra_pretrain_spectra: True
+    sample_from_pretrain_spectra: True
     sanity_check_max_num_spectra: 200
     generalization_max_num_spectra: 500
     num_gt_spectra_upper_bound: 200000

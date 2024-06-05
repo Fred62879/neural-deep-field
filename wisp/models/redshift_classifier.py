@@ -30,7 +30,7 @@ class RedshiftClassifier(nn.Module):
         #     **self.kwargs)
 
         # input_dim = 2 * self.kwargs["wave_embed_dim"]
-        input_dim = self.kwargs["classifier_decoder_input_dim"]
+        input_dim = 2 * self.kwargs["classifier_decoder_input_dim"]
         output_dim = 1
         self.decoder = BasicDecoder(
             input_dim, output_dim, True,
@@ -48,11 +48,13 @@ class RedshiftClassifier(nn.Module):
 
     def forward(
             self, channels, wave, wave_range, spectra_masks,
-            spectra_lambdawise_losses, idx=None, selected_ids=None
+            gt_spectra, recon_spectra, spectra_lambdawise_losses, idx=None, selected_ids=None
     ):
         """
         @Params
           wave: [bsz,nsmpl]
+          gt_spectra: [bsz,nsmpl]
+          recon_spectra: [bsz,nbins,nsmpl]
           spectra_masks: [bsz,nsmpl]
           spectra_lambdawise_losses: [bsz,nbins,nsmpl]
         @Return
@@ -65,7 +67,13 @@ class RedshiftClassifier(nn.Module):
         # pe_wave = self.encoder(wave)
         # pe_losses = self.encoder(spetra_lambdawise_losses)
         # print(pe_wave.shape, pe_losses.shape)
-        logits = self.decoder(spectra_lambdawise_losses).flatten()
-        # logits = F.sigmoid(logits)
+
+        # print(gt_spectra.shape, recon_spectra.shape)
+        nbins = recon_spectra.shape[1]
+        input = torch.cat((gt_spectra[:,None].tile(1,nbins,1) * spectra_masks[:,None],
+                           recon_spectra * spectra_masks[:,None]), dim=-1)
+        # input = spectra_lambdawise_losses * spectra_masks
+        logits = self.decoder(input).flatten()
+        assert not torch.isnan(logits).any()
         ret["redshift_logits"] = logits
         return ret

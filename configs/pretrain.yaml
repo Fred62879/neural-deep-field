@@ -28,12 +28,18 @@ embedder:
 pretrain:
     pretrain_batch_size: 10000
 
+    use_latents_as_coords: True
+    zero_init_spectra_latents: True
+    optimize_spectra_latents: True
     spectra_latent_dim: 16
+
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 200
     pretrain_wave_sample_method: uniform_dense
 
+    model_redshift: True
     apply_gt_redshift: True
+
     regularize_spectra_latents: True
     spectra_latents_regu_beta: 16
 

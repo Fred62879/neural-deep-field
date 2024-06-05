@@ -7,7 +7,7 @@ from collections import defaultdict
 from wisp.utils import PerfTimer
 from wisp.utils.common import get_bool_classify_redshift, \
     get_bool_has_redshift_latents, get_bool_weight_spectra_loss_with_global_restframe_loss, \
-    get_bool_save_lambdawise_spectra_loss
+    get_bool_save_redshift_classification_data #, get_bool_save_lambdawise_spectra_loss
 
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.embedders.encoder import Encoder
@@ -24,7 +24,8 @@ class SpectraNerf(BaseNeuralField):
         self.use_latents_as_coords = kwargs["use_latents_as_coords"]
         self.pixel_supervision = kwargs["pretrain_pixel_supervision"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**kwargs)
-        self.save_lambdawise_spectra_loss = get_bool_save_lambdawise_spectra_loss(**kwargs)
+        # self.save_lambdawise_spectra_loss = get_bool_save_lambdawise_spectra_loss(**kwargs)
+        self.save_lambdawise_spectra_loss = get_bool_save_redshift_classification_data(**kwargs)
 
         super(SpectraNerf, self).__init__()
 

@@ -290,7 +290,7 @@ trainer:
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
-    gpu_data: ['coords','pixels','weights','full_wave','full_emitted_wave','wave','trans','nsmpl','spectra_source_data','spectra_masks','spectra_pixels','spectra_redshift','spectra_wave','spectra_redshift','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift','sup_spectra_wave','sup_spectra_masks','sup_spectra_data','init_redshift_prob','scaler_latents','redshift_latents','gt_redshift_bin_ids','gt_redshift_bin_masks','gt_redshift_bin_masks_b','spectra_lambdawise_losses']
+    gpu_data: ['coords','pixels','weights','full_wave','full_emitted_wave','wave','trans','nsmpl','spectra_source_data','spectra_masks','spectra_pixels','spectra_redshift','spectra_wave','spectra_redshift','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift','sup_spectra_wave','sup_spectra_masks','sup_spectra_data','init_redshift_prob','scaler_latents','redshift_latents','gt_redshift_bin_ids','gt_redshift_bin_masks','gt_redshift_bin_masks_b','spectra_lambdawise_losses',recon_spectra,gt_spectra,spectra_masks_b]
 
     learn_spectra_within_wave_range: True
 

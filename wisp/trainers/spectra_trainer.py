@@ -575,8 +575,8 @@ class SpectraTrainer(BaseTrainer):
         fields = ["spectra_sup_bounds"]
         if self.classification_mode:
             # add "spectra_loss_data" to fields if want to sample wave/mask/loss
-            fields.extend(["wave","wave_range","gt_redshift_bin_masks_b",
-                           "spectra_masks_b","spectra_lambdawise_losses"])
+            fields.extend(["wave","wave_range","gt_redshift_bin_masks_b","gt_spectra",
+                           "recon_spectra","spectra_masks_b","spectra_lambdawise_losses"])
         elif self.mode == "redshift_pretrain":
             fields.extend(["wave_range","spectra_masks",
                            "spectra_redshift","spectra_source_data"])
@@ -642,19 +642,24 @@ class SpectraTrainer(BaseTrainer):
 
         # train classifier on top of trained model to predict redshift
         if self.classification_mode:
-            dir = join(self.log_dir, "..", self.extra_args["pre_classification_log_dir"])
-            prefix = self.extra_args["pre_classification_fname_prefix"]
+            log_dir = get_redshift_classification_data_dir(self.mode, **self.extra_args)
+            dir = join(self.log_dir, "..", log_dir)
+            prefix = self.extra_args["redshift_classification_data_fname_prefix"]
             wave_fname = join(dir, f"{prefix}_wave.npy")
             masks_fname = join(dir, f"{prefix}_spectra_masks.npy")
             # gt_bin_fname = join(dir, f"{prefix}_gt_bin_ids.npy")
             loss_fname = join(dir, f"{prefix}_lambdawise_losses.npy")
             gt_bin_masks_fname = join(dir, f"{prefix}_gt_bin_masks.npy")
+            gt_spectra_fname = join(dir, f"{prefix}_gt_spectra.npy")
+            recon_spectra_fname = join(dir, f"{prefix}_recon_spectra.npy")
             self.dataset.set_hardcode_data("wave",np.load(wave_fname))
             self.dataset.set_hardcode_data("spectra_masks_b",np.load(masks_fname))
             self.dataset.set_hardcode_data("spectra_lambdawise_losses",np.load(loss_fname))
             # self.dataset.set_hardcode_data("gt_redshift_bin_ids_b",np.load(gt_bin_fname).T)
             self.dataset.set_hardcode_data(
                 "gt_redshift_bin_masks_b",np.load(gt_bin_masks_fname).T)
+            self.dataset.set_hardcode_data("gt_spectra", np.load(gt_spectra_fname))
+            self.dataset.set_hardcode_data("recon_spectra", np.load(recon_spectra_fname))
 
         self.dataset.set_fields(fields)
 

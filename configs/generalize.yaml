@@ -5,8 +5,8 @@ global:
     exp_name: 'vipers-spectra-ssim'
     log_fname: 'genlz'
 
-    tasks: ['generalization']
-    tasks: ['generalization_infer','save_lambdawise_spectra_loss','save_redshift'] #,'plot_redshift_est_stats','plot_redshift_residual'] #,'plot_redshift_logits']
+    tasks: [train, generalization]
+    tasks: [infer, generalization_infer, save_redshift_classification_data, save_redshift, plot_redshift_est_stats, plot_redshift_residual] #,'plot_redshift_logits']
 
 optimizer:
     optimizer_type: 'adam'
@@ -29,14 +29,19 @@ pretrain:
     generalize_train_first_layer: False
 
     pretrain_batch_size: 20
+
+    use_latents_as_coords: True
+    zero_init_spectra_latents: True
+    optimize_spectra_latents: True
+    spectra_latent_dim: 16
+
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 200
     pretrain_wave_sample_method: 'uniform_dense'
 
+    model_redshift: True
     brute_force_redshift: True
     optimize_latents_for_each_redshift_bin: True
-
-    spectra_latent_dim: 16
 
     pretrain_log_dir: ''
     pretrained_model_name: 'model-ep1000-bch0.pth'
@@ -71,6 +76,7 @@ trainer:
     save_model_every: 50
 
     plot_l2_loss: True
+    plot_gt_bin_loss: True
 
     resume_train: False
     resume_log_dir: ''

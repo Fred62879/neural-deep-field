@@ -41,12 +41,15 @@ def get_exp_dir(**kwargs):
     return exp_dir
 
 def get_redshift_classification_data_dir(mode, **kwargs):
-    if mode == "redshift_classification_sc_infer":
+    if mode == "redshift_classification_train":
         log_dir = join(kwargs["redshift_classification_sc_data_dir"],
-                       "val_spectra_lambdawise_loss")
+                       "val_redshift_classification_data")
+    elif mode == "redshift_classification_sc_infer":
+        log_dir = join(kwargs["redshift_classification_sc_data_dir"],
+                       "val_redshift_classification_data")
     elif mode == "redshift_classification_genlz_infer":
         log_dir = join(kwargs["redshift_classification_genlz_data_dir"],
-                       "test_spectra_lambdawise_loss")
+                       "test_redshift_classification_data")
     else: raise ValueError()
     return log_dir
 
@@ -132,9 +135,16 @@ def get_bool_plot_lambdawise_spectra_loss(**kwargs):
         "generalization_infer" in kwargs["tasks"] or \
         "spectra_pretrain_infer" in kwargs["tasks"] )
 
-def get_bool_save_lambdawise_spectra_loss(**kwargs):
+# def get_bool_save_lambdawise_spectra_loss(**kwargs):
+#     return (
+#         "save_lambdawise_spectra_loss" in kwargs["tasks"]
+#     ) and (
+#         "sanity_check_infer" in kwargs["tasks"] or \
+#         "generalization_infer" in kwargs["tasks"])
+
+def get_bool_save_redshift_classification_data(**kwargs):
     return (
-        "save_lambdawise_spectra_loss" in kwargs["tasks"]
+        "save_redshift_classification_data" in kwargs["tasks"]
     ) and (
         "sanity_check_infer" in kwargs["tasks"] or \
         "generalization_infer" in kwargs["tasks"])
@@ -404,8 +414,7 @@ def print_shape(data):
 def get_input_latent_dim(**kwargs):
     """ Get the dimension of the input RA/DEC coordinate for MLP.
     """
-    if kwargs["pretrain_codebook"] and \
-       ("spectra_pretrain" in kwargs["tasks"] or \
+    if ("spectra_pretrain" in kwargs["tasks"] or \
         "spectra_pretrain_infer" in kwargs["tasks"] or \
         "sanity_check" in kwargs["tasks"] or \
         "sanity_check_infer" in kwargs["tasks"] or \
@@ -572,7 +581,8 @@ def forward(
         save_spectra_latents=False,
         save_codebook_spectra=False,
         save_spectra_all_bins=False,
-        save_lambdawise_weights=False
+        save_lambdawise_weights=False,
+        save_redshift_classification_data=False
 ):
     net_args, requested_channels = {}, []
     if "coords" in data:
@@ -600,7 +610,7 @@ def forward(
         if save_codebook_spectra: requested_channels.append("codebook_spectra")
         if save_spectra_all_bins: requested_channels.append("spectra_all_bins")
 
-        if "wave" in net_args:
+        if "wave" in data:
             net_args["wave"] = data["wave"]
         net_args["wave_range"] = data["wave_range"] # linear normalization
 
@@ -671,6 +681,9 @@ def forward(
             if spectra_l2_loss_func is not None:
                 requested_channels.append("spectra_lambdawise_loss_l2")
 
+        if save_redshift_classification_data:
+            requested_channels.append("spectra")
+
         # train with lambdawise weights (either generate with mlp or use global loss)
         if regress_lambdawise_weights_share_latents:
             if regress_lambdawise_weights_use_gt_bin_latent:
@@ -683,6 +696,8 @@ def forward(
             requested_channels.append("lambdawise_weights")
 
         if classification_mode:
+            net_args["gt_spectra"] = data["gt_spectra"]
+            net_args["recon_spectra"] = data["recon_spectra"]
             net_args["spectra_masks"] = data["spectra_masks_b"]
             net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses"]
 
