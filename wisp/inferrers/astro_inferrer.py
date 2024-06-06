@@ -1821,7 +1821,7 @@ class AstroInferrer(BaseInferrer):
             self.gt_redshift.extend(data["spectra_redshift"])
             if self.clsfy_sc_infer or self.clsfy_genlz_infer:
                 logits = ret["redshift_logits"].view(-1, self.num_redshift_bins)
-                ids = torch.argmax(logits, dim=-1)
+                ids = torch.argmax(logits, dim=-1) #.detach().cpu().numpy()
                 argmax_redshift = self.redshift_bins[ids]
                 self.est_redshift.extend(argmax_redshift)
             elif self.classify_redshift:

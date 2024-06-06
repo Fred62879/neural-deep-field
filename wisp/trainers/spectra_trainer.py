@@ -1399,13 +1399,17 @@ class SpectraTrainer(BaseTrainer):
             lo = i * n_spectrum_per_fig
             hi = min(lo + n_spectrum_per_fig, n_spectra)
 
+            if self.plot_spectra_with_weights:
+                cur_lambdawise_weights = lambdawise_weights[lo:hi],
+            else: cur_lambdawise_weights = None
+
             cur_metrics = self.dataset.plot_spectrum(
                 self.spectra_dir, fname,
                 self.extra_args["flux_norm_cho"], None,
                 self.spectra_wave[lo:hi], None, self.gt_fluxes[lo:hi],
                 self.spectra_wave[lo:hi], self.recon_fluxes[lo:hi],
                 lambdawise_losses=None,
-                lambdawise_weights=lambdawise_weights[lo:hi],
+                lambdawise_weights=cur_lambdawise_weights,
                 clip=self.extra_args["plot_clipped_spectrum"],
                 gt_masks=self.spectra_masks[lo:hi],
                 recon_masks=self.spectra_masks[lo:hi],
