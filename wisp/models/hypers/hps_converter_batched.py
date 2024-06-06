@@ -60,8 +60,10 @@ class HyperSpectralConverter(nn.Module):
     ####################
 
     def linear_norm_wave(self, wave, wave_bound):
-        (lo, hi) = wave_bound # 3940, 10870
+        (lo, hi) = wave_bound
+        #print(lo, hi, torch.min(wave), torch.max(wave))
         return self.wave_multiplier * (wave - lo) / (hi - lo)
+        # return self.wave_multiplier * (2 * (wave - lo) / (hi - lo) - 1)
 
     def shift_wave(self, wave, redshift, ret):
         """ Convert observed lambda to emitted lambda.
@@ -152,11 +154,15 @@ class HyperSpectralConverter(nn.Module):
         """
         embed_dim = latents.shape[-1]
 
+        #print(torch.min(wave[...,0], dim=-1)[0])
+        #print(torch.max(wave[...,0], dim=-1)[0])
         if redshift is None:
             if self._model_redshift:
                 warnings.warn("model redshift without providing redshift values!")
         else: wave = self.shift_wave(wave, redshift, ret)
         wave = self.linear_norm_wave(wave, wave_bound)
+        #print(torch.min(wave), torch.max(wave))
+        #assert 0
 
         if self.encode_wave:
             wave = self.wave_encoder(wave) # [...,bsz,num_samples,wave_embed_dim]

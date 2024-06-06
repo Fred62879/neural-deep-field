@@ -1464,7 +1464,7 @@ class SpectraData:
         if self.kwargs["plot_spectrum_with_recon"]:
             sub_dir = sub_dir + "with_recon_"
         if lambdawise_losses is not None:
-            if get_bool_classify_redshift_based_on_l2: loss_cho = "l2"
+            if get_bool_classify_redshift_based_on_l2(**self.kwargs): loss_cho = "l2"
             else: loss_cho = self.kwargs["spectra_loss_cho"]
             if self.kwargs["plot_spectrum_with_loss"]:
                 sub_dir += f"with_{loss_cho}_lambdawise_loss_"

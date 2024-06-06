@@ -92,8 +92,8 @@ def set_wave_range(data, **kwargs):
     """
     if kwargs["calculate_wave_range_based_on_spectra"]:
         if kwargs["learn_spectra_within_wave_range"]:
-            wave_range = [kwargs["spectra_supervision_wave_lo"],
-                          kwargs["spectra_supervision_wave_hi"]]
+            # wave_range = [kwargs["spectra_supervision_wave_lo"],
+            wave_range = [0, kwargs["spectra_supervision_wave_hi"]]
         else:
             wave = np.array(data["gt_spectra"][:,0])
             wave_range = np.array([
