@@ -147,7 +147,6 @@ class BaseInferrer(ABC):
         for group_task in self.group_tasks:
             self._toggle(group_task)
             self._register_inferrence_func(group_task)
-
             if self.verbose:
                 log.info(f"inferring for {group_task}")
             if self.run_model:
@@ -225,6 +224,11 @@ class BaseInferrer(ABC):
         assert(task in set(self.group_tasks))
         for group_task in self.group_tasks:
             setattr(self, group_task, False)
+        if task == "infer_all_coords_full_model" or \
+           task == "infer_selected_coords_partial_model" or \
+           task == "infer_hardcode_coords_modified_model":
+            self.run_model = True
+        else: self.run_model = False
         setattr(self, task, True)
 
     def _register_inferrence_func(self, group_task):

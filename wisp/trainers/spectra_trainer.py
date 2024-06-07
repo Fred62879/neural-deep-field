@@ -1074,7 +1074,7 @@ class SpectraTrainer(BaseTrainer):
             # only load pretrained latents to gt bin, all other bins are 0
             assert self.dataset.get_spectra_source() == "val"
             spectra_redshift = self.dataset.get_spectra_redshift() # validation spectra
-            (lo, hi) = get_redshift_range(**self.kwargs)
+            (lo, hi) = get_redshift_range(**self.extra_args)
             gt_bin_ids = get_bin_ids(
                 lo, self.extra_args["redshift_bin_width"],
                 spectra_redshift.numpy(), add_batched_dim=True

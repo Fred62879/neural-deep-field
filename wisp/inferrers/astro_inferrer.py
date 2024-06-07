@@ -182,7 +182,6 @@ class AstroInferrer(BaseInferrer):
 
         for group_task in self.group_tasks:
             if group_task == "infer_all_coords_full_model":
-                self.run_model = True
                 self.infer_funcs[group_task] = [
                     self.pre_inferrence_all_coords_full_model,
                     self.post_inferrence_all_coords_full_model,
@@ -191,7 +190,6 @@ class AstroInferrer(BaseInferrer):
                     self.post_checkpoint_all_coords_full_model ]
 
             elif group_task == "infer_selected_coords_partial_model":
-                self.run_model = True
                 self.infer_funcs[group_task] = [
                     self.pre_inferrence_selected_coords_partial_model,
                     self.post_inferrence_selected_coords_partial_model,
@@ -200,7 +198,6 @@ class AstroInferrer(BaseInferrer):
                     self.post_checkpoint_selected_coords_partial_model ]
 
             elif group_task == "infer_hardcode_coords_modified_model":
-                self.run_model = True
                 self.infer_funcs[group_task] = [
                     self.pre_inferrence_hardcode_coords_modified_model,
                     self.post_inferrence_hardcode_coords_modified_model,
@@ -209,7 +206,6 @@ class AstroInferrer(BaseInferrer):
                     self.post_checkpoint_hardcode_coords_modified_model ]
 
             elif group_task == "infer_no_model_run":
-                self.run_model = False
                 self.infer_funcs[group_task] = [None]*5
 
             else: raise Exception("Unrecgonized group inferrence task.")
@@ -1446,7 +1442,7 @@ class AstroInferrer(BaseInferrer):
                 """
                 outlier_ids = np.load(fname)
                 selected_supervision_spectra_ids = \
-                    self.dataset.get_redshift_pretrain_spectra_ids()
+                    self.dataset.get_sanity_check_spectra_ids()
                 ids = selected_supervision_spectra_ids[outlier_ids]
             else:
                 ids = np.load(fname)
@@ -1554,7 +1550,9 @@ class AstroInferrer(BaseInferrer):
             np.save(fname, selected_axes)
 
         suffix = ""
+        if self.extra_args["infer_selected"]: suffix = "_selected"
         if self.extra_args["infer_outlier_only"]: suffix = "_outlier"
+
         if all_models_together:
             for model_id, cur_latents in enumerate(low_dim_latents):
                 fname = join(latents_path, f"{model_id}{suffix}.png")
@@ -1832,7 +1830,7 @@ class AstroInferrer(BaseInferrer):
             self.gt_redshift.extend(data["spectra_redshift"])
             if self.clsfy_sc_infer or self.clsfy_genlz_infer:
                 logits = ret["redshift_logits"].view(-1, self.num_redshift_bins)
-                ids = torch.argmax(logits, dim=-1) #.detach().cpu().numpy()
+                ids = torch.argmax(logits, dim=-1).detach().cpu().numpy()
                 argmax_redshift = self.redshift_bins[ids]
                 self.est_redshift.extend(argmax_redshift)
             elif self.classify_redshift:

@@ -3,10 +3,10 @@ parent: base_cc.yaml
 global:
     use_tqdm: True
     exp_name: vdz-spectra-ssim
-    log_fname: pretrain
+    log_fname: pretrain_100k_spectra_5k_epochs
 
     tasks: [train, spectra_pretrain]
-    tasks: [infer, spectra_pretrain_infer, recon_spectra, plot_spectra_latents_pca] #plot_global_lambdawise_spectra_loss]
+    # tasks: [infer, spectra_pretrain_infer, recon_spectra] #plot_spectra_latents_pca] #plot_global_lambdawise_spectra_loss]
 
 optimizer:
     optimizer_type: adam
@@ -33,7 +33,7 @@ pretrain:
     use_latents_as_coords: True
     zero_init_spectra_latents: True
     optimize_spectra_latents: True
-    spectra_latent_dim: 16
+    spectra_latent_dim: 32
 
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 100
@@ -56,8 +56,8 @@ decoder:
 
     decoder_activate_before_latents_skip: False
     decoder_latents_skip_all_layers: True
-    decoder_latents_skip_method: 'add'
-    decoder_latents_skip_add_conversion_method: 'multi_conversion'
+    decoder_latents_skip_method: add
+    decoder_latents_skip_add_conversion_method: multi_conversion
 
 trainer:
     num_epochs: 5000
@@ -81,10 +81,10 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240607-033031_pretrain_100k_spectra_m64_100_samples_divide_wave_norm_pe_dim_64_5k_epochs
+    #infer_log_dir: nan
     infer_selected: True
-    pretrain_num_infer_upper_bound: 280
-    spectra_inferrence_id_fname: 20240607-205711_sc_1000_spectra_200_epochs_regu_beta_16_033031/val_redshift/model-0_redshift_outlier_ids.npy
+    pretrain_num_infer_upper_bound: 700
+    spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: False
 
     pretrain_infer_batch_size: 100
@@ -113,7 +113,6 @@ dataset:
     calculate_wave_range_based_on_trans: False
     calculate_wave_range_based_on_spectra: True
     wave_range_fname: wave_range_spectra_6k_to_8k.npy
-    # wave_range_fname: wave_range_spectra_5k_to_9k.npy
 
 spectra_data:
     require_only_basic_spectra: True
@@ -132,8 +131,6 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    sample_from_pretrain_spectra: True
-    sanity_check_max_num_spectra: 1000
     num_gt_spectra_upper_bound: 200000 #25400
     num_supervision_spectra_upper_bound: 200000 #25400
 
