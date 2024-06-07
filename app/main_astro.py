@@ -15,7 +15,7 @@ if __name__ == "__main__":
     from wisp.trainers import AstroTrainer, SpectraTrainer
 
     args, args_str = parse_args()
-    args.wave_embed_dim = args.spectra_latent_dim
+    # args.wave_embed_dim = args.spectra_latent_dim
     if args.use_gpu: query_GPU_mem()
 
     tasks = set(args.tasks)

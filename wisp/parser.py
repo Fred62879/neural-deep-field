@@ -261,6 +261,7 @@ def define_cmd_line_args():
     net_group.add_argument("--wave-encode-method", type=str,
                            choices=["positional"],
                            help="lambda encoding method.")
+    net_group.add_argument("--linear-norm-wave", action="store_true")
     net_group.add_argument("--wave-multiplier", type=int)
 
     ###################

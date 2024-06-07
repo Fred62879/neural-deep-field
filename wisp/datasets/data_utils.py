@@ -218,7 +218,6 @@ def batch_sample_torch(
             sample_ids = torch.rand(bsz, nsmpl) # uniform random number [0,1)
             sample_ids = sample_ids * (hi - lo)[:,None] + lo[:,None] # sacle to given range
             sample_ids = sample_ids.to(torch.long)
-            sample_ids, _ = torch.sort(sample_ids, dim=-1)
         elif sample_method == "uniform_dense":
             """
             densely sample within defined range (lo~?) with even step (without replacement)

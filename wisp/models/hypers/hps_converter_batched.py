@@ -29,6 +29,7 @@ class HyperSpectralConverter(nn.Module):
         self.encode_wave = kwargs["encode_wave"]
         self.quantize_spectra = kwargs["quantize_spectra"]
         self.combine_method = kwargs["hps_combine_method"]
+        self.linear_norm_wave = kwargs["linear_norm_wave"]
 
         self.classify_redshift = get_bool_classify_redshift(**kwargs)
         self.use_global_spectra_loss_as_lambdawise_weights = \
@@ -59,10 +60,11 @@ class HyperSpectralConverter(nn.Module):
     # forward operations
     ####################
 
-    def linear_norm_wave(self, wave, wave_bound):
+    def _linear_norm_wave(self, wave, wave_bound):
         (lo, hi) = wave_bound
         #print(lo, hi, torch.min(wave), torch.max(wave))
-        return self.wave_multiplier * (wave - lo) / (hi - lo)
+        # return self.wave_multiplier * (wave - lo) / (hi - lo)
+        return self.wave_multiplier * wave / hi
         # return self.wave_multiplier * (2 * (wave - lo) / (hi - lo) - 1)
 
     def shift_wave(self, wave, redshift, ret):
@@ -134,6 +136,10 @@ class HyperSpectralConverter(nn.Module):
             assert(spatial.shape == spectral.shape)
             latents = spatial + spectral # [...,embed_dim]
         elif self.combine_method == "concat":
+            #print(spatial.shape, spectral.shape)
+            #print(spatial)
+            #print(spectral)
+            #assert 0
             latents = torch.cat((spatial, spectral), dim=-1)
         else:
             raise ValueError("Unsupported spatial-spectral combination method.")
@@ -160,9 +166,9 @@ class HyperSpectralConverter(nn.Module):
             if self._model_redshift:
                 warnings.warn("model redshift without providing redshift values!")
         else: wave = self.shift_wave(wave, redshift, ret)
-        wave = self.linear_norm_wave(wave, wave_bound)
+        if self.linear_norm_wave:
+            wave = self._linear_norm_wave(wave, wave_bound)
         #print(torch.min(wave), torch.max(wave))
-        #assert 0
 
         if self.encode_wave:
             wave = self.wave_encoder(wave) # [...,bsz,num_samples,wave_embed_dim]

@@ -66,15 +66,15 @@ optimizer:
 
 net:
     nef_type: 'AstroHyperSpectralNerf' #'AstroNerf'
-    model_redshift: True
+    model_redshift: False
     redshift_model_method: 'classification' #'regression'
     redshift_classification_method: 'weighted_avg' #'argmax'
 
-    encode_wave: True
+    encode_wave: False
     wave_encode_method: 'positional_encoding'
     wave_multiplier: 20
 
-    encode_coords: True
+    encode_coords: False
     coords_encode_method: 'grid' #'positional_encoding'
 
 embedder:
@@ -96,7 +96,7 @@ embedder:
     wave_encoder_siren_hidden_w0: 30
     wave_encoder_siren_seed: 0
     wave_encoder_siren_coords_scaler: 1
-    wave_encoder_siren_last_linear: False
+    wave_encoder_siren_last_linear: True
 
 grid:
     grid_dim: 2
@@ -110,13 +110,10 @@ grid:
     min_grid_res: 64 #6
     max_grid_res: 64 #690 #160
     codebook_bitwidth: 20
-    interpolation_align_corners: True
+    interpolation_align_corners: False
 
 pretrain:
-    pretrain_codebook: True
-    sample_from_spectra_pretrain_spectra: True
-    add_validation_spectra_not_in_supervision: False
-    num_extra_validation_spectra: 20
+    pretrain_codebook: False
 
     pretrain_batch_size: 7000
     pretrain_pixel_beta: 1
@@ -141,24 +138,24 @@ pretrain:
     neg_sup_alternation_starts_with: "latents"
     neg_sup_alternation_steps: [1,1]
 
-    zero_init_spectra_latents: True
+    zero_init_spectra_latents: False
     optimize_spectra_latents_as_logits: False
-    optimize_spectra_latents: True
-    load_pretrained_spectra_latents: True
-    load_pretrained_spectra_latents_to_gt_bin_only: True
+    optimize_spectra_latents: False
+    load_pretrained_spectra_latents: False
+    load_pretrained_spectra_latents_to_gt_bin_only: False
     optimize_codebook_logits_mlp: False
     load_pretrained_codebook_logits_mlp: False
 
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    brute_force_redshift: True
+    brute_force_redshift: False
     binwise_loss_beta: 50
     use_binwise_spectra_loss_as_redshift_logits: False
 
-    zero_init_redshift_latents: True
-    optimize_redshift_latents_as_logits: True
-    optimize_redshift_latents: True
+    zero_init_redshift_latents: False
+    optimize_redshift_latents_as_logits: False
+    optimize_redshift_latents: False
     optimize_redshift_logits_mlp: False
 
     regularize_redshift_logits: False
@@ -181,8 +178,8 @@ pretrain:
     # pretrained_model_name: 'model-step20000.pth'
     pretrained_model_name: 'model-ep50000-bch0.pth'
 
-    split_latent: True
-    use_latents_as_coords: True
+    split_latent: False
+    use_latents_as_coords: False
 
     spectra_latent_dim: 12
     scaler_latent_dim: 0
@@ -214,7 +211,7 @@ decoder:
     siren_first_w0: 24
     siren_hidden_w0: 6
     siren_coords_scaler: 8
-    siren_last_linear: True
+    siren_last_linear: False
 
 qtz:
     quantize_latent: False
@@ -231,8 +228,8 @@ qtz:
     qtz_temperature_scale: 0.01
 
 spatial_decod:
-    decode_bias: True
-    decode_scaler: True
+    decode_bias: False
+    decode_scaler: False
 
     spatial_decod_hidden_dim: 64
     spatial_decod_num_hidden_layers: 1
@@ -269,7 +266,7 @@ trainer:
     sockeye_log_dir: '/arc/project/pr-kmyi-1/fred/data/pdr3/output'
 
     plot_loss: True
-    plot_gt_bin_loss: True
+    plot_gt_bin_loss: False
     pixel_loss_cho: l1
     pixel_loss_reduction: none
     spectra_loss_cho: l2 #emd
@@ -279,7 +276,7 @@ trainer:
 
     train_based_on_epochs: True
     step_based_sample_w_replace: False
-    step_based_sample_wo_replace: True
+    step_based_sample_wo_replace: False
 
     num_steps: 20000
     num_epochs: 10000
@@ -295,7 +292,7 @@ trainer:
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
-    gpu_data: ['coords','pixels','weights','full_wave','full_emitted_wave','wave','trans','nsmpl','spectra_source_data','spectra_masks','spectra_pixels','spectra_redshift','spectra_wave','spectra_redshift','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift','sup_spectra_wave','sup_spectra_masks','sup_spectra_data','init_redshift_prob','scaler_latents','redshift_latents','gt_redshift_bin_ids','gt_redshift_bin_masks']
+    gpu_data: ['coords','pixels','weights','full_wave','full_emitted_wave','wave','trans','nsmpl','spectra_source_data','spectra_masks','spectra_pixels','spectra_redshift','spectra_wave','spectra_redshift','redshift','spectra_latents','gt_spectra_pixels','gt_spectra_redshift','sup_spectra_wave','sup_spectra_masks','sup_spectra_data','init_redshift_prob','scaler_latents','redshift_latents','gt_redshift_bin_ids','gt_redshift_bin_masks','gt_redshift_bin_masks_b','spectra_lambdawise_losses',recon_spectra,gt_spectra,spectra_masks_b]
 
     learn_spectra_within_wave_range: True
 
@@ -315,12 +312,19 @@ trainer:
     train_spectra_pixels_only: False
 
     pixel_supervision: False
-    spectra_supervision: True
+    spectra_supervision: False
 
-    apply_gt_redshift: False                      # -
-    redshift_unsupervision: False                 #  |_these options conflict each other 
-    redshift_semi_supervision: False              #  |
-    optimize_latents_for_each_redshift_bin: True  # -
+    apply_gt_redshift: False
+    brute_force_redshift: False # brute force, each bin has its own spectra
+
+    # if brute force, we have three choices
+    regularize_binwise_spectra_latents: False     # conflicts each other
+    optimize_latents_for_each_redshift_bin: False #
+    # optimize_one_latent_for_all_redshift_bins:  # hidden, True if the other two False
+
+    calculate_spectra_loss_based_on_optimal_bin: False # only if we use single latent
+    calculate_spectra_loss_based_on_top_n_bins: False  # only if we use single latent
+    num_bins_to_calculate_spectra_loss: 5
 
     correct_gt_redshift_based_on_redshift_bin: True
 
@@ -343,9 +347,9 @@ infer:
     infer_batch_size: 500
     pretrain_infer_batch_size: 5 #10
 
-    infer_use_all_wave: True
+    infer_use_all_wave: False
     # infer_num_wave: 
-    pretrain_infer_use_all_wave: True
+    pretrain_infer_use_all_wave: False
     pretrain_infer_num_wave: 200
     pretrain_infer_wave_sample_method: 'uniform_non_random'
 
@@ -537,12 +541,18 @@ spectra_data:
     vipers_w4_source_spectra_fname: source_vipers_w4_table.tbl
 
     max_spectra_len: 8191 # hardcoded
-    num_gt_spectra_upper_bound: 500 #6500 # spectra to load
-    num_supervision_spectra_upper_bound: 100
-    val_spectra_ratio: 0.2
 
-    sup_spectra_ratio: 0.95
-    spectra_split_ratios: [0.05,0,0.95]
+    num_gt_spectra_upper_bound: -1 # spectra to load
+    num_supervision_spectra_upper_bound: -1
+    sample_from_pretrain_spectra: False
+    sanity_check_max_num_spectra: -1
+    add_validation_spectra_not_in_supervision: False
+    num_extra_validation_spectra: 20
+    generalization_max_num_spectra: 10000
+
+    val_spectra_ratio: 0.2
+    sup_spectra_ratio: 0.9
+    spectra_split_ratios: [0.1,0,0.9]
 
     # **** Below fields should be modified together ****
     spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']
@@ -556,8 +566,8 @@ spectra_data:
 
     spectra_supervision_wave_lo: 6000
     spectra_supervision_wave_hi: 8000
-    codebook_spectra_plot_wave_lo: 6000 #2000
-    codebook_spectra_plot_wave_hi: 8000 #10000
+    codebook_spectra_plot_wave_lo: 6000
+    codebook_spectra_plot_wave_hi: 8000
     load_spectra_data_from_cache: True
     # debug1: 300 spectra [9812][0,1][0-8] normed
     # debug2: 30 spectra [9812][0][0,1,2] normed
@@ -569,6 +579,10 @@ spectra_data:
     filter_redshift: False
     filter_redshift_lo: -1
     filter_redshift_hi: -1
+
+    redshift_classification_sc_data_dir: 'nan'
+    redshift_classification_genlz_data_dir: 'nan'
+    redshift_classification_data_fname_prefix: 'nan'
 
 inpaint:
     inpaint_cho: 'spectral_inpaint' #'no_inpaint'

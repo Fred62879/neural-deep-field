@@ -23,8 +23,9 @@ optimizer:
 embedder:
     encode_wave: True
     wave_encode_method: positional_encoding
-    wave_multiplier: 16
     wave_embed_dim: 16
+    linear_norm_wave: True
+    wave_multiplier: 16
 
 pretrain:
     pretrain_batch_size: 10000
