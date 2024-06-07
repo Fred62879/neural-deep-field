@@ -98,6 +98,7 @@ class SpectraTrainer(BaseTrainer):
             self.mode = "generalization"
         else: raise ValueError("Invalid mode!")
 
+        self.baseline_mode =self.mode == "redshift_pretrain"
         self.pre_classification_mode = self.mode == "sanity_check" or \
             self.mode == "generalization"
         self.classification_mode = self.mode == "redshift_classification_train"
@@ -410,8 +411,8 @@ class SpectraTrainer(BaseTrainer):
         if self.mode != "redshift_classification_train" and \
            self.mode != "redshift_pretrain":
             # latents here are used to
-            #  EITHER generate codebook coefficients (no softmax applied) in codebook qtz setting
-            #  OR concatenate with lambda to be directly decoded as spectra in autodecoder setting
+            #  EITHER generate codebook coefficients (wo softmax) in codebook qtz setting
+            #  OR concat with lambda to be directly decoded as spectra in autodecoder setting
             latents, redshift_latents = self.init_latents()
 
             if self.optimize_bins_separately:
@@ -456,11 +457,15 @@ class SpectraTrainer(BaseTrainer):
             self.init_dataloader()
 
     def init_loss(self):
-        if self.classification_mode:
+        if self.baseline_mode:
+            if self.regress_redshift:
+                self.redshift_loss = nn.MSELoss(reduction="mean")
+            elif self.classify_redshift:
+                self.redshift_loss = nn.CrossEntropyLoss()
+            else: raise ValueError()
+        elif self.classification_mode:
             # self.bce_loss = nn.BCEWithLogitsLoss(weight=self.num_redshift_bins)
             self.bce_loss = nn.BCEWithLogitsLoss(reduction="none")
-        elif self.regress_redshift:
-            self.redshift_loss = nn.MSELoss(reduction="mean")
         else:
             if self.plot_individ_spectra_loss:
                 # if we need loss for each spectra in a batch
@@ -578,8 +583,9 @@ class SpectraTrainer(BaseTrainer):
             fields.extend(["wave","wave_range","gt_redshift_bin_masks_b","gt_spectra",
                            "recon_spectra","spectra_masks_b","spectra_lambdawise_losses"])
         elif self.mode == "redshift_pretrain":
-            fields.extend(["wave_range","spectra_masks",
-                           "spectra_redshift","spectra_source_data"])
+            fields.extend([
+                "wave_range","spectra_masks","spectra_redshift","spectra_source_data"])
+            if self.classify_redshift: fields.append("gt_redshift_bin_masks")
         else:
             fields.extend(["wave_data","spectra_masks",
                            "spectra_redshift","spectra_source_data"])
@@ -609,13 +615,15 @@ class SpectraTrainer(BaseTrainer):
             self.dataset.set_num_wave_samples(self.extra_args["pretrain_num_wave_samples"])
             self.dataset.set_wave_sample_method(self.extra_args["pretrain_wave_sample_method"])
 
-        self.dataset.set_length(self.num_spectra)
+        # if self.classification_mode:
+        #     length = self.num_spectra * self.num_redshift_bins
+        # else: length = self.num_spectra
+        length = self.num_spectra
+        self.dataset.set_length(length)
         if self.extra_args["infer_selected"]:
             self.selected_ids = select_inferrence_ids(
-                self.num_spectra,
-                self.extra_args["pretrain_num_infer_upper_bound"])
-        else:
-            self.selected_ids = np.arange(self.num_spectra)
+                length, self.extra_args["pretrain_num_infer_upper_bound"])
+        else: self.selected_ids = np.arange(length)
 
         if self.classify_redshift:
             self.dataset.set_num_redshift_bins(self.num_redshift_bins)
@@ -1527,14 +1535,14 @@ class SpectraTrainer(BaseTrainer):
                 self.gt_bin_ids, self.gt_redshift, self.extra_args["redshift_lo"],
                 self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
                 self.extra_args["num_spectrum_per_row"], f"{fname}_precision_recall.png",
-                self.extra_args["num_redshfit_est_stats_residual_levels"],
+                self.extra_args["num_redshift_est_stats_residual_levels"],
                 cho=self.extra_args["redshift_est_stats_cho"])
         else:
             plot_redshift_estimation_stats_together(
                 self.gt_bin_ids, self.gt_redshift, self.extra_args["redshift_lo"],
                 self.extra_args["redshift_hi"], self.extra_args["redshift_bin_width"],
                 f"{fname}_precision_recall",
-                self.extra_args["num_redshfit_est_stats_residual_levels"],
+                self.extra_args["num_redshift_est_stats_residual_levels"],
                 cho=self.extra_args["redshift_est_stats_cho"])
 
         log.info("redshift logits plotting done")
@@ -1575,7 +1583,7 @@ class SpectraTrainer(BaseTrainer):
         self.timer.check("added to gpu")
 
         spectra_loss_func, spectra_l2_loss_func = None, None
-        if not self.classification_mode and not self.regress_redshift:
+        if not self.baseline_mode and not self.classification_mode:
             spectra_loss_func = self.spectra_loss_func
             if self.plot_l2_loss:
                 spectra_l2_loss_func = self.spectra_l2_loss_func
@@ -1597,10 +1605,12 @@ class SpectraTrainer(BaseTrainer):
             split_latent=self.split_latent,
             plot_l2_loss=self.plot_l2_loss,
             regress_redshift=self.regress_redshift,
+            classify_redshift=self.classify_redshift,
             apply_gt_redshift=self.apply_gt_redshift,
             perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
-            classification_mode=self.classification_mode,
+            spectra_baseline_mode=self.baseline_mode,
+            spectra_classification_mode=self.classification_mode,
             optimize_bins_separately=self.optimize_bins_separately,
             regularize_codebook_spectra=self.regularize_codebook_spectra,
             calculate_binwise_spectra_loss= self.calculate_binwise_spectra_loss,
@@ -1713,9 +1723,20 @@ class SpectraTrainer(BaseTrainer):
     def _calculate_spectra_loss(self, ret, data):
         spectra_wrong_bin_regu, spectra_l2_loss = 0, None
 
-        if self.classification_mode:
-            # print(ret["redshift_logits"].shape)
-            # print(data["spectra_masks_b"].shape, data["gt_redshift_bin_masks_b"].shape)
+        if self.baseline_mode:
+            # print(ret["redshift"].shape, data["spectra_redshift"].shape)
+            # print(ret["redshift"], data["spectra_redshift"])
+            if self.regress_redshift:
+                spectra_loss = self.redshift_loss(ret["redshift"], data["spectra_redshift"])
+            elif self.classify_redshift:
+                #print(ret["redshift_logits"].shape)
+                #print(torch.sum(ret["redshift_logits"], dim=-1))
+                #print(data["gt_redshift_bin_masks"].shape)
+                spectra_loss = self.redshift_loss(
+                    ret["redshift_logits"], data["gt_redshift_bin_masks"].to(torch.float32))
+            else: raise ValueError()
+
+        elif self.classification_mode:
             est = ret["redshift_logits"]
             gt = data["gt_redshift_bin_masks_b"].flatten().to(torch.float32) # bool to float
 
@@ -1723,11 +1744,6 @@ class SpectraTrainer(BaseTrainer):
             weight = torch.ones_like(spectra_loss)
             weight[gt==1.] = self.num_redshift_bins
             spectra_loss = (spectra_loss * weight).mean()
-
-        elif self.regress_redshift:
-            # print(ret["redshift"].shape, data["spectra_redshift"].shape)
-            # print(ret["redshift"], data["spectra_redshift"])
-            spectra_loss = self.redshift_loss(ret["redshift"], data["spectra_redshift"])
 
         elif self.brute_force:
             if self.neg_sup_wrong_redshift:

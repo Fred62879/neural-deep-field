@@ -37,7 +37,7 @@ pretrain:
 
     pretrain_use_all_wave: False
     pretrain_num_wave_samples: 100
-    pretrain_wave_sample_method: 'uniform_dense'
+    pretrain_wave_sample_method: rand_dense
     
     model_redshift: True
     brute_force_redshift: True

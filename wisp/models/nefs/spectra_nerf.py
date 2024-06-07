@@ -166,7 +166,7 @@ class SpectraNerf(BaseNeuralField):
             ret = ret[idx]
         return ret
 
-    def pretrain(self, wave, wave_range,
+    def pretrain(self, wave_range,
                  coords=None,
                  trans=None, trans_mask=None, nsmpl=None,
                  full_emitted_wave=None,
@@ -250,6 +250,7 @@ class SpectraNerf(BaseNeuralField):
         )
         timer.check("spatial decoding done")
 
+        wave = spectra_source_data[:,0][...,None] # [bsz,nsmpl,1]
         self.hps_decoder(
             latents, wave, trans, nsmpl, wave_range,
             trans_mask=trans_mask,

@@ -447,7 +447,7 @@ class AstroDataset(Dataset):
                     sup_bounds=out["spectra_sup_bounds"],
                     keep_sample_ids=True)
 
-                wave = out["spectra_source_data"][:,0]
+                # wave = out["spectra_source_data"][:,0]
 
                 out["spectra_masks"] = batch_sample_torch(
                     out["spectra_masks"], self.num_wave_samples,
@@ -464,7 +464,7 @@ class AstroDataset(Dataset):
                 nsmpl[nsmpl == 0] = 1
                 out["nsmpl"] = nsmpl
 
-            out["wave"] = out["spectra_source_data"][:,0][...,None] # [bsz,nsmpl,1]
+            # out["wave"] = out["spectra_source_data"][:,0][...,None] # [bsz,nsmpl,1]
 
             if self.mode == "spectra_pretrain" and (
                     self.kwargs["regularize_within_codebook_spectra"] or \

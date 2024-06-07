@@ -107,8 +107,13 @@ def get_bool_regress_redshift(**kwargs):
 def get_bool_classify_redshift(**kwargs):
     return kwargs["space_dim"] == 3 and \
         kwargs["model_redshift"] and \
-        not kwargs["apply_gt_redshift"] and \
         kwargs["redshift_model_method"] == "classification"
+
+def get_bool_redshift_pretrain_mode(**kwargs):
+    tasks = set(kwargs["tasks"])
+    return "redshift_pretrain" in tasks or \
+        "redshift_pretrain_infer" in tasks or \
+        "redshift_test_infer" in tasks
 
 def get_bool_classify_redshift_based_on_l2(**kwargs):
     return get_bool_classify_redshift(**kwargs) and \
@@ -550,10 +555,12 @@ def forward(
         split_latent=False,
         plot_l2_loss=False,
         regress_redshift=False,
+        classify_redshift=False,
         apply_gt_redshift=False,
         spectra_supervision=False,
         perform_integration=False,
-        classification_mode=False,
+        spectra_classification_mode=False,
+        spectra_baseline_mode=False,
         trans_sample_method="none",
         optimize_bins_separately=False,
         redshift_supervision_train=False,
@@ -695,16 +702,19 @@ def forward(
         if save_lambdawise_weights:
             requested_channels.append("lambdawise_weights")
 
-        if classification_mode:
+        if spectra_baseline_mode:
+            if regress_redshift:
+                requested_channels.append("redshift")
+            elif classify_redshift:
+                requested_channels.append("redshift_logits")
+            net_args["spectra_masks"] = data["spectra_masks"]
+            net_args["spectra_source_data"] = data["spectra_source_data"]
+
+        if spectra_classification_mode:
             net_args["gt_spectra"] = data["gt_spectra"]
             net_args["recon_spectra"] = data["recon_spectra"]
             net_args["spectra_masks"] = data["spectra_masks_b"]
             net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses"]
-
-        if regress_redshift:
-            requested_channels.append("redshift")
-            net_args["spectra_masks"] = data["spectra_masks"]
-            net_args["spectra_source_data"] = data["spectra_source_data"]
     else:
         raise ValueError("Unsupported space dimension.")
 

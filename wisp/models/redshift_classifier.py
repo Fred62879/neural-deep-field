@@ -70,7 +70,7 @@ class RedshiftClassifier(nn.Module):
         """
         ret = {}
         if self.kwargs["classify_based_on_loss"]:
-            # print(spectra_masks.shape, spectra_lambdawise_losses.shape, wave.shape)
+            # print('*', spectra_masks.shape, spectra_lambdawise_losses.shape, wave.shape)
             # print(wave[0])
             # pe_wave = self.encoder(wave)
             # pe_losses = self.encoder(spetra_lambdawise_losses)
@@ -95,7 +95,7 @@ class RedshiftClassifier(nn.Module):
                                recon_spectra * spectra_masks[:,None]), dim=-1)
         else: raise ValueError()
 
-        logits = self.decoder(input).flatten()
+        logits = self.decoder(input).flatten() # [bsz,nbins,1] -> [n,]
         assert not torch.isnan(logits).any()
         ret["redshift_logits"] = logits
         return ret

@@ -2,15 +2,15 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: 'dz-spectra-ssim'
-    log_fname: 'regress_train'
+    exp_name: dz-spectra-ssim
+    log_fname: baseline
 
-    tasks: ['train','redshift_pretrain']
-    tasks: ['infer','redshift_pretrain_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
+    tasks: [train, redshift_pretrain]
+    tasks: [infer, redshift_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
     #tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
 
 optimizer:
-    optimizer_type: 'adam'
+    optimizer_type: adam
 
     b1: 0.5
     b2: 0.999
@@ -23,12 +23,10 @@ optimizer:
 
 pretrain:
     pretrain_batch_size: 10000
-
     pretrain_use_all_wave: True
-    pretrain_num_wave_samples: -1
 
     model_redshift: True
-    redshift_model_method: regression
+    redshift_model_method: classification #regression
 
 decoder:
     regressor_decoder_input_dim: 280
@@ -37,15 +35,15 @@ decoder:
     regressor_decoder_hidden_dim: 512
 
 trainer:
-    num_epochs: 40000
+    num_epochs: 10000
     batch_size: 5500
-    log_cli_every: 4000
+    log_cli_every: 1000
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 4000
+    save_model_every: 1000
 
-    resume_train: True
-    resume_log_dir: 20240605-124627_regress_train_1k_spectra_10k_epochs
+    resume_train: False
+    resume_log_dir: ''
     resume_model_fname: 'model-ep10000-bch0.pth'
 
 infer:

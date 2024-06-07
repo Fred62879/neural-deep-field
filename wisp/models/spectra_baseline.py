@@ -4,34 +4,27 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from wisp.utils import PerfTimer
+from wisp.utils.common import init_redshift_bins
 
 from wisp.models.decoders import BasicDecoder
 from wisp.models.embedders.encoder import Encoder
 
-class RedshiftRegressor(nn.Module):
+class SpectraBaseline(nn.Module):
     def __init__(self, **kwargs):
-        super(RedshiftRegressor, self).__init__()
+        super(SpectraBaseline, self).__init__()
         assert kwargs["model_redshift"], "we must model redshift during pretrain"
         self.kwargs = kwargs
+        self.redshift_model_method = kwargs["redshift_model_method"]
 
         self.init_model()
 
     def init_model(self):
-        # embedder_args = (
-        #     1, self.kwargs["wave_embed_dim"],
-        #     self.kwargs["wave_embed_omega"],
-        #     self.kwargs["wave_embed_sigma"],
-        #     self.kwargs["wave_embed_bias"],
-        #     self.kwargs["wave_embed_seed"])
-        # self.encoder = Encoder(
-        #     input_dim=1,
-        #     encode_method=self.kwargs["wave_encode_method"],
-        #     embedder_args=embedder_args,
-        #     **self.kwargs)
-
-        # input_dim = 2 * self.kwargs["wave_embed_dim"]
         input_dim = self.kwargs["regressor_decoder_input_dim"]
-        output_dim = 1
+        if self.redshift_model_method == "regression":
+            output_dim = 1
+        elif self.redshift_model_method == "classification":
+            output_dim = len(init_redshift_bins(**self.kwargs))
+        else: raise ValueError()
 
         self.decoder = BasicDecoder(
             input_dim, output_dim, True,
@@ -62,6 +55,11 @@ class RedshiftRegressor(nn.Module):
         # print(torch.sum(spectra_masks, dim=-1))
         # print(wave.shape, spectra.shape, spectra_masks.shape)
         # todo: incorporate spectra mask into forward?
-        redshift = self.decoder(spectra * spectra_masks).flatten()
-        ret["redshift"] = redshift
+        # print(spectra.shape, spectra_masks.shape)
+        output = self.decoder(spectra * spectra_masks)
+        if self.redshift_model_method == "regression":
+            ret["redshift"] = output.flatten()
+        elif self.redshift_model_method == "classification":
+            ret["redshift_logits"] = F.softmax(output, dim=-1)
+        else: raise ValueError()
         return ret

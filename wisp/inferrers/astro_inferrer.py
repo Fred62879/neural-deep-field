@@ -161,7 +161,7 @@ class AstroInferrer(BaseInferrer):
         if self.clsfy_sc_infer or self.clsfy_genlz_infer:
             self.spectra_infer_pipeline = self.pipelines["redshift_classifier"]
         elif self.redshift_pretrain_infer or self.redshift_test_infer:
-            self.spectra_infer_pipeline = self.pipelines["redshift_regressor"]
+            self.spectra_infer_pipeline = self.pipelines["spectra_baseline"]
         else:
             if self.recon_spectra or self.recon_spectra_all_bins or self.recon_redshift or \
                self.plot_global_lambdawise_spectra_loss or self.save_redshift_classification_data:
@@ -619,6 +619,8 @@ class AstroInferrer(BaseInferrer):
         if self.redshift_infer:
             self.requested_fields.extend([
                 "wave_range","spectra_masks","spectra_redshift","spectra_source_data"])
+            if self.classify_redshift:
+                self.requested_fields.append("gt_redshift_bin_masks")
 
             if self.infer_selected:
                 self.dataset_length = min(self.num_selected, self.num_spectra)
@@ -1595,7 +1597,7 @@ class AstroInferrer(BaseInferrer):
 
             if self.classify_redshift:
                 suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
-                redshift_logits = ret["redshift_logits{suffix}"]
+                redshift_logits = ret[f"redshift_logits{suffix}"]
                 ids = torch.argmax(redshift_logits, dim=-1)
                 argmax_redshift = ret["redshift"][ids]
                 weighted_redshift = torch.sum(ret["redshift"] * redshift_logits, dim=-1)
@@ -1676,7 +1678,8 @@ class AstroInferrer(BaseInferrer):
                 split_latent=self.split_latent,
                 regress_redshift=self.regress_redshift,
                 apply_gt_redshift=self.apply_gt_redshift,
-                classification_mode=self.clsfy_sc_infer or self.clsfy_genlz_infer,
+                spectra_baseline_mode=self.redshift_infer,
+                spectra_classification_mode=self.clsfy_sc_infer or self.clsfy_genlz_infer,
                 classify_redshift_based_on_l2= \
                     self.classify_redshift_based_on_l2,
                 calculate_binwise_spectra_loss= \
@@ -1816,7 +1819,15 @@ class AstroInferrer(BaseInferrer):
     def collect_redshift_data(self, data, ret):
         if self.save_redshift_during_redshift_infer:
             self.gt_redshift.extend(data["spectra_redshift"])
-            self.est_redshift.extend(ret["redshift"])
+            if self.regress_redshift:
+                self.est_redshift.extend(ret["redshift"])
+            elif self.classify_redshift:
+                suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
+                redshift_logits = ret[f"redshift_logits{suffix}"]
+                ids = torch.argmax(redshift_logits, dim=-1)
+                argmax_redshift = self.redshift_bins[ids]
+                self.est_redshift.extend(argmax_redshift)
+            else: raise ValueError()
         elif self.save_redshift_during_spectra_infer:
             self.gt_redshift.extend(data["spectra_redshift"])
             if self.clsfy_sc_infer or self.clsfy_genlz_infer:
@@ -1842,7 +1853,7 @@ class AstroInferrer(BaseInferrer):
             self.gt_redshift.extend(data["spectra_semi_sup_redshift"])
             if self.classify_redshift:
                 suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
-                logits = ret["redshift_logits{suffix}"]
+                logits = ret[f"redshift_logits{suffix}"]
                 ids = torch.argmax(logits, dim=-1)
                 argmax_redshift = ret["redshift"][ids]
                 weighted_redshift = torch.sum(ret["redshift"] * logits, dim=-1)

@@ -71,7 +71,7 @@ def get_train_pipeline_from_config(device, tasks, args):
             pipeline = AstroPipeline(globals()[args.nef_type](integrate=False,**vars(args)))
         else: raise ValueError()
     elif "redshift_pretrain" in tasks:
-        pipeline = AstroPipeline(RedshiftRegressor(**vars(args)))
+        pipeline = AstroPipeline(SpectraBaseline(**vars(args)))
     elif has_common(tasks, ["spectra_pretrain","sanity_check","generalization"]):
         pipeline = AstroPipeline(SpectraNerf(**vars(args)))
     elif has_common(tasks, ["redshift_classification_train"]):
@@ -96,7 +96,7 @@ def get_infer_pipelines_from_config(device, tasks, args):
                 AstroHyperSpectralNerf(integrate=False, **vars(args)))
 
     elif "redshift_pretrain_infer" in tasks or "redshift_test_infer" in tasks:
-        pipelines["redshift_regressor"] = AstroPipeline(RedshiftRegressor(**vars(args)))
+        pipelines["spectra_baseline"] = AstroPipeline(SpectraBaseline(**vars(args)))
 
     elif has_common(
         tasks, ["spectra_pretrain_infer","sanity_check_infer","generalization_infer"]

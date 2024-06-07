@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: vdz-spectra-ssim-debug
+    exp_name: dz-spectra-ssim-debug
     log_fname: pretrain
 
     tasks: [train, spectra_pretrain] #, recon_spectra]
@@ -23,9 +23,9 @@ optimizer:
 embedder:
     encode_wave: True
     wave_encode_method: positional_encoding
-    wave_embed_dim: 16
+    wave_embed_dim: 64
     linear_norm_wave: True
-    wave_multiplier: 16
+    wave_multiplier: 64
 
 pretrain:
     pretrain_batch_size: 10000
@@ -48,14 +48,14 @@ pretrain:
 decoder:
     decoder_activation_type: relu
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 5
+    decoder_num_hidden_layers: 3
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
     decoder_gaussian_sigma: .1
 
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_all_layers: False
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
@@ -118,7 +118,7 @@ spectra_data:
 
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deimos,zcosmos,vipers_w1,vipers_w4]
+    spectra_data_sources: [deimos,zcosmos] #,vipers_w1,vipers_w4]
     random_permute_source_spectra: True
 
     spectra_supervision_wave_lo: 6000
@@ -130,8 +130,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 200000 #25400
-    num_supervision_spectra_upper_bound: 100 #200000 #25400
+    num_gt_spectra_upper_bound: 25400
+    num_supervision_spectra_upper_bound: 100 #25400
 
     filter_redshift: False
     filter_redshift_lo: 0.02
