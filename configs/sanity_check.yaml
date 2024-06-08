@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: dz-spectra-ssim
+    exp_name: vdz-spectra-ssim
     log_fname: sc
 
-    tasks: [train,sanity_check] #,recon_spectra]
-    tasks: [infer, sanity_check_infer, recon_spectra, save_redshift] #save_redshift_classification_data] #recon_spectra, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca
+    tasks: [train, sanity_check] #,recon_spectra]
+    tasks: [infer, sanity_check_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca #save_redshift_classification_data
 
 optimizer:
     optimizer_type: 'adam'
@@ -23,9 +23,9 @@ optimizer:
 embedder:
     encode_wave: True
     wave_encode_method: positional_encoding
-    wave_embed_dim: 16
+    wave_embed_dim: 64
     linear_norm_wave: True
-    wave_multiplier: 16
+    wave_multiplier: 64
 
 pretrain:
     pretrain_batch_size: 25
@@ -106,14 +106,15 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240605-044957_sc_1k_spectra_cyclecloud
+    # infer_log_dir: 
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: True
+    infer_outlier_only: False
 
     classify_redshift_based_on_l2: False
+    classify_redshift_based_on_combined_ssim_l2: True
     infer_use_global_loss_as_lambdawise_weights: False
 
     pretrain_infer_batch_size: 20
@@ -144,18 +145,18 @@ infer:
 dataset:
     calculate_wave_range_based_on_trans: False
     calculate_wave_range_based_on_spectra: True
-    wave_range_fname: wave_range_spectra_5k_to_9k.npy
+    wave_range_fname: wave_range_spectra_6k_to_8k.npy
 
 spectra_data:
     require_only_basic_spectra: True
 
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deimos,zcosmos] #vipers_w1,vipers_w4]
+    spectra_data_sources: [deimos,zcosmos,vipers_w1,vipers_w4]
     random_permute_source_spectra: True
 
-    spectra_supervision_wave_lo: 5000
-    spectra_supervision_wave_hi: 9000
+    spectra_supervision_wave_lo: 6000
+    spectra_supervision_wave_hi: 8000
 
     min_num_valid_samples: 100
     spectra_upsample_scale: 10
@@ -165,8 +166,8 @@ spectra_data:
 
     sample_from_pretrain_spectra: True
     sanity_check_max_num_spectra: 1000
-    num_gt_spectra_upper_bound: 25400 #200000
-    num_supervision_spectra_upper_bound: 25400 #200000
+    num_gt_spectra_upper_bound: 200000
+    num_supervision_spectra_upper_bound: 200000
 
     filter_redshift: False
     filter_redshift_lo: 0.02

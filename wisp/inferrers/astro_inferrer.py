@@ -1841,19 +1841,18 @@ class AstroInferrer(BaseInferrer):
                 self.est_redshift.extend(argmax_redshift)
             elif self.classify_redshift:
                 if self.classify_redshift_based_on_combined_ssim_l2:
-                    ids = torch.argsort(ret["redshift_logits"], dim=-1)[:,-2:]
-                    #print(ids.shape)
-                    ids = create_batch_ids(ids)
-                    print(ids.shape, ids)
-                    print(ret["redshift_logits_l2"].shape)
-                    logits = ret["redshift_logits_l2"][ids[0], ids[1]]
-                    print(logits.shape, logits)
-                    assert 0
+                    selected_bin_ids = torch.argsort(ret["redshift_logits"], dim=-1)[:,-2:]
+                    b_selected_bin_ids = create_batch_ids(selected_bin_ids) # [2,bsz,2]
+                    logits = ret["redshift_logits_l2"][
+                        b_selected_bin_ids[0], b_selected_bin_ids[1]]
+                    l2_ids = torch.argmax(logits, dim=-1)
+                    b_l2_ids = create_batch_ids(l2_ids)
+                    ids = selected_bin_ids[b_l2_ids[0], b_l2_ids[1]] # [bsz]
                 else:
                     suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
                     logits = ret[f"redshift_logits{suffix}"]
+                    ids = torch.argmax(logits, dim=-1)
 
-                ids = torch.argmax(logits, dim=-1)
                 argmax_redshift = ret["redshift"][ids]
                 # weighted_redshift = torch.sum(ret["redshift"] * logits, dim=-1)
                 self.est_redshift.extend(argmax_redshift)
