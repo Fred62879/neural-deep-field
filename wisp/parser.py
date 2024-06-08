@@ -961,7 +961,9 @@ def define_cmd_line_args():
 
     infer_group.add_argument("--classify-redshift-based-on-l2", action="store_true",
                              help="when classify bins, use l2 loss")
-
+    infer_group.add_argument("--classify-redshift-based-on-combined-ssim-l2",
+                             action="store_true", help="when classify bins, use ssim first\
+                             and then l2 loss")
     infer_group.add_argument("--infer-use-global-loss-as-lambdawise-weights",
                              action="store_true")
 

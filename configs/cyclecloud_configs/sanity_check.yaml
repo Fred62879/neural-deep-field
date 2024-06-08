@@ -113,7 +113,8 @@ infer:
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
     infer_outlier_only: True
 
-    classify_redshift_based_on_l2: True
+    classify_redshift_based_on_l2: False
+    classify_redshift_based_on_combined_ssim_l2: True
     infer_use_global_loss_as_lambdawise_weights: False
 
     pretrain_infer_batch_size: 20

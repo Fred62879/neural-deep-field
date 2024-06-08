@@ -119,6 +119,11 @@ def get_bool_classify_redshift_based_on_l2(**kwargs):
     return get_bool_classify_redshift(**kwargs) and \
         kwargs["classify_redshift_based_on_l2"] and kwargs["spectra_loss_cho"] != "l2"
 
+def get_bool_classify_redshift_based_on_combined_ssim_l2(**kwargs):
+    return get_bool_classify_redshift(**kwargs) and \
+        kwargs["classify_redshift_based_on_combined_ssim_l2"] and \
+        kwargs["spectra_loss_cho"] == "ssim1d"
+
 def get_bool_limit_redshift_range(**kwargs):
     return ("sanity_check" in kwargs["tasks"] or \
             "generalization" in kwargs["tasks"]

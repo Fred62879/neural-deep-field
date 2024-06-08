@@ -104,6 +104,8 @@ class AstroInferrer(BaseInferrer):
             suffix = ""
             if self.classify_redshift_based_on_l2:
                 suffix += "l2_based_"
+            if self.classify_redshift_based_on_combined_ssim_l2:
+                suffix += "ssim_l2_based_"
             if self.extra_args["infer_use_global_loss_as_lambdawise_weights"] and \
                not self.extra_args["use_global_spectra_loss_as_lambdawise_weights"]:
                 suffix += "weighted"
@@ -285,6 +287,8 @@ class AstroInferrer(BaseInferrer):
 
         self.classify_redshift_based_on_l2 = \
             get_bool_classify_redshift_based_on_l2(**self.extra_args)
+        self.classify_redshift_based_on_combined_ssim_l2 = \
+            get_bool_classify_redshift_based_on_combined_ssim_l2(**self.extra_args)
 
         # weighted spectra training
         self.regress_lambdawise_weights = \
@@ -1659,7 +1663,8 @@ class AstroInferrer(BaseInferrer):
                 self.spectra_infer_pipeline.set_batch_reduction_order("qtz_first")
             loss_func = self._get_spectra_loss_func(
                 self.extra_args["spectra_loss_cho"])
-            if self.classify_redshift_based_on_l2:
+            if self.classify_redshift_based_on_l2 or \
+               self.classify_redshift_based_on_combined_ssim_l2:
                 l2_loss_func = self._get_spectra_loss_func("l2")
 
         with torch.no_grad():
@@ -1679,7 +1684,8 @@ class AstroInferrer(BaseInferrer):
                 spectra_baseline_mode=self.redshift_infer,
                 spectra_classification_mode=self.clsfy_sc_infer or self.clsfy_genlz_infer,
                 classify_redshift_based_on_l2= \
-                    self.classify_redshift_based_on_l2,
+                    self.classify_redshift_based_on_l2 or \
+                    self.classify_redshift_based_on_combined_ssim_l2,
                 calculate_binwise_spectra_loss= \
                     self.calculate_binwise_spectra_loss,
                 calculate_lambdawise_spectra_loss= \
@@ -1834,15 +1840,27 @@ class AstroInferrer(BaseInferrer):
                 argmax_redshift = self.redshift_bins[ids]
                 self.est_redshift.extend(argmax_redshift)
             elif self.classify_redshift:
-                suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
-                logits = ret[f"redshift_logits{suffix}"]
+                if self.classify_redshift_based_on_combined_ssim_l2:
+                    ids = torch.argsort(ret["redshift_logits"], dim=-1)[:,-2:]
+                    #print(ids.shape)
+                    ids = create_batch_ids(ids)
+                    print(ids.shape, ids)
+                    print(ret["redshift_logits_l2"].shape)
+                    logits = ret["redshift_logits_l2"][ids[0], ids[1]]
+                    print(logits.shape, logits)
+                    assert 0
+                else:
+                    suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
+                    logits = ret[f"redshift_logits{suffix}"]
+
                 ids = torch.argmax(logits, dim=-1)
                 argmax_redshift = ret["redshift"][ids]
-                weighted_redshift = torch.sum(ret["redshift"] * logits, dim=-1)
+                # weighted_redshift = torch.sum(ret["redshift"] * logits, dim=-1)
                 self.est_redshift.extend(argmax_redshift)
-                self.weighted_redshift.extend(weighted_redshift)
+                # self.weighted_redshift.extend(weighted_redshift)
                 if self.plot_est_redshift_logits:
                     self.redshift_logits.extend(logits)
+
             elif self.regress_redshift:
                 raise NotImplementedError()
             else:
