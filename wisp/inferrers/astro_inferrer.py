@@ -1786,7 +1786,7 @@ class AstroInferrer(BaseInferrer):
             self.optimal_wrong_bin_ids.extend(ids)
 
         if self.save_redshift_classification_data:
-            self.spectra_wave_s.extend(data["wave"][...,0]) # [bsz,nsmpls]
+            self.spectra_wave_s.extend(data["spectra_source_data"][:,0]) # [bsz,nsmpls]
             self.spectra_masks_s.extend(data["spectra_masks"]) # [bsz,nsmpls]
             # self.gt_bin_ids_s.extend(data["gt_redshift_bin_ids"].T) # [bsz,2]
             self.gt_bin_masks_s.extend(data["gt_redshift_bin_masks"]) # [bsz,nbins]
@@ -1828,7 +1828,7 @@ class AstroInferrer(BaseInferrer):
             elif self.classify_redshift:
                 suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
                 redshift_logits = ret[f"redshift_logits{suffix}"]
-                ids = torch.argmax(redshift_logits, dim=-1)
+                ids = torch.argmax(redshift_logits, dim=-1).detach().cpu().numpy()
                 argmax_redshift = self.redshift_bins[ids]
                 self.est_redshift.extend(argmax_redshift)
             else: raise ValueError()

@@ -550,9 +550,9 @@ spectra_data:
     num_extra_validation_spectra: 20
     generalization_max_num_spectra: 10000
 
-    val_spectra_ratio: 0.2
+    val_spectra_ratio: 0.2 # only used in patch-wise spectra split
     sup_spectra_ratio: 0.9
-    spectra_split_ratios: [0.1,0,0.9]
+    spectra_split_ratios: [0.1,0,0.9] # used in all-together spectra split (ABANDONED now)
 
     # **** Below fields should be modified together ****
     spectra_tracts: ['9569','9570','9571','9572','9812','9813','9814','10054','10055','10056']

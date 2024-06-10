@@ -6,7 +6,7 @@ global:
     log_fname: pretrain_100k_spectra_5k_epochs
 
     tasks: [train, spectra_pretrain]
-    # tasks: [infer, spectra_pretrain_infer, recon_spectra] #plot_spectra_latents_pca] #plot_global_lambdawise_spectra_loss]
+    tasks: [infer, spectra_pretrain_infer, recon_spectra] #plot_spectra_latents_pca] #plot_global_lambdawise_spectra_loss]
 
 optimizer:
     optimizer_type: adam
@@ -81,7 +81,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    #infer_log_dir: nan
+    infer_log_dir: 20240610-042304_pretrain_100k_spectra_5k_epochs
     infer_selected: True
     pretrain_num_infer_upper_bound: 700
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'

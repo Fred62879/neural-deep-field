@@ -54,7 +54,7 @@ pretrain:
     pretrained_model_name: model-ep5000-bch0.pth
 
     regularize_spectra_latents: True
-    spectra_latents_regu_beta: 32
+    spectra_latents_regu_beta: 16
 
     use_global_spectra_loss_as_lambdawise_weights: False
     limit_redshift_to_pretrain_range: False
