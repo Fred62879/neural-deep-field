@@ -43,7 +43,7 @@ pretrain:
     apply_gt_redshift: True
 
     regularize_spectra_latents: True
-    spectra_latents_regu_beta: 16
+    spectra_latents_regu_beta: 4
 
 decoder:
     decoder_activation_type: relu

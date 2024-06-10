@@ -2,7 +2,7 @@
 #SBATCH --time=16:00:00
 #SBATCH --nodes=1
 #SBATCH --gres=gpu
-#SBATCH --job-name=vdz-spectra-ssim-pretrain-5-layers
+#SBATCH --job-name=vdz-spectra-ssim-pretrain-5-layers-regu-4
 #SBATCH --output=./outputs/%x-%j.out
 #SBATCH --mem=40960
 

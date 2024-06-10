@@ -6,8 +6,8 @@ global:
     log_fname: clsfy
 
     tasks: [train, redshift_classification_train]
-    tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
-    tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    #tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    #tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
 
 optimizer:
     optimizer_type: adam
@@ -54,7 +54,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240607-195757_clsfy_100_spectra_2k_epochs
+    #infer_log_dir: 20240607-195757_clsfy_100_spectra_2k_epochs
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -86,8 +86,8 @@ dataset:
 spectra_data:
     require_only_basic_spectra: True
 
-    redshift_classification_sc_data_dir: 20240607-194102_sc_100_spectra_200_epochs_regu_beta_32_033031
-    redshift_classification_genlz_data_dir: 20240607-201819_genlz_100_spectra_200_epochs_regu_beta_32_033031
+    redshift_classification_sc_data_dir: 20240609-173954_sc_10k_spectra
+    redshift_classification_genlz_data_dir: ''
     redshift_classification_data_fname_prefix: model-0
 
     spectra_cho: v1
@@ -105,7 +105,7 @@ spectra_data:
     spectra_smooth_sigma: 15
 
     sample_from_pretrain_spectra: True
-    sanity_check_max_num_spectra: 100
+    sanity_check_max_num_spectra: 10000
     generalization_max_num_spectra: 100
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000

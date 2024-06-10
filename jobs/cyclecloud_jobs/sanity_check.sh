@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --time=1:00:00
+#SBATCH --time=12:00:00
 #SBATCH --nodes=1
 #SBATCH --gres=gpu
-#SBATCH --job-name=dz-spectra-sanity-check
+#SBATCH --job-name=vdz-spectra-sanity-check-10k-spectra
 #SBATCH --output=./outputs/%x-%j.out
-#SBATCH --mem=20480
+#SBATCH --mem=40960
 
 source /shared/home/ztxie/envs/wisp/bin/activate
 cd ../../
 
-python app/main_astro.py --config configs/cyclecloud_configs/sanity_check.yaml
+python app/main_astro.py --config configs/cyclecloud_configs/sanity_check_10k_spectra.yaml

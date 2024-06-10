@@ -4,6 +4,7 @@ import os
 import sys
 import torch
 import random
+import psutil
 import logging
 import nvidia_smi
 import numpy as np
@@ -102,11 +103,13 @@ def get_bool_encode_coords(**kwargs):
 def get_bool_regress_redshift(**kwargs):
     return kwargs["space_dim"] == 3 and \
         kwargs["model_redshift"] and \
+        not kwargs["apply_gt_redshift"] and \
         kwargs["redshift_model_method"] == "regression"
 
 def get_bool_classify_redshift(**kwargs):
     return kwargs["space_dim"] == 3 and \
         kwargs["model_redshift"] and \
+        not kwargs["apply_gt_redshift"] and \
         kwargs["redshift_model_method"] == "classification"
 
 def get_bool_redshift_pretrain_mode(**kwargs):
@@ -475,6 +478,18 @@ def get_gpu_info():
 
 def query_mem(a):
     return a.element_size() * a.nelement()
+
+def show_cpu_memory():
+    # gives a single float value
+    print(psutil.cpu_percent())
+    # gives an object with many fields
+    print(psutil.virtual_memory())
+    # you can convert that object to a dictionary
+    print(dict(psutil.virtual_memory()._asdict()))
+    # you can have the percentage of used RAM
+    print(psutil.virtual_memory().percent)
+    # you can calculate percentage of available memory
+    print(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)
 
 def query_GPU_mem():
     nvidia_smi.nvmlInit()

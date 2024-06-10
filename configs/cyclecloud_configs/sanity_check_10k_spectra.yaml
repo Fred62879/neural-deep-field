@@ -3,10 +3,10 @@ parent: base_cc.yaml
 global:
     use_tqdm: True
     exp_name: vdz-spectra-ssim
-    log_fname: sc
+    log_fname: sc_10k_spectra
 
     tasks: [train, sanity_check]
-    # tasks: [infer, sanity_check_infer, plot_spectra_latents_pca, recon_spectra, save_redshift] #, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] save_redshift_classification_data
+    tasks: [infer, sanity_check_infer, plot_spectra_latents_pca, save_redshift] #, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] save_redshift_classification_data
 
 optimizer:
     optimizer_type: adam
@@ -106,12 +106,12 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: 
+    infer_log_dir: 20240609-173954_sc_10k_spectra
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: True
+    infer_outlier_only: False
 
     classify_redshift_based_on_l2: False
     classify_redshift_based_on_combined_ssim_l2: True
