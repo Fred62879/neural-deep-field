@@ -693,7 +693,7 @@ class SpectraData:
         """
         if not get_bool_redshift_pretrain_mode(**self.kwargs): return
 
-        num_wave_samples = self.kwargs["regressor_decoder_input_dim"]
+        num_wave_samples = self.kwargs["baseline_decoder_input_dim"]
         sample_method = self.kwargs["redshift_regress_spectra_sample_method"]
         sup_bounds = self.data["gt_spectra_sup_bound"]
 

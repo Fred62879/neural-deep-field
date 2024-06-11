@@ -583,10 +583,10 @@ class SpectraTrainer(BaseTrainer):
             fields.extend(["wave","wave_range","gt_redshift_bin_masks_b","gt_spectra",
                            "recon_spectra","spectra_masks_b","spectra_redshift_b",
                            "spectra_lambdawise_losses"])
-        elif self.mode == "redshift_pretrain":
+        elif self.baseline_mode:
             fields.extend([
                 "wave_range","spectra_masks","spectra_redshift","spectra_source_data"])
-            if self.classify_redshift: fields.append("gt_redshift_bin_masks")
+            if self.classify_redshift: fields.append("gt_redshift_bin_ids")
         else:
             fields.extend(["wave_data","spectra_masks",
                            "spectra_redshift","spectra_source_data"])
@@ -1735,8 +1735,11 @@ class SpectraTrainer(BaseTrainer):
                 #print(ret["redshift_logits"].shape)
                 #print(torch.sum(ret["redshift_logits"], dim=-1))
                 #print(data["gt_redshift_bin_masks"].shape)
+                #print(ret["redshift_logits"][0])
+                #print(data["gt_redshift_bin_ids"][1])
                 spectra_loss = self.redshift_loss(
-                    ret["redshift_logits"], data["gt_redshift_bin_masks"].to(torch.float32))
+                    # ret["redshift_logits"], data["gt_redshift_bin_masks"].to(torch.float32))
+                    ret["redshift_logits"], data["gt_redshift_bin_ids"][1])
             else: raise ValueError()
 
         elif self.classification_mode:

@@ -7,7 +7,7 @@ global:
 
     tasks: [train, redshift_pretrain]
     tasks: [infer, redshift_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
-    tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
+    #tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
 
 optimizer:
     optimizer_type: adam
@@ -29,10 +29,15 @@ pretrain:
     redshift_model_method: classification #regression
 
 decoder:
-    regressor_decoder_input_dim: 280
-    regressor_decoder_batch_norm: False
-    regressor_decoder_num_hidden_layers: 5
-    regressor_decoder_hidden_dim: 512
+    baseline_decoder_input_dim: 280
+    baseline_decoder_num_hidden_layers: 5
+    baseline_decoder_hidden_dim: 512
+
+    baseline_decoder_batch_norm: False
+    baseline_decoder_activate_before_skip: False
+    baseline_decoder_skip_all_layers: True
+    baseline_decoder_skip_method: add
+    baseline_decoder_skip_add_conversion_method: multi_conversion
 
 trainer:
     num_epochs: 10000

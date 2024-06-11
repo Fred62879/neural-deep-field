@@ -369,12 +369,17 @@ def define_cmd_line_args():
     decoder_group.add_argument("--decoder-latents-skip-method", nargs="+")
     decoder_group.add_argument("--decoder-latents-skip-add-conversion-method", nargs="+")
 
-    decoder_group.add_argument("--regressor-decoder-input-dim", type=int)
-    decoder_group.add_argument("--regressor-decoder-num-hidden-layers", type=int, default=1,
+    decoder_group.add_argument("--baseline-decoder-input-dim", type=int)
+    decoder_group.add_argument("--baseline-decoder-num-hidden-layers", type=int, default=1,
                                help="Number of layers for the decoder")
-    decoder_group.add_argument("--regressor-decoder-hidden-dim", type=int, default=128,
+    decoder_group.add_argument("--baseline-decoder-hidden-dim", type=int, default=128,
                                help="Network width")
-    decoder_group.add_argument("--regressor-decoder-batch-norm", action="store_true")
+    decoder_group.add_argument("--baseline-decoder-batch-norm", action="store_true")
+    decoder_group.add_argument("--baseline-decoder-skip-all-layers", action="store_true",
+                               help="pass latents as skip to each decoder layer.")
+    decoder_group.add_argument("--baseline-decoder-activate-before-skip", action="store_true")
+    decoder_group.add_argument("--baseline-decoder-skip-method", nargs="+")
+    decoder_group.add_argument("--baseline-decoder-skip-add-conversion-method", nargs="+")
 
     decoder_group.add_argument("--classifier-decoder-input-dim", type=int)
     decoder_group.add_argument("--classifier-decoder-num-hidden-layers", type=int, default=1,

@@ -19,7 +19,7 @@ class SpectraBaseline(nn.Module):
         self.init_model()
 
     def init_model(self):
-        input_dim = self.kwargs["regressor_decoder_input_dim"]
+        input_dim = self.kwargs["baseline_decoder_input_dim"]
         if self.redshift_model_method == "regression":
             output_dim = 1
         elif self.redshift_model_method == "classification":
@@ -28,9 +28,15 @@ class SpectraBaseline(nn.Module):
 
         self.decoder = BasicDecoder(
             input_dim, output_dim, True,
-            num_layers=self.kwargs["classifier_decoder_num_hidden_layers"] + 1,
-            hidden_dim=self.kwargs["classifier_decoder_hidden_dim"],
-            batch_norm=self.kwargs["classifier_decoder_batch_norm"])
+            num_layers=self.kwargs["baseline_decoder_num_hidden_layers"] + 1,
+            hidden_dim=self.kwargs["baseline_decoder_hidden_dim"],
+            batch_norm=self.kwargs["baseline_decoder_batch_norm"],
+            skip=[],
+            skip_method=self.kwargs["baseline_decoder_skip_method"],
+            skip_all_layers=self.kwargs["baseline_decoder_skip_all_layers"],
+            activate_before_skip=self.kwargs["baseline_decoder_activate_before_skip"],
+            skip_add_conversion_method= \
+                self.kwargs["baseline_decoder_skip_add_conversion_method"])
 
     def index_latents(self, data, selected_ids, idx):
         ret = data
