@@ -636,7 +636,8 @@ class AstroInferrer(BaseInferrer):
             if self.clsfy_sc_infer or self.clsfy_genlz_infer:
                 self.requested_fields.extend([
                     "wave","wave_range","gt_redshift_bin_masks_b","gt_spectra","recon_spectra",
-                    "spectra_masks_b","spectra_lambdawise_losses","spectra_redshift"])
+                    "spectra_masks_b","spectra_lambdawise_losses","spectra_redshift",
+                    "spectra_redshift_b"])
             else:
                 self.requested_fields.extend([
                     "idx","wave_data","spectra_source_data",
@@ -677,12 +678,14 @@ class AstroInferrer(BaseInferrer):
                 prefix = self.extra_args["redshift_classification_data_fname_prefix"]
                 wave_fname = join(dir, f"{prefix}_wave.npy")
                 masks_fname = join(dir, f"{prefix}_spectra_masks.npy")
+                redshift_fname = join(dir, f"{prefix}_spectra_redshift.npy")
                 loss_fname = join(dir, f"{prefix}_lambdawise_losses.npy")
                 gt_bin_masks_fname = join(dir, f"{prefix}_gt_bin_masks.npy")
                 gt_spectra_fname = join(dir, f"{prefix}_gt_spectra.npy")
                 recon_spectra_fname = join(dir, f"{prefix}_recon_spectra.npy")
                 self.dataset.set_hardcode_data("wave", np.load(wave_fname))
                 self.dataset.set_hardcode_data("spectra_masks_b", np.load(masks_fname))
+                self.dataset.set_hardcode_data("spectra_redshift_b", np.load(redshift_fname))
                 self.dataset.set_hardcode_data("spectra_lambdawise_losses", np.load(loss_fname))
                 self.dataset.set_hardcode_data(
                     "gt_redshift_bin_masks_b", np.load(gt_bin_masks_fname).T)

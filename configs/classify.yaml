@@ -3,11 +3,11 @@ parent: base.yaml
 global:
     use_tqdm: True
     exp_name: vdz-spectra-ssim
-    log_fname: clsfy_based_on_spectra
+    log_fname: clsfy
 
     tasks: [train, redshift_classification_train]
-    #tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
-    #tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
 
 optimizer:
     optimizer_type: adam
