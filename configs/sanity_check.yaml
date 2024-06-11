@@ -6,7 +6,7 @@ global:
     log_fname: sc
 
     tasks: [train, sanity_check] #,recon_spectra]
-    tasks: [infer, sanity_check_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca #save_redshift_classification_data
+    tasks: [infer, sanity_check_infer, save_redshift_classification_data, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca
 
 optimizer:
     optimizer_type: 'adam'
@@ -48,11 +48,11 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: 20240518-093832_ssim_4500_epochs
-    pretrained_model_name: model-ep4500-bch0.pth
+    pretrain_log_dir: 20240607-033031_pretrain_100k_spectra_m64_100_samples_divide_wave_norm_pe_dim_64_5k_epochs
+    pretrained_model_name: model-ep5000-bch0.pth
 
     regularize_spectra_latents: True
-    spectra_latents_regu_beta: 32
+    spectra_latents_regu_beta: 16
 
     sanity_check_finetune: False
     spectra_wrong_bin_regu_beta: 16
@@ -69,7 +69,7 @@ pretrain:
     lambdawise_weights_decoder_hidden_dim: 128
 
 decoder:
-    decoder_activation_type: relu #gaussian
+    decoder_activation_type: relu
     decoder_batch_norm: False
     decoder_num_hidden_layers: 5
     decoder_hidden_dim: 512
@@ -79,8 +79,8 @@ decoder:
 
     decoder_activate_before_latents_skip: False
     decoder_latents_skip_all_layers: True
-    decoder_latents_skip_method: 'add'
-    decoder_latents_skip_add_conversion_method: 'multi_conversion'
+    decoder_latents_skip_method: add
+    decoder_latents_skip_add_conversion_method: multi_conversion
 
 trainer:
     num_epochs: 200
@@ -106,7 +106,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: 
+    infer_log_dir: 20240607-204921_sc_100_spectra_200_epochs_regu_beta_16_033031
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -165,7 +165,7 @@ spectra_data:
     spectra_smooth_sigma: 15
 
     sample_from_pretrain_spectra: True
-    sanity_check_max_num_spectra: 1000
+    sanity_check_max_num_spectra: 100
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 

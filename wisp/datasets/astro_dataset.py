@@ -43,7 +43,7 @@ class AstroDataset(Dataset):
 
         if self.space_dim == 3:
             self.unbatched_fields = {
-                "idx","selected_ids","wave_data","wave_range",
+                "idx","selected_ids","wave_data","wave_range","nearest_neighbour_data",
                 "model_data","redshift_data","spectra_data","spectra_loss_data",
                 "gt_redshift_bin_ids","gt_redshift_bin_masks","global_restframe_spectra_loss"}
         else:
@@ -374,6 +374,8 @@ class AstroDataset(Dataset):
             self.get_redshift_data(out)
         if "spectra_loss_data" in self.requested_fields:
             self.get_spectra_loss_data(len(idx), out)
+        if "nearest_neighbour_data" in self.requested_fields:
+            self.get_nearest_neighbour_data(out)
         if "gt_redshift_bin_ids" in self.requested_fields:
             self.get_gt_redshift_bin_ids(out)
         if "gt_redshift_bin_masks" in self.requested_fields:
@@ -419,6 +421,22 @@ class AstroDataset(Dataset):
             self.num_wave_samples,
             sample_method=self.wave_sample_method,
             sample_ids=sample_ids)
+
+    def get_nearest_neighbour_data(self, out):
+        sup_bounds = self.spectra_dataset.get_supervision_sup_bound()
+        # print(self.spectra_dataset.get_supervision_mask().shape, sup_bounds.shape)
+
+        out["sup_spectra_masks"], sample_ids = batch_sample_torch(
+            self.spectra_dataset.get_supervision_mask(),
+            self.num_wave_samples,
+            sample_method=self.wave_sample_method,
+            keep_sample_ids=True, sup_bounds=sup_bounds)
+
+        out["sup_spectra_source_data"] = batch_sample_torch(
+            self.spectra_dataset.get_supervision_spectra(),
+            self.num_wave_samples,
+            sample_method=self.wave_sample_method,
+            sup_bounds=sup_bounds, sample_ids=sample_ids)
 
     def get_wave_data(self, batch_size, out):
         """ Get wave (lambda and transmission) data depending on data source.

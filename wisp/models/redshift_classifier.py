@@ -50,12 +50,17 @@ class RedshiftClassifier(nn.Module):
             ret = ret[idx]
         return ret
 
+    def shift_wave(self, wave, redshift):
+        wave = wave / (1 + redshift[:,None])
+        return wave
+
     def linear_norm_wave(self, wave, wave_range):
         (lo, hi) = wave_range
-        return self.wave_multiplier * (wave - lo) / (hi - lo)
+        # return self.wave_multiplier * (wave - lo) / (hi - lo)
+        return wave / hi
 
     def forward(
-            self, channels, wave, wave_range, spectra_masks,
+            self, channels, wave, wave_range, spectra_masks, spectra_redshift,
             gt_spectra, recon_spectra, spectra_lambdawise_losses, idx=None, selected_ids=None
     ):
         """
@@ -80,12 +85,13 @@ class RedshiftClassifier(nn.Module):
 
         elif self.kwargs["classify_based_on_wave_loss"]:
             nbins = spectra_lambdawise_losses.shape[1]
-            print(torch.min(wave), torch.max(wave))
-            print(wave_range)
+            # print(torch.min(wave), torch.max(wave))
+            wave = self.shift_wave(wave, spectra_redshift)
+            # print(torch.min(wave), torch.max(wave))
             wave = self.linear_norm_wave(wave, wave_range)
-            print(wave.shape)
-            print(wave[0])
-            assert 0
+            # print(torch.min(wave), torch.max(wave))
+            # print(wave.shape, wave[0])
+            # print(spectra_lambdawise_losses[0])
             input = torch.cat((wave[:,None].tile(1,nbins,1) * spectra_masks[:,None],
                                spectra_lambdawise_losses * spectra_masks[:,None]), dim=-1)
 

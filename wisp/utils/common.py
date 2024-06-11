@@ -734,6 +734,7 @@ def forward(
             net_args["gt_spectra"] = data["gt_spectra"]
             net_args["recon_spectra"] = data["recon_spectra"]
             net_args["spectra_masks"] = data["spectra_masks_b"]
+            net_args["spectra_redshift"] = data["spectra_redshift_b"]
             net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses"]
     else:
         raise ValueError("Unsupported space dimension.")

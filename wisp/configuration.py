@@ -103,14 +103,14 @@ def get_infer_pipelines_from_config(device, tasks, args):
     ):
         pipelines["full"] = AstroPipeline(SpectraNerf(**vars(args)))
 
-        if "recon_spectra" in tasks or "recon_spectra_all_bins" in tasks or \
-           "save_redshift" in tasks or "plot_redshift_logits" in tasks or \
-           "plot_codebook_coeff" in tasks or \
-           "plot_binwise_spectra_loss" in tasks or \
-           "plot_codebook_coeff_all_bins" in tasks or \
-           "save_redshift_classification_data" in tasks or \
-           "plot_global_lambdawise_spectra_loss" in tasks:
-            pipelines["spectra_infer"] = AstroPipeline(SpectraNerf(**vars(args)))
+        # if "recon_spectra" in tasks or "recon_spectra_all_bins" in tasks or \
+        #    "save_redshift" in tasks or "plot_redshift_logits" in tasks or \
+        #    "plot_codebook_coeff" in tasks or \
+        #    "plot_binwise_spectra_loss" in tasks or \
+        #    "plot_codebook_coeff_all_bins" in tasks or \
+        #    "save_redshift_classification_data" in tasks or \
+        #    "plot_global_lambdawise_spectra_loss" in tasks:
+        pipelines["spectra_infer"] = AstroPipeline(SpectraNerf(**vars(args)))
 
         if "recon_codebook_spectra" in tasks:
             pipelines["codebook_spectra_infer"] = AstroPipeline(CodebookNef(**vars(args)))
