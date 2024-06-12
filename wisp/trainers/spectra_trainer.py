@@ -580,9 +580,10 @@ class SpectraTrainer(BaseTrainer):
         fields = ["spectra_sup_bounds"]
         if self.classification_mode:
             # add "spectra_loss_data" to fields if want to sample wave/mask/loss
-            fields.extend(["wave","wave_range","gt_redshift_bin_masks_b","gt_spectra",
-                           "recon_spectra","spectra_masks_b","spectra_redshift_b",
-                           "spectra_lambdawise_losses"])
+            fields.extend(["spectra_loss_data","spectra_lambdawise_losses",
+                           "wave","wave_range","gt_spectra","recon_spectra",
+                           "spectra_masks_b","spectra_redshift_b",
+                           "gt_redshift_bin_ids_b","gt_redshift_bin_masks_b"])
         elif self.baseline_mode:
             fields.extend([
                 "wave_range","spectra_masks","spectra_redshift","spectra_source_data"])
@@ -654,23 +655,24 @@ class SpectraTrainer(BaseTrainer):
             log_dir = get_redshift_classification_data_dir(self.mode, **self.extra_args)
             dir = join(self.log_dir, "..", log_dir)
             prefix = self.extra_args["redshift_classification_data_fname_prefix"]
-            wave_fname = join(dir, f"{prefix}_wave.npy")
-            masks_fname = join(dir, f"{prefix}_spectra_masks.npy")
-            redshift_fname = join(dir, f"{prefix}_spectra_redshift.npy")
-            # gt_bin_fname = join(dir, f"{prefix}_gt_bin_ids.npy")
+
             loss_fname = join(dir, f"{prefix}_lambdawise_losses.npy")
-            gt_bin_masks_fname = join(dir, f"{prefix}_gt_bin_masks.npy")
+            wave_fname = join(dir, f"{prefix}_wave.npy")
             gt_spectra_fname = join(dir, f"{prefix}_gt_spectra.npy")
             recon_spectra_fname = join(dir, f"{prefix}_recon_spectra.npy")
-            self.dataset.set_hardcode_data("wave",np.load(wave_fname))
-            self.dataset.set_hardcode_data("spectra_masks_b",np.load(masks_fname))
-            self.dataset.set_hardcode_data("spectra_redshift_b",np.load(redshift_fname))
+            masks_fname = join(dir, f"{prefix}_spectra_masks.npy")
+            gt_bin_ids_fname = join(dir, f"{prefix}_gt_bin_ids.npy")
+            redshift_fname = join(dir, f"{prefix}_spectra_redshift.npy")
+            gt_bin_masks_fname = join(dir, f"{prefix}_gt_bin_masks.npy")
+
             self.dataset.set_hardcode_data("spectra_lambdawise_losses",np.load(loss_fname))
-            # self.dataset.set_hardcode_data("gt_redshift_bin_ids_b",np.load(gt_bin_fname).T)
-            self.dataset.set_hardcode_data(
-                "gt_redshift_bin_masks_b",np.load(gt_bin_masks_fname).T)
+            self.dataset.set_hardcode_data("wave",np.load(wave_fname))
             self.dataset.set_hardcode_data("gt_spectra", np.load(gt_spectra_fname))
             self.dataset.set_hardcode_data("recon_spectra", np.load(recon_spectra_fname))
+            self.dataset.set_hardcode_data("spectra_masks_b",np.load(masks_fname))
+            self.dataset.set_hardcode_data("spectra_redshift_b",np.load(redshift_fname))
+            self.dataset.set_hardcode_data("gt_redshift_bin_ids_b",np.load(gt_bin_ids_fname))
+            self.dataset.set_hardcode_data("gt_redshift_bin_masks_b",np.load(gt_bin_masks_fname))
 
         self.dataset.set_fields(fields)
 
@@ -1732,14 +1734,13 @@ class SpectraTrainer(BaseTrainer):
             if self.regress_redshift:
                 spectra_loss = self.redshift_loss(ret["redshift"], data["spectra_redshift"])
             elif self.classify_redshift:
-                #print(ret["redshift_logits"].shape)
+                print(ret["redshift_logits"].shape)
                 #print(torch.sum(ret["redshift_logits"], dim=-1))
-                #print(data["gt_redshift_bin_masks"].shape)
-                #print(ret["redshift_logits"][0])
-                #print(data["gt_redshift_bin_ids"][1])
+                print(data["gt_redshift_bin_masks"].shape)
+                assert 0
                 spectra_loss = self.redshift_loss(
-                    # ret["redshift_logits"], data["gt_redshift_bin_masks"].to(torch.float32))
-                    ret["redshift_logits"], data["gt_redshift_bin_ids"][1])
+                    ret["redshift_logits"], data["gt_redshift_bin_masks"].to(torch.float32))
+                    # ret["redshift_logits"], data["gt_redshift_bin_ids"][1])
             else: raise ValueError()
 
         elif self.classification_mode:
@@ -1748,7 +1749,8 @@ class SpectraTrainer(BaseTrainer):
 
             spectra_loss = self.bce_loss(est, gt)
             weight = torch.ones_like(spectra_loss)
-            weight[gt==1.] = self.num_redshift_bins
+            # weight[gt==1.] = self.num_redshift_bins
+            weight[gt==1.] = self.extra_args["classifier_train_num_bins_to_sample"] - 1
             spectra_loss = (spectra_loss * weight).mean()
 
         elif self.brute_force:

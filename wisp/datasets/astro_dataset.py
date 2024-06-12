@@ -13,9 +13,9 @@ from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
 from wisp.utils.common import print_shape, get_bin_ids, \
-    create_gt_redshift_bin_masks, get_redshift_range, has_common
+    create_gt_redshift_bin_masks, get_redshift_range, has_common, create_batch_ids
 from wisp.datasets.data_utils import clip_data_to_ref_wave_range, \
-    get_wave_range_fname, batch_sample_torch, get_bound_id
+    get_wave_range_fname, batch_sample_bins, batch_sample_torch, get_bound_id
 
 
 class AstroDataset(Dataset):
@@ -401,26 +401,37 @@ class AstroDataset(Dataset):
 
     def get_spectra_loss_data(self, batch_size, out):
         """
-        Currently NOT is use.
-        Do batch sampling for spectra loss data (`spetctra_wave`, `spectra_lambdawise_losses`).
+        Sample from wrong bins (always keep the gt bin)
         """
-        out["wave"], sample_ids = batch_sample_torch(
-            torch.FloatTensor(out["wave"]),
-            self.num_wave_samples,
-            sample_method=self.wave_sample_method,
-            keep_sample_ids=True)
+        # Do batch sampling for spectra loss data (`spetctra_wave`, `spectra_lambdawise_losses`).
+        # out["wave"], sample_ids = batch_sample_torch(
+        #     torch.FloatTensor(out["wave"]),
+        #     self.num_wave_samples,
+        #     sample_method=self.wave_sample_method,
+        #     keep_sample_ids=True)
 
-        out["spectra_masks_b"] = batch_sample_torch(
-            torch.tensor(out["spectra_masks_b"]).to(bool),
-            self.num_wave_samples,
-            sample_method=self.wave_sample_method,
-            sample_ids=sample_ids)
+        # out["spectra_masks_b"] = batch_sample_torch(
+        #     torch.tensor(out["spectra_masks_b"]).to(bool),
+        #     self.num_wave_samples,
+        #     sample_method=self.wave_sample_method,
+        #     sample_ids=sample_ids)
 
-        out["spectra_lambdawise_losses"] = batch_sample_torch(
-            torch.FloatTensor(out["spectra_lambdawise_losses"]),
-            self.num_wave_samples,
-            sample_method=self.wave_sample_method,
-            sample_ids=sample_ids)
+        # out["spectra_lambdawise_losses"] = batch_sample_torch(
+        #     torch.FloatTensor(out["spectra_lambdawise_losses"]),
+        #     self.num_wave_samples,
+        #     sample_method=self.wave_sample_method,
+        #     sample_ids=sample_ids)
+
+        # print(out["recon_spectra"].shape, out["gt_spectra"].shape, out["spectra_lambdawise_losses"].shape, out["gt_redshift_bin_masks_b"].shape, out["gt_redshift_bin_ids_b"].shape)
+        # print(out["gt_redshift_bin_masks_b"], out["gt_redshift_bin_ids_b"])
+        # ids = create_batch_ids(out["gt_redshift_bin_ids_b"])
+        # print(out["gt_redshift_bin_masks_b"][ids[0],ids[1]])
+
+        if self.kwargs["classifier_train_sample_bins"]:
+            out["recon_spectra"], out["gt_redshift_bin_masks_b"] = batch_sample_bins(
+                out["recon_spectra"],
+                out["gt_redshift_bin_masks_b"], out["gt_redshift_bin_ids_b"],
+                self.kwargs["classifier_train_num_bins_to_sample"] - 1)
 
     def get_nearest_neighbour_data(self, out):
         sup_bounds = self.spectra_dataset.get_supervision_sup_bound()

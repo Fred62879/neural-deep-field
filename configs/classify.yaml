@@ -24,6 +24,8 @@ optimizer:
 pretrain:
     pretrain_batch_size: 25
     pretrain_use_all_wave: True
+    classifier_train_sample_bins: True
+    classifier_train_num_bins_to_sample: 5
 
     model_redshift: True
     brute_force_redshift: True
@@ -36,8 +38,8 @@ decoder:
     classifier_decoder_hidden_dim: 512
 
     classify_based_on_loss: False
-    classify_concat_spectra: False
-    classify_based_on_wave_loss: True
+    classify_concat_spectra: True
+    classify_based_on_wave_loss: False
 
 trainer:
     num_epochs: 10000

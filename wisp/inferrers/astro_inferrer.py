@@ -658,8 +658,7 @@ class AstroInferrer(BaseInferrer):
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
                 self.requested_fields.append("spectra_ivar_reliable")
             if self.save_redshift_classification_data:
-                # self.requested_fields.append("gt_redshift_bin_ids")
-                self.requested_fields.append("gt_redshift_bin_masks")
+                self.requested_fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_masks"])
 
             if self.find_nn_spectra:
                 self.requested_fields.extend(["nearest_neighbour_data"])
@@ -1088,7 +1087,7 @@ class AstroInferrer(BaseInferrer):
         if self.save_redshift_classification_data:
             self.gt_spectra_s = []
             self.recon_spectra_s = []
-            # self.gt_bin_ids_s = []
+            self.gt_bin_ids_s = []
             self.gt_bin_masks_s = []
             self.spectra_wave_s = []
             self.spectra_masks_s = []
@@ -1806,7 +1805,8 @@ class AstroInferrer(BaseInferrer):
             self.spectra_wave_s.extend(data["spectra_source_data"][:,0]) # [bsz,nsmpls]
             self.spectra_masks_s.extend(data["spectra_masks"]) # [bsz,nsmpls]
             self.spectra_redshift_s.extend(data["spectra_redshift"])
-            # self.gt_bin_ids_s.extend(data["gt_redshift_bin_ids"].T) # [bsz,2]
+            # print(data["gt_redshift_bin_ids"].shape, data["gt_redshift_bin_masks"].shape)
+            self.gt_bin_ids_s.extend(data["gt_redshift_bin_ids"][1]) # [bsz]
             self.gt_bin_masks_s.extend(data["gt_redshift_bin_masks"]) # [bsz,nbins]
             self.spectra_lambdawise_losses_s.extend(ret["spectra_lambdawise_loss"])
             self.gt_spectra_s.extend(data["spectra_source_data"][:,1])
@@ -1957,10 +1957,10 @@ class AstroInferrer(BaseInferrer):
                 self.gt_spectra_s).detach().cpu().numpy() # [bsz,nsmpl]
             self.recon_spectra_s = torch.stack(
                 self.recon_spectra_s).detach().cpu().numpy() # [bsz,nsmpl]
-            # self.gt_bin_ids_s = torch.stack(
-            #     self.gt_bin_ids_s).detach().cpu().numpy().T # [2,bsz]
+            self.gt_bin_ids_s = torch.stack(
+                self.gt_bin_ids_s).detach().cpu().numpy() # [bsz,2]
             self.gt_bin_masks_s = torch.stack(
-                self.gt_bin_masks_s).detach().cpu().numpy().T # [2,bsz]
+                self.gt_bin_masks_s).detach().cpu().numpy() # [bsz,nbins]
             self.spectra_wave_s = torch.stack(
                 self.spectra_wave_s).detach().cpu().numpy() # [bsz,nsmpl]
             self.spectra_masks_s = torch.stack(
@@ -2421,9 +2421,9 @@ class AstroInferrer(BaseInferrer):
         fname = join(self.redshift_classification_data_dir,
                      f"model-{model_id}_spectra_redshift{suffix}")
         np.save(fname, self.spectra_redshift_s)
-        # fname = join(self.redshift_classification_data_dir,
-        #              f"model-{model_id}_gt_bin_ids{suffix}")
-        # np.save(fname, self.gt_bin_ids_s)
+        fname = join(self.redshift_classification_data_dir,
+                     f"model-{model_id}_gt_bin_ids{suffix}")
+        np.save(fname, self.gt_bin_ids_s)
         fname = join(self.redshift_classification_data_dir,
                      f"model-{model_id}_gt_bin_masks{suffix}")
         np.save(fname, self.gt_bin_masks_s)

@@ -549,6 +549,9 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--use-latents-as-coords", action="store_true",
                                 help="pass latents as coords to model.")
 
+    pretrain_group.add_argument("--classifier-train-sample-bins", action="store_true")
+    pretrain_group.add_argument("--classifier-train-num-bins-to-sample", action="store_true")
+
     ###################
     # Spatial Decoder arguments
     ###################

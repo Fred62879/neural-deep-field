@@ -14,6 +14,7 @@ import numpy as np
 # from wisp.core import Rays
 from functools import lru_cache
 from os.path import join, exists
+from wisp.utils.common import create_batch_ids
 # from torch._six import string_classes
 # from torch.utils.data._utils.collate import default_convert
 
@@ -268,6 +269,45 @@ def batch_sample_torch(
         ret = ret.permute(reorded_axis)
     if keep_sample_ids: return ret, sample_ids
     return ret
+
+def batch_sample_bins(data, bin_masks, gt_bin_ids, n):
+    """
+    Sample
+    @Param
+      data: [bsz,nbins,nsmpl] np
+      bin_masks: [bsz,nbins] np
+      gt_bin_ids: [bsz] np
+    """
+    bsz, nbins, _ = data.shape
+    gt_bin_ids = create_batch_ids(gt_bin_ids)
+    assert (bin_masks[gt_bin_ids[0],gt_bin_ids[1]] == True).all()
+
+    # select `n` bins among all wrong bins
+    bin_ids = np.tile(np.arange(nbins), (bsz,1))
+    wrong_bin_ids = (bin_ids[~bin_masks]).reshape(bsz,nbins-1)
+    # print(wrong_bin_ids.shape, wrong_bin_ids[0], gt_bin_ids[1][0])
+
+    ids = np.array([np.random.choice(nbins-1, n, replace=False)
+                    for _ in range(bsz)])
+    # ids = (np.random.rand(bsz,n) * (nbins - 2)).astype(int)
+    ids = create_batch_ids(ids)
+    sampled_wrong_bin_ids = wrong_bin_ids[ids[0],ids[1]]
+    # print(gt_bin_ids)
+    # print(sampled_wrong_bin_ids.shape, sampled_wrong_bin_ids)
+    sampled_wrong_bin_ids = create_batch_ids(sampled_wrong_bin_ids)
+
+    # mark selected wrong bin as `True` and select from given `data`
+    # print(np.sum(bin_masks, axis=-1))
+    selected_bin_masks = np.copy(bin_masks)
+    selected_bin_masks[sampled_wrong_bin_ids[0],sampled_wrong_bin_ids[1]] = True
+    # print(np.sum(bin_masks, axis=-1), np.sum(selected_bin_masks, axis=-1))
+    data = (data[selected_bin_masks]).reshape(bsz,n+1,-1)
+
+    # create new gt logits
+    # print(gt_bin_ids, sampled_wrong_bin_ids)
+    bin_masks = bin_masks[selected_bin_masks].reshape(bsz,n+1)
+    # print(bin_masks.shape, bin_masks)
+    return data, bin_masks
 
 def get_bound_id(wave_bound, source_wave, within_bound=True):
     """ Get id of lambda values in source wave that bounds or is bounded by given wave_bound

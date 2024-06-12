@@ -99,6 +99,7 @@ class RedshiftClassifier(nn.Module):
             nbins = recon_spectra.shape[1]
             input = torch.cat((gt_spectra[:,None].tile(1,nbins,1) * spectra_masks[:,None],
                                recon_spectra * spectra_masks[:,None]), dim=-1)
+            # print(input.shape, input.dtype, input.device)
         else: raise ValueError()
 
         logits = self.decoder(input).flatten() # [bsz,nbins,1] -> [n,]
