@@ -230,6 +230,9 @@ class SpectraTrainer(BaseTrainer):
             self.mode == "sanity_check"
         assert not self.sanity_check_with_weights or self.sanity_check_finetune
 
+        self.sanity_check_sample_bins_per_step = self.mode == "sanity_check" and \
+            self.extra_args["sanity_check_sample_bins_per_step"]
+
         # ** use global restframe loss
         if self.use_global_spectra_loss_as_lambdawise_weights:
             self.global_restframe_spectra_loss_fname = join(
@@ -586,11 +589,12 @@ class SpectraTrainer(BaseTrainer):
 
         fields = ["spectra_sup_bounds"]
         if self.classification_mode:
-            # add "spectra_loss_data" to fields if want to sample wave/mask/loss
-            fields.extend(["spectra_loss_data","spectra_lambdawise_losses",
+            fields.extend(["spectra_lambdawise_losses",
                            "wave","wave_range","gt_spectra","recon_spectra",
                            "spectra_masks_b","spectra_redshift_b",
                            "gt_redshift_bin_ids_b","gt_redshift_bin_masks_b"])
+            self.dataset.toggle_classifier_train_sample_bins(
+                self.extra_args["classifier_train_sample_bins"])
         elif self.baseline_mode:
             fields.extend([
                 "wave_range","spectra_masks","spectra_redshift","spectra_source_data"])
@@ -599,6 +603,8 @@ class SpectraTrainer(BaseTrainer):
         else:
             fields.extend(["wave_data","spectra_masks",
                            "spectra_redshift","spectra_source_data"])
+            self.dataset.toggle_sanity_check_sample_bins_per_step(
+                self.sanity_check_sample_bins_per_step)
 
         # todo, codebook pretrain "coords" not handled
         if self.pixel_supervision:
@@ -1627,6 +1633,7 @@ class SpectraTrainer(BaseTrainer):
             optimize_bins_separately=self.optimize_bins_separately,
             regularize_codebook_spectra=self.regularize_codebook_spectra,
             calculate_binwise_spectra_loss= self.calculate_binwise_spectra_loss,
+            sanity_check_sample_bins_per_step=self.sanity_check_sample_bins_per_step,
             regress_lambdawise_weights_share_latents=\
                 self.regress_lambdawise_weights and \
                 self.regress_lambdawise_weights_share_latents,

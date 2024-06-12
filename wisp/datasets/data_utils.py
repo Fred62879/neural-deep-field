@@ -272,14 +272,15 @@ def batch_sample_torch(
 
 def batch_sample_bins(data, bin_masks, gt_bin_ids, n):
     """
-    Sample
+    Sample randomly `data` corresponding to `n` wrong bins.
     @Param
       data: [bsz,nbins,nsmpl] np
       bin_masks: [bsz,nbins] np
-      gt_bin_ids: [bsz] np
+      gt_bin_ids: [bsz]/[2,bsz] np
     """
-    bsz, nbins, _ = data.shape
-    gt_bin_ids = create_batch_ids(gt_bin_ids)
+    bsz, nbins = bin_masks.shape
+    if gt_bin_ids.ndim == 1:
+        gt_bin_ids = create_batch_ids(gt_bin_ids)
     assert (bin_masks[gt_bin_ids[0],gt_bin_ids[1]] == True).all()
 
     # select `n` bins among all wrong bins
@@ -301,13 +302,15 @@ def batch_sample_bins(data, bin_masks, gt_bin_ids, n):
     selected_bin_masks = np.copy(bin_masks)
     selected_bin_masks[sampled_wrong_bin_ids[0],sampled_wrong_bin_ids[1]] = True
     # print(np.sum(bin_masks, axis=-1), np.sum(selected_bin_masks, axis=-1))
-    data = (data[selected_bin_masks]).reshape(bsz,n+1,-1)
 
-    # create new gt logits
-    # print(gt_bin_ids, sampled_wrong_bin_ids)
-    bin_masks = bin_masks[selected_bin_masks].reshape(bsz,n+1)
-    # print(bin_masks.shape, bin_masks)
-    return data, bin_masks
+    if data is not None:
+        data = (data[selected_bin_masks]).reshape(bsz,n+1,-1)
+        # create new gt logits
+        # print(gt_bin_ids, sampled_wrong_bin_ids)
+        bin_masks = bin_masks[selected_bin_masks].reshape(bsz,n+1)
+        # print(bin_masks.shape, bin_masks)
+
+    return data, bin_masks, selected_bin_masks
 
 def get_bound_id(wave_bound, source_wave, within_bound=True):
     """ Get id of lambda values in source wave that bounds or is bounded by given wave_bound

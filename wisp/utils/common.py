@@ -452,9 +452,12 @@ def remove_from_device(data):
             data[field] = data[field].detach().cpu()
 
 def add_to_device(data, valid_fields, device):
-    for field in valid_fields:
-        if field in data:
-            data[field] = data[field].to(device)
+    # for field in valid_fields:
+    #     if field in data:
+    #         data[field] = data[field].to(device)
+    for k in data:
+        if data[k].__class__.__name__ == "Tensor":
+            data[k] = data[k].to(device)
 
 def sort_alphanumeric(list):
     """ Sort the given iterable in the way that humans expect."""
@@ -588,6 +591,7 @@ def forward(
         classify_redshift_based_on_l2=False,
         calculate_binwise_spectra_loss=False,
         calculate_lambdawise_spectra_loss=False,
+        sanity_check_sample_bins_per_step=False,
         regress_lambdawise_weights_share_latents=False,
         regress_lambdawise_weights_use_gt_bin_latent=False,
         use_global_spectra_loss_as_lambdawise_weights=False,
@@ -736,6 +740,9 @@ def forward(
             net_args["spectra_masks"] = data["spectra_masks_b"]
             net_args["spectra_redshift"] = data["spectra_redshift_b"]
             net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses"]
+
+        if sanity_check_sample_bins_per_step:
+            net_args["selected_bin_masks"] = data["selected_bin_masks"]
     else:
         raise ValueError("Unsupported space dimension.")
 

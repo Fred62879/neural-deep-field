@@ -79,6 +79,8 @@ class AstroDataset(Dataset):
         self.infer_selected = False
         self.perform_integration = True
         self.use_predefined_wave_range = False
+        self.classifier_train_sample_bins = False
+        self.sanity_check_sample_bins_per_step = False
 
     ############
     # Setters
@@ -146,6 +148,12 @@ class AstroDataset(Dataset):
 
     def toggle_selected_inferrence(self, infer_selected: bool):
         self.infer_selected = infer_selected
+
+    def toggle_classifier_train_sample_bins(self, sample: bool):
+        self.classifier_train_sample_bins = sample
+
+    def toggle_sanity_check_sample_bins_per_step(self, sample: bool):
+        self.sanity_check_sample_bins_per_step = sample
 
     ############
     # Getters
@@ -308,6 +316,7 @@ class AstroDataset(Dataset):
         for field in batched_fields:
             out[field] = self.get_batched_data(field, idx)
         self.get_unbatched_data(idx, out)
+        self.process_data(out)
 
         # print_shape(out)
         if self.transform is not None:
@@ -317,6 +326,21 @@ class AstroDataset(Dataset):
     ############
     # Helpers
     ############
+
+    def index_selected_data(self, data, idx):
+        """ Index data with both selected_ids and given idx
+              (for selective spectra inferrence only)
+            @Param
+               selected_ids: select from source data (filter index)
+               idx: dataset index (batch index)
+        """
+        if self.infer_selected:
+            assert self.mode == "spectra_pretrain_infer" or \
+                self.mode == "sanity_check_infer" or \
+                self.mode == "generalization_infer"
+            assert "selected_ids" in self.data
+            data = data[self.data["selected_ids"]]
+        return data[idx]
 
     def get_batched_data(self, field, idx):
         if field == "coords":
@@ -332,7 +356,6 @@ class AstroDataset(Dataset):
             data = self.fits_dataset.get_spectra_id_map()
         elif field == "spectra_bin_map":
             data = self.fits_dataset.get_spectra_bin_map()
-
         elif field == "spectra_masks":
             data = self.get_spectra_masks()
         elif field == "spectra_pixels":
@@ -372,8 +395,6 @@ class AstroDataset(Dataset):
             self.get_spectra_data(out)
         if "redshift_data" in self.requested_fields:
             self.get_redshift_data(out)
-        if "spectra_loss_data" in self.requested_fields:
-            self.get_spectra_loss_data(len(idx), out)
         if "nearest_neighbour_data" in self.requested_fields:
             self.get_nearest_neighbour_data(out)
         if "gt_redshift_bin_ids" in self.requested_fields:
@@ -384,22 +405,20 @@ class AstroDataset(Dataset):
             out["global_restframe_spectra_loss"] = \
                 self.data["global_restframe_spectra_loss"]
 
-    def index_selected_data(self, data, idx):
-        """ Index data with both selected_ids and given idx
-              (for selective spectra inferrence only)
-            @Param
-               selected_ids: select from source data (filter index)
-               idx: dataset index (batch index)
-        """
-        if self.infer_selected:
-            assert self.mode == "spectra_pretrain_infer" or \
-                self.mode == "sanity_check_infer" or \
-                self.mode == "generalization_infer"
-            assert "selected_ids" in self.data
-            data = data[self.data["selected_ids"]]
-        return data[idx]
+    def process_data(self, out):
+        if self.sanity_check_sample_bins_per_step:
+            self.sample_sanity_check_data(out)
+        if self.classifier_train_sample_bins:
+            self.sample_spectra_loss_data(out)
 
-    def get_spectra_loss_data(self, batch_size, out):
+    def sample_sanity_check_data(self, out):
+        # print(out.keys())
+        # print(out["gt_redshift_bin_ids"].shape, out["gt_redshift_bin_masks"].shape)
+        _, _, out["selected_bin_masks"] = batch_sample_bins(
+            None, out["gt_redshift_bin_masks"], out["gt_redshift_bin_ids"],
+            self.kwargs["sanity_check_num_bins_to_sample"] - 1)
+
+    def sample_spectra_loss_data(self, out):
         """
         Sample from wrong bins (always keep the gt bin)
         """
@@ -427,11 +446,10 @@ class AstroDataset(Dataset):
         # ids = create_batch_ids(out["gt_redshift_bin_ids_b"])
         # print(out["gt_redshift_bin_masks_b"][ids[0],ids[1]])
 
-        if self.kwargs["classifier_train_sample_bins"]:
-            out["recon_spectra"], out["gt_redshift_bin_masks_b"] = batch_sample_bins(
-                out["recon_spectra"],
-                out["gt_redshift_bin_masks_b"], out["gt_redshift_bin_ids_b"],
-                self.kwargs["classifier_train_num_bins_to_sample"] - 1)
+        out["recon_spectra"], out["gt_redshift_bin_masks_b"] = batch_sample_bins(
+            out["recon_spectra"],
+            out["gt_redshift_bin_masks_b"], out["gt_redshift_bin_ids_b"],
+            self.kwargs["classifier_train_num_bins_to_sample"] - 1)
 
     def get_nearest_neighbour_data(self, out):
         sup_bounds = self.spectra_dataset.get_supervision_sup_bound()

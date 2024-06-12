@@ -24,6 +24,7 @@ class SpectraNerf(BaseNeuralField):
         self.use_latents_as_coords = kwargs["use_latents_as_coords"]
         self.pixel_supervision = kwargs["pretrain_pixel_supervision"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**kwargs)
+        self.sanity_check_sample_bins_per_step = kwargs["sanity_check_sample_bins_per_step"]
         # self.save_lambdawise_spectra_loss = get_bool_save_lambdawise_spectra_loss(**kwargs)
         self.save_lambdawise_spectra_loss = get_bool_save_redshift_classification_data(**kwargs)
 
@@ -118,6 +119,8 @@ class SpectraNerf(BaseNeuralField):
                     ])
                     if self.kwargs["plot_spectrum_under_gt_bin"]:
                         channels.append("gt_bin_spectra")
+                    if self.sanity_check_sample_bins_per_step:
+                        channels.append("selected_bin_masks")
 
             if self.save_lambdawise_spectra_loss or \
                self.kwargs["plot_spectrum_with_loss"] or \
@@ -178,6 +181,7 @@ class SpectraNerf(BaseNeuralField):
                  spectra_loss_func=None,
                  spectra_l2_loss_func=None,
                  spectra_source_data=None,
+                 selected_bin_masks=None,
                  gt_redshift_bin_ids=None,
                  gt_redshift_bin_masks=None,
                  global_restframe_spectra_loss=None
@@ -200,6 +204,7 @@ class SpectraNerf(BaseNeuralField):
 
               optm_bin_ids: [bsz] ids of bin with best spectra quality at pervious step
               gt_redshift_bin_ids: [bsz,nbins]
+              selected_bin_masks: [bsz,nbins]
               gt_redshift_bin_masks: [bsz,nbins]
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
@@ -231,6 +236,10 @@ class SpectraNerf(BaseNeuralField):
                 print(coords[0,74:77])
                 coords = coords * gt_redshift_bin_masks \
                     + (coords * (~gt_redshift_bin_masks)).detach()
+
+        if self.sanity_check_sample_bins_per_step:
+            assert selected_bin_masks is not None
+            raise NotImplementedError()
 
         coords = coords[:,None]
         ret["coords"] = coords
