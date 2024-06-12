@@ -2,12 +2,12 @@ parent: base_cc.yaml
 
 global:
     use_tqdm: True
-    exp_name: vdz-spectra-ssim
+    exp_name: vdz-spectra-baseline
     log_fname: baseline
 
     tasks: [train, redshift_pretrain]
     tasks: [infer, redshift_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
-    #tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
+    tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
 
 optimizer:
     optimizer_type: adam
@@ -15,6 +15,8 @@ optimizer:
     b1: 0.5
     b2: 0.999
     lr: 1e-4
+    baseline_lr: 1e-5
+    classifier_lr: 1e-3
     spectra_latents_lr: 1e-3
     spectra_pretrain_lr: 1e-3
     weight_decay: 1e-5
@@ -22,34 +24,35 @@ optimizer:
     sgd_momentum: 0.9
 
 pretrain:
-    pretrain_batch_size: 10000
+    pretrain_batch_size: 100000
     pretrain_use_all_wave: True
 
     model_redshift: True
     redshift_model_method: classification #regression
+    redshift_classification_strategy: binary
 
 decoder:
     baseline_decoder_input_dim: 280
-    baseline_decoder_num_hidden_layers: 5
+    baseline_decoder_num_hidden_layers: 3
     baseline_decoder_hidden_dim: 512
 
     baseline_decoder_batch_norm: False
     baseline_decoder_activate_before_skip: False
-    baseline_decoder_skip_all_layers: True
+    baseline_decoder_skip_all_layers: False
     baseline_decoder_skip_method: add
     baseline_decoder_skip_add_conversion_method: multi_conversion
 
 trainer:
-    num_epochs: 10000
+    num_epochs: 20000
     batch_size: 5500
-    log_cli_every: 1000
+    log_cli_every: 2000
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 1000
+    save_model_every: 2000
 
-    resume_train: False
-    resume_log_dir: ''
-    resume_model_fname: 'model-ep10000-bch0.pth'
+    resume_train: True
+    resume_log_dir: 20240612-205217_baseline_bin_class_10k_spectra_20k_epochs_r
+    resume_model_fname: model-ep10000-bch0.pth
 
 infer:
     infer_last_model_only: True
@@ -106,7 +109,7 @@ spectra_data:
 
     generalization_max_num_spectra: 100
     num_gt_spectra_upper_bound: 200000
-    num_supervision_spectra_upper_bound: 1000 #200000
+    num_supervision_spectra_upper_bound: 10000 #200000
 
     filter_redshift: False
     filter_redshift_lo: 0.02

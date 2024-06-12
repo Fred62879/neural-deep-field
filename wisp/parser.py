@@ -251,6 +251,7 @@ def define_cmd_line_args():
     net_group.add_argument("--redshift-model-method", type=str,
                            help="choice of redshift modeling",
                            choices=["none","regression","classification"])
+    net_group.add_argument("--redshift-classification-strategy", type=str)
     net_group.add_argument("--redshift-classification-method", type=str,
                            choices=["argmax","weighted_avg"])
     net_group.add_argument("--encode-coords", action="store_true")
@@ -808,6 +809,8 @@ def define_cmd_line_args():
     optim_group.add_argument("--spectra-latents-lr", type=float, default=0.001)
     optim_group.add_argument("--redshift-latents-lr", type=float, default=0.001)
     optim_group.add_argument("--spectra-pretrain-lr", type=float, default=0.0001)
+    optim_group.add_argument("--classifier-lr", type=float, default=0.0001)
+    optim_group.add_argument("--baseline-lr", type=float, default=0.0001)
 
     optim_group.add_argument("--weight-decay", type=float, default=0, help="Weight decay.")
     optim_group.add_argument("--grid-lr-weight", type=float, default=100.0,

@@ -461,7 +461,11 @@ class SpectraTrainer(BaseTrainer):
             if self.regress_redshift:
                 self.redshift_loss = nn.MSELoss(reduction="mean")
             elif self.classify_redshift:
-                self.redshift_loss = nn.CrossEntropyLoss()
+                if self.extra_args["redshift_classification_strategy"] == "binary":
+                    self.redshift_loss = nn.BCEWithLogitsLoss(reduction="none")
+                elif self.extra_args["redshift_classification_strategy"] == "multi_class":
+                    self.redshift_loss = nn.CrossEntropyLoss()
+                else: raise ValueError()
             else: raise ValueError()
         elif self.classification_mode:
             # self.bce_loss = nn.BCEWithLogitsLoss(weight=self.num_redshift_bins)
@@ -564,7 +568,10 @@ class SpectraTrainer(BaseTrainer):
                     optms = { "all_params": self.optim_cls(net_params, **self.optim_params) }
 
         elif self.classification_mode or self.mode == "redshift_pretrain":
-            net_params = self._assign_model_optimization_params()
+            if self.classification_mode: lr = self.extra_args["classifier_lr"]
+            else: lr = self.extra_args["baseline_lr"]
+            net_params = self._assign_model_optimization_params(lr)
+            # net_params = self._assign_model_optimization_params()
             optms = { "all_params": self.optim_cls(net_params, **self.optim_params) }
         else:
             raise ValueError()
@@ -587,7 +594,8 @@ class SpectraTrainer(BaseTrainer):
         elif self.baseline_mode:
             fields.extend([
                 "wave_range","spectra_masks","spectra_redshift","spectra_source_data"])
-            if self.classify_redshift: fields.append("gt_redshift_bin_ids")
+            if self.classify_redshift:
+                fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_masks"])
         else:
             fields.extend(["wave_data","spectra_masks",
                            "spectra_redshift","spectra_source_data"])
@@ -1734,13 +1742,20 @@ class SpectraTrainer(BaseTrainer):
             if self.regress_redshift:
                 spectra_loss = self.redshift_loss(ret["redshift"], data["spectra_redshift"])
             elif self.classify_redshift:
-                print(ret["redshift_logits"].shape)
-                #print(torch.sum(ret["redshift_logits"], dim=-1))
-                print(data["gt_redshift_bin_masks"].shape)
-                assert 0
-                spectra_loss = self.redshift_loss(
-                    ret["redshift_logits"], data["gt_redshift_bin_masks"].to(torch.float32))
-                    # ret["redshift_logits"], data["gt_redshift_bin_ids"][1])
+                # print(ret["redshift_logits"].shape)
+                # print(torch.sum(ret["redshift_logits"], dim=-1))
+                # print(data["gt_redshift_bin_masks"].shape)
+                # print(data["gt_redshift_bin_ids"].shape)
+                if self.extra_args["redshift_classification_strategy"] == "binary":
+                    gt = data["gt_redshift_bin_masks"].flatten().to(torch.float32)
+                    spectra_loss = self.redshift_loss(ret["redshift_logits"], gt)
+                    weight = torch.ones_like(spectra_loss)
+                    weight[gt==1.] = self.num_redshift_bins
+                    spectra_loss = (spectra_loss * weight).mean()
+                elif self.extra_args["redshift_classification_strategy"] == "multi_class":
+                    spectra_loss = self.redshift_loss(
+                        ret["redshift_logits"], data["gt_redshift_bin_ids"][1])
+                else: raise ValueError()
             else: raise ValueError()
 
         elif self.classification_mode:
@@ -1996,11 +2011,14 @@ class SpectraTrainer(BaseTrainer):
                                  "lr": self.extra_args["spectra_pretrain_lr"]})
         return latents_group, net_params_group
 
-    def _assign_model_optimization_params(self):
+    def _assign_model_optimization_params(self, lr):
         model_params = []
         for name in self.params_dict:
             model_params.append(self.params_dict[name])
-        return model_params
+        # return model_params
+        model_params_group = []
+        model_params_group.append({"params": model_params, "lr": lr})
+        return model_params_group
 
     def _assign_brute_force_optimization_params(self):
         spectra_latents, redshift_latents = None, None

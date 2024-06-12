@@ -60,12 +60,14 @@ class SpectraBaseline(nn.Module):
         spectra = spectra_source_data[:,1]
         # print(torch.sum(spectra_masks, dim=-1))
         # print(wave.shape, spectra.shape, spectra_masks.shape)
-        # todo: incorporate spectra mask into forward?
-        # print(spectra.shape, spectra_masks.shape)
         output = self.decoder(spectra * spectra_masks)
         if self.redshift_model_method == "regression":
             ret["redshift"] = output.flatten()
         elif self.redshift_model_method == "classification":
-            ret["redshift_logits"] = F.softmax(output, dim=-1)
+            if self.kwargs["redshift_classification_strategy"] == "binary":
+                ret["redshift_logits"] = output.flatten()
+            elif self.kwargs["redshift_classification_strategy"] == "multi_class":
+                ret["redshift_logits"] = F.softmax(output, dim=-1)
+            else: raise ValueError()
         else: raise ValueError()
         return ret

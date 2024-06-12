@@ -1846,9 +1846,10 @@ class AstroInferrer(BaseInferrer):
             elif self.classify_redshift:
                 suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
                 redshift_logits = ret[f"redshift_logits{suffix}"]
-                print(redshift_logits.shape, redshift_logits[0])
-                print(torch.sum(redshift_logits, dim=-1))
-                assert 0
+                if self.extra_args["redshift_classification_strategy"] == "binary":
+                    redshift_logits = redshift_logits.view(-1, self.num_redshift_bins)
+                # print(redshift_logits.shape, redshift_logits[0])
+                # print(torch.sum(redshift_logits, dim=-1))
                 ids = torch.argmax(redshift_logits, dim=-1).detach().cpu().numpy()
                 argmax_redshift = self.redshift_bins[ids]
                 self.est_redshift.extend(argmax_redshift)
