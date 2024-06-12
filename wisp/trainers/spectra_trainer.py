@@ -1762,8 +1762,12 @@ class SpectraTrainer(BaseTrainer):
             est = ret["redshift_logits"]
             gt = data["gt_redshift_bin_masks_b"].flatten().to(torch.float32) # bool to float
 
+            # print(est.shape, gt.shape)
+            # print(est, gt)
             spectra_loss = self.bce_loss(est, gt)
+            # print(spectra_loss.shape, spectra_loss)
             weight = torch.ones_like(spectra_loss)
+            # print(weight.shape, weight)
             # weight[gt==1.] = self.num_redshift_bins
             weight[gt==1.] = self.extra_args["classifier_train_num_bins_to_sample"] - 1
             spectra_loss = (spectra_loss * weight).mean()

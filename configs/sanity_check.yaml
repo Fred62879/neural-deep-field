@@ -106,7 +106,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240607-204921_sc_100_spectra_200_epochs_regu_beta_16_033031
+    infer_log_dir: 20240609-173954_sc_10k_spectra_200_epochs_033031 #20240607-204921_sc_100_spectra_200_epochs_regu_beta_16_033031
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -165,7 +165,7 @@ spectra_data:
     spectra_smooth_sigma: 15
 
     sample_from_pretrain_spectra: True
-    sanity_check_max_num_spectra: 100
+    sanity_check_max_num_spectra: 10000
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 

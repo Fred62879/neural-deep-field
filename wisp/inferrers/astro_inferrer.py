@@ -1802,15 +1802,22 @@ class AstroInferrer(BaseInferrer):
             self.optimal_wrong_bin_ids.extend(ids)
 
         if self.save_redshift_classification_data:
-            self.spectra_wave_s.extend(data["spectra_source_data"][:,0]) # [bsz,nsmpls]
-            self.spectra_masks_s.extend(data["spectra_masks"]) # [bsz,nsmpls]
-            self.spectra_redshift_s.extend(data["spectra_redshift"])
-            # print(data["gt_redshift_bin_ids"].shape, data["gt_redshift_bin_masks"].shape)
-            self.gt_bin_ids_s.extend(data["gt_redshift_bin_ids"][1]) # [bsz]
-            self.gt_bin_masks_s.extend(data["gt_redshift_bin_masks"]) # [bsz,nbins]
-            self.spectra_lambdawise_losses_s.extend(ret["spectra_lambdawise_loss"])
-            self.gt_spectra_s.extend(data["spectra_source_data"][:,1])
-            self.recon_spectra_s.extend(ret["spectra_all_bins"].permute(1,0,2))
+            self.spectra_wave_s.extend(
+                data["spectra_source_data"][:,0].detach().cpu()) # [bsz,nsmpls]
+            self.spectra_masks_s.extend(
+                data["spectra_masks"].detach().cpu()) # [bsz,nsmpls]
+            self.spectra_redshift_s.extend(
+                data["spectra_redshift"].detach().cpu())
+            self.gt_bin_ids_s.extend(
+                data["gt_redshift_bin_ids"][1].detach().cpu()) # [bsz]
+            self.gt_bin_masks_s.extend(
+                data["gt_redshift_bin_masks"].detach().cpu()) # [bsz,nbins]
+            self.spectra_lambdawise_losses_s.extend(
+                ret["spectra_lambdawise_loss"].detach().cpu())
+            self.gt_spectra_s.extend(
+                data["spectra_source_data"][:,1].detach().cpu())
+            self.recon_spectra_s.extend(
+                ret["spectra_all_bins"].permute(1,0,2).detach().cpu())
 
         if self.plot_codebook_coeff:
             self.gt_redshift_cl.extend(data["spectra_redshift"])
@@ -1955,21 +1962,21 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_redshift_classification_data:
             self.gt_spectra_s = torch.stack(
-                self.gt_spectra_s).detach().cpu().numpy() # [bsz,nsmpl]
+                self.gt_spectra_s).numpy() # [bsz,nsmpl]
             self.recon_spectra_s = torch.stack(
-                self.recon_spectra_s).detach().cpu().numpy() # [bsz,nsmpl]
+                self.recon_spectra_s).numpy() # [bsz,nsmpl]
             self.gt_bin_ids_s = torch.stack(
-                self.gt_bin_ids_s).detach().cpu().numpy() # [bsz,2]
+                self.gt_bin_ids_s).numpy() # [bsz,2]
             self.gt_bin_masks_s = torch.stack(
-                self.gt_bin_masks_s).detach().cpu().numpy() # [bsz,nbins]
+                self.gt_bin_masks_s).numpy() # [bsz,nbins]
             self.spectra_wave_s = torch.stack(
-                self.spectra_wave_s).detach().cpu().numpy() # [bsz,nsmpl]
+                self.spectra_wave_s).numpy() # [bsz,nsmpl]
             self.spectra_masks_s = torch.stack(
-                self.spectra_masks_s).detach().cpu().numpy() # [bsz,nsmpl]
+                self.spectra_masks_s).numpy() # [bsz,nsmpl]
             self.spectra_redshift_s = torch.stack(
-                self.spectra_redshift_s).detach().cpu().numpy() # [bsz,nsmpl]
+                self.spectra_redshift_s).numpy() # [bsz,nsmpl]
             self.spectra_lambdawise_losses_s = torch.stack(
-                self.spectra_lambdawise_losses_s).detach().cpu().numpy() # [bsz,nbins,nsmpl]
+                self.spectra_lambdawise_losses_s).numpy() # [bsz,nbins,nsmpl]
 
         if self.plot_global_lambdawise_spectra_loss:
             self.spectra_wave_g = torch.stack(
