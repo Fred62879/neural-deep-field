@@ -195,15 +195,15 @@ def get_bool_weight_spectra_loss_with_global_restframe_loss(**kwargs):
     return get_bool_train_spectra_with_lambdawise_weights(**kwargs) or \
         get_bool_infer_spectra_with_lambdawise_weights(**kwargs)
 
-def get_optimal_wrong_bin_ids(all_bin_losses, gt_bin_masks):
+def get_optimal_wrong_bin_ids(all_bin_losses, redshift_bins_mask):
     """
     Get id of the non-GT redshift bin that achieves the lowest spectra loss.
     """
-    val = all_bin_losses[gt_bin_masks]
-    all_bin_losses[gt_bin_masks] = float('inf')
+    val = all_bin_losses[redshift_bins_mask]
+    all_bin_losses[redshift_bins_mask] = float('inf')
     optimal_wrong_bin_losses, optimal_wrong_bin_ids = torch.min(
         all_bin_losses, dim=-1) # ids of optimal wrong bins
-    all_bin_losses[gt_bin_masks] = val
+    all_bin_losses[redshift_bins_mask] = val
     return optimal_wrong_bin_ids, optimal_wrong_bin_losses
 
 def get_redshift_range(**kwargs):
@@ -254,17 +254,17 @@ def get_gt_redshift_bin_ids(redshift, add_batch_dim=False, **kwargs):
         ids = create_batch_ids(ids)
     return ids
 
-def create_gt_redshift_bin_masks(num_bins, gt_bin_ids, to_bool=False):
+def create_redshift_bins_mask(num_bins, gt_bin_ids, to_bool=False):
     """ Create binary mask where 1 corresponds to gt bin and 0 for wrong bins.
         @Params:
           gt_bin_ids: [2,bsz]
     """
     bsz = gt_bin_ids.shape[-1]
-    masks = np.zeros((bsz, num_bins))
-    masks[gt_bin_ids[0],gt_bin_ids[1]] = 1
-    if to_bool: masks = masks.astype(bool)
-    else:       masks = masks.astype(np.long)
-    return masks
+    mask = np.zeros((bsz, num_bins))
+    mask[gt_bin_ids[0],gt_bin_ids[1]] = 1
+    if to_bool: mask = mask.astype(bool)
+    else:       mask = mask.astype(np.long)
+    return mask
 
 def create_batch_ids(ids):
     """ Add batch dim id to a given list of ids.
@@ -704,14 +704,16 @@ def forward(
         if regularize_codebook_spectra:
             net_args["full_emitted_wave"] = data["full_emitted_wave"]
             requested_channels.append("full_range_codebook_spectra")
+        # if save_gt_bin_spectra or optimize_bins_separately:
+        #     net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
+        # if optimize_bins_separately:
+        #     net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
         if save_gt_bin_spectra or optimize_bins_separately:
-            net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
-        if optimize_bins_separately:
-            net_args["gt_redshift_bin_masks"] = data["gt_redshift_bin_masks"]
+            net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
 
         if apply_gt_redshift:
             net_args["specz"] = data["spectra_redshift"]
-            net_args["spectra_masks"] = data["spectra_masks"]
+            net_args["spectra_mask"] = data["spectra_mask"]
             net_args["spectra_loss_func"] = spectra_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.append("spectrawise_loss")
@@ -721,7 +723,7 @@ def forward(
                 requested_channels.append("spectrawise_loss_l2")
 
         if calculate_binwise_spectra_loss:
-            net_args["spectra_masks"] = data["spectra_masks"]
+            net_args["spectra_mask"] = data["spectra_mask"]
             net_args["spectra_loss_func"] = spectra_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.extend(["spectra_binwise_loss","redshift_logits"])
@@ -732,7 +734,7 @@ def forward(
                     "spectra_binwise_loss_l2","redshift_logits_l2"])
 
         if calculate_lambdawise_spectra_loss:
-            net_args["spectra_masks"] = data["spectra_masks"]
+            net_args["spectra_mask"] = data["spectra_mask"]
             net_args["spectra_loss_func"] = spectra_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
             requested_channels.append("spectra_lambdawise_loss")
@@ -758,18 +760,19 @@ def forward(
                 requested_channels.append("redshift")
             elif classify_redshift:
                 requested_channels.append("redshift_logits")
-            net_args["spectra_masks"] = data["spectra_masks"]
+            net_args["spectra_mask"] = data["spectra_mask"]
             net_args["spectra_source_data"] = data["spectra_source_data"]
 
         if spectra_classification_mode:
             net_args["gt_spectra"] = data["gt_spectra"]
             net_args["recon_spectra"] = data["recon_spectra"]
-            net_args["spectra_masks"] = data["spectra_masks_b"]
+            net_args["spectra_mask"] = data["spectra_mask_b"]
             net_args["spectra_redshift"] = data["spectra_redshift_b"]
             net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses"]
 
         if sanity_check_sample_bins:
             net_args["selected_bins_mask"] = data["selected_bins_mask"]
+            net_args["redshift_bins_mask"] = data["selected_redshift_bins_mask"]
     else:
         raise ValueError("Unsupported space dimension.")
 

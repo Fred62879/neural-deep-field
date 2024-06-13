@@ -72,8 +72,8 @@ class TransData:
         if self.learn_trusted_spectra:
             name = str(self.kwargs["spectra_supervision_wave_lo"]) + "_" + \
                 str(self.kwargs["spectra_supervision_wave_hi"])
-            self.full_wave_masks_fname = join(
-                self.trans_dir, f"full_wave_masks_{name}_{self.smpl_interval}"
+            self.full_wave_mask_fname = join(
+                self.trans_dir, f"full_wave_mask_{name}_{self.smpl_interval}"
             )
         self.encd_ids_fname = join(self.trans_dir, f"encd_ids_{self.smpl_interval}.npy")
 
@@ -157,11 +157,11 @@ class TransData:
     def get_full_trans_data(self):
         return self.data["trans_data"]
 
-    def get_full_wave_masks(self):
-        """ Get masks for supervised wave range.
+    def get_full_wave_mask(self):
+        """ Get mask for supervised wave range.
         """
         assert self.learn_trusted_spectra
-        return self.data["full_wave_masks"]
+        return self.data["full_wave_mask"]
 
     def get_num_samples_within_bands(self):
         return np.load(self.nsmpl_within_bands_fname)
@@ -380,7 +380,7 @@ class TransData:
         if not exists(self.full_wave_fname + ".npy") or \
            not exists(self.full_trans_fname + ".npy") or \
            (not self.uniform_sample and not exists(self.full_distrib_fname + ".npy")) or \
-           (self.learn_trusted_spectra and not exists(self.full_wave_masks_fname + ".npy")):
+           (self.learn_trusted_spectra and not exists(self.full_wave_mask_fname + ".npy")):
 
             # average all bands to get probability for mixture sampling
             trans_pdf = pnormalize(self.data["trans"])
@@ -391,12 +391,12 @@ class TransData:
 
             if self.learn_trusted_spectra:
                 (lo, hi) = get_bound_id(self.trusted_wave_bound, full_wave)
-                full_wave_masks = np.zeros(len(full_wave)).astype(bool)
-                full_wave_masks[lo:hi+1] = 1
+                full_wave_mask = np.zeros(len(full_wave)).astype(bool)
+                full_wave_mask[lo:hi+1] = 1
 
             np.save(self.encd_ids_fname, encd_ids)
             np.save(self.full_wave_fname, full_wave)
-            np.save(self.full_wave_masks_fname, full_wave_masks)
+            np.save(self.full_wave_mask_fname, full_wave_mask)
             np.save(self.full_trans_fname, full_trans)
             np.save(self.full_distrib_fname, distrib)
             plot_save(self.full_trans_fname, full_wave, full_trans.T)
@@ -409,7 +409,7 @@ class TransData:
             if not self.uniform_sample:
                 distrib = np.load(self.full_distrib_fname + ".npy")
             if self.learn_trusted_spectra:
-                full_wave_masks = np.load(self.full_wave_masks_fname + ".npy")
+                full_wave_mask = np.load(self.full_wave_mask_fname + ".npy")
 
         if self.uniform_sample:
             distrib = np.ones(len(full_wave)).astype(np.float64)
@@ -421,7 +421,7 @@ class TransData:
         self.data["encd_ids"] = torch.FloatTensor(encd_ids)
         self.data["full_wave"] = full_wave.astype('float32')
         self.data["full_trans"] = torch.FloatTensor(full_trans)
-        if self.learn_trusted_spectra: self.data["full_wave_masks"] = full_wave_masks
+        if self.learn_trusted_spectra: self.data["full_wave_mask"] = full_wave_mask
         if not self.uniform_sample: self.data["distrib"] = torch.FloatTensor(distrib)
         else: self.data["distrib"] = None
 
@@ -499,15 +499,15 @@ class TransData:
                          label=self.kwargs["plot_labels"][j],
                          linestyle=self.kwargs["plot_styles"][j])
 
-    def integrate(self, spectra, spectra_masks=None, all_wave=True, interpolate=False):
+    def integrate(self, spectra, spectra_mask=None, all_wave=True, interpolate=False):
         """ Integrate spectra over transmission.
             TODO: deal with cases where spectra pixel has multiple neighbours
             @Param
               spectra: spectra data [bsz,2,nsmpl] (wave/flux)
-              spectra_masks: mask out range of spectra to ignore [bsz,nsmpl] (1-keep, 0-drop)
+              spectra_mask: mask out range of spectra to ignore [bsz,nsmpl] (1-keep, 0-drop)
         """
         if interpolate:
-            spectra = self.interpolate_spectra(spectra, spectra_masks)
+            spectra = self.interpolate_spectra(spectra, spectra_mask)
         elif all_wave:
             trans = self.data["full_trans"].numpy()
             nsmpl = self.data["nsmpl_within_bands"].numpy()
@@ -535,7 +535,7 @@ def batch_sample_wave(bsz, nsmpls, trans_data,
         @Param  wave        [nsmpl_full]
                 trans       [nbands,nsmpl_full]
                 distrib     [nsmpl_full]
-                band_masks  [nbands,nsmpl_full] if mixture o.w. None
+                band_mask  [nbands,nsmpl_full] if mixture o.w. None
         @Return smpl_wave   [bsz,nsmpl,1]
                 smpl_trans  [bsz,nbands,nsmpl]
                 avg_nsmpl   [nbands]

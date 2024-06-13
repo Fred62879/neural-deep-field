@@ -18,7 +18,7 @@ from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array, \
     get_bool_infer_spectra_with_lambdawise_weights, \
     get_bool_classify_redshift_based_on_l2, get_bool_regress_redshift, \
     get_bool_redshift_pretrain_mode, get_bool_sanity_check_sample_bins, \
-    get_gt_redshift_bin_ids, create_gt_redshift_bin_masks
+    get_gt_redshift_bin_ids, create_redshift_bins_mask
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
@@ -449,12 +449,11 @@ class SpectraData:
         # print(self.data["validation_spectra_redshift"].shape)
         redshift = self.get_validation_redshift()
         gt_bin_ids = get_gt_redshift_bin_ids(redshift, add_batch_dim=True, **self.kwargs)
-        gt_bin_masks = create_gt_redshift_bin_masks(
+        bins_mask = create_redshift_bins_mask(
             self.num_redshift_bins, gt_bin_ids, to_bool=True)
-        # print(gt_bin_ids.shape, gt_bin_ids.dtype, gt_bin_masks.shape, gt_bin_masks.dtype)
 
         _, _, self.data["selected_bins_mask"] = batch_sample_bins(
-            None, gt_bin_masks, gt_bin_ids, self.kwargs["sanity_check_num_bins_to_sample"] - 1)
+            None, bins_mask, gt_bin_ids, self.kwargs["sanity_check_num_bins_to_sample"] - 1)
         # print(self.data["selected_bins_mask"].shape, self.data["selected_bins_mask"].dtype)
         # print(np.sum(self.data["selected_bins_mask"], axis=-1))
 
@@ -1269,16 +1268,16 @@ class SpectraData:
     # Utilities
     #############
 
-    # def interpolate_spectra(self, f, spectra, masks):
+    # def interpolate_spectra(self, f, spectra, mask):
     #     """ Interpolate spectra to same discretization interval as trans data
     #         @Param
     #           spectra: spectra data [bsz,2,nsmpl] (wave/flux)
-    #           masks: mask out range of spectra to ignore [bsz,nsmpl] (1-keep, 0-drop)
+    #           mask: mask out range of spectra to ignore [bsz,nsmpl] (1-keep, 0-drop)
     #     """
-    #     # masks = masks[:,None] #.tile(1,2,1)
+    #     # mask = mask[:,None] #.tile(1,2,1)
     #     interp_spectra = []
-    #     print(spectra.shape, masks.shape)
-    #     for (cur_spectra, cur_mask) in zip(spectra, masks):
+    #     print(spectra.shape, mask.shape)
+    #     for (cur_spectra, cur_mask) in zip(spectra, mask):
     #         interp_spectra.append(
     #             self.interpolate_one_spectra(f, cur_spectra, cur_mask)
     #         )
@@ -1603,7 +1602,7 @@ class SpectraData:
             lambdawise_losses=None, lambdawise_weights=None,
             colors=None, titles=None, is_codebook=False, save_spectra=False,
             calculate_metrics=True, save_spectra_together=False,
-            gt_masks=None, recon_masks=None, clip=False, spectra_clipped=False
+            gt_mask=None, recon_mask=None, clip=False, spectra_clipped=False
     ):
         """
         Plot all given spectra.
@@ -1625,7 +1624,7 @@ class SpectraData:
        @Return
          metrics: [n_spectra,n_metrics]
         """
-        assert not clip or (recon_masks is not None or spectra_clipped)
+        assert not clip or (recon_mask is not None or spectra_clipped)
         calculate_metrics = calculate_metrics and not is_codebook and (clip or spectra_clipped)
 
         n = len(recon_wave)
@@ -1633,9 +1632,9 @@ class SpectraData:
         if ivar is None: ivar = [None]*n
         if redshift is None: redshift = [None]*n
         if gt_wave is None: gt_wave = [None]*n
-        if gt_masks is None: gt_masks = [None]*n
+        if gt_mask is None: gt_mask = [None]*n
         if gt_fluxes is None: gt_fluxes = [None]*n
-        if recon_masks is None: recon_masks = [None]*n
+        if recon_mask is None: recon_mask = [None]*n
         if recon_fluxes2 is None: recon_fluxes2 = [None]*n
         if recon_losses2 is None: recon_losses2 = [None]*n
         if recon_fluxes3 is None: recon_fluxes3 = [None]*n
@@ -1644,9 +1643,9 @@ class SpectraData:
         if lambdawise_weights is None: lambdawise_weights = [None]*n
 
         assert gt_fluxes[0] is None or \
-            (len(gt_wave) == n and len(gt_fluxes) == n and len(gt_masks) == n)
-        assert recon_masks[0] is None or \
-            (len(recon_fluxes) == n and len(recon_masks) == n)
+            (len(gt_wave) == n and len(gt_fluxes) == n and len(gt_mask) == n)
+        assert recon_mask[0] is None or \
+            (len(recon_fluxes) == n and len(recon_mask) == n)
 
         recon_fluxes = to_numpy(recon_fluxes)
         if gt_fluxes[0] is not None: gt_fluxes = to_numpy(gt_fluxes)
@@ -1671,7 +1670,7 @@ class SpectraData:
                                 calculate_metrics, linelist)
         metrics = []
         for idx, cur_plot_data in enumerate(
-            zip(titles, redshift, gt_wave, ivar, gt_masks, gt_fluxes, recon_wave, recon_masks,
+            zip(titles, redshift, gt_wave, ivar, gt_mask, gt_fluxes, recon_wave, recon_mask,
                 recon_fluxes, recon_fluxes2, recon_losses2, recon_fluxes3, recon_losses3,
                 lambdawise_losses, lambdawise_weights)
         ):

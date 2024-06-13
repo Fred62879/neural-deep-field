@@ -271,22 +271,22 @@ def batch_sample_torch(
     if keep_sample_ids: return ret, sample_ids
     return ret
 
-def batch_sample_bins(data, bin_masks, gt_bin_ids, n):
+def batch_sample_bins(data, redshift_bins_mask, gt_bin_ids, n):
     """
     Sample randomly `data` corresponding to `n` wrong bins.
     @Param
       data: [bsz,nbins,nsmpl] np
-      bin_masks: [bsz,nbins] np
+      redshift_bins_mask: [bsz,nbins] np
       gt_bin_ids: [bsz]/[2,bsz] np
     """
-    bsz, nbins = bin_masks.shape
+    bsz, nbins = redshift_bins_mask.shape
     if gt_bin_ids.ndim == 1:
         gt_bin_ids = create_batch_ids(gt_bin_ids)
-    assert (bin_masks[gt_bin_ids[0],gt_bin_ids[1]] == True).all()
+    assert (redshift_bins_mask[gt_bin_ids[0],gt_bin_ids[1]] == True).all()
 
     # select `n` bins among all wrong bins
     bin_ids = np.tile(np.arange(nbins), (bsz,1))
-    wrong_bin_ids = (bin_ids[~bin_masks]).reshape(bsz,nbins-1)
+    wrong_bin_ids = (bin_ids[~redshift_bins_mask]).reshape(bsz,nbins-1)
     # print(wrong_bin_ids.shape, wrong_bin_ids[0], gt_bin_ids[1][0])
 
     ids = np.array([np.random.choice(nbins-1, n, replace=False)
@@ -299,19 +299,19 @@ def batch_sample_bins(data, bin_masks, gt_bin_ids, n):
     sampled_wrong_bin_ids = create_batch_ids(sampled_wrong_bin_ids)
 
     # mark selected wrong bin as `True` and select from given `data`
-    # print(np.sum(bin_masks, axis=-1))
-    selected_bins_mask = np.copy(bin_masks)
+    # print(np.sum(redshift_bins_mask, axis=-1))
+    selected_bins_mask = np.copy(redshift_bins_mask)
     selected_bins_mask[sampled_wrong_bin_ids[0],sampled_wrong_bin_ids[1]] = True
-    # print(np.sum(bin_masks, axis=-1), np.sum(selected_bins_mask, axis=-1))
+    # print(np.sum(redshift_bins_mask, axis=-1), np.sum(selected_bins_mask, axis=-1))
 
     if data is not None:
         data = (data[selected_bins_mask]).reshape(bsz,n+1,-1)
         # create new gt logits
         # print(gt_bin_ids, sampled_wrong_bin_ids)
-        bin_masks = bin_masks[selected_bins_mask].reshape(bsz,n+1)
-        # print(bin_masks.shape, bin_masks)
+        redshift_bins_mask = redshift_bins_mask[selected_bins_mask].reshape(bsz,n+1)
+        # print(redshift_bins_mask.shape, redshift_bins_mask)
 
-    return data, bin_masks, selected_bins_mask
+    return data, redshift_bins_mask, selected_bins_mask
 
 def get_bound_id(wave_bound, source_wave, within_bound=True):
     """ Get id of lambda values in source wave that bounds or is bounded by given wave_bound
@@ -393,24 +393,6 @@ def add_dummy_dim(coords, **kwargs):
         coords[...,:2] = coords_2d
     coords = torch.FloatTensor(coords)
     return coords
-
-# def create_gt_redshift_bin_ids(redshift, **kwargs):
-#     (lo, hi) = get_redshift_range(**kwargs)
-#     gt_bin_ids = get_bin_ids(
-#         lo, kwargs["redshift_bin_width"],
-#         redshift.numpy(), add_batched_dim=True)
-#     return torch.tensor(gt_bin_ids)
-
-# def create_gt_redshift_bin_masks(self, num_bins, redshift, to_bool=True, **kwargs):
-#     """ Get mask with 0 in indices of wrong bins
-#     """
-#     gt_bin_ids = create_gt_redshift_bin_ids(redshift, **kwargs)
-#     gt_bin_masks = create_gt_redshift_bin_masks(gt_bin_ids, num_bins)
-#     if to_bool: gt_bin_masks = gt_bin_masks.astype(bool)
-#     else: gt_bin_masks = gt_bin_masks.astype(np.long)
-#     gt_bin_masks = torch.tensor(gt_bin_masks)
-#     return gt_bin_ids, gt_bin_masks
-
 
 # def default_collate(batch):
 #     r"""

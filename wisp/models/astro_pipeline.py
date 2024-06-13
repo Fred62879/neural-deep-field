@@ -36,8 +36,8 @@ class AstroPipeline(nn.Module):
     def add_latents(self):
         self.model.add_latents()
 
-    def combine_latents_all_bins(self, gt_bin_ids, wrong_bin_ids, gt_bin_masks):
-        self.model.combine_latents_all_bins(gt_bin_ids, wrong_bin_ids, gt_bin_masks)
+    def combine_latents_all_bins(self, gt_bin_ids, wrong_bin_ids, redshift_bins_mask):
+        self.model.combine_latents_all_bins(gt_bin_ids, wrong_bin_ids, redshift_bins_mask)
 
     def forward(self, *args, **kwargs):
         return self.model(*args, **kwargs)

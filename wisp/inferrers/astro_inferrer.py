@@ -549,7 +549,7 @@ class AstroInferrer(BaseInferrer):
                 self.wave_sample_method = self.extra_args["pretrain_infer_wave_sample_method"]
 
             self.requested_fields.extend([
-                "idx","spectra_source_data","spectra_masks","spectra_sup_bounds"])
+                "idx","spectra_source_data","spectra_mask","spectra_sup_bounds"])
             if self.recon_img: # _sup_spectra
                 self.requested_fields.append("spectra_pixels")
             if self.apply_gt_redshift:
@@ -622,9 +622,9 @@ class AstroInferrer(BaseInferrer):
 
         if self.redshift_infer:
             self.requested_fields.extend([
-                "wave_range","spectra_masks","spectra_redshift","spectra_source_data"])
+                "wave_range","spectra_mask","spectra_redshift","spectra_source_data"])
             if self.classify_redshift:
-                self.requested_fields.append("gt_redshift_bin_masks")
+                self.requested_fields.append("redshift_bins_mask")
 
             if self.infer_selected:
                 self.dataset_length = min(self.num_selected, self.num_spectra)
@@ -636,13 +636,13 @@ class AstroInferrer(BaseInferrer):
             self.requested_fields.append("spectra_sup_bounds")
             if self.clsfy_sc_infer or self.clsfy_genlz_infer:
                 self.requested_fields.extend([
-                    "wave","wave_range","gt_redshift_bin_masks_b","gt_spectra","recon_spectra",
-                    "spectra_masks_b","spectra_lambdawise_losses","spectra_redshift",
+                    "wave","wave_range","redshift_bins_mask_b","gt_spectra","recon_spectra",
+                    "spectra_mask_b","spectra_lambdawise_losses","spectra_redshift",
                     "spectra_redshift_b"])
             else:
                 self.requested_fields.extend([
                     "idx","wave_data","spectra_source_data",
-                    "spectra_masks","spectra_redshift"])
+                    "spectra_mask","spectra_redshift"])
                 if self.sanity_check_sample_bins:
                     self.requested_fields.extend(["redshift_bins","selected_bins_mask"])
 
@@ -657,11 +657,11 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.append("gt_redshift_bin_ids")
             if self.neg_sup_wrong_redshift or \
                self.plot_gt_bin_spectra or self.plot_optimal_wrong_bin_spectra:
-                self.requested_fields.append("gt_redshift_bin_masks")
+                self.requested_fields.append("redshift_bins_mask")
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
                 self.requested_fields.append("spectra_ivar_reliable")
             if self.save_redshift_classification_data:
-                self.requested_fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_masks"])
+                self.requested_fields.extend(["gt_redshift_bin_ids","redshift_bins_mask"])
 
             if self.find_nn_spectra:
                 self.requested_fields.extend(["nearest_neighbour_data"])
@@ -679,18 +679,18 @@ class AstroInferrer(BaseInferrer):
                 dir = join(self.log_dir, "..", log_dir)
                 prefix = self.extra_args["redshift_classification_data_fname_prefix"]
                 wave_fname = join(dir, f"{prefix}_wave.npy")
-                masks_fname = join(dir, f"{prefix}_spectra_masks.npy")
+                mask_fname = join(dir, f"{prefix}_spectra_mask.npy")
                 redshift_fname = join(dir, f"{prefix}_spectra_redshift.npy")
                 loss_fname = join(dir, f"{prefix}_lambdawise_losses.npy")
-                gt_bin_masks_fname = join(dir, f"{prefix}_gt_bin_masks.npy")
+                gt_bin_mask_fname = join(dir, f"{prefix}_gt_bin_mask.npy")
                 gt_spectra_fname = join(dir, f"{prefix}_gt_spectra.npy")
                 recon_spectra_fname = join(dir, f"{prefix}_recon_spectra.npy")
                 self.dataset.set_hardcode_data("wave", np.load(wave_fname))
-                self.dataset.set_hardcode_data("spectra_masks_b", np.load(masks_fname))
+                self.dataset.set_hardcode_data("spectra_mask_b", np.load(mask_fname))
                 self.dataset.set_hardcode_data("spectra_redshift_b", np.load(redshift_fname))
                 self.dataset.set_hardcode_data("spectra_lambdawise_losses", np.load(loss_fname))
                 self.dataset.set_hardcode_data(
-                    "gt_redshift_bin_masks_b", np.load(gt_bin_masks_fname).T)
+                    "redshift_bins_mask_b", np.load(gt_bin_mask_fname).T)
                 self.dataset.set_hardcode_data("gt_spectra", np.load(gt_spectra_fname))
                 self.dataset.set_hardcode_data("recon_spectra", np.load(recon_spectra_fname))
 
@@ -780,13 +780,13 @@ class AstroInferrer(BaseInferrer):
             self.coords_source = "spectra_latents"
             self.dataset_length = self.qtz_n_embd
             # if self.extra_args["plot_clipped_spectrum"]:
-            #     self.requested_fields.append("spectra_masks")
+            #     self.requested_fields.append("spectra_mask")
 
         elif self.recon_codebook_spectra_individ:
             if self.spectra_infer:
                 self.coords_source = None
                 self.requested_fields.extend([
-                    "idx","spectra_source_data","spectra_masks",
+                    "idx","spectra_source_data","spectra_mask",
                     "spectra_redshift","spectra_sup_bounds"])
 
                 if self.infer_selected:
@@ -845,11 +845,11 @@ class AstroInferrer(BaseInferrer):
         if self.integrate_gt_spectra:
             self.gt_pixels = self.dataset.get_validation_spectra_pixels().numpy()
             valid_spectra = self.dataset.get_validation_spectra()[:,:2] # [bsz,2,nsmpl]
-            valid_spectra_masks = self.dataset.get_validation_spectra_masks() # [bsz,nsmpl]
+            valid_spectra_mask = self.dataset.get_validation_spectra_mask() # [bsz,nsmpl]
             func = self.dataset.get_transmission_interpolation_function()
 
             self.recon_pixels = []
-            for (spectra, mask) in zip(valid_spectra, valid_spectra_masks):
+            for (spectra, mask) in zip(valid_spectra, valid_spectra_mask):
                 wave = spectra[0]
                 (id_lo, id_hi) = get_bound_id(self.dataset.get_trans_wave_range(), wave)
                 wave = wave[id_lo:id_hi+1]
@@ -1068,7 +1068,7 @@ class AstroInferrer(BaseInferrer):
             self.ivar = []
             self.gt_fluxes = []
             self.spectra_wave = []
-            self.spectra_masks = []
+            self.spectra_mask = []
 
         if self.recon_spectra:
             self.recon_fluxes = []
@@ -1091,15 +1091,15 @@ class AstroInferrer(BaseInferrer):
             self.gt_spectra_s = []
             self.recon_spectra_s = []
             self.gt_bin_ids_s = []
-            self.gt_bin_masks_s = []
+            self.gt_bin_mask_s = []
             self.spectra_wave_s = []
-            self.spectra_masks_s = []
+            self.spectra_mask_s = []
             self.spectra_redshift_s = []
             self.spectra_lambdawise_losses_s = []
 
         if self.plot_global_lambdawise_spectra_loss:
             self.spectra_wave_g = []
-            self.spectra_masks_g = []
+            self.spectra_mask_g = []
             self.spectra_redshift_g = []
             self.spectra_lambdawise_losses_g = []
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
@@ -1221,10 +1221,10 @@ class AstroInferrer(BaseInferrer):
         self.codebook_spectra = []
         if self.recon_codebook_spectra:
             self.spectra_wave_c = []
-            self.spectra_masks_c = []
+            self.spectra_mask_c = []
         if self.recon_codebook_spectra_individ and self.spectra_infer:
             self.spectra_wave_ci = []
-            self.spectra_masks_ci = []
+            self.spectra_mask_ci = []
 
     def run_checkpoint_hardcode_coords_modified_model(self, model_id, checkpoint):
         if self.recon_codebook_spectra:
@@ -1246,11 +1246,11 @@ class AstroInferrer(BaseInferrer):
         if self.recon_codebook_spectra:
             spectra_wave = torch.stack(self.spectra_wave_c).view(
                 self.dataset_length, -1).detach().cpu().numpy()
-            spectra_masks = torch.stack(self.spectra_masks_c).bool().view(
+            spectra_mask = torch.stack(self.spectra_mask_c).bool().view(
                 self.dataset_length, -1).detach().cpu().numpy()
 
             # if spectra is 2d, add dummy 1st dim to simplify code
-            enum = zip([spectra_wave], [self.codebook_spectra], [spectra_masks])
+            enum = zip([spectra_wave], [self.codebook_spectra], [spectra_mask])
             dir = self.codebook_spectra_dir
             fname = f"model-{model_id}_" + \
                 str(self.extra_args["codebook_spectra_plot_wave_lo"]) + "_" + \
@@ -1260,10 +1260,10 @@ class AstroInferrer(BaseInferrer):
             if self.spectra_infer:
                 spectra_wave = torch.stack(self.spectra_wave_ci).view(
                     self.dataset_length, -1).detach().cpu().numpy()
-                spectra_masks = torch.stack(self.spectra_masks_ci).bool().view(
+                spectra_mask = torch.stack(self.spectra_mask_ci).bool().view(
                     self.dataset_length, -1).detach().cpu().numpy()
 
-                enum = zip(spectra_wave, self.codebook_spectra, spectra_masks)
+                enum = zip(spectra_wave, self.codebook_spectra, spectra_mask)
                 dir = self.codebook_spectra_individ_dir
                 fname = f"model-{model_id}"
             else:
@@ -1275,21 +1275,21 @@ class AstroInferrer(BaseInferrer):
 
                 spectra_wave = np.tile(
                     self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
-                spectra_masks = np.tile(
-                    self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
+                spectra_mask = np.tile(
+                    self.dataset.get_full_wave_mask(), num_spectra).reshape(num_spectra, -1)
 
-                enum = zip(spectra_wave, self.codebook_spectra, spectra_masks)
+                enum = zip(spectra_wave, self.codebook_spectra, spectra_mask)
                 dir = self.codebook_spectra_individ_dir
                 fname = f"model-{model_id}"
         else:
             raise ValueError()
 
         for i, obj in enumerate(enum):
-            (wave, codebook_spectra, masks) = obj
+            (wave, codebook_spectra, mask) = obj
             if self.recon_codebook_spectra_individ:
                 wave = np.tile(wave, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
-                if masks is not None:
-                    masks = np.tile(masks, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
+                if mask is not None:
+                    mask = np.tile(mask, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
 
             cur_dir = join(dir, f"spectra-{i}")
             Path(cur_dir).mkdir(parents=True, exist_ok=True)
@@ -1299,7 +1299,7 @@ class AstroInferrer(BaseInferrer):
                 None, None, wave, codebook_spectra,
                 is_codebook=True,
                 save_spectra_together=True,
-                recon_masks=masks,
+                recon_mask=mask,
                 clip=self.extra_args["plot_clipped_spectrum"]
             )
 
@@ -1407,12 +1407,12 @@ class AstroInferrer(BaseInferrer):
 
                 if self.recon_codebook_spectra:
                     self.spectra_wave_c.extend(data["wave"])
-                    self.spectra_masks_c.extend(data["spectra_masks"])
+                    self.spectra_mask_c.extend(data["spectra_mask"])
 
                 elif self.recon_codebook_spectra_individ:
                     if self.spectra_infer:
                         self.spectra_wave_ci.extend(data["wave"])
-                        self.spectra_masks_ci.extend(data["spectra_masks"])
+                        self.spectra_mask_ci.extend(data["spectra_mask"])
                         # self.redshift.extend(data["spectra_redshift"])
 
                 else: raise ValueError()
@@ -1736,7 +1736,7 @@ class AstroInferrer(BaseInferrer):
             self.ivar.extend(data["spectra_source_data"][:,2])
             self.gt_fluxes.extend(data["spectra_source_data"][:,1])
             self.spectra_wave.extend(data["spectra_source_data"][:,0])
-            self.spectra_masks.extend(data["spectra_masks"])
+            self.spectra_mask.extend(data["spectra_mask"])
 
         if self.recon_spectra:
             fluxes = ret["spectra"]
@@ -1765,7 +1765,7 @@ class AstroInferrer(BaseInferrer):
                     lambdawise_losses = []
                     if self.plot_gt_bin_spectra:
                         gt_bin_lambadwise_losses = losses[
-                            data["gt_redshift_bin_masks"]] # [bsz,nsmpl]
+                            data["redshift_bins_mask"]] # [bsz,nsmpl]
                         lambdawise_losses.extend(gt_bin_lambadwise_losses[None,...])
                     if self.plot_optimal_wrong_bin_spectra:
                         ids = self._get_optimal_wrong_bin_data(ret, data, get_id_only=True)
@@ -1805,14 +1805,14 @@ class AstroInferrer(BaseInferrer):
         if self.save_redshift_classification_data:
             self.spectra_wave_s.extend(
                 data["spectra_source_data"][:,0].detach().cpu()) # [bsz,nsmpls]
-            self.spectra_masks_s.extend(
-                data["spectra_masks"].detach().cpu()) # [bsz,nsmpls]
+            self.spectra_mask_s.extend(
+                data["spectra_mask"].detach().cpu()) # [bsz,nsmpls]
             self.spectra_redshift_s.extend(
                 data["spectra_redshift"].detach().cpu())
             self.gt_bin_ids_s.extend(
                 data["gt_redshift_bin_ids"][1].detach().cpu()) # [bsz]
-            self.gt_bin_masks_s.extend(
-                data["gt_redshift_bin_masks"].detach().cpu()) # [bsz,nbins]
+            self.gt_bin_mask_s.extend(
+                data["redshift_bins_mask"].detach().cpu()) # [bsz,nbins]
             self.spectra_lambdawise_losses_s.extend(
                 ret["spectra_lambdawise_loss"].detach().cpu())
             self.gt_spectra_s.extend(
@@ -1836,7 +1836,7 @@ class AstroInferrer(BaseInferrer):
 
         if self.plot_global_lambdawise_spectra_loss:
             self.spectra_wave_g.extend(data["spectra_source_data"][:,0])
-            self.spectra_masks_g.extend(data["spectra_masks"])
+            self.spectra_mask_g.extend(data["spectra_mask"])
             self.spectra_redshift_g.extend(data["spectra_redshift"])
             self.spectra_lambdawise_losses_g.extend(self._get_lambdawise_losses(ret))
             if self.plot_global_lambdawise_spectra_loss_with_ivar:
@@ -1937,11 +1937,11 @@ class AstroInferrer(BaseInferrer):
                 num_spectra, -1).detach().cpu().numpy()
             self.gt_wave = torch.stack(self.spectra_wave).view(
                 num_spectra, -1).detach().cpu().numpy()
-            self.gt_masks = torch.stack(self.spectra_masks).bool().view(
+            self.gt_mask = torch.stack(self.spectra_mask).bool().view(
                 num_spectra, -1).detach().cpu().numpy()
 
             self.recon_wave = self.gt_wave
-            self.recon_masks = self.gt_masks
+            self.recon_mask = self.gt_mask
 
             if self.recon_spectra:
                 self.recon_fluxes = torch.stack(self.recon_fluxes).view(
@@ -1981,12 +1981,12 @@ class AstroInferrer(BaseInferrer):
                 self.recon_spectra_s).numpy() # [bsz,nsmpl]
             self.gt_bin_ids_s = torch.stack(
                 self.gt_bin_ids_s).numpy() # [bsz,2]
-            self.gt_bin_masks_s = torch.stack(
-                self.gt_bin_masks_s).numpy() # [bsz,nbins]
+            self.gt_bin_mask_s = torch.stack(
+                self.gt_bin_mask_s).numpy() # [bsz,nbins]
             self.spectra_wave_s = torch.stack(
                 self.spectra_wave_s).numpy() # [bsz,nsmpl]
-            self.spectra_masks_s = torch.stack(
-                self.spectra_masks_s).numpy() # [bsz,nsmpl]
+            self.spectra_mask_s = torch.stack(
+                self.spectra_mask_s).numpy() # [bsz,nsmpl]
             self.spectra_redshift_s = torch.stack(
                 self.spectra_redshift_s).numpy() # [bsz,nsmpl]
             self.spectra_lambdawise_losses_s = torch.stack(
@@ -1995,8 +1995,8 @@ class AstroInferrer(BaseInferrer):
         if self.plot_global_lambdawise_spectra_loss:
             self.spectra_wave_g = torch.stack(
                 self.spectra_wave_g).detach().cpu().numpy()
-            self.spectra_masks_g = torch.stack(
-                self.spectra_masks_g).detach().cpu().numpy()
+            self.spectra_mask_g = torch.stack(
+                self.spectra_mask_g).detach().cpu().numpy()
             self.spectra_redshift_g = torch.stack(
                 self.spectra_redshift_g).detach().cpu().numpy()
             self.spectra_lambdawise_losses_g = torch.stack(
@@ -2014,11 +2014,11 @@ class AstroInferrer(BaseInferrer):
                 val_spectra = self.dataset.get_validation_spectra()
                 self.gt_wave = val_spectra[:,0]
                 self.gt_fluxes = val_spectra[:,1]
-                self.gt_masks = self.dataset.get_validation_spectra_masks()
+                self.gt_mask = self.dataset.get_validation_spectra_mask()
             else:
                 num_spectra = self.cur_patch.get_num_spectra()
                 self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
-                self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
+                self.gt_mask = self.cur_patch.get_spectra_pixel_mask()
                 self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
         elif self.test:
             assert 0
@@ -2027,14 +2027,14 @@ class AstroInferrer(BaseInferrer):
             test_spectra = self.dataset.get_test_spectra()
             self.gt_wave = test_spectra[:,0]
             self.gt_fluxes = test_spectra[:,1]
-            self.gt_masks = self.dataset.get_test_spectra_masks()
+            self.gt_mask = self.dataset.get_test_spectra_mask()
         else:
             raise ValueError()
 
         self.recon_wave = np.tile(
             self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
-        self.recon_masks = np.tile(
-            self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
+        self.recon_mask = np.tile(
+            self.dataset.get_full_wave_mask(), num_spectra).reshape(num_spectra, -1)
         self.recon_fluxes = torch.stack(self.recon_fluxes).view(
             num_spectra, self.neighbour_size**2, -1).detach().cpu().numpy()
 
@@ -2104,10 +2104,10 @@ class AstroInferrer(BaseInferrer):
             titles = titles[ids]
             self.ivar = self.ivar[ids]
             self.gt_wave = self.gt_wave[ids]
-            self.gt_masks = self.gt_masks[ids]
+            self.gt_mask = self.gt_mask[ids]
             self.gt_fluxes = self.gt_fluxes[ids]
             self.recon_wave = self.recon_wave[ids]
-            self.recon_masks = self.recon_masks[ids]
+            self.recon_mask = self.recon_mask[ids]
             self.recon_fluxes = self.recon_fluxes[ids]
             if self.plot_spectra_with_lines:
                 self.gt_redshift_l = self.gt_redshift_l[ids]
@@ -2169,8 +2169,8 @@ class AstroInferrer(BaseInferrer):
                 lambdawise_losses=lambdawise_losses,
                 lambdawise_weights=lambdawise_weights,
                 clip=self.extra_args["plot_clipped_spectrum"],
-                gt_masks=self.gt_masks[lo:hi],
-                recon_masks=self.recon_masks[lo:hi],
+                gt_mask=self.gt_mask[lo:hi],
+                recon_mask=self.recon_mask[lo:hi],
                 calculate_metrics=not self.infer_outlier_only,
                 titles=titles[lo:hi]
             )
@@ -2193,11 +2193,11 @@ class AstroInferrer(BaseInferrer):
         n_figs_each = int(np.ceil(num_bins / n_spectrum_per_fig))
         redshift_bins = init_redshift_bins(**self.extra_args).numpy()
 
-        def calculate_binwise_loss(gt_fluxes, recon_fluxes, masks, i):
-            mask = torch.FloatTensor(masks[i]).to('cuda:0')
+        def calculate_binwise_loss(gt_fluxes, recon_fluxes, mask, i):
+            cur_mask = torch.FloatTensor(mask[i]).to('cuda:0')
             gt_fluxes = torch.FloatTensor(gt_fluxes[i]).to('cuda:0')
             recon_fluxes = torch.FloatTensor(recon_fluxes[:,i]).to('cuda:0')
-            losses = [F.mse_loss(recon*mask, gt_fluxes*mask, reduction="sum").item()
+            losses = [F.mse_loss(recon*cur_mask, gt_fluxes*cur_mask, reduction="sum").item()
                       for recon in recon_fluxes]
             return np.array(losses)
 
@@ -2205,11 +2205,11 @@ class AstroInferrer(BaseInferrer):
             redshift_logits = torch.stack(self.redshift_logits).detach().cpu().numpy()[i]
             # plt.plot(redshift_logits);plt.savefig('tmp.png');plt.close()
             recon_fluxes = redshift_logits @ recon_fluxes_all[:,i]
-            # plt.plot(recon_fluxes*self.recon_masks[i]);
-            # plt.plot(self.gt_fluxes[i]*self.recon_masks[i]);
+            # plt.plot(recon_fluxes*self.recon_mask[i]);
+            # plt.plot(self.gt_fluxes[i]*self.recon_mask[i]);
             # plt.savefig('tmp_.png'); plt.close()
-            loss = F.mse_loss(torch.FloatTensor(recon_fluxes*self.recon_masks[i]),
-                              torch.FloatTensor(self.gt_fluxes[i]*self.recon_masks[i]),
+            loss = F.mse_loss(torch.FloatTensor(recon_fluxes*self.recon_mask[i]),
+                              torch.FloatTensor(self.gt_fluxes[i]*self.recon_mask[i]),
                               reduction="sum")
             return loss.item()
 
@@ -2230,7 +2230,7 @@ class AstroInferrer(BaseInferrer):
             if self.brute_force:
                 # loss = calculate_loss(i); print(loss) #;assert 0
                 losses = calculate_binwise_loss(
-                    self.gt_fluxes, recon_fluxes_all, self.recon_masks, i)
+                    self.gt_fluxes, recon_fluxes_all, self.recon_mask, i)
                 fname = join(cur_dir, f"bin_wise_spectra_loss-model-{model_id}-spectra{i}")
                 np.save(fname, losses)
 
@@ -2253,8 +2253,8 @@ class AstroInferrer(BaseInferrer):
                     recon_fluxes_all[lo:hi,i],
                     # save_spectra_together=True,
                     clip=self.extra_args["plot_clipped_spectrum"],
-                    gt_masks=change_shape(self.gt_masks[i], m),
-                    recon_masks=change_shape(self.recon_masks[i], m),
+                    gt_mask=change_shape(self.gt_mask[i], m),
+                    recon_mask=change_shape(self.recon_mask[i], m),
                     calculate_metrics=False,
                     titles=titles[lo:hi])
 
@@ -2328,8 +2328,8 @@ class AstroInferrer(BaseInferrer):
                 recon_fluxes3=fluxes3,
                 colors=colors,
                 titles=titles,
-                gt_masks=self.gt_masks[lo:hi],
-                recon_masks=self.recon_masks[lo:hi],
+                gt_mask=self.gt_mask[lo:hi],
+                recon_mask=self.recon_mask[lo:hi],
                 clip=self.extra_args["plot_clipped_spectrum"],
                 calculate_metrics=not self.infer_outlier_only)
 
@@ -2440,8 +2440,8 @@ class AstroInferrer(BaseInferrer):
                      f"model-{model_id}_wave{suffix}")
         np.save(fname, self.spectra_wave_s)
         fname = join(self.redshift_classification_data_dir,
-                     f"model-{model_id}_spectra_masks{suffix}")
-        np.save(fname, self.spectra_masks_s)
+                     f"model-{model_id}_spectra_mask{suffix}")
+        np.save(fname, self.spectra_mask_s)
         fname = join(self.redshift_classification_data_dir,
                      f"model-{model_id}_spectra_redshift{suffix}")
         np.save(fname, self.spectra_redshift_s)
@@ -2449,8 +2449,8 @@ class AstroInferrer(BaseInferrer):
                      f"model-{model_id}_gt_bin_ids{suffix}")
         np.save(fname, self.gt_bin_ids_s)
         fname = join(self.redshift_classification_data_dir,
-                     f"model-{model_id}_gt_bin_masks{suffix}")
-        np.save(fname, self.gt_bin_masks_s)
+                     f"model-{model_id}_gt_bin_mask{suffix}")
+        np.save(fname, self.gt_bin_mask_s)
         fname = join(self.redshift_classification_data_dir,
                      f"model-{model_id}_lambdawise_losses{suffix}")
         np.save(fname, self.spectra_lambdawise_losses_s) # [bsz,nbins,nsmpl]
@@ -2595,8 +2595,8 @@ class AstroInferrer(BaseInferrer):
         emitted_wave = self.spectra_wave_g / (1 + self.spectra_redshift_g[:,None])
         self._save_redshift_range(path, emitted_wave, self.spectra_redshift_g)
 
-        emitted_wave = emitted_wave[self.spectra_masks_g]
-        lambdawise_losses = self.spectra_lambdawise_losses_g[self.spectra_masks_g]
+        emitted_wave = emitted_wave[self.spectra_mask_g]
+        lambdawise_losses = self.spectra_lambdawise_losses_g[self.spectra_mask_g]
         self._plot_global_restframe_spectra_loss(
             model_id, emitted_wave, lambdawise_losses, path)
 
@@ -2605,17 +2605,17 @@ class AstroInferrer(BaseInferrer):
             if sum(ivar_reliable) == 0: return
 
             ivar = self.spectra_ivar_g[ivar_reliable]
-            masks = self.spectra_masks_g[ivar_reliable]
+            mask = self.spectra_mask_g[ivar_reliable]
             emitted_wave_i = emitted_wave[ivar_reliable]
             lambdawise_losses = self.spectra_lambdawise_losses_g[ivar_reliable]
 
-            ivar = ivar[masks]
+            ivar = ivar[mask]
             # print(ivar.shape)
             # print(sum(ivar > 0))
             assert (ivar > 0).all()
             std = np.sqrt(ivar)
-            emitted_wave_i = emitted_wave_i[masks]
-            lambdawise_losses = lambdawise_losses[masks] * std
+            emitted_wave_i = emitted_wave_i[mask]
+            lambdawise_losses = lambdawise_losses[mask] * std
             self._plot_global_restframe_spectra_loss(
                 model_id, emitted_wave_i, lambdawise_losses, path, suffix="_ivar_scaled")
 
@@ -2627,8 +2627,8 @@ class AstroInferrer(BaseInferrer):
         # Calculate and save range of redshift that converts supervision lambda
         #   range to within the given emitted lambda range.
         # """
-        # wave = self.spectra_wave_g[self.spectra_masks_g]
-        # emitted_wave = emitted_wave[self.spectra_masks_g]
+        # wave = self.spectra_wave_g[self.spectra_mask_g]
+        # emitted_wave = emitted_wave[self.spectra_mask_g]
         # lo_wave, hi_wave = np.min(wave), np.max(wave)
         # lo_emitted_wave, hi_emitted_wave = np.min(emitted_wave), np.max(emitted_wave)
         # lo, hi = hi_wave / hi_emitted_wave - 1, lo_wave / lo_emitted_wave - 1
@@ -2709,14 +2709,18 @@ class AstroInferrer(BaseInferrer):
     def _get_gt_bin_spectra_losses(self, ret, data):
         all_bin_losses = self._get_all_bin_losses(ret)
         bsz = len(all_bin_losses)
-        gt_bin_losses = all_bin_losses[data["gt_redshift_bin_masks"]]
+        if self.sanity_check_sample_bins:
+            mask = data["selected_redshift_bins_mask"]
+        else: mask = data["redshift_bins_mask"]
+        gt_bin_losses = all_bin_losses[mask]
         return gt_bin_losses
 
     def _get_optimal_wrong_bin_data(self, ret, data, get_id_only=False):
         all_bin_losses = self._get_all_bin_losses(ret)
-        ids, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(
-            all_bin_losses, data["gt_redshift_bin_masks"]
-        )
+        if self.sanity_check_sample_bins:
+            mask = data["selected_redshift_bins_mask"]
+        else: mask = data["redshift_bins_mask"]
+        ids, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(all_bin_losses, mask)
         ids = create_batch_ids(ids.detach().cpu().numpy())
         if get_id_only: return ids
 

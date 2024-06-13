@@ -6,7 +6,7 @@ global:
     log_fname: sc
 
     tasks: [train, sanity_check] #,recon_spectra]
-    tasks: [infer, sanity_check_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca save_redshift_classification_data
+    tasks: [infer, sanity_check_infer, recon_spectra, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca save_redshift_classification_data
 
 optimizer:
     optimizer_type: 'adam'
@@ -110,7 +110,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: 20240609-173954_sc_10k_spectra_200_epochs_033031 #20240607-204921_sc_100_spectra_200_epochs_regu_beta_16_033031
+    # infer_log_dir:
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -118,7 +118,7 @@ infer:
     infer_outlier_only: False
 
     classify_redshift_based_on_l2: False
-    classify_redshift_based_on_combined_ssim_l2: True
+    classify_redshift_based_on_combined_ssim_l2: False
     infer_use_global_loss_as_lambdawise_weights: False
 
     pretrain_infer_batch_size: 20

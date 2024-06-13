@@ -233,10 +233,10 @@ class PatchData:
             return self.data["spectra_pixel_wave"][idx]
         return self.data["spectra_pixel_wave"]
 
-    def get_spectra_pixel_masks(self, idx=None):
+    def get_spectra_pixel_mask(self, idx=None):
         if idx is not None:
-            return self.data["spectra_pixel_masks"][idx]
-        return self.data["spectra_pixel_masks"]
+            return self.data["spectra_pixel_mask"][idx]
+        return self.data["spectra_pixel_mask"]
 
     def get_spectra_pixel_fluxes(self, idx=None):
         if idx is not None:
@@ -362,19 +362,19 @@ class PatchData:
         path = self.spectra_obj.get_processed_spectra_path()
         cur_patch_spectra_fname = join(path, f"{self.patch_uid}{suffix}.npy")
         cur_patch_redshift_fname = join(path, f"{self.patch_uid}_redshift.npy")
-        cur_patch_spectra_masks_fname = join(path, f"{self.patch_uid}_masks.npy")
+        cur_patch_spectra_mask_fname = join(path, f"{self.patch_uid}_mask.npy")
         cur_patch_img_coords_fname = join(path, f"{self.patch_uid}_img_coords.npy")
 
         spectra = np.load(cur_patch_spectra_fname) # [n,2] [wave,flux]
         redshift = np.load(cur_patch_redshift_fname)
         img_coords = np.load(cur_patch_img_coords_fname)
-        spectra_masks = np.load(cur_patch_spectra_masks_fname)
+        spectra_mask = np.load(cur_patch_spectra_mask_fname)
 
         valid_spectra_ids = self.filter_spectra(img_coords)
         spectra = spectra[valid_spectra_ids]
         redshift = redshift[valid_spectra_ids]
         img_coords = img_coords[valid_spectra_ids]
-        spectra_masks = spectra_masks[valid_spectra_ids]
+        spectra_mask = spectra_mask[valid_spectra_ids]
         pixel_ids = self.get_pixel_ids(img_coords[:,0], img_coords[:,1])
 
         if self.kwargs["normalize_coords"]:
@@ -410,7 +410,7 @@ class PatchData:
         self.data["spectra_pixel_redshift"] = redshift
         self.data["spectra_pixel_wave"] = spectra[:,0]
         self.data["spectra_pixel_fluxes"] = spectra[:,1]
-        self.data["spectra_pixel_masks"] = spectra_masks
+        self.data["spectra_pixel_mask"] = spectra_mask
 
         if self.mark_spectra_on_patch:
             self.mark_spectra_on_img()

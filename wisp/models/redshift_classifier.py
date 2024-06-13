@@ -60,7 +60,7 @@ class RedshiftClassifier(nn.Module):
         return wave / hi
 
     def forward(
-            self, channels, wave, wave_range, spectra_masks, spectra_redshift,
+            self, channels, wave, wave_range, spectra_mask, spectra_redshift,
             gt_spectra, recon_spectra, spectra_lambdawise_losses, idx=None, selected_ids=None
     ):
         """
@@ -68,20 +68,20 @@ class RedshiftClassifier(nn.Module):
           wave: [bsz,nsmpl]
           gt_spectra: [bsz,nsmpl]
           recon_spectra: [bsz,nbins,nsmpl]
-          spectra_masks: [bsz,nsmpl]
+          spectra_mask: [bsz,nsmpl]
           spectra_lambdawise_losses: [bsz,nbins,nsmpl]
         @Return
           logits: [bsz*nsmpl]
         """
         ret = {}
         if self.kwargs["classify_based_on_loss"]:
-            # print('*', spectra_masks.shape, spectra_lambdawise_losses.shape, wave.shape)
+            # print('*', spectra_mask.shape, spectra_lambdawise_losses.shape, wave.shape)
             # print(wave[0])
             # pe_wave = self.encoder(wave)
             # pe_losses = self.encoder(spetra_lambdawise_losses)
             # print(pe_wave.shape, pe_losses.shape)
             # todo: incorporate spectra mask into forward
-            input = spectra_lambdawise_losses * spectra_masks[:,None]
+            input = spectra_lambdawise_losses * spectra_mask[:,None]
 
         elif self.kwargs["classify_based_on_wave_loss"]:
             nbins = spectra_lambdawise_losses.shape[1]
@@ -92,13 +92,13 @@ class RedshiftClassifier(nn.Module):
             # print(torch.min(wave), torch.max(wave))
             # print(wave.shape, wave[0])
             # print(spectra_lambdawise_losses[0])
-            input = torch.cat((wave[:,None].tile(1,nbins,1) * spectra_masks[:,None],
-                               spectra_lambdawise_losses * spectra_masks[:,None]), dim=-1)
+            input = torch.cat((wave[:,None].tile(1,nbins,1) * spectra_mask[:,None],
+                               spectra_lambdawise_losses * spectra_mask[:,None]), dim=-1)
 
         elif self.kwargs["classify_concat_spectra"]:
             nbins = recon_spectra.shape[1]
-            input = torch.cat((gt_spectra[:,None].tile(1,nbins,1) * spectra_masks[:,None],
-                               recon_spectra * spectra_masks[:,None]), dim=-1)
+            input = torch.cat((gt_spectra[:,None].tile(1,nbins,1) * spectra_mask[:,None],
+                               recon_spectra * spectra_mask[:,None]), dim=-1)
             # print(input.shape, input.dtype, input.device)
         else: raise ValueError()
 

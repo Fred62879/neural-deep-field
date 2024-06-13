@@ -46,11 +46,11 @@ class SpectraBaseline(nn.Module):
             ret = ret[idx]
         return ret
 
-    def forward(self, channels, wave_range, spectra_masks, spectra_source_data,
+    def forward(self, channels, wave_range, spectra_mask, spectra_source_data,
                 idx=None, selected_ids=None):
         """
         @Params
-          spectra_masks: [bsz,nsmpl]
+          spectra_mask: [bsz,nsmpl]
           spectra_source_data: [bsz,3,nsmpl]
         @Return
           logits: [bsz*nsmpl]
@@ -58,9 +58,7 @@ class SpectraBaseline(nn.Module):
         ret = {}
         wave = spectra_source_data[:,0]
         spectra = spectra_source_data[:,1]
-        # print(torch.sum(spectra_masks, dim=-1))
-        # print(wave.shape, spectra.shape, spectra_masks.shape)
-        output = self.decoder(spectra * spectra_masks)
+        output = self.decoder(spectra * spectra_mask)
         if self.redshift_model_method == "regression":
             ret["redshift"] = output.flatten()
         elif self.redshift_model_method == "classification":

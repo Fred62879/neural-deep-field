@@ -325,10 +325,10 @@ class SpectraTrainer(BaseTrainer):
         assert sum([self.optimize_gt_bin_only, self.dont_optimize_gt_bin]) <= 1
 
         if self.optimize_bins_separately:
-            self.gt_redshift_bin_ids, self.gt_redshift_bin_masks = \
-                self.dataset.create_gt_redshift_bin_masks(self.num_redshift_bins)
+            self.gt_redshift_bin_ids, self.gt_redshift_bin_mask = \
+                self.dataset.create_gt_redshift_bin_mask(self.num_redshift_bins)
             self.wrong_redshift_bin_ids = \
-                self.dataset.create_wrong_redshift_bin_ids(self.gt_redshift_bin_masks)
+                self.dataset.create_wrong_redshift_bin_ids(self.gt_redshift_bin_mask)
 
         assert not self.optimize_spectra_latents_as_logits or self.qtz_spectra
         # no pretrained latents to load
@@ -425,7 +425,7 @@ class SpectraTrainer(BaseTrainer):
                 self.pipeline.combine_latents_all_bins(
                     self.gt_redshift_bin_ids,
                     self.wrong_redshift_bin_ids,
-                    self.gt_redshift_bin_masks)
+                    self.gt_redshift_bin_mask)
             elif self.regularize_binwise_spectra_latents:
                 base_latents, addup_latents = latents
                 self.pipeline.set_base_latents(base_latents)
@@ -590,17 +590,17 @@ class SpectraTrainer(BaseTrainer):
         if self.classification_mode:
             fields.extend(["spectra_lambdawise_losses",
                            "wave","wave_range","gt_spectra","recon_spectra",
-                           "spectra_masks_b","spectra_redshift_b",
-                           "gt_redshift_bin_ids_b","gt_redshift_bin_masks_b"])
+                           "spectra_mask_b","spectra_redshift_b",
+                           "gt_redshift_bin_ids_b","gt_redshift_bin_mask_b"])
             self.dataset.toggle_classifier_train_sample_bins(
                 self.extra_args["classifier_train_sample_bins"])
         elif self.baseline_mode:
             fields.extend([
-                "wave_range","spectra_masks","spectra_redshift","spectra_source_data"])
+                "wave_range","spectra_mask","spectra_redshift","spectra_source_data"])
             if self.classify_redshift:
-                fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_masks"])
+                fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_mask"])
         else:
-            fields.extend(["wave_data","spectra_masks",
+            fields.extend(["wave_data","spectra_mask",
                            "spectra_redshift","spectra_source_data"])
             if self.sanity_check_sample_bins:
                 fields.append("selected_bins_mask")
@@ -611,7 +611,7 @@ class SpectraTrainer(BaseTrainer):
         if self.pixel_supervision:
             fields.append("spectra_pixels")
         if self.plot_gt_bin_loss or self.neg_sup_wrong_redshift:
-            fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_masks"])
+            fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_mask"])
 
         # use original spectra wave
         self.dataset.set_wave_source("spectra")
@@ -672,19 +672,19 @@ class SpectraTrainer(BaseTrainer):
             wave_fname = join(dir, f"{prefix}_wave.npy")
             gt_spectra_fname = join(dir, f"{prefix}_gt_spectra.npy")
             recon_spectra_fname = join(dir, f"{prefix}_recon_spectra.npy")
-            masks_fname = join(dir, f"{prefix}_spectra_masks.npy")
+            mask_fname = join(dir, f"{prefix}_spectra_mask.npy")
             gt_bin_ids_fname = join(dir, f"{prefix}_gt_bin_ids.npy")
             redshift_fname = join(dir, f"{prefix}_spectra_redshift.npy")
-            gt_bin_masks_fname = join(dir, f"{prefix}_gt_bin_masks.npy")
+            redshift_bins_mask_fname = join(dir, f"{prefix}_redshift_bins_mask.npy")
 
             self.dataset.set_hardcode_data("spectra_lambdawise_losses",np.load(loss_fname))
             self.dataset.set_hardcode_data("wave",np.load(wave_fname))
             self.dataset.set_hardcode_data("gt_spectra", np.load(gt_spectra_fname))
             self.dataset.set_hardcode_data("recon_spectra", np.load(recon_spectra_fname))
-            self.dataset.set_hardcode_data("spectra_masks_b",np.load(masks_fname))
+            self.dataset.set_hardcode_data("spectra_mask_b",np.load(mask_fname))
             self.dataset.set_hardcode_data("spectra_redshift_b",np.load(redshift_fname))
             self.dataset.set_hardcode_data("gt_redshift_bin_ids_b",np.load(gt_bin_ids_fname))
-            self.dataset.set_hardcode_data("gt_redshift_bin_masks_b",np.load(gt_bin_masks_fname))
+            self.dataset.set_hardcode_data("redshift_bins_mask_b",np.load(redshift_bins_mask_fname))
 
         self.dataset.set_fields(fields)
 
@@ -912,7 +912,7 @@ class SpectraTrainer(BaseTrainer):
                 self.recon_fluxes.extend(ret["spectra"])
                 self.gt_fluxes.extend(data["spectra_source_data"][:,1])
                 self.spectra_wave.extend(data["spectra_source_data"][:,0])
-                self.spectra_masks.extend(data["spectra_masks"])
+                self.spectra_mask.extend(data["spectra_mask"])
             if self.plot_spectra_with_weights:
                 assert ret["lambdawise_weights"].ndim == 3 # [nbins,bsz,nsmpl]
                 if self.regress_lambdawise_weights_share_latents:
@@ -923,7 +923,7 @@ class SpectraTrainer(BaseTrainer):
             if self.recon_codebook_spectra_individ:
                 self.codebook_spectra.extend(ret["codebook_spectra"])
                 self.spectra_wave_c.extend(data["spectra_source_data"][:,0])
-                self.spectra_masks_c.extend(data["spectra_masks"])
+                self.spectra_mask_c.extend(data["spectra_mask"])
 
         self.total_steps += 1
         self.timer.check("batch ended")
@@ -1300,14 +1300,14 @@ class SpectraTrainer(BaseTrainer):
             self.gt_fluxes = []
             self.recon_fluxes = []
             self.spectra_wave = []
-            self.spectra_masks = []
+            self.spectra_mask = []
         if self.plot_codebook_logits:
             self.codebook_logits = []
         if self.plot_spectra_with_weights:
             self.lambdawise_weights = []
         if self.recon_codebook_spectra_individ:
             self.spectra_wave_c = []
-            self.spectra_masks_c = []
+            self.spectra_mask_c = []
             self.codebook_spectra = []
 
         # re-init dataloader to make sure pixels are in order
@@ -1412,7 +1412,7 @@ class SpectraTrainer(BaseTrainer):
 
         self.spectra_wave = torch.stack(self.spectra_wave).view(
             self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
-        self.spectra_masks = torch.stack(self.spectra_masks).bool().view(
+        self.spectra_mask = torch.stack(self.spectra_mask).bool().view(
             self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
 
         # plot spectrum in multiple figures, each figure contains several spectrum
@@ -1438,8 +1438,8 @@ class SpectraTrainer(BaseTrainer):
                 lambdawise_losses=None,
                 lambdawise_weights=cur_lambdawise_weights,
                 clip=self.extra_args["plot_clipped_spectrum"],
-                gt_masks=self.spectra_masks[lo:hi],
-                recon_masks=self.spectra_masks[lo:hi],
+                gt_mask=self.spectra_mask[lo:hi],
+                recon_mask=self.spectra_mask[lo:hi],
                 calculate_metrics=False,
                 titles=titles[lo:hi])
 
@@ -1453,22 +1453,22 @@ class SpectraTrainer(BaseTrainer):
         ).detach().cpu().numpy()[self.selected_ids]
         self.spectra_wave_c = torch.stack(self.spectra_wave_c).view(
             self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
-        self.spectra_masks_c = torch.stack(self.spectra_masks_c).bool().view(
+        self.spectra_mask_c = torch.stack(self.spectra_mask_c).bool().view(
             self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
 
         if self.extra_args["infer_selected"]:
             input("plot codebook spectra for all spectra, press Enter to confirm...")
 
         prefix = "individ-"
-        for i, (wave, masks, codebook_spectra) in enumerate(
-                zip(self.spectra_wave_c, self.spectra_masks_c, self.codebook_spectra)
+        for i, (wave, mask, codebook_spectra) in enumerate(
+                zip(self.spectra_wave_c, self.spectra_mask_c, self.codebook_spectra)
         ):
             cur_dir = join(self.codebook_spectra_dir, f"spectra-{i}")
             Path(cur_dir).mkdir(parents=True, exist_ok=True)
 
             fname = f"{prefix}ep{self.cur_iter}-bch{self.cur_batch}"
             wave = np.tile(wave, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
-            masks = np.tile(masks, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
+            mask = np.tile(mask, self.qtz_n_embd).reshape(self.qtz_n_embd, -1)
 
             self.dataset.plot_spectrum(
                 cur_dir, fname, self.extra_args["flux_norm_cho"],
@@ -1476,7 +1476,7 @@ class SpectraTrainer(BaseTrainer):
                 is_codebook=True,
                 save_spectra_together=True,
                 clip=self.extra_args["plot_clipped_spectrum"],
-                recon_masks=masks)
+                recon_mask=mask)
 
     def _plot_logits_for_gt_bin(self):
         logits = np.array(self.gt_bin_logits) # [nepochs,nspectra]
@@ -1587,7 +1587,7 @@ class SpectraTrainer(BaseTrainer):
     def _get_optimal_wrong_bin_data(self, ret, data):
         all_bin_losses = self._get_all_bin_losses(ret)
         ids, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(
-            all_bin_losses, data["gt_redshift_bin_masks"]
+            all_bin_losses, data["gt_redshift_bin_mask"]
         )
         ids = create_batch_ids(ids.detach().cpu().numpy())
         return ids, optimal_wrong_bin_losses
@@ -1752,10 +1752,10 @@ class SpectraTrainer(BaseTrainer):
             elif self.classify_redshift:
                 # print(ret["redshift_logits"].shape)
                 # print(torch.sum(ret["redshift_logits"], dim=-1))
-                # print(data["gt_redshift_bin_masks"].shape)
+                # print(data["gt_redshift_bin_mask"].shape)
                 # print(data["gt_redshift_bin_ids"].shape)
                 if self.extra_args["redshift_classification_strategy"] == "binary":
-                    gt = data["gt_redshift_bin_masks"].flatten().to(torch.float32)
+                    gt = data["gt_redshift_bin_mask"].flatten().to(torch.float32)
                     spectra_loss = self.redshift_loss(ret["redshift_logits"], gt)
                     weight = torch.ones_like(spectra_loss)
                     weight[gt==1.] = self.num_redshift_bins
@@ -1768,7 +1768,7 @@ class SpectraTrainer(BaseTrainer):
 
         elif self.classification_mode:
             est = ret["redshift_logits"]
-            gt = data["gt_redshift_bin_masks_b"].flatten().to(torch.float32) # bool to float
+            gt = data["gt_redshift_bin_mask_b"].flatten().to(torch.float32) # bool to float
 
             # print(est.shape, gt.shape)
             # print(est, gt)
@@ -1815,12 +1815,12 @@ class SpectraTrainer(BaseTrainer):
         all_bin_loss = ret[loss_name] # [bsz,n_bins] no `nan` or any invalid values
 
         if self.optimize_gt_bin_only:
-            _masks = data["gt_redshift_bin_masks"].to(all_bin_loss.device)
-            spectra_loss = self.spectra_reduce_func(all_bin_loss * _masks)
+            _mask = data["gt_redshift_bin_mask"].to(all_bin_loss.device)
+            spectra_loss = self.spectra_reduce_func(all_bin_loss * _mask)
         elif self.dont_optimize_gt_bin:
             # spectra_loss = self.spectra_reduce_func(
-            #     all_bin_loss[~data["gt_redshift_bin_masks"]])
-            inv_mask = ~data["gt_redshift_bin_masks"].to(all_bin_loss.device)
+            #     all_bin_loss[~data["gt_redshift_bin_mask"]])
+            inv_mask = ~data["gt_redshift_bin_mask"].to(all_bin_loss.device)
             spectra_loss = self.spectra_reduce_func(all_bin_loss * inv_mask)
         else: # optimize all bins together
             if self.calculate_spectra_loss_based_on_optimal_bin:
@@ -1835,7 +1835,7 @@ class SpectraTrainer(BaseTrainer):
                 spectra_loss = self.spectra_reduce_func(spectra_loss)
             else:
                 if self.sanity_check_with_weights:
-                    gt_bin_loss = all_bin_loss[data["gt_redshift_bin_masks"]] # [bsz]
+                    gt_bin_loss = all_bin_loss[data["gt_redshift_bin_mask"]] # [bsz]
                     _, optimal_wrong_bin_loss = \
                         self._get_optimal_wrong_bin_data(ret, data) # [bsz]
                     spectra_regu = gt_bin_loss - optimal_wrong_bin_loss
@@ -1850,7 +1850,7 @@ class SpectraTrainer(BaseTrainer):
                 spectra_loss = self.spectra_reduce_func(all_bin_loss)
 
         if self.plot_gt_bin_loss:
-            all_spectra_gt_bin_loss = all_bin_loss[data["gt_redshift_bin_masks"]]
+            all_spectra_gt_bin_loss = all_bin_loss[data["gt_redshift_bin_mask"]]
             gt_bin_loss = self.spectra_reduce_func(all_spectra_gt_bin_loss)
             loss_name = f"gt_bin{loss_name_suffix}_loss"
             self.log_dict[loss_name] += gt_bin_loss.item()
@@ -1861,7 +1861,7 @@ class SpectraTrainer(BaseTrainer):
         """ Calculate spectra loss under negative supervision settings.
         """
         all_bin_loss = ret["spectra_binwise_loss"] # [bsz,n_bins]
-        gt_bin_loss = torch.mean(all_bin_loss[data["gt_redshift_bin_masks"]])
+        gt_bin_loss = torch.mean(all_bin_loss[data["gt_redshift_bin_mask"]])
         self.log_dict["gt_bin_loss"] += gt_bin_loss.item()
 
         if self.cur_neg_sup_target == "latents":
@@ -1870,7 +1870,7 @@ class SpectraTrainer(BaseTrainer):
                 _, optimal_wrong_bin_loss = self._get_optimal_wrong_bin_data(ret, data)
                 self.log_dict["wrong_bin_loss"] += torch.mean(optimal_wrong_bin_loss).item()
             else:
-                wrong_bin_loss = all_bin_loss[~data["gt_redshift_bin_masks"]] # [n,]
+                wrong_bin_loss = all_bin_loss[~data["gt_redshift_bin_mask"]] # [n,]
                 self.log_dict["wrong_bin_loss"] += torch.mean(wrong_bin_loss).item()
 
         elif self.cur_neg_sup_target == "net":
@@ -1882,7 +1882,7 @@ class SpectraTrainer(BaseTrainer):
                     optimal_wrong_bin_loss
                 wrong_bin_loss[wrong_bin_loss < 0] = 0
             else:
-                wrong_bin_loss = all_bin_loss[~data["gt_redshift_bin_masks"]] # [n,nbins-1]
+                wrong_bin_loss = all_bin_loss[~data["gt_redshift_bin_mask"]] # [n,nbins-1]
                 self.log_dict["wrong_bin_loss"] += torch.mean(wrong_bin_loss).item()
                 # wrong_bin_loss = self.extra_args["neg_sup_constant"] - wrong_bin_loss
                 wrong_bin_loss = wrong_bin_loss - self.extra_args["neg_sup_constant"]
@@ -2076,9 +2076,9 @@ class SpectraTrainer(BaseTrainer):
         if self.optimize_spectra_latents:
             # optimize only part of the spectra latents
             # if self.optimize_gt_bin_only:
-            #     spectra_latents = spectra_latents[gt_bin_masks] # gt bin latents
+            #     spectra_latents = spectra_latents[redshift_bins_mask] # gt bin latents
             # elif self.dont_optimize_gt_bin:
-            #     spectra_latents = spectra_latents[~gt_bin_masks] # wrong bin latents
+            #     spectra_latents = spectra_latents[~redshift_bins_mask] # wrong bin latents
             if self.optimize_latents_alternately: # em
                 self._add_spectra_latents(spectra_latents, spectra_latents_group)
             elif self.regularize_binwise_spectra_latents:

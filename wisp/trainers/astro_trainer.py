@@ -314,7 +314,7 @@ class AstroTrainer(BaseTrainer):
             if self.recon_img or self.recon_crop: self.recon_pixels = []
             if self.recon_gt_spectra:
                 self.recon_wave = []
-                self.recon_masks = []
+                self.recon_mask = []
                 self.recon_fluxes = []
             if self.recon_codebook_spectra_individ:
                 self.codebook_spectra = []
@@ -443,7 +443,7 @@ class AstroTrainer(BaseTrainer):
             if self.recon_gt_spectra:
                 if self.spectra_supervision:
                     self.recon_fluxes.append(ret["sup_spectra"])
-                    self.recon_masks.append(data["sup_spectra_masks"])
+                    self.recon_mask.append(data["sup_spectra_mask"])
                     self.recon_wave.append(data["sup_spectra_wave"][...,0])
                 else:
                     self.recon_fluxes.extend(ret["spectra"])
@@ -737,7 +737,7 @@ class AstroTrainer(BaseTrainer):
                 recon_pixels = recon_pixels * weights
 
             if self.spectral_inpaint:
-                mask = data["masks"]
+                mask = data["mask"]
                 recon_loss = self.pixel_loss(gt_pixels, recon_pixels, mask)
             else:
                 recon_loss = self.pixel_loss(gt_pixels, recon_pixels)
@@ -749,13 +749,13 @@ class AstroTrainer(BaseTrainer):
         if self.spectra_supervision:
             # recon_fluxes = ret["sup_spectra"]
             # gt_spectra = data["sup_spectra_data"]
-            # spectra_masks = data["sup_spectra_masks"]
+            # spectra_mask = data["sup_spectra_mask"]
 
             # if len(recon_fluxes) == 0:
             #     spectra_loss = 0
             # else:
             #     spectra_loss = self.spectra_loss(
-            #         spectra_masks, gt_spectra, recon_fluxes,
+            #         spectra_mask, gt_spectra, recon_fluxes,
             #         weight_by_wave_coverage=self.extra_args["weight_by_wave_coverage"]
             #     ) * self.spectra_beta
             #     self.log_dict["spectra_loss"] += spectra_loss.item()
@@ -936,7 +936,7 @@ class AstroTrainer(BaseTrainer):
         # if self.spectra_supervision:
         #     num_spectra = self.cur_patch.get_num_spectra()
         #     self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
-        #     self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
+        #     self.gt_mask = self.cur_patch.get_spectra_pixel_mask()
         #     self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
         # elif self.train_spectra_pixels_only:
         #     # todo, use spectra within current patch
@@ -944,33 +944,33 @@ class AstroTrainer(BaseTrainer):
         #     val_spectra = self.dataset.get_validation_spectra()
         #     self.gt_wave = val_spectra[:,0]
         #     self.gt_fluxes = val_spectra[:,1]
-        #     self.gt_masks = self.dataset.get_validation_spectra_masks()
+        #     self.gt_mask = self.dataset.get_validation_spectra_mask()
         # else:
         #     num_spectra = self.cur_patch.get_num_spectra()
         #     self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
-        #     self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
+        #     self.gt_mask = self.cur_patch.get_spectra_pixel_mask()
         #     self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
 
         num_spectra = self.cur_patch.get_num_spectra()
         self.gt_wave = self.cur_patch.get_spectra_pixel_wave()
-        self.gt_masks = self.cur_patch.get_spectra_pixel_masks()
+        self.gt_mask = self.cur_patch.get_spectra_pixel_mask()
         self.gt_fluxes = self.cur_patch.get_spectra_pixel_fluxes()
 
         self.recon_fluxes = torch.stack(self.recon_fluxes)
 
         if self.spectra_supervision:
             self.recon_wave = torch.stack(self.recon_wave)
-            self.recon_masks = torch.stack(self.recon_masks)
+            self.recon_mask = torch.stack(self.recon_mask)
             # recon_xxx [num_batches,num_spectra_coords,num_sampeles]
-            self.recon_masks = self.recon_masks[0].detach().cpu().numpy()
+            self.recon_mask = self.recon_mask[0].detach().cpu().numpy()
             # we get all spectra at each batch (duplications), thus average over batches
             self.recon_wave = torch.mean(self.recon_wave, dim=0).detach().cpu().numpy()
             self.recon_fluxes = torch.mean(self.recon_fluxes, dim=0)
         else:
             self.recon_wave = np.tile(
                 self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
-            self.recon_masks = np.tile(
-                self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
+            self.recon_mask = np.tile(
+                self.dataset.get_full_wave_mask(), num_spectra).reshape(num_spectra, -1)
             # all spectra are collected (no duplications) and we need
             #   only selected ones (incl. neighbours)
             self.recon_fluxes = self.recon_fluxes.view(
@@ -986,8 +986,8 @@ class AstroTrainer(BaseTrainer):
             self.gt_wave, self.gt_fluxes,
             self.recon_wave, self.recon_fluxes,
             save_spectra=True,
-            gt_masks=self.gt_masks,
-            recon_masks=self.recon_masks,
+            gt_mask=self.gt_mask,
+            recon_mask=self.recon_mask,
             clip=self.extra_args["plot_clipped_spectrum"]
         )
 
@@ -1012,8 +1012,8 @@ class AstroTrainer(BaseTrainer):
 
         recon_wave = np.tile(
             self.dataset.get_full_wave(), num_spectra).reshape(num_spectra, -1)
-        recon_masks = np.tile(
-            self.dataset.get_full_wave_masks(), num_spectra).reshape(num_spectra, -1)
+        recon_mask = np.tile(
+            self.dataset.get_full_wave_mask(), num_spectra).reshape(num_spectra, -1)
 
         for i, codebook_spectra in enumerate(self.codebook_spectra):
             cur_dir = join(self.codebook_spectra_dir, f"spectra-{i}")
@@ -1025,7 +1025,7 @@ class AstroTrainer(BaseTrainer):
                 self.extra_args["flux_norm_cho"],
                 None, None,
                 recon_wave, codebook_spectra,
-                recon_masks=recon_masks,
+                recon_mask=recon_mask,
                 is_codebook=True,
                 save_spectra_together=True,
                 clip=self.extra_args["plot_clipped_spectrum"]

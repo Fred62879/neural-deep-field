@@ -88,12 +88,12 @@ class ssim1d(nn.Module):
         gauss = gauss[None,None,:].cuda()
         return gauss
 
-    def _forward(self, s1, s2, masks):
+    def _forward(self, s1, s2, mask):
         """
         Calculate the masked ssim loss between the given two spectra.
         @Param
           s1/2: spectra flux [(nbins,)bsz,nsmpl]
-          masks: 0 indicates `nan`
+          mask: 0 indicates `nan`
                  [(nbins,)bsz,nsmpl] duplicate in dim0 if multi-bin
         @Note
           When processing spectra, we append `nan` to the end of each spectra to make
@@ -105,7 +105,7 @@ class ssim1d(nn.Module):
           We can simply replace these `nan` with 0 which is essentially zero padding.
         """
         # assert valid region (indicated by mask) has no nan values
-        assert not torch.isnan(s1[masks]).any() and not torch.isnan(s2[masks]).any()
+        assert not torch.isnan(s1[mask]).any() and not torch.isnan(s2[mask]).any()
 
         invalid, val1, val2 = self._replace_nan(s1, s2)
 
@@ -118,7 +118,7 @@ class ssim1d(nn.Module):
             nbins,bsz,nsmpl = s1.shape
             s1 = s1.view(-1,1,nsmpl) # [nbins*bsz,1,nsmpl]
             s2 = s2.view(-1,1,nsmpl)
-            # masks = masks.view(-1,1,nsmpl)
+            # mask = mask.view(-1,1,nsmpl)
         else: raise ValueError()
 
         # calculating the mu parameter (locally) for both signals using a gaussian filter
@@ -160,7 +160,7 @@ class ssim1d(nn.Module):
             s2 = s2.view(nbins,bsz,nsmpl)
             ssim_score = ssim_score.view(nbins,bsz,nsmpl)
 
-        self._restore_nan(invalid, s1, s2, val1, val2, ssim_score, masks)
+        self._restore_nan(invalid, s1, s2, val1, val2, ssim_score, mask)
         return ssim_score
 
     def _replace_nan(self, s1, s2):
@@ -173,12 +173,12 @@ class ssim1d(nn.Module):
         s2[invalid] = 0
         return invalid, val1, val2
 
-    def _restore_nan(self, invalid, s1, s2, val1, val2, ssim_score, masks):
+    def _restore_nan(self, invalid, s1, s2, val1, val2, ssim_score, mask):
         """
         Change ssim in invalid region to `nan`.
         Restore any replaced `nan` values in the two spectra.
         """
-        ssim_score[masks == 0] = math.nan
+        ssim_score[mask == 0] = math.nan
         if torch.sum(invalid) > 0:
             ssim_score[invalid] = math.nan
             s1[invalid] = val1
@@ -196,7 +196,7 @@ class spectra_supervision_loss(nn.Module):
         self.weight_by_wave_coverage = weight_by_wave_coverage
         self.is_ssim = loss_func.__class__.__name__ == "ssim1d"
 
-    def forward(self, gt_spectra, recon_fluxes, masks):
+    def forward(self, gt_spectra, recon_fluxes, mask):
         """
         Calculate lambda-wise spectra loss
         @Param
@@ -209,28 +209,28 @@ class spectra_supervision_loss(nn.Module):
         if self.weight_by_wave_coverage:
             if gt_spectra.ndim == 3:
                 weight = gt_spectra[:,3]
-                ret = self._forward(gt_spectra[:,1]*weight, recon_fluxes*weight, masks)
+                ret = self._forward(gt_spectra[:,1]*weight, recon_fluxes*weight, mask)
             elif gt_spectra.ndim == 4:
                 weight = gt_spectra[:,:,3]
-                ret = self._forward(gt_spectra[:,:,1]*weight, recon_fluxes*weight, masks)
+                ret = self._forward(gt_spectra[:,:,1]*weight, recon_fluxes*weight, mask)
             else: raise ValueError()
         else:
             if gt_spectra.ndim == 3:
                 # print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
-                ret = self._forward(gt_spectra[:,1], recon_fluxes, masks)
+                ret = self._forward(gt_spectra[:,1], recon_fluxes, mask)
                 # print(torch.isnan(gt_spectra[:,1]).any(), torch.isnan(recon_fluxes).any())
             elif gt_spectra.ndim == 4:
                 #print(torch.isnan(gt_spectra[:,:,1]).any(), torch.isnan(recon_fluxes).any())
-                ret = self._forward(gt_spectra[:,:,1], recon_fluxes, masks)
+                ret = self._forward(gt_spectra[:,:,1], recon_fluxes, mask)
                 #print(torch.isnan(gt_spectra[:,:,1]).any(), torch.isnan(recon_fluxes).any())
             else: raise ValueError()
 
         assert recon_fluxes.shape == ret.shape
         return ret
 
-    def _forward(self, s1, s2, masks):
+    def _forward(self, s1, s2, mask):
         if self.is_ssim:
-            ret = self.loss_func(s1, s2, masks)
+            ret = self.loss_func(s1, s2, mask)
         else: ret = self.loss_func(s1, s2)
         return ret
 
