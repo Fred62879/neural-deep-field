@@ -200,7 +200,10 @@ class BasicDecoder(nn.Module):
             h = self.skip_current(h, x_skip)
 
         if self.batch_norm:
-            if h.ndim == 3: # [bsz,nsmpl,dim]
+            if h.ndim == 2: # [bsz,nsmpl]
+                # baseline or classification mode, sample used as features
+                h = self.bns[i](h)
+            elif h.ndim == 3: # [bsz,nsmpl,dim]
                 h = h.permute(0,2,1)
                 h = self.bns[i](h)
                 h = h.permute(0,2,1)

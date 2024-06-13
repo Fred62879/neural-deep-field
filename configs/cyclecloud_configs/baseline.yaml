@@ -1,13 +1,13 @@
 parent: base_cc.yaml
 
 global:
-    use_tqdm: True
+    use_tqdm: False
     exp_name: vdz-spectra-baseline
     log_fname: baseline
 
     tasks: [train, redshift_pretrain]
     tasks: [infer, redshift_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
-    tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
+    # tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
 
 optimizer:
     optimizer_type: adam
@@ -36,7 +36,7 @@ decoder:
     baseline_decoder_num_hidden_layers: 3
     baseline_decoder_hidden_dim: 512
 
-    baseline_decoder_batch_norm: False
+    baseline_decoder_batch_norm: True
     baseline_decoder_activate_before_skip: False
     baseline_decoder_skip_all_layers: False
     baseline_decoder_skip_method: add
@@ -50,9 +50,9 @@ trainer:
     save_data_every: -1
     save_model_every: 2000
 
-    resume_train: True
-    resume_log_dir: 20240612-205217_baseline_bin_class_10k_spectra_20k_epochs_r
-    resume_model_fname: model-ep10000-bch0.pth
+    resume_train: False
+    resume_log_dir: ''
+    resume_model_fname: model-ep20000-bch0.pth
 
 infer:
     infer_last_model_only: True
@@ -107,9 +107,9 @@ spectra_data:
 
     redshift_regress_spectra_sample_method: uniform_dense
 
-    generalization_max_num_spectra: 100
+    generalization_max_num_spectra: 10000
     num_gt_spectra_upper_bound: 200000
-    num_supervision_spectra_upper_bound: 10000 #200000
+    num_supervision_spectra_upper_bound: 200000
 
     filter_redshift: False
     filter_redshift_lo: 0.02

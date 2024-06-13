@@ -212,6 +212,7 @@ def plot_redshift_estimation_stats_together(
 
     if cho == "accuracy":
         plt.plot(residual_levels, stats)
+        plt.ylim(0,1.1)
         plt.xlabel("residual"); plt.ylabel("accuracy")
         plt.title(f"Accuracy under different residual levels")
         plt.tight_layout(); plt.savefig(fname + "_accuracy.png"); plt.close()
