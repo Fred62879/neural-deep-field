@@ -207,8 +207,7 @@ class SpectraTrainer(BaseTrainer):
                     self.calculate_spectra_loss_based_on_top_n_bins)
 
         if self.classify_redshift:
-            redshift_bins = init_redshift_bins(**self.extra_args)
-            self.num_redshift_bins = len(redshift_bins)
+            self.num_redshift_bins = self.dataset.get_num_redshift_bins()
 
         # * weighted spectra training
         self.regress_lambdawise_weights = self.brute_force and \
@@ -230,8 +229,8 @@ class SpectraTrainer(BaseTrainer):
             self.mode == "sanity_check"
         assert not self.sanity_check_with_weights or self.sanity_check_finetune
 
-        self.sanity_check_sample_bins_per_step = self.mode == "sanity_check" and \
-            self.extra_args["sanity_check_sample_bins_per_step"]
+        self.sanity_check_sample_bins = get_bool_sanity_check_sample_bins(**self.extra_args)
+        self.sanity_check_sample_bins_per_step = get_bool_sanity_check_sample_bins_per_step(**self.extra_args)
 
         # ** use global restframe loss
         if self.use_global_spectra_loss_as_lambdawise_weights:
@@ -603,6 +602,8 @@ class SpectraTrainer(BaseTrainer):
         else:
             fields.extend(["wave_data","spectra_masks",
                            "spectra_redshift","spectra_source_data"])
+            if self.sanity_check_sample_bins:
+                fields.append("selected_bins_mask")
             self.dataset.toggle_sanity_check_sample_bins_per_step(
                 self.sanity_check_sample_bins_per_step)
 
@@ -640,9 +641,6 @@ class SpectraTrainer(BaseTrainer):
             self.selected_ids = select_inferrence_ids(
                 length, self.extra_args["pretrain_num_infer_upper_bound"])
         else: self.selected_ids = np.arange(length)
-
-        if self.classify_redshift:
-            self.dataset.set_num_redshift_bins(self.num_redshift_bins)
 
         # weighted spectra training
         if self.use_global_spectra_loss_as_lambdawise_weights:
@@ -1093,11 +1091,13 @@ class SpectraTrainer(BaseTrainer):
             # only load pretrained latents to gt bin, all other bins are 0
             assert self.dataset.get_spectra_source() == "val"
             spectra_redshift = self.dataset.get_spectra_redshift() # validation spectra
-            (lo, hi) = get_redshift_range(**self.extra_args)
-            gt_bin_ids = get_bin_ids(
-                lo, self.extra_args["redshift_bin_width"],
-                spectra_redshift.numpy(), add_batched_dim=True
-            )
+            # (lo, hi) = get_redshift_range(**self.extra_args)
+            # gt_bin_ids = get_bin_ids(
+            #     lo, self.extra_args["redshift_bin_width"],
+            #     spectra_redshift.numpy(), add_batched_dim=True
+            # )
+            gt_bin_ids = get_gt_redshift_bin_ids(
+                spectra_redshift.numpy(), **self.extra_args)
 
             if self.optimize_bins_separately:
                 wrong_bin_latents = torch.ones(
@@ -1631,9 +1631,10 @@ class SpectraTrainer(BaseTrainer):
             spectra_baseline_mode=self.baseline_mode,
             spectra_classification_mode=self.classification_mode,
             optimize_bins_separately=self.optimize_bins_separately,
+            sanity_check_sample_bins=self.sanity_check_sample_bins or \
+                self.sanity_check_sample_bins_per_step,
             regularize_codebook_spectra=self.regularize_codebook_spectra,
             calculate_binwise_spectra_loss= self.calculate_binwise_spectra_loss,
-            sanity_check_sample_bins_per_step=self.sanity_check_sample_bins_per_step,
             regress_lambdawise_weights_share_latents=\
                 self.regress_lambdawise_weights and \
                 self.regress_lambdawise_weights_share_latents,

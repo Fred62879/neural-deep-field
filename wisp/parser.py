@@ -551,7 +551,8 @@ def define_cmd_line_args():
                                 help="pass latents as coords to model.")
 
     pretrain_group.add_argument("--sanity-check-sample-bins", action="store_true")
-    pretrain_group.add_argument("--sanity-check-num-bins-to-sample", action="store_true")
+    pretrain_group.add_argument("--sanity-check-sample-bins-per-step", action="store_true")
+    pretrain_group.add_argument("--sanity-check-num-bins-to-sample", type=int)
     pretrain_group.add_argument("--classifier-train-sample-bins", action="store_true")
     pretrain_group.add_argument("--classifier-train-num-bins-to-sample", action="store_true")
 

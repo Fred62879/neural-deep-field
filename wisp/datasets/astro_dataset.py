@@ -12,8 +12,9 @@ from wisp.datasets.fits_data import FitsData
 from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
-from wisp.utils.common import print_shape, get_bin_ids, \
-    create_gt_redshift_bin_masks, get_redshift_range, has_common, create_batch_ids
+from wisp.utils.common import print_shape, has_common, create_batch_ids, \
+    get_bool_classify_redshift, init_redshift_bins, \
+    get_gt_redshift_bin_ids, create_gt_redshift_bin_masks
 from wisp.datasets.data_utils import clip_data_to_ref_wave_range, \
     get_wave_range_fname, batch_sample_bins, batch_sample_torch, get_bound_id
 
@@ -44,7 +45,7 @@ class AstroDataset(Dataset):
         if self.space_dim == 3:
             self.unbatched_fields = {
                 "idx","selected_ids","wave_data","wave_range","nearest_neighbour_data",
-                "model_data","redshift_data","spectra_data","spectra_loss_data",
+                "model_data","redshift_data","spectra_data","spectra_loss_data","redshift_bins",
                 "gt_redshift_bin_ids","gt_redshift_bin_masks","global_restframe_spectra_loss"}
         else:
             self.unbatched_fields = set()
@@ -57,6 +58,12 @@ class AstroDataset(Dataset):
 
         self.trans_dataset = TransData(self.device, **self.kwargs)
         self.spectra_dataset = SpectraData(self.trans_dataset, self.device, **self.kwargs)
+
+        if get_bool_classify_redshift(**self.kwargs):
+            self.redshift_bins = init_redshift_bins(**self.kwargs)
+            self.num_redshift_bins = len(self.redshift_bins)
+            self.spectra_dataset.set_num_redshift_bins(self.num_redshift_bins)
+
         self.spectra_dataset.finalize_spectra()
 
         if has_common(self.kwargs["tasks"], ["main_train"]):
@@ -136,9 +143,6 @@ class AstroDataset(Dataset):
         """
         self.wave_sample_method = method
 
-    def set_num_redshift_bins(self, num_bins):
-        self.num_redshift_bins = num_bins
-
     def toggle_integration(self, integrate: bool):
         self.perform_integration = integrate
 
@@ -176,6 +180,9 @@ class AstroDataset(Dataset):
 
     def get_num_patches(self):
         return len(self.get_patch_uids())
+
+    def get_num_redshift_bins(self):
+        return self.num_redshift_bins
 
 
     def get_patch_uids(self):
@@ -256,6 +263,9 @@ class AstroDataset(Dataset):
         if self.spectra_source == "test":
             return self.spectra_dataset.get_test_spectra(idx)
 
+    def get_selected_bins_mask(self, idx=None):
+        return self.spectra_dataset.get_selected_bins_mask(idx)
+
     def get_num_gt_spectra(self):
         return self.spectra_dataset.get_num_gt_spectra()
 
@@ -328,11 +338,12 @@ class AstroDataset(Dataset):
     ############
 
     def index_selected_data(self, data, idx):
-        """ Index data with both selected_ids and given idx
-              (for selective spectra inferrence only)
-            @Param
-               selected_ids: select from source data (filter index)
-               idx: dataset index (batch index)
+        """
+        Index data with both selected_ids and given idx
+          (for selective spectra inferrence only)
+        @Param
+           selected_ids: select from source data (filter index)
+           idx: dataset index (batch index)
         """
         if self.infer_selected:
             assert self.mode == "spectra_pretrain_infer" or \
@@ -369,6 +380,8 @@ class AstroDataset(Dataset):
         elif field == "spectra_ivar_reliable":
             data = self.get_spectra_ivar_reliable()
 
+        elif field == "selected_bins_mask":
+            data = self.get_selected_bins_mask()
         # elif field == "masks":
         #     data = self.mask_dataset.get_mask()
         elif field in self.data:
@@ -397,6 +410,9 @@ class AstroDataset(Dataset):
             self.get_redshift_data(out)
         if "nearest_neighbour_data" in self.requested_fields:
             self.get_nearest_neighbour_data(out)
+
+        if "redshift_bins" in self.requested_fields:
+            out["redshift_bins"] = self.redshift_bins
         if "gt_redshift_bin_ids" in self.requested_fields:
             self.get_gt_redshift_bin_ids(out)
         if "gt_redshift_bin_masks" in self.requested_fields:
@@ -602,14 +618,16 @@ class AstroDataset(Dataset):
         del out["spectra_id_map"]
 
     def get_gt_redshift_bin_ids(self, out):
-        out["gt_redshift_bin_ids"] = self.create_gt_redshift_bin_ids(
-            spectra_redshift=out["spectra_redshift"])
+        out["gt_redshift_bin_ids"] = get_gt_redshift_bin_ids(
+            out["spectra_redshift"].numpy(), add_batch_dim=True, **self.kwargs)
 
     def get_gt_redshift_bin_masks(self, out):
-        _, out["gt_redshift_bin_masks"] = \
-            self.create_gt_redshift_bin_masks(
-                self.num_redshift_bins,
-                spectra_redshift=out["spectra_redshift"])
+        if "gt_redshift_bin_ids" not in out:
+            gt_bin_ids = get_gt_redshift_bin_ids(
+                out["spectra_redshift"].numpy(), add_batch_dim=True, **self.kwargs)
+        else: gt_bin_ids = out["gt_redshift_bin_ids"]
+        out["gt_redshift_bin_masks"] = create_gt_redshift_bin_masks(
+            self.num_redshift_bins, gt_bin_ids)
 
     ############
     # Debug data
@@ -627,25 +645,17 @@ class AstroDataset(Dataset):
         # pos = np.arange(bsz)
         # ids = np.concatenate((pos[None,:],ids[None,:]),axis=0)
         # init_probs[ ids[0,:], ids[1:,] ] = 1
-        ids = get_bin_ids(
-            lo, self.kwargs["redshift_bin_width"],
-            out["spectra_redshift"], add_batched_dim=True
-        )
+        # ids = get_bin_ids(
+        #     lo, self.kwargs["redshift_bin_width"],
+        #     out["spectra_redshift"], add_batched_dim=True)
+        ids = get_gt_redshift_bin_ids(
+            out["spectra_redshift"].numpy(), add_batch_dim=True, **self.kwargs)
         init_probs[ids[0], ids[1]] = 1
         out["init_redshift_prob"] = init_probs
 
     ############
     # Utilities
     ############
-
-    def create_gt_redshift_bin_ids(self, spectra_redshift=None):
-        if spectra_redshift is None:
-            spectra_redshift = self.get_spectra_redshift()
-        (lo, hi) = get_redshift_range(**self.kwargs)
-        gt_bin_ids = get_bin_ids(
-            lo, self.kwargs["redshift_bin_width"],
-            spectra_redshift.numpy(), add_batched_dim=True)
-        return torch.tensor(gt_bin_ids)
 
     def create_wrong_redshift_bin_ids(self, gt_bin_masks):
         """
@@ -659,16 +669,6 @@ class AstroDataset(Dataset):
         gt_bin_masks = gt_bin_masks[...,None].tile(1,1,2)
         wrong_bin_ids = wrong_bin_ids[~gt_bin_masks].view(bsz,nbins-1,2).permute(2,0,1)
         return wrong_bin_ids
-
-    def create_gt_redshift_bin_masks(self, num_bins, spectra_redshift=None, to_bool=True):
-        """ Get mask with 0 in indices of wrong bins
-        """
-        gt_bin_ids = self.create_gt_redshift_bin_ids(spectra_redshift=spectra_redshift)
-        gt_bin_masks = create_gt_redshift_bin_masks(gt_bin_ids, num_bins)
-        if to_bool: gt_bin_masks = gt_bin_masks.astype(bool)
-        else: gt_bin_masks = gt_bin_masks.astype(np.long)
-        gt_bin_masks = torch.tensor(gt_bin_masks)
-        return gt_bin_ids, gt_bin_masks
 
     def get_pixel_ids_one_patch(self, r, c, neighbour_size=1):
         return self.fits_dataset.get_pixel_ids_one_patch(r, c, neighbour_size)

@@ -17,12 +17,14 @@ from wisp.utils.plot import plot_spectra
 from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array, \
     get_bool_infer_spectra_with_lambdawise_weights, \
     get_bool_classify_redshift_based_on_l2, get_bool_regress_redshift, \
-    get_bool_redshift_pretrain_mode
+    get_bool_redshift_pretrain_mode, get_bool_sanity_check_sample_bins, \
+    get_gt_redshift_bin_ids, create_gt_redshift_bin_masks
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
     get_coords_norm_range_fname, add_dummy_dim, wave_within_bound, \
-    get_dataset_path, get_img_data_path, batch_sample_torch, set_wave_range
+    get_dataset_path, get_img_data_path, batch_sample_torch, set_wave_range, \
+    batch_sample_bins
 
 from tqdm import tqdm
 from pathlib import Path
@@ -242,6 +244,15 @@ class SpectraData:
         if self.spectra_process_patch_info:
             self.process_coords()
         self.split_spectra()
+        if get_bool_sanity_check_sample_bins(**self.kwargs):
+            self.sample_bins_during_sanity_check()
+
+    #############
+    # Setters
+    #############
+
+    def set_num_redshift_bins(self, num_bins):
+        self.num_redshift_bins = num_bins
 
     #############
     # Getters
@@ -410,9 +421,42 @@ class SpectraData:
             return self.data["test_ivar_reliable"]
         return self.data["test_ivar_reliable"][idx]
 
+    def get_selected_bins_mask(self, idx=None):
+        if idx is None:
+            return self.data["selected_bins_mask"]
+        return self.data["selected_bins_mask"][idx]
+
     #############
     # Helpers
     #############
+
+    def transform_data(self):
+        self.to_tensor([
+            "emitted_wave",
+            "gt_spectra",
+            "gt_spectra_pixels",
+            "gt_spectra_redshift",
+            "gt_spectra_sup_bound",
+            "gt_spectra_img_coords",
+            "gt_spectra_world_coords",
+        ], torch.float32)
+        self.to_tensor([
+            "gt_spectra_mask",
+            "emitted_wave_mask",
+        ], torch.bool)
+
+    def sample_bins_during_sanity_check(self):
+        # print(self.data["validation_spectra_redshift"].shape)
+        redshift = self.get_validation_redshift()
+        gt_bin_ids = get_gt_redshift_bin_ids(redshift, add_batch_dim=True, **self.kwargs)
+        gt_bin_masks = create_gt_redshift_bin_masks(
+            self.num_redshift_bins, gt_bin_ids, to_bool=True)
+        # print(gt_bin_ids.shape, gt_bin_ids.dtype, gt_bin_masks.shape, gt_bin_masks.dtype)
+
+        _, _, self.data["selected_bins_mask"] = batch_sample_bins(
+            None, gt_bin_masks, gt_bin_ids, self.kwargs["sanity_check_num_bins_to_sample"] - 1)
+        # print(self.data["selected_bins_mask"].shape, self.data["selected_bins_mask"].dtype)
+        # print(np.sum(self.data["selected_bins_mask"], axis=-1))
 
     def process_coords(self):
         if self.kwargs["coords_type"] == "img":
@@ -431,21 +475,6 @@ class SpectraData:
             coords = add_dummy_dim(coords, **self.kwargs)
 
         self.data["gt_spectra_coords"] = coords # [n,n_neighbr,2/3]
-
-    def transform_data(self):
-        self.to_tensor([
-            "emitted_wave",
-            "gt_spectra",
-            "gt_spectra_pixels",
-            "gt_spectra_redshift",
-            "gt_spectra_sup_bound",
-            "gt_spectra_img_coords",
-            "gt_spectra_world_coords",
-        ], torch.float32)
-        self.to_tensor([
-            "gt_spectra_mask",
-            "emitted_wave_mask",
-        ], torch.bool)
 
     def split_spectra(self):
         """
@@ -685,9 +714,9 @@ class SpectraData:
 
     def sample_spectra(self):
         """
-        In case of redshift regression we sample the source spectra when initializing.
+        To train the redshift baseline model, we sample the source spectra when initializing.
           During training, we use all samples and don't do sampling anymore.
-        Note, during regression, we treat each spectra as a latent. Thus the sample dim
+        Note, during training, we treat each spectra as a latent. Thus the sample dim
           becomes the latent dim ([bsz,1,nsmpl]). We need to sample spectra data properly
           s.t. there are as few invalid samples as possible.
         """

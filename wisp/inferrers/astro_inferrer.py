@@ -290,6 +290,8 @@ class AstroInferrer(BaseInferrer):
         self.classify_redshift_based_on_combined_ssim_l2 = \
             get_bool_classify_redshift_based_on_combined_ssim_l2(**self.extra_args)
 
+        self.sanity_check_sample_bins = get_bool_sanity_check_sample_bins(**self.extra_args)
+
         # weighted spectra training
         self.regress_lambdawise_weights = \
             self.extra_args["regress_lambdawise_weights"] and \
@@ -346,8 +348,7 @@ class AstroInferrer(BaseInferrer):
             self.extra_args["calculate_spectra_loss_based_on_optimal_bin"]
 
         if self.classify_redshift:
-            self.redshift_bins = init_redshift_bins(**self.extra_args)
-            self.num_redshift_bins = len(self.redshift_bins)
+            self.num_redshift_bins = self.dataset.get_num_redshift_bins()
 
         self.save_redshift = "save_redshift" in tasks and self.model_redshift
         self.save_redshift_test = self.save_redshift and self.test
@@ -642,6 +643,8 @@ class AstroInferrer(BaseInferrer):
                 self.requested_fields.extend([
                     "idx","wave_data","spectra_source_data",
                     "spectra_masks","spectra_redshift"])
+                if self.sanity_check_sample_bins:
+                    self.requested_fields.extend(["redshift_bins","selected_bins_mask"])
 
             self.wave_source = "spectra"
             self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
@@ -1440,9 +1443,6 @@ class AstroInferrer(BaseInferrer):
             self.dataset.set_num_wave_samples(self.num_wave_samples)
             self.dataset.set_wave_sample_method(self.wave_sample_method)
 
-        if self.classify_redshift:
-            self.dataset.set_num_redshift_bins(self.num_redshift_bins)
-
     @lru_cache # to remove
     def _select_inferrence_ids(self):
         fname = join(self.log_dir, "..", self.extra_args["spectra_inferrence_id_fname"])
@@ -1696,6 +1696,7 @@ class AstroInferrer(BaseInferrer):
                 apply_gt_redshift=self.apply_gt_redshift,
                 spectra_baseline_mode=self.redshift_infer,
                 spectra_classification_mode=self.clsfy_sc_infer or self.clsfy_genlz_infer,
+                sanity_check_sample_bins=self.sanity_check_sample_bins,
                 classify_redshift_based_on_l2= \
                     self.classify_redshift_based_on_l2 or \
                     self.classify_redshift_based_on_combined_ssim_l2,
@@ -1882,8 +1883,21 @@ class AstroInferrer(BaseInferrer):
                     logits = ret[f"redshift_logits{suffix}"]
                     ids = torch.argmax(logits, dim=-1)
 
-                argmax_redshift = ret["redshift"][ids]
-                # weighted_redshift = torch.sum(ret["redshift"] * logits, dim=-1)
+                if self.sanity_check_sample_bins:
+                    # logits = ret["redshift_logits"]  # [bsz,n_selected]
+                    redshift = data["redshift_bins"] # [n_total_bins]
+                    selected_bins_mask = data["selected_bins_mask"] # [bsz,n_total_bins]
+                    bsz = selected_bins_mask.shape[0]
+                    redshift = redshift[None,:].tile(bsz,1)
+                    redshift = redshift[selected_bins_mask].view(bsz,-1)
+                    # print(redshift.shape, redshift, ids.shape)
+                    ids = create_batch_ids(ids) # [2,bsz]
+                    argmax_redshift = redshift[ids[0],ids[1]]
+                    # print(argmax_redshift, argmax_redshift.shape)
+                else:
+                    argmax_redshift = ret["redshift"][ids]
+                    # weighted_redshift = torch.sum(ret["redshift"] * logits, dim=-1)
+
                 self.est_redshift.extend(argmax_redshift)
                 # self.weighted_redshift.extend(weighted_redshift)
                 if self.plot_est_redshift_logits:
@@ -2341,11 +2355,13 @@ class AstroInferrer(BaseInferrer):
             # if each bin has its own set of codebook coeff, we plot that for gt bin only
             gt_redshift = torch.stack(self.gt_redshift_cl).detach().cpu().numpy()
             if ids is not None: gt_redshift = gt_redshift[ids]
-            (lo, hi) = get_redshift_range(**self.extra_args)
-            gt_bin_ids = get_bin_ids(
-                lo, self.extra_args["redshift_bin_width"],
-                gt_redshift, add_batched_dim=True
-            )
+            # (lo, hi) = get_redshift_range(**self.extra_args)
+            # gt_bin_ids = get_bin_ids(
+            #     lo, self.extra_args["redshift_bin_width"],
+            #     gt_redshift, add_batched_dim=True)
+            gt_bin_ids = get_gt_redshift_bin_ids(
+                gt_redshift, add_batch_dim=True, **self.extra_args)
+
             y = codebook_coeff[gt_bin_ids[0], gt_bin_ids[1]]
             if self.plot_optimal_wrong_bin_codebook_coeff:
                 optimal_wrong_bin_ids = create_batch_ids(optimal_wrong_bin_ids)

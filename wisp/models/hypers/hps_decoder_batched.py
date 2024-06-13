@@ -390,7 +390,8 @@ class HyperSpectralDecoderB(nn.Module):
     def reconstruct_spectra(
             self, input, wave, scaler, bias, redshift, wave_bound, ret, codebook,
             qtz_args, spectra_masks, spectra_loss_func, spectra_l2_loss_func, gt_spectra,
-            gt_redshift_bin_ids, optm_bin_ids, global_restframe_spectra_loss
+            gt_redshift_bin_ids, optm_bin_ids, global_restframe_spectra_loss,
+            selected_bins_mask
     ):
         """
         Reconstruct emitted (codebook) spectra (under possibly multiple redshift values)
@@ -416,7 +417,7 @@ class HyperSpectralDecoderB(nn.Module):
             spectra (codebook spectra) [(num_bins,)num_embed,bsz,nsmpl]
             """
             codes = codebook.weight[:,None,None].tile(1,bsz,1,1)
-            latents = self.convert(wave, codes, redshift, wave_bound, ret)
+            latents = self.convert(wave, codes, redshift, wave_bound, selected_bins_mask, ret)
             codebook_spectra = self.spectra_decoder(latents)[...,0] # [...,nbins,bsz,nsmpl]
             if self.use_lambdawise_weights:
                 self.generate_lambdawise_weights(
@@ -425,7 +426,8 @@ class HyperSpectralDecoderB(nn.Module):
                 input, codebook_spectra, ret, qtz_args, spectra_masks,
                 spectra_loss_func, gt_spectra, gt_redshift_bin_ids) # [bsz,nsmpl]
         else:
-            latents = self.convert(wave, input, redshift, wave_bound, ret) # [...,bsz,nsmpl,dim]
+            latents = self.convert(
+                wave, input, redshift, wave_bound, selected_bins_mask, ret) # [...,bsz,nsmpl,dim]
             spectra = self.spectra_decoder(latents)[...,0] # [...,bsz,nsmpl]
             if self.use_lambdawise_weights:
                 self.generate_lambdawise_weights(
@@ -446,11 +448,12 @@ class HyperSpectralDecoderB(nn.Module):
         return latents, spectra
 
     def forward(
-        self, latents, wave, trans, nsmpl, full_wave_bound,
-        trans_mask=None, full_emitted_wave=None, codebook=None, qtz_args=None,
-        ret=None, spectra_masks=None, spectra_loss_func=None, spectra_l2_loss_func=None,
-        spectra_source_data=None, optm_bin_ids=None, gt_redshift_bin_ids=None,
-        global_restframe_spectra_loss=None
+            self, latents, wave, trans, nsmpl, full_wave_bound,
+            trans_mask=None, full_emitted_wave=None, codebook=None, qtz_args=None,
+            ret=None, spectra_masks=None, selected_bins_mask=None,
+            spectra_loss_func=None, spectra_l2_loss_func=None,
+            spectra_source_data=None, optm_bin_ids=None, gt_redshift_bin_ids=None,
+            global_restframe_spectra_loss=None,
     ):
         """
         @Param
@@ -508,7 +511,7 @@ class HyperSpectralDecoderB(nn.Module):
             redshift, full_wave_bound, ret, codebook, qtz_args,
             spectra_masks, spectra_loss_func, spectra_l2_loss_func,
             spectra_source_data, gt_redshift_bin_ids, optm_bin_ids,
-            global_restframe_spectra_loss
+            global_restframe_spectra_loss, selected_bins_mask
         )
         timer.check("hps_decoder::spectra reconstruced")
 

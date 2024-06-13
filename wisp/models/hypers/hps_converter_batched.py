@@ -3,7 +3,8 @@ import torch
 import warnings
 import torch.nn as nn
 
-from wisp.utils.common import get_bool_classify_redshift
+from wisp.utils.common import get_bool_classify_redshift, \
+    get_bool_sanity_check_sample_bins
 
 from wisp.models.embedders import Encoder
 from wisp.models.decoders import BasicDecoder, Siren
@@ -32,6 +33,7 @@ class HyperSpectralConverter(nn.Module):
         self.linear_norm_wave = kwargs["linear_norm_wave"]
 
         self.classify_redshift = get_bool_classify_redshift(**kwargs)
+        self.sanity_check_sample_bins = get_bool_sanity_check_sample_bins(**kwargs)
         self.use_global_spectra_loss_as_lambdawise_weights = \
             kwargs["use_global_spectra_loss_as_lambdawise_weights"] or \
             kwargs["infer_use_global_loss_as_lambdawise_weights"]
@@ -62,12 +64,10 @@ class HyperSpectralConverter(nn.Module):
 
     def _linear_norm_wave(self, wave, wave_bound):
         (lo, hi) = wave_bound
-        #print(lo, hi, torch.min(wave), torch.max(wave))
         # return self.wave_multiplier * (wave - lo) / (hi - lo)
         return self.wave_multiplier * wave / hi
-        # return self.wave_multiplier * (2 * (wave - lo) / (hi - lo) - 1)
 
-    def shift_wave(self, wave, redshift, ret):
+    def shift_wave(self, wave, redshift, selected_bins_mask, ret):
         """ Convert observed lambda to emitted lambda.
             @Param
               wave: [bsz,nsmpl,1]
@@ -75,20 +75,27 @@ class HyperSpectralConverter(nn.Module):
             @Return
               emitted_wave: [(num_bins,)bsz,nsmpl,1]
         """
-        # print(torch.min(wave), torch.max(wave))
-        # print(torch.min(redshift), torch.max(redshift))
+        bsz, nsmpl, _ = wave.shape
+
         wave = wave.permute(1,2,0)
         if self.classify_redshift:
             num_bins = len(redshift)
             wave = wave[...,None].tile(1,1,1,num_bins)
         wave = wave / (1 + redshift) # dont use `/=` this will change wave object
-        # print(torch.min(wave), torch.max(wave))
 
         if wave.ndim == 3:
             wave = wave.permute(2,0,1)
         elif wave.ndim == 4:
             wave = wave.permute(3,2,0,1)
         else: raise ValueError("Wrong wave dimension when redshifting.")
+
+        if selected_bins_mask is not None:
+            if wave.ndim == 3:
+                pass
+            elif wave.ndim == 4:
+                wave = wave[selected_bins_mask.T[...,None,None].tile(1,1,nsmpl,1)]
+                wave = wave.view(-1,bsz,nsmpl,1)
+            else: raise ValueError()
 
         if self.use_global_spectra_loss_as_lambdawise_weights:
             ret["emitted_wave"] = wave[...,0] # [(nbins,)bsz,nsmpl]
@@ -136,16 +143,12 @@ class HyperSpectralConverter(nn.Module):
             assert(spatial.shape == spectral.shape)
             latents = spatial + spectral # [...,embed_dim]
         elif self.combine_method == "concat":
-            #print(spatial.shape, spectral.shape)
-            #print(spatial)
-            #print(spectral)
-            #assert 0
             latents = torch.cat((spatial, spectral), dim=-1)
         else:
             raise ValueError("Unsupported spatial-spectral combination method.")
         return latents
 
-    def forward(self, wave, latents, redshift, wave_bound, ret):
+    def forward(self, wave, latents, redshift, wave_bound, selected_bins_mask, ret):
         """ Process wave (shift, encode, if required) and
               combine with RA/DEC (original state or encoded) to hyperspectral latents.
             @Param
@@ -160,15 +163,12 @@ class HyperSpectralConverter(nn.Module):
         """
         embed_dim = latents.shape[-1]
 
-        #print(torch.min(wave[...,0], dim=-1)[0])
-        #print(torch.max(wave[...,0], dim=-1)[0])
         if redshift is None:
             if self._model_redshift:
                 warnings.warn("model redshift without providing redshift values!")
-        else: wave = self.shift_wave(wave, redshift, ret)
+        else: wave = self.shift_wave(wave, redshift, selected_bins_mask, ret)
         if self.linear_norm_wave:
             wave = self._linear_norm_wave(wave, wave_bound)
-        #print(torch.min(wave), torch.max(wave))
 
         if self.encode_wave:
             wave = self.wave_encoder(wave) # [...,bsz,num_samples,wave_embed_dim]

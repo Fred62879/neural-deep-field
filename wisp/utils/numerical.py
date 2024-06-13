@@ -8,7 +8,7 @@ from sklearn.decomposition import PCA
 from scipy.interpolate import interp1d
 from astropy.visualization import ZScaleInterval
 from skimage.metrics import structural_similarity
-from wisp.utils.common import to_numpy, init_redshift_bins, get_bin_id
+from wisp.utils.common import to_numpy, init_redshift_bins
 
 
 def reduce_latents_dim_pca(all_latents, n, selected_axes=None):

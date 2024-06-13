@@ -7,7 +7,8 @@ from collections import defaultdict
 from wisp.utils import PerfTimer
 from wisp.utils.common import get_bool_classify_redshift, \
     get_bool_has_redshift_latents, get_bool_weight_spectra_loss_with_global_restframe_loss, \
-    get_bool_save_redshift_classification_data #, get_bool_save_lambdawise_spectra_loss
+    get_bool_save_redshift_classification_data, get_bool_sanity_check_sample_bins, \
+    get_bool_sanity_check_sample_bins_per_step
 
 from wisp.models.nefs import BaseNeuralField
 from wisp.models.embedders.encoder import Encoder
@@ -24,7 +25,9 @@ class SpectraNerf(BaseNeuralField):
         self.use_latents_as_coords = kwargs["use_latents_as_coords"]
         self.pixel_supervision = kwargs["pretrain_pixel_supervision"]
         self.has_redshift_latents = get_bool_has_redshift_latents(**kwargs)
-        self.sanity_check_sample_bins_per_step = kwargs["sanity_check_sample_bins_per_step"]
+
+        self.sanity_check_sample_bins = get_bool_sanity_check_sample_bins(**kwargs)
+        self.sanity_check_sample_bins_per_step = get_bool_sanity_check_sample_bins_per_step(**kwargs)
         # self.save_lambdawise_spectra_loss = get_bool_save_lambdawise_spectra_loss(**kwargs)
         self.save_lambdawise_spectra_loss = get_bool_save_redshift_classification_data(**kwargs)
 
@@ -119,8 +122,9 @@ class SpectraNerf(BaseNeuralField):
                     ])
                     if self.kwargs["plot_spectrum_under_gt_bin"]:
                         channels.append("gt_bin_spectra")
-                    if self.sanity_check_sample_bins_per_step:
-                        channels.append("selected_bin_masks")
+                    if self.sanity_check_sample_bins or \
+                       self.sanity_check_sample_bins_per_step:
+                        channels.append("selected_bins_mask")
 
             if self.save_lambdawise_spectra_loss or \
                self.kwargs["plot_spectrum_with_loss"] or \
@@ -181,7 +185,7 @@ class SpectraNerf(BaseNeuralField):
                  spectra_loss_func=None,
                  spectra_l2_loss_func=None,
                  spectra_source_data=None,
-                 selected_bin_masks=None,
+                 selected_bins_mask=None,
                  gt_redshift_bin_ids=None,
                  gt_redshift_bin_masks=None,
                  global_restframe_spectra_loss=None
@@ -204,7 +208,7 @@ class SpectraNerf(BaseNeuralField):
 
               optm_bin_ids: [bsz] ids of bin with best spectra quality at pervious step
               gt_redshift_bin_ids: [bsz,nbins]
-              selected_bin_masks: [bsz,nbins]
+              selected_bins_mask: [bsz,nbins]
               gt_redshift_bin_masks: [bsz,nbins]
         """
         timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
@@ -225,6 +229,15 @@ class SpectraNerf(BaseNeuralField):
                 coords = self.latents
                 coords = self.index_latents(coords, selected_ids, idx)
 
+                if self.sanity_check_sample_bins:
+                    assert selected_bins_mask is not None
+                    # print(coords.shape, selected_bins_mask.shape)
+                    bsz, _, nsmpl = coords.shape
+                    coords = coords[selected_bins_mask[...,None].tile(1,1,nsmpl)]
+                    coords = coords.view(bsz,-1,nsmpl)
+
+                # print(coords.shape, self.latents.shape)
+
             if gt_redshift_bin_masks is not None:
                 assert 0
                 # check gt bin id, useful only when we load pretrained latents to gt bin only
@@ -238,7 +251,7 @@ class SpectraNerf(BaseNeuralField):
                     + (coords * (~gt_redshift_bin_masks)).detach()
 
         if self.sanity_check_sample_bins_per_step:
-            assert selected_bin_masks is not None
+            assert selected_bins_mask is not None
             raise NotImplementedError()
 
         coords = coords[:,None]
@@ -267,12 +280,13 @@ class SpectraNerf(BaseNeuralField):
             qtz_args=qtz_args, ret=ret,
             full_emitted_wave=full_emitted_wave,
             spectra_masks=spectra_masks,
+            selected_bins_mask=selected_bins_mask,
             spectra_loss_func=spectra_loss_func,
             spectra_l2_loss_func=spectra_l2_loss_func,
             spectra_source_data=spectra_source_data,
             optm_bin_ids=optm_bin_ids,
             gt_redshift_bin_ids=gt_redshift_bin_ids,
-            global_restframe_spectra_loss=global_restframe_spectra_loss
+            global_restframe_spectra_loss=global_restframe_spectra_loss,
         )
 
         # print(ret.keys())
