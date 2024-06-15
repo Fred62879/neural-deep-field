@@ -210,30 +210,21 @@ class HyperSpectralDecoderB(nn.Module):
           (i.e. weighted average or argmax of spectra under all bins) (no qtz usage).
         @Param
           spectra [nbins,bsz,nsmpl]
-          redshift_bins_mask [bsz,nbins]
+          redshift_bins_mask [bsz,nbins] where 1 indicates gt bin
           ret["redshift_logits"] [bsz,nbins]
         @Return
           spectra [bsz,nsmpl]
         """
         if self.kwargs["brute_force_redshift"]:
-            """
-            Get argmax spectra which is for visualization only.
-            Optimization requires loss of spectra under each bin.
-            """
             if redshift_bins_mask is not None:
-                nbins, bsz, nsmpl = spectra.shape
-                # print(spectra.shape, redshift_bins_mask.shape)
-                # print(redshift_bins_mask)
-                # mask = (redshift_bins_mask.T)[...,None].tile(1,1,nsmpl)
-                # print(mask.shape)
-                # print(spectra[mask].shape)
-                # ret["gt_bin_spectra"] = spectra[mask].view(bsz,nsmpl)
-
-                ret["gt_bin_spectra"] = (spectra.permute(1,0,2)[redshift_bins_mask])
-
-                # ids = torch.tensor([[0,1],[55,35]], dtype=torch.long).to("cuda:0")
-                # print(spectra.shape, ids[0], ids[1])
-                # ret["gt_bin_spectra"] = spectra[ids[1],ids[0]]
+                """
+                Get argmax spectra which is for visualization only.
+                Optimization requires loss of spectra under each bin.
+                We need to apply the mask with the batch dimension at dim 0
+                  e.g. `spectra[redshift_bins_mask.T]` will mess up the batch dim,
+                  spectra 0 may end up as spectra 1.
+                """
+                ret["gt_bin_spectra"] = spectra.permute(1,0,2)[redshift_bins_mask]
 
             suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
             redshift_logits = ret[f"redshift_logits{suffix}"].detach()

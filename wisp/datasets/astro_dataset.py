@@ -670,17 +670,19 @@ class AstroDataset(Dataset):
     # Utilities
     ############
 
-    def create_wrong_redshift_bin_ids(self, redshift_bins_mask):
+    def get_wrong_redshift_bin_ids(self, redshift_bins_mask):
         """
         @Param: redshift_bins_mask [bsz,nbins]
         @Return: wrong bin ids [2,bsz,nbins-1]
         """
-        bsz, nbins = redshift_bins_mask.shape
-        wrong_bin_ids = torch.tensor(
-            list(product(range(bsz), range(nbins))), dtype=redshift_bins_mask.dtype
-        ).view(bsz,nbins,2)
-        redshift_bins_mask = redshift_bins_mask[...,None].tile(1,1,2)
-        wrong_bin_ids = wrong_bin_ids[~redshift_bins_mask].view(bsz,nbins-1,2).permute(2,0,1)
+        # bsz, nbins = redshift_bins_mask.shape
+        # wrong_bin_ids = torch.tensor(
+        #     list(product(range(bsz), range(nbins))), dtype=redshift_bins_mask.dtype
+        # ).view(bsz,nbins,2)
+        # redshift_bins_mask = redshift_bins_mask[...,None].tile(1,1,2)
+        # wrong_bin_ids = wrong_bin_ids[~redshift_bins_mask].view(bsz,nbins-1,2).permute(2,0,1)
+        wrong_bin_ids = get_wrong_redshift_bin_ids(redshift_bins_mask)
+        wrong_bin_ids = torch.tensor(wrong_bin_ids)
         return wrong_bin_ids
 
     def get_pixel_ids_one_patch(self, r, c, neighbour_size=1):

@@ -248,6 +248,14 @@ def get_gt_redshift_bin_ids(redshift, add_batch_dim=True, **kwargs):
     if add_batch_dim: ids = create_batch_ids(ids)
     return ids
 
+def get_wrong_redshift_bin_ids(redshift_bins_mask, add_batch_dim=True):
+    bsz, nbins = redshift_bins_mask.shape
+    bin_ids = np.tile(np.arange(nbins), (bsz,1))
+    wrong_bin_ids = (bin_ids[~redshift_bins_mask]).reshape(bsz,nbins-1)
+    # print(wrong_bin_ids.shape, wrong_bin_ids[0], gt_bin_ids[1][0])
+    if add_batch_dim: wrong_bin_ids = create_batch_ids(wrong_bins_ids)
+    return wrong_bin_ids
+
 def create_redshift_bins_mask(num_bins, redshift, keep_ids=False, to_bool=True, **kwargs):
     """ Create binary mask where 1 corresponds to gt bin and 0 for wrong bins.
         @Params:

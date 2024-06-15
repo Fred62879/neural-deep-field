@@ -73,7 +73,8 @@ class HyperSpectralConverter(nn.Module):
         """ Convert observed lambda to emitted lambda.
             @Param
               wave: [bsz,nsmpl,1]
-              redshift: [bsz] or [num_bins]
+              redshift: [bsz] or [n_bins]
+              selected_bins_mask: 1 for chose bins, 0 for others [bsz,n_bins]
             @Return
               emitted_wave: [(num_bins,)bsz,nsmpl,1]
         """
@@ -92,12 +93,19 @@ class HyperSpectralConverter(nn.Module):
         else: raise ValueError("Wrong wave dimension when redshifting.")
 
         if self.sample_bins:
+            """
+            We need to apply the mask with the batch dimension at dim 0
+              e.g. `wave[selected_bins_mask.T]` will mess up the batch dim,
+              spectra 0 may end up as spectra 1.
+            """
             assert selected_bins_mask is not None
             if wave.ndim == 3:
                 pass
             elif wave.ndim == 4:
-                wave = wave[selected_bins_mask.T[...,None,None].tile(1,1,nsmpl,1)]
-                wave = wave.view(-1,bsz,nsmpl,1)
+                # wave = wave[selected_bins_mask.T[...,None,None].tile(1,1,nsmpl,1)]
+                # wave = wave.view(-1,bsz,nsmpl,1)
+                wave = wave.permute(1,0,2,3)[selected_bins_mask].view(
+                    bsz,-1,nsmpl,1).permute(1,0,2,3)
             else: raise ValueError()
 
         if self.use_global_spectra_loss_as_lambdawise_weights:

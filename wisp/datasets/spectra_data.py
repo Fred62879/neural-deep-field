@@ -610,10 +610,10 @@ class SpectraData:
         sup_ids = sup_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
 
         num_sc_spectra = min(len(sup_ids), self.kwargs["sanity_check_max_num_spectra"])
-        # all_ids = np.arange(len(sup_ids))
-        # np.random.shuffle(all_ids)
-        # self.sanity_check_ids = all_ids[:num_sc_spectra]
-        self.sanity_check_ids = np.arange(num_sc_spectra)
+        all_ids = np.arange(len(sup_ids))
+        np.random.shuffle(all_ids)
+        self.sanity_check_ids = all_ids[:num_sc_spectra]
+        # self.sanity_check_ids = np.arange(num_sc_spectra)
         val_ids = sup_ids[self.sanity_check_ids]
         return test_ids, val_ids, sup_ids
 

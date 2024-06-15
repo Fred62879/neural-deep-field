@@ -5,8 +5,8 @@ global:
     exp_name: vdz-spectra-ssim
     log_fname: sc
 
-    tasks: [train, sanity_check, recon_spectra]
-    #tasks: [infer, sanity_check_infer, recon_spectra, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca save_redshift_classification_data
+    tasks: [train, sanity_check] #, recon_spectra]
+    tasks: [infer, sanity_check_infer, recon_spectra, save_redshift] #, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca save_redshift_classification_data
 
 optimizer:
     optimizer_type: adam
@@ -28,7 +28,7 @@ embedder:
     wave_multiplier: 64
 
 pretrain:
-    pretrain_batch_size: 25
+    pretrain_batch_size: 500
 
     use_latents_as_coords: True
     zero_init_spectra_latents: True
@@ -39,9 +39,9 @@ pretrain:
     pretrain_num_wave_samples: 100
     pretrain_wave_sample_method: rand_dense
 
-    sanity_check_sample_bins: False
+    sanity_check_sample_bins: True
     sanity_check_sample_bins_per_step: False
-    sanity_check_num_bins_to_sample: 1
+    sanity_check_num_bins_to_sample: 5
     
     model_redshift: True
     brute_force_redshift: True
@@ -87,11 +87,11 @@ decoder:
     decoder_latents_skip_add_conversion_method: multi_conversion
 
 trainer:
-    num_epochs: 200
-    log_cli_every: 20
+    num_epochs: 500
+    log_cli_every: 50
     plot_grad_every: -1
-    save_data_every: 20
-    save_model_every: 20
+    save_data_every: -1
+    save_model_every: 50
 
     plot_l2_loss: True
     plot_gt_bin_loss: True
@@ -109,12 +109,12 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: 20240614-170547_sc
+    # infer_log_dir: 
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: False
+    infer_outlier_only: True
 
     classify_redshift_based_on_l2: False
     classify_redshift_based_on_combined_ssim_l2: False
@@ -168,7 +168,7 @@ spectra_data:
     spectra_smooth_sigma: 15
 
     sample_from_pretrain_spectra: True
-    sanity_check_max_num_spectra: 2
+    sanity_check_max_num_spectra: 1000
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 

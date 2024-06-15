@@ -420,7 +420,7 @@ class SpectraTrainer(BaseTrainer):
                 # redshift_bins_mask = create_redshift_bins_mask(
                 #     self.num_redshift_bins)
                 # wrong_redshift_bin_ids = \
-                #     self.dataset.create_wrong_redshift_bin_ids(redshift_bins_mask)
+                #     self.dataset.get_wrong_redshift_bin_ids(redshift_bins_mask)
                 # gt_bin_latents, wrong_bin_latents = latents
                 # self.pipeline.set_gt_bin_latents(gt_bin_latents)
                 # self.pipeline.set_wrong_bin_latents(wrong_bin_latents)
@@ -1637,8 +1637,6 @@ class SpectraTrainer(BaseTrainer):
            self.sanity_check_sample_bins_per_step:
             self.pipeline.toggle_sample_bins(True)
 
-        # print(data["gt_redshift_bin_ids"])
-        # print(data["redshift_bins_mask"])
         ret = forward(
             data,
             self.pipeline,
@@ -1840,8 +1838,8 @@ class SpectraTrainer(BaseTrainer):
         all_bin_loss = ret[loss_name] # [bsz,n_bins] no `nan` or any invalid values
 
         if self.optimize_gt_bin_only:
-            _mask = data["redshift_bins_mask"].to(all_bin_loss.device)
-            spectra_loss = self.spectra_reduce_func(all_bin_loss * _mask)
+            mask = data["redshift_bins_mask"].to(all_bin_loss.device)
+            spectra_loss = self.spectra_reduce_func(all_bin_loss * mask)
         elif self.dont_optimize_gt_bin:
             # spectra_loss = self.spectra_reduce_func(
             #     all_bin_loss[~data["redshift_bins_mask"]])

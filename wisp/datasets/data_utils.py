@@ -14,7 +14,7 @@ import numpy as np
 # from wisp.core import Rays
 from functools import lru_cache
 from os.path import join, exists
-from wisp.utils.common import create_batch_ids
+from wisp.utils.common import create_batch_ids, get_wrong_redshift_bin_ids
 
 # from torch._six import string_classes
 # from torch.utils.data._utils.collate import default_convert
@@ -285,17 +285,13 @@ def batch_sample_bins(data, redshift_bins_mask, gt_bin_ids, n):
     assert (redshift_bins_mask[gt_bin_ids[0],gt_bin_ids[1]] == True).all()
 
     # select `n` bins among all wrong bins
-    bin_ids = np.tile(np.arange(nbins), (bsz,1))
-    wrong_bin_ids = (bin_ids[~redshift_bins_mask]).reshape(bsz,nbins-1)
-    # print(wrong_bin_ids.shape, wrong_bin_ids[0], gt_bin_ids[1][0])
-
     ids = np.array([np.random.choice(nbins-1, n, replace=False)
                     for _ in range(bsz)])
-    # ids = (np.random.rand(bsz,n) * (nbins - 2)).astype(int)
-    ids = create_batch_ids(ids)
+    ids = create_batch_ids(ids) # [bsz,n]
+    wrong_bin_ids = get_wrong_redshift_bin_ids(
+        redshift_bins_mask, add_batch_dim=False) # [bsz,nbins-1]
     sampled_wrong_bin_ids = wrong_bin_ids[ids[0],ids[1]]
-    # print(gt_bin_ids)
-    # print(sampled_wrong_bin_ids.shape, sampled_wrong_bin_ids)
+    # print(gt_bin_ids, sampled_wrong_bin_ids.shape, sampled_wrong_bin_ids)
     sampled_wrong_bin_ids = create_batch_ids(sampled_wrong_bin_ids)
 
     # mark selected wrong bin as `True` and select from given `data`
