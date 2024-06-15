@@ -109,7 +109,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: 
+    infer_log_dir: 20240614-190659_sc_1k_spectra_500_epochs
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100

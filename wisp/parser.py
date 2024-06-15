@@ -553,6 +553,9 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--sanity-check-sample-bins", action="store_true")
     pretrain_group.add_argument("--sanity-check-sample-bins-per-step", action="store_true")
     pretrain_group.add_argument("--sanity-check-num-bins-to-sample", type=int)
+
+    pretrain_group.add_argument("--classifier-use-bin-sampled-data", action="store_true",
+                                help="data gather from sanity check are sampled with bins")
     pretrain_group.add_argument("--classifier-train-sample-bins", action="store_true")
     pretrain_group.add_argument("--classifier-train-num-bins-to-sample", action="store_true")
 

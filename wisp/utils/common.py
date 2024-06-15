@@ -128,6 +128,13 @@ def get_bool_sanity_check_sample_bins_per_step(**kwargs):
     return kwargs["sanity_check_sample_bins_per_step"] and \
         ("sanity_check" in tasks or "sanity_check_infer" in tasks)
 
+def get_bool_classifier_use_bin_sampled_data(**kwargs):
+    tasks = set(kwargs["tasks"])
+    return kwargs["classifier_use_bin_sampled_data"] and \
+        ("redshift_classification_train" in tasks or \
+         "redshift_classification_sc_infer" in tasks or \
+         "redshift_classification_genlz_infer" in tasks)
+
 def get_bool_classify_redshift_based_on_l2(**kwargs):
     return get_bool_classify_redshift(**kwargs) and \
         kwargs["classify_redshift_based_on_l2"] and kwargs["spectra_loss_cho"] != "l2"
@@ -256,6 +263,33 @@ def get_wrong_redshift_bin_ids(redshift_bins_mask, add_batch_dim=True):
     if add_batch_dim: wrong_bin_ids = create_batch_ids(wrong_bins_ids)
     return wrong_bin_ids
 
+def get_argmax_redshift_bin_ids(
+        logits, logits2=None, classify_base_on_combined_metrics=False
+):
+    if classify_base_on_combined_metrics:
+        selected_bin_ids = torch.argsort(logits, dim=-1)[:,-2:]
+        b_selected_bin_ids = create_batch_ids(selected_bin_ids) # [2,bsz,2]
+        logits = logits2[b_selected_bin_ids[0], b_selected_bin_ids[1]]
+        m2_ids = torch.argmax(logits, dim=-1)
+        b_m2_ids = create_batch_ids(m2_ids)
+        ids = selected_bin_ids[b_m2_ids[0], b_m2_ids[1]] # [bsz]
+    else:
+        ids = torch.argmax(logits, dim=-1)
+    return ids
+
+def get_argmax_redshift(
+        redshift, ids, bin_sampled=False, selected_bins_mask=None
+):
+    if bin_sampled:
+        assert selected_bins_mask is not None
+        bsz = selected_bins_mask.shape[0]
+        redshift = redshift[None,:].tile(bsz,1)
+        redshift = redshift[selected_bins_mask].view(bsz,-1)
+        ids = create_batch_ids(ids)
+        argmax_redshift = redshift[ids[0],ids[1]]
+    else: argmax_redshift = redshift[ids]
+    return argmax_redshift
+
 def create_redshift_bins_mask(num_bins, redshift, keep_ids=False, to_bool=True, **kwargs):
     """ Create binary mask where 1 corresponds to gt bin and 0 for wrong bins.
         @Params:
@@ -289,6 +323,7 @@ def create_batch_ids(ids):
         indices = torch.tensor(indices).type(ids.dtype).to(ids.device)
         ids = torch.cat((indices[None,:], ids[None,:]), dim=0)
     else:
+        assert ids.__class__.__name__ == "ndarray"
         ids = np.concatenate((indices[None,:], ids[None,:]), axis=0)
     return ids
 

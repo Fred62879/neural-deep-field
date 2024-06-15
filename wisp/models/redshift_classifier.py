@@ -102,7 +102,8 @@ class RedshiftClassifier(nn.Module):
             # print(input.shape, input.dtype, input.device)
         else: raise ValueError()
 
-        logits = self.decoder(input).flatten() # [bsz,nbins,1] -> [n,]
+        logits = self.decoder(input)
+        logits = logits.flatten() # [bsz,nbins,1] -> [n,]
         assert not torch.isnan(logits).any()
         ret["redshift_logits"] = logits
         return ret
