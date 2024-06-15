@@ -223,9 +223,13 @@ class HyperSpectralDecoderB(nn.Module):
             if redshift_bins_mask is not None:
                 nbins, bsz, nsmpl = spectra.shape
                 # print(spectra.shape, redshift_bins_mask.shape)
-                mask = (redshift_bins_mask.T)[...,None].tile(1,1,nsmpl)
+                # print(redshift_bins_mask)
+                # mask = (redshift_bins_mask.T)[...,None].tile(1,1,nsmpl)
                 # print(mask.shape)
-                ret["gt_bin_spectra"] = spectra[mask].view(bsz,nsmpl)
+                # print(spectra[mask].shape)
+                # ret["gt_bin_spectra"] = spectra[mask].view(bsz,nsmpl)
+
+                ret["gt_bin_spectra"] = (spectra.permute(1,0,2)[redshift_bins_mask])
 
                 # ids = torch.tensor([[0,1],[55,35]], dtype=torch.long).to("cuda:0")
                 # print(spectra.shape, ids[0], ids[1])
@@ -327,18 +331,6 @@ class HyperSpectralDecoderB(nn.Module):
                 calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret, suffix="_l2")
 
             spectra = self.classify_redshift3D(spectra, redshift_bins_mask, ret)
-
-        if "gt_bin_spectra" in ret:
-            ## plot debug
-            # print(gt_spectra.shape, ret["gt_bin_spectra"].shape)
-            a = gt_spectra.detach().cpu().numpy()
-            b = ret["gt_bin_spectra"].detach().cpu().numpy()
-            # b = spectra.detach().cpu().numpy()
-            plt.plot(a[0,0],a[0,1])
-            plt.plot(a[0,0],b[0])
-            plt.savefig('tmp.png')
-            plt.close()
-            ## ends
 
         return spectra
 
