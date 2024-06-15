@@ -5,11 +5,11 @@ global:
     exp_name: vdz-spectra-ssim
     log_fname: sc
 
-    tasks: [train, sanity_check] #,recon_spectra]
-    tasks: [infer, sanity_check_infer, recon_spectra, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca save_redshift_classification_data
+    tasks: [train, sanity_check, recon_spectra]
+    #tasks: [infer, sanity_check_infer, recon_spectra, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca save_redshift_classification_data
 
 optimizer:
-    optimizer_type: 'adam'
+    optimizer_type: adam
 
     b1: 0.5
     b2: 0.999
@@ -39,9 +39,9 @@ pretrain:
     pretrain_num_wave_samples: 100
     pretrain_wave_sample_method: rand_dense
 
-    sanity_check_sample_bins: True
+    sanity_check_sample_bins: False
     sanity_check_sample_bins_per_step: False
-    sanity_check_num_bins_to_sample: 5
+    sanity_check_num_bins_to_sample: 1
     
     model_redshift: True
     brute_force_redshift: True
@@ -88,10 +88,9 @@ decoder:
 
 trainer:
     num_epochs: 200
-    batch_size: 5500
     log_cli_every: 20
-    plot_grad_every: 20
-    save_data_every: -1
+    plot_grad_every: -1
+    save_data_every: 20
     save_model_every: 20
 
     plot_l2_loss: True
@@ -110,7 +109,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir:
+    # infer_log_dir: 20240614-170547_sc
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -169,7 +168,7 @@ spectra_data:
     spectra_smooth_sigma: 15
 
     sample_from_pretrain_spectra: True
-    sanity_check_max_num_spectra: 100
+    sanity_check_max_num_spectra: 2
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 

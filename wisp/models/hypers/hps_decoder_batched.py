@@ -178,6 +178,9 @@ class HyperSpectralDecoderB(nn.Module):
         self.calculate_bayesian_redshift_logits = partial(
             calculate_bayesian_redshift_logits, loss, mask, gt_spectra)
 
+    def toggle_sample_bins(self, sample: bool):
+        self.convert.toggle_sample_bins(sample)
+
     #########
     # Helpers
     #########
@@ -219,8 +222,14 @@ class HyperSpectralDecoderB(nn.Module):
             """
             if redshift_bins_mask is not None:
                 nbins, bsz, nsmpl = spectra.shape
+                # print(spectra.shape, redshift_bins_mask.shape)
                 mask = (redshift_bins_mask.T)[...,None].tile(1,1,nsmpl)
+                # print(mask.shape)
                 ret["gt_bin_spectra"] = spectra[mask].view(bsz,nsmpl)
+
+                # ids = torch.tensor([[0,1],[55,35]], dtype=torch.long).to("cuda:0")
+                # print(spectra.shape, ids[0], ids[1])
+                # ret["gt_bin_spectra"] = spectra[ids[1],ids[0]]
 
             suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
             redshift_logits = ret[f"redshift_logits{suffix}"].detach()
@@ -318,6 +327,18 @@ class HyperSpectralDecoderB(nn.Module):
                 calculate_redshift_logits(self.kwargs["binwise_loss_beta"], ret, suffix="_l2")
 
             spectra = self.classify_redshift3D(spectra, redshift_bins_mask, ret)
+
+        if "gt_bin_spectra" in ret:
+            ## plot debug
+            # print(gt_spectra.shape, ret["gt_bin_spectra"].shape)
+            a = gt_spectra.detach().cpu().numpy()
+            b = ret["gt_bin_spectra"].detach().cpu().numpy()
+            # b = spectra.detach().cpu().numpy()
+            plt.plot(a[0,0],a[0,1])
+            plt.plot(a[0,0],b[0])
+            plt.savefig('tmp.png')
+            plt.close()
+            ## ends
 
         return spectra
 
@@ -468,6 +489,11 @@ class HyperSpectralDecoderB(nn.Module):
         - loss
           spectra_loss_func: spectra loss of choice for training
           spectra_l2_loss_func: when train with ssim, we may calculate l2 loss as well
+
+        - mask
+          redshift_bins_mask: 1 for gt bin, 0 for all other bins
+          selected_bins_mask: 1 for bins we sample at current step, 0 for others
+                              (gt bin always selected)
 
         ret (output from nerf and/or quantization): {
             "scaler":        unique scaler value for each coord. [bsz,1]

@@ -102,6 +102,9 @@ class SpectraNerf(BaseNeuralField):
     def set_bayesian_redshift_logits_calculation(self, loss, mask, gt_spectra):
         self.hps_decoder.set_bayesian_redshift_logits_calculation(loss, mask, gt_spectra)
 
+    def toggle_sample_bins(self, sample: bool):
+        self.hps_decoder.toggle_sample_bins(sample)
+
     def register_forward_functions(self):
         """ Register forward functions with the channels that they output.
         """
@@ -247,11 +250,11 @@ class SpectraNerf(BaseNeuralField):
                 coords = self.latents
                 coords = self.index_latents(coords, selected_ids, idx)
 
-                if self.sanity_check_sample_bins:
-                    assert selected_bins_mask is not None
-                    bsz, _, nsmpl = coords.shape
-                    coords = coords[selected_bins_mask[...,None].tile(1,1,nsmpl)]
-                    coords = coords.view(bsz,-1,nsmpl)
+            # if self.sanity_check_sample_bins:
+            #     assert selected_bins_mask is not None
+            #     bsz, _, nsmpl = coords.shape
+            #     coords = coords[selected_bins_mask[...,None].tile(1,1,nsmpl)]
+            #     coords = coords.view(bsz,-1,nsmpl)
 
             if self.optimize_bins_separately:
                 # assert redshift_bins_mask is not None:
@@ -266,7 +269,7 @@ class SpectraNerf(BaseNeuralField):
                 raise NotImplementedError()
 
         if self.sanity_check_sample_bins_per_step:
-            assert selected_bins_mask is not None
+            # assert selected_bins_mask is not None
             raise NotImplementedError()
 
         coords = coords[:,None]

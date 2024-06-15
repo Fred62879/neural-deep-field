@@ -33,6 +33,9 @@ class AstroPipeline(nn.Module):
     def set_bayesian_redshift_logits_calculation(self, loss, mask, gt_spectra):
         self.model.set_bayesian_redshift_logits_calculation(loss, mask, gt_spectra)
 
+    def toggle_sample_bins(self, sample: bool):
+        self.model.toggle_sample_bins(sample)
+
     def add_latents(self):
         self.model.add_latents()
 

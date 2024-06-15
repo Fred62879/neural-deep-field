@@ -644,7 +644,9 @@ class AstroInferrer(BaseInferrer):
                     "idx","wave_data","spectra_source_data",
                     "spectra_mask","spectra_redshift"])
                 if self.sanity_check_sample_bins:
-                    self.requested_fields.extend(["redshift_bins","selected_bins_mask"])
+                    self.requested_fields.extend([
+                        "redshift_bins","redshift_bins_mask","selected_bins_mask"])
+                    self.dataset.toggle_sanity_check_sample_bins(True)
 
             self.wave_source = "spectra"
             self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
@@ -1680,6 +1682,9 @@ class AstroInferrer(BaseInferrer):
                self.classify_redshift_based_on_combined_ssim_l2:
                 l2_loss_func = self._get_spectra_loss_func("l2")
 
+        if self.sanity_check_sample_bins:
+            self.spectra_infer_pipeline.toggle_sample_bins(True)
+
         with torch.no_grad():
             ret = forward(
                 data,
@@ -1884,16 +1889,13 @@ class AstroInferrer(BaseInferrer):
                     ids = torch.argmax(logits, dim=-1)
 
                 if self.sanity_check_sample_bins:
-                    # logits = ret["redshift_logits"]  # [bsz,n_selected]
                     redshift = data["redshift_bins"] # [n_total_bins]
                     selected_bins_mask = data["selected_bins_mask"] # [bsz,n_total_bins]
                     bsz = selected_bins_mask.shape[0]
                     redshift = redshift[None,:].tile(bsz,1)
                     redshift = redshift[selected_bins_mask].view(bsz,-1)
-                    # print(redshift.shape, redshift, ids.shape)
                     ids = create_batch_ids(ids) # [2,bsz]
                     argmax_redshift = redshift[ids[0],ids[1]]
-                    # print(argmax_redshift, argmax_redshift.shape)
                 else:
                     argmax_redshift = ret["redshift"][ids]
                     # weighted_redshift = torch.sum(ret["redshift"] * logits, dim=-1)
@@ -2359,8 +2361,7 @@ class AstroInferrer(BaseInferrer):
             # gt_bin_ids = get_bin_ids(
             #     lo, self.extra_args["redshift_bin_width"],
             #     gt_redshift, add_batched_dim=True)
-            gt_bin_ids = get_gt_redshift_bin_ids(
-                gt_redshift, add_batch_dim=True, **self.extra_args)
+            gt_bin_ids = get_gt_redshift_bin_ids(gt_redshift, **self.extra_args)
 
             y = codebook_coeff[gt_bin_ids[0], gt_bin_ids[1]]
             if self.plot_optimal_wrong_bin_codebook_coeff:
@@ -2709,17 +2710,15 @@ class AstroInferrer(BaseInferrer):
     def _get_gt_bin_spectra_losses(self, ret, data):
         all_bin_losses = self._get_all_bin_losses(ret)
         bsz = len(all_bin_losses)
-        if self.sanity_check_sample_bins:
-            mask = data["selected_redshift_bins_mask"]
-        else: mask = data["redshift_bins_mask"]
+        mask = data["redshift_bins_mask"]
+        # print('infer, gt bin', mask.shape)
         gt_bin_losses = all_bin_losses[mask]
         return gt_bin_losses
 
     def _get_optimal_wrong_bin_data(self, ret, data, get_id_only=False):
         all_bin_losses = self._get_all_bin_losses(ret)
-        if self.sanity_check_sample_bins:
-            mask = data["selected_redshift_bins_mask"]
-        else: mask = data["redshift_bins_mask"]
+        mask = data["redshift_bins_mask"]
+        # print('infer, optimal wrong bin', mask.shape)
         ids, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(all_bin_losses, mask)
         ids = create_batch_ids(ids.detach().cpu().numpy())
         if get_id_only: return ids

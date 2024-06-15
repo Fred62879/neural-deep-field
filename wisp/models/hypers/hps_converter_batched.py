@@ -3,8 +3,7 @@ import torch
 import warnings
 import torch.nn as nn
 
-from wisp.utils.common import get_bool_classify_redshift, \
-    get_bool_sanity_check_sample_bins
+from wisp.utils.common import get_bool_classify_redshift
 
 from wisp.models.embedders import Encoder
 from wisp.models.decoders import BasicDecoder, Siren
@@ -20,6 +19,7 @@ class HyperSpectralConverter(nn.Module):
         super(HyperSpectralConverter, self).__init__()
 
         self.kwargs = kwargs
+        self.sample_bins = False
         self._qtz_spectra = _qtz_spectra
         self._model_redshift = _model_redshift
         self.wave_multiplier = kwargs["wave_multiplier"]
@@ -33,7 +33,6 @@ class HyperSpectralConverter(nn.Module):
         self.linear_norm_wave = kwargs["linear_norm_wave"]
 
         self.classify_redshift = get_bool_classify_redshift(**kwargs)
-        self.sanity_check_sample_bins = get_bool_sanity_check_sample_bins(**kwargs)
         self.use_global_spectra_loss_as_lambdawise_weights = \
             kwargs["use_global_spectra_loss_as_lambdawise_weights"] or \
             kwargs["infer_use_global_loss_as_lambdawise_weights"]
@@ -57,6 +56,9 @@ class HyperSpectralConverter(nn.Module):
                 **self.kwargs)
         else:
             assert not self.kwargs["encode_wave"]
+
+    def toggle_sample_bins(self, sample: bool):
+        self.sample_bins = sample
 
     ####################
     # forward operations
@@ -89,7 +91,8 @@ class HyperSpectralConverter(nn.Module):
             wave = wave.permute(3,2,0,1)
         else: raise ValueError("Wrong wave dimension when redshifting.")
 
-        if selected_bins_mask is not None:
+        if self.sample_bins:
+            assert selected_bins_mask is not None
             if wave.ndim == 3:
                 pass
             elif wave.ndim == 4:

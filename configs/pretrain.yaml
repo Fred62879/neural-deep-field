@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: dz-spectra-ssim-debug
+    exp_name: vdz-spectra-ssim
     log_fname: pretrain
 
     tasks: [train, spectra_pretrain] #, recon_spectra]
-    #tasks: [infer, spectra_pretrain_infer, recon_spectra] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
+    tasks: [infer, spectra_pretrain_infer, recon_spectra] #'plot_global_lambdawise_spectra_loss'] #'plot_spectra_latents_pca'
 
 optimizer:
     optimizer_type: adam
@@ -48,14 +48,14 @@ pretrain:
 decoder:
     decoder_activation_type: relu
     decoder_batch_norm: False
-    decoder_num_hidden_layers: 3
+    decoder_num_hidden_layers: 5
     decoder_hidden_dim: 512
     decoder_skip_layers: []
 
     decoder_gaussian_sigma: .1
 
     decoder_activate_before_latents_skip: False
-    decoder_latents_skip_all_layers: False
+    decoder_latents_skip_all_layers: True
     decoder_latents_skip_method: 'add'
     decoder_latents_skip_add_conversion_method: 'multi_conversion'
 
@@ -80,7 +80,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: 
+    infer_log_dir: 20240607-033031_pretrain_100k_spectra_m64_100_samples_divide_wave_norm_pe_dim_64_5k_epochs
     infer_selected: True
     pretrain_num_infer_upper_bound: 35
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
@@ -92,7 +92,7 @@ infer:
     pretrain_infer_wave_sample_method: uniform_dense
 
     plot_clipped_spectrum: True
-    plot_spectrum_with_loss: True
+    plot_spectrum_with_loss: False
     plot_spectrum_with_ivar: False
     plot_spectrum_with_lines: False
     plot_spectrum_with_recon: True
@@ -118,7 +118,7 @@ spectra_data:
 
     spectra_cho: v1
     spectra_process_patch_info: False
-    spectra_data_sources: [deimos,zcosmos] #,vipers_w1,vipers_w4]
+    spectra_data_sources: [deimos,zcosmos,vipers_w1,vipers_w4]
     random_permute_source_spectra: True
 
     spectra_supervision_wave_lo: 6000
@@ -130,8 +130,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    num_gt_spectra_upper_bound: 25400
-    num_supervision_spectra_upper_bound: 100 #25400
+    num_gt_spectra_upper_bound: 200000
+    num_supervision_spectra_upper_bound: 200000
 
     filter_redshift: False
     filter_redshift_lo: 0.02

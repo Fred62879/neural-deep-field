@@ -239,31 +239,29 @@ def init_redshift_bins(init_np=False, **kwargs):
 #         ids = np.concatenate((indices, ids[None,:]), axis=0)
 #     return ids
 
-def get_gt_redshift_bin_ids(redshift, add_batch_dim=False, **kwargs):
+def get_gt_redshift_bin_ids(redshift, add_batch_dim=True, **kwargs):
     (lo, hi) = get_redshift_range(**kwargs)
-    # gt_bin_ids = get_bin_ids(
-    #     lo, kwargs["redshift_bin_width"],
-    #     redshift.numpy(), add_batched_dim=True)
-    # return torch.tensor(gt_bin_ids)
-    if redshift.__class__.__name__ == "Tensor":
-        redshift = redshift.numpy()
+    if redshift.__class__.__name__ == "Tensor": redshift = redshift.numpy()
     assert redshift.__class__.__name__ == "ndarray"
     ids = (redshift - kwargs["redshift_bin_width"] / 2 - lo) / kwargs["redshift_bin_width"]
     ids = np.rint(ids).astype(int)
-    if add_batch_dim:
-        ids = create_batch_ids(ids)
+    if add_batch_dim: ids = create_batch_ids(ids)
     return ids
 
-def create_redshift_bins_mask(num_bins, gt_bin_ids, to_bool=False):
+def create_redshift_bins_mask(num_bins, redshift, keep_ids=False, to_bool=True, **kwargs):
     """ Create binary mask where 1 corresponds to gt bin and 0 for wrong bins.
         @Params:
           gt_bin_ids: [2,bsz]
     """
+    if redshift.__class__.__name__ == "Tensor": redshift = redshift.numpy()
+    assert redshift.__class__.__name__ == "ndarray"
+    gt_bin_ids = get_gt_redshift_bin_ids(redshift, **kwargs)
     bsz = gt_bin_ids.shape[-1]
     mask = np.zeros((bsz, num_bins))
     mask[gt_bin_ids[0],gt_bin_ids[1]] = 1
     if to_bool: mask = mask.astype(bool)
     else:       mask = mask.astype(np.long)
+    if keep_ids: return gt_bin_ids, mask
     return mask
 
 def create_batch_ids(ids):
@@ -614,6 +612,7 @@ def forward(
         trans_sample_method="none",
         optimize_bins_separately=False,
         sanity_check_sample_bins=False,
+        sanity_check_sample_bins_per_step=False,
         redshift_supervision_train=False,
         regularize_codebook_spectra=False,
         classify_redshift_based_on_l2=False,
@@ -704,10 +703,6 @@ def forward(
         if regularize_codebook_spectra:
             net_args["full_emitted_wave"] = data["full_emitted_wave"]
             requested_channels.append("full_range_codebook_spectra")
-        # if save_gt_bin_spectra or optimize_bins_separately:
-        #     net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
-        # if optimize_bins_separately:
-        #     net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
         if save_gt_bin_spectra or optimize_bins_separately:
             net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
 
@@ -771,8 +766,10 @@ def forward(
             net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses"]
 
         if sanity_check_sample_bins:
+            net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
             net_args["selected_bins_mask"] = data["selected_bins_mask"]
-            net_args["redshift_bins_mask"] = data["selected_redshift_bins_mask"]
+        elif sanity_check_sample_bins_per_step:
+            net_args["selected_bins_mask"] = data["selected_bins_mask"]
     else:
         raise ValueError("Unsupported space dimension.")
 

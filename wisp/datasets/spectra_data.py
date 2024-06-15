@@ -15,10 +15,9 @@ import matplotlib.pyplot as plt
 from wisp.datasets.patch_data import PatchData
 from wisp.utils.plot import plot_spectra
 from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array, \
-    get_bool_infer_spectra_with_lambdawise_weights, \
+    create_redshift_bins_mask, get_bool_infer_spectra_with_lambdawise_weights, \
     get_bool_classify_redshift_based_on_l2, get_bool_regress_redshift, \
-    get_bool_redshift_pretrain_mode, get_bool_sanity_check_sample_bins, \
-    get_gt_redshift_bin_ids, create_redshift_bins_mask
+    get_bool_redshift_pretrain_mode, get_bool_sanity_check_sample_bins
 from wisp.utils.numerical import normalize_coords, calculate_metrics
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
@@ -245,7 +244,7 @@ class SpectraData:
             self.process_coords()
         self.split_spectra()
         if get_bool_sanity_check_sample_bins(**self.kwargs):
-            self.sample_bins_during_sanity_check()
+            self.sample_bins_for_sanity_check()
 
     #############
     # Setters
@@ -445,17 +444,12 @@ class SpectraData:
             "emitted_wave_mask",
         ], torch.bool)
 
-    def sample_bins_during_sanity_check(self):
-        # print(self.data["validation_spectra_redshift"].shape)
+    def sample_bins_for_sanity_check(self):
         redshift = self.get_validation_redshift()
-        gt_bin_ids = get_gt_redshift_bin_ids(redshift, add_batch_dim=True, **self.kwargs)
-        bins_mask = create_redshift_bins_mask(
-            self.num_redshift_bins, gt_bin_ids, to_bool=True)
-
+        gt_bin_ids, bins_mask = create_redshift_bins_mask(
+            self.num_redshift_bins, redshift, keep_ids=True, **self.kwargs)
         _, _, self.data["selected_bins_mask"] = batch_sample_bins(
             None, bins_mask, gt_bin_ids, self.kwargs["sanity_check_num_bins_to_sample"] - 1)
-        # print(self.data["selected_bins_mask"].shape, self.data["selected_bins_mask"].dtype)
-        # print(np.sum(self.data["selected_bins_mask"], axis=-1))
 
     def process_coords(self):
         if self.kwargs["coords_type"] == "img":
@@ -614,8 +608,12 @@ class SpectraData:
 
         test_ids = test_ids[:self.kwargs["generalization_max_num_spectra"]]
         sup_ids = sup_ids[:self.kwargs["num_supervision_spectra_upper_bound"]]
-        self.sanity_check_ids = np.arange(
-            min(len(sup_ids), self.kwargs["sanity_check_max_num_spectra"]))
+
+        num_sc_spectra = min(len(sup_ids), self.kwargs["sanity_check_max_num_spectra"])
+        # all_ids = np.arange(len(sup_ids))
+        # np.random.shuffle(all_ids)
+        # self.sanity_check_ids = all_ids[:num_sc_spectra]
+        self.sanity_check_ids = np.arange(num_sc_spectra)
         val_ids = sup_ids[self.sanity_check_ids]
         return test_ids, val_ids, sup_ids
 

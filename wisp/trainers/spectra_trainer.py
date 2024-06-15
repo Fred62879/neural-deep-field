@@ -85,6 +85,7 @@ class SpectraTrainer(BaseTrainer):
         self.save_pixel_values = "save_pixel_values" in tasks
         self.plot_codebook_logits = "plot_codebook_logits" in tasks
         self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ" in tasks
+        self.plot_gt_bin_spectra = self.extra_args["plot_spectrum_under_gt_bin"]
 
         if "spectra_pretrain" in tasks:
             self.mode = "spectra_pretrain"
@@ -229,8 +230,11 @@ class SpectraTrainer(BaseTrainer):
             self.mode == "sanity_check"
         assert not self.sanity_check_with_weights or self.sanity_check_finetune
 
-        self.sanity_check_sample_bins = get_bool_sanity_check_sample_bins(**self.extra_args)
-        self.sanity_check_sample_bins_per_step = get_bool_sanity_check_sample_bins_per_step(**self.extra_args)
+        self.sanity_check_sample_bins = \
+            get_bool_sanity_check_sample_bins(**self.extra_args)
+        self.sanity_check_sample_bins_per_step = \
+            get_bool_sanity_check_sample_bins_per_step(**self.extra_args)
+        assert not (self.sanity_check_sample_bins and self.sanity_check_sample_bins_per_step)
 
         # ** use global restframe loss
         if self.use_global_spectra_loss_as_lambdawise_weights:
@@ -324,12 +328,6 @@ class SpectraTrainer(BaseTrainer):
             self.load_pretrained_spectra_latents
         assert sum([self.optimize_gt_bin_only, self.dont_optimize_gt_bin]) <= 1
 
-        if self.optimize_bins_separately:
-            self.gt_redshift_bin_ids, self.gt_redshift_bin_mask = \
-                self.dataset.create_gt_redshift_bin_mask(self.num_redshift_bins)
-            self.wrong_redshift_bin_ids = \
-                self.dataset.create_wrong_redshift_bin_ids(self.gt_redshift_bin_mask)
-
         assert not self.optimize_spectra_latents_as_logits or self.qtz_spectra
         # no pretrained latents to load
 
@@ -418,14 +416,17 @@ class SpectraTrainer(BaseTrainer):
             latents, redshift_latents = self.init_latents()
 
             if self.optimize_bins_separately:
+                # gt_redshift_bin_ids = get_redshift_bin_ids()
+                # redshift_bins_mask = create_redshift_bins_mask(
+                #     self.num_redshift_bins)
+                # wrong_redshift_bin_ids = \
+                #     self.dataset.create_wrong_redshift_bin_ids(redshift_bins_mask)
+                # gt_bin_latents, wrong_bin_latents = latents
+                # self.pipeline.set_gt_bin_latents(gt_bin_latents)
+                # self.pipeline.set_wrong_bin_latents(wrong_bin_latents)
+                # self.pipeline.combine_latents_all_bins(
+                #     gt_redshift_bin_ids, wrong_redshift_bin_ids, redshift_bins_mask)
                 raise NotImplementedError()
-                gt_bin_latents, wrong_bin_latents = latents
-                self.pipeline.set_gt_bin_latents(gt_bin_latents)
-                self.pipeline.set_wrong_bin_latents(wrong_bin_latents)
-                self.pipeline.combine_latents_all_bins(
-                    self.gt_redshift_bin_ids,
-                    self.wrong_redshift_bin_ids,
-                    self.gt_redshift_bin_mask)
             elif self.regularize_binwise_spectra_latents:
                 base_latents, addup_latents = latents
                 self.pipeline.set_base_latents(base_latents)
@@ -591,27 +592,28 @@ class SpectraTrainer(BaseTrainer):
             fields.extend(["spectra_lambdawise_losses",
                            "wave","wave_range","gt_spectra","recon_spectra",
                            "spectra_mask_b","spectra_redshift_b",
-                           "gt_redshift_bin_ids_b","gt_redshift_bin_mask_b"])
+                           "gt_redshift_bin_ids_b","redshift_bins_mask_b"])
             self.dataset.toggle_classifier_train_sample_bins(
                 self.extra_args["classifier_train_sample_bins"])
         elif self.baseline_mode:
             fields.extend([
                 "wave_range","spectra_mask","spectra_redshift","spectra_source_data"])
             if self.classify_redshift:
-                fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_mask"])
+                fields.extend(["gt_redshift_bin_ids","redshift_bins_mask"])
         else:
-            fields.extend(["wave_data","spectra_mask",
+            fields.extend(["wave_data","spectra_mask","gt_redshift_bin_ids",
                            "spectra_redshift","spectra_source_data"])
             if self.sanity_check_sample_bins:
-                fields.append("selected_bins_mask")
-            self.dataset.toggle_sanity_check_sample_bins_per_step(
-                self.sanity_check_sample_bins_per_step)
+                fields.extend(["redshift_bins_mask","selected_bins_mask"])
+                self.dataset.toggle_sanity_check_sample_bins(True)
+            elif self.sanity_check_sample_bins_per_step:
+                self.dataset.toggle_sanity_check_sample_bins_per_step(True)
 
         # todo, codebook pretrain "coords" not handled
         if self.pixel_supervision:
             fields.append("spectra_pixels")
         if self.plot_gt_bin_loss or self.neg_sup_wrong_redshift:
-            fields.extend(["gt_redshift_bin_ids","gt_redshift_bin_mask"])
+            fields.extend(["gt_redshift_bin_ids","redshift_bins_mask"])
 
         # use original spectra wave
         self.dataset.set_wave_source("spectra")
@@ -718,7 +720,6 @@ class SpectraTrainer(BaseTrainer):
 
         # for n, p in self.pipeline.named_parameters():
             # print(n, p.requires_grad)
-            # if n == 'model.latents': # print(p.shape) print(p[:2,0])
 
         if self.extra_args["resume_train"]:
             self.resume_train()
@@ -726,7 +727,6 @@ class SpectraTrainer(BaseTrainer):
         # check model state (frozen or not)
         # for n, p in self.pipeline.named_parameters():
             # print(n, p.requires_grad)
-            # if n == 'model.latents': #print(p.shape)print(p[:2,0])
 
     def end_train(self):
         self.writer.close()
@@ -870,11 +870,9 @@ class SpectraTrainer(BaseTrainer):
         if self._plot_grad_now():
             plot_grad_flow(self.params_dict.items(), self.grad_fname)
 
-        # print(self.pipeline.model.latents[0,74:77])
         if not self.use_lbfgs:
             self.optimizer.step(target=self._get_optm_target())
             self.timer.check("stepped")
-        # print(self.pipeline.model.latents[0,74:77])
 
         return ret
 
@@ -913,6 +911,8 @@ class SpectraTrainer(BaseTrainer):
                 self.gt_fluxes.extend(data["spectra_source_data"][:,1])
                 self.spectra_wave.extend(data["spectra_source_data"][:,0])
                 self.spectra_mask.extend(data["spectra_mask"])
+                if self.plot_gt_bin_spectra:
+                    self.gt_bin_fluxes.extend(ret["gt_bin_spectra"])
             if self.plot_spectra_with_weights:
                 assert ret["lambdawise_weights"].ndim == 3 # [nbins,bsz,nsmpl]
                 if self.regress_lambdawise_weights_share_latents:
@@ -938,10 +938,10 @@ class SpectraTrainer(BaseTrainer):
             latents = self.init_pretrain_spectra_latents()
             redshift_latents = None
         elif self.brute_force:
-            latents = self.init_redshift_pretrain_spectra_latents()
+            latents = self.init_brute_force_spectra_latents()
             if not self.has_redshift_latents:
                 redshift_latents = None
-            else: redshift_latents = self.init_redshift_pretrain_redshift_latents()
+            else: redshift_latents = self.init_brute_force_redshift_latents()
         else:
             raise ValueError("Invalid spectra trainer mode!")
         return latents, redshift_latents
@@ -1008,6 +1008,12 @@ class SpectraTrainer(BaseTrainer):
                 if n not in nms:
                     freeze_excls.append(n)
 
+            # sc sample debug #REMOVE
+            # checkpoint = torch.load(self.pretrained_model_fname)
+            # for n in checkpoint["model_state_dict"].keys():
+            #     freeze_excls.append(n)
+            # done
+
             if self.mode == "generalization" or not self.sanity_check_finetune:
                 freeze_layers_excl(self.pipeline, excls=freeze_excls)
                 log.info(f"only {freeze_excls} not frozen!")
@@ -1028,9 +1034,10 @@ class SpectraTrainer(BaseTrainer):
             zero_init=self.extra_args["zero_init_spectra_latents"],
             freeze=not self.optimize_spectra_latents
         )
+        assert 0
         return latents
 
-    def init_redshift_pretrain_redshift_latents(self):
+    def init_brute_force_redshift_latents(self):
         if not self.apply_gt_redshift and self.split_latent:
             sp = (self.num_spectra, self.extra_args["redshift_logit_latent_dim"])
             latents = self.create_latents(
@@ -1040,7 +1047,7 @@ class SpectraTrainer(BaseTrainer):
         else: latents = None
         return latents
 
-    def init_redshift_pretrain_spectra_latents(self):
+    def init_brute_force_spectra_latents(self):
         """ Initialize latents for spectra generation during sanity.
         """
         latents = None
@@ -1048,11 +1055,15 @@ class SpectraTrainer(BaseTrainer):
             sp_z_dim = self.extra_args["qtz_num_embed"]
         else: sp_z_dim = self.extra_args["spectra_latent_dim"]
 
+        if self.sanity_check_sample_bins:
+            n_bins = self.extra_args["sanity_check_num_bins_to_sample"]
+        else: n_bins = self.num_redshift_bins
+
         if self.regularize_binwise_spectra_latents:
             sp = [(self.num_spectra, sp_z_dim),
-                  (self.num_spectra, self.num_redshift_bins, sp_z_dim)]
+                  (self.num_spectra, n_bins, sp_z_dim)]
         elif self.optimize_latents_for_each_redshift_bin:
-            sp = (self.num_spectra, self.num_redshift_bins, sp_z_dim)
+            sp = (self.num_spectra, n_bins, sp_z_dim)
         else: sp = (self.num_spectra, sp_z_dim)
 
         if not self.load_pretrained_spectra_latents:
@@ -1068,8 +1079,9 @@ class SpectraTrainer(BaseTrainer):
             pretrained = checkpoint["model_state_dict"]["model.latents"][permute_ids].detach()
 
             if self.optimize_latents_for_each_redshift_bin:
-                if pretrained.ndim == 3:
+                if self.mode == "spectra_pretrain":
                     # when we pretrain with brute force
+                    assert pretrained.ndim == 3 and self.brute_force
                     raise NotImplementedError()
                 else:
                     pretrained = self.load_pretrained_latents_all_bins(pretrained)
@@ -1087,37 +1099,36 @@ class SpectraTrainer(BaseTrainer):
         """ This is only called when we pretrain via applying GT redshift directly;
               and sanity check with brute force method.
         """
+        n_bins = self.extra_args["sanity_check_num_bins_to_sample"] \
+            if self.sanity_check_sample_bins else self.num_redshift_bins
+
         if self.load_pretrained_spectra_latents_to_gt_bin_only:
             # only load pretrained latents to gt bin, all other bins are 0
             assert self.dataset.get_spectra_source() == "val"
-            spectra_redshift = self.dataset.get_spectra_redshift() # validation spectra
-            # (lo, hi) = get_redshift_range(**self.extra_args)
-            # gt_bin_ids = get_bin_ids(
-            #     lo, self.extra_args["redshift_bin_width"],
-            #     spectra_redshift.numpy(), add_batched_dim=True
-            # )
-            gt_bin_ids = get_gt_redshift_bin_ids(
-                spectra_redshift.numpy(), **self.extra_args)
 
             if self.optimize_bins_separately:
-                wrong_bin_latents = torch.ones(
-                    len(pretrained), self.num_redshift_bins-1, pretrained.shape[-1],
-                    dtype=pretrained.dtype)
+                sp = (len(pretrained), n_bins-1, pretrained.shape[-1])
+                wrong_bin_latents = torch.ones(sp, dtype=pretrained.dtype)
                 pretrained = [pretrained[:,None], wrong_bin_latents]
             else:
-                to_load = torch.ones(
-                    len(pretrained), self.num_redshift_bins, pretrained.shape[-1],
-                    dtype=pretrained.dtype).to(pretrained.device)
+                redshift = self.dataset.get_spectra_redshift() # validation spectra
+                gt_bin_ids = get_gt_redshift_bin_ids(redshift, **self.extra_args)
+                bsz, dim = pretrained.shape
+                sp = (bsz, self.num_redshift_bins, dim)
+                to_load = torch.ones(sp, dtype=pretrained.dtype).to(pretrained.device)
                 to_load[gt_bin_ids[0],gt_bin_ids[1]] = pretrained
+
+                if self.sanity_check_sample_bins:
+                    selected_bins_mask = torch.tensor(self.dataset.get_selected_bins_mask())
+                    to_load = to_load[
+                        selected_bins_mask[...,None].tile(1,1,dim)].view(bsz,n_bins,dim)
+
                 pretrained = to_load
         else:
             if self.optimize_bins_separately:
-                pretrained = [
-                    pretrained[:,None],
-                    pretrained[:,None].tile(1, self.num_redshift_bins-1, 1)]
-            else:
-                pretrained = pretrained[:,None].detach().tile(
-                    1, self.num_redshift_bins, 1)
+                pretrained = [pretrained[:,None],pretrained[:,None].tile(1, n_bins-1, 1)]
+            else: pretrained = pretrained[:,None].detach().tile(1, n_bins, 1)
+
         return pretrained
 
     def create_latents(self, sp, pretrained=None, zero_init=False, freeze=False, seed=0):
@@ -1301,6 +1312,8 @@ class SpectraTrainer(BaseTrainer):
             self.recon_fluxes = []
             self.spectra_wave = []
             self.spectra_mask = []
+            if self.plot_gt_bin_spectra:
+                self.gt_bin_fluxes = []
         if self.plot_codebook_logits:
             self.codebook_logits = []
         if self.plot_spectra_with_weights:
@@ -1403,6 +1416,11 @@ class SpectraTrainer(BaseTrainer):
             self.num_spectra, self.extra_args["spectra_neighbour_size"]**2, -1
         ).detach().cpu().numpy()[self.selected_ids]
 
+        if self.plot_gt_bin_spectra:
+            gt_bin_fluxes = torch.stack(self.gt_bin_fluxes).view(
+                self.num_spectra, -1).detach().cpu().numpy()[self.selected_ids]
+        else: gt_bin_fluxes = None
+
         if self.plot_spectra_with_weights:
             lambdawise_weights = torch.stack(
                 self.lambdawise_weights).detach().cpu().numpy()[self.selected_ids]
@@ -1426,6 +1444,9 @@ class SpectraTrainer(BaseTrainer):
             lo = i * n_spectrum_per_fig
             hi = min(lo + n_spectrum_per_fig, n_spectra)
 
+            if self.plot_gt_bin_spectra:
+                cur_gt_bin_fluxes = gt_bin_fluxes[lo:hi]
+            else: cur_gt_bin_fluxes = None
             if self.plot_spectra_with_weights:
                 cur_lambdawise_weights = lambdawise_weights[lo:hi],
             else: cur_lambdawise_weights = None
@@ -1435,6 +1456,7 @@ class SpectraTrainer(BaseTrainer):
                 self.extra_args["flux_norm_cho"], None,
                 self.spectra_wave[lo:hi], None, self.gt_fluxes[lo:hi],
                 self.spectra_wave[lo:hi], self.recon_fluxes[lo:hi],
+                recon_fluxes2=cur_gt_bin_fluxes,
                 lambdawise_losses=None,
                 lambdawise_weights=cur_lambdawise_weights,
                 clip=self.extra_args["plot_clipped_spectrum"],
@@ -1587,7 +1609,7 @@ class SpectraTrainer(BaseTrainer):
     def _get_optimal_wrong_bin_data(self, ret, data):
         all_bin_losses = self._get_all_bin_losses(ret)
         ids, optimal_wrong_bin_losses = get_optimal_wrong_bin_ids(
-            all_bin_losses, data["gt_redshift_bin_mask"]
+            all_bin_losses, data["redshift_bins_mask"]
         )
         ids = create_batch_ids(ids.detach().cpu().numpy())
         return ids, optimal_wrong_bin_losses
@@ -1611,6 +1633,12 @@ class SpectraTrainer(BaseTrainer):
             steps = self.spectra_pretrain_total_steps
         else: steps = self.total_steps
 
+        if self.sanity_check_sample_bins or \
+           self.sanity_check_sample_bins_per_step:
+            self.pipeline.toggle_sample_bins(True)
+
+        # print(data["gt_redshift_bin_ids"])
+        # print(data["redshift_bins_mask"])
         ret = forward(
             data,
             self.pipeline,
@@ -1643,9 +1671,10 @@ class SpectraTrainer(BaseTrainer):
                 self.regress_lambdawise_weights_use_gt_bin_latent,
             use_global_spectra_loss_as_lambdawise_weights=\
                 self.use_global_spectra_loss_as_lambdawise_weights,
-            save_spectra=self.recon_spectra, #not self.classification_mode,
+            save_spectra=self.recon_spectra,
             save_coords=self.regularize_spectra_latents,
             save_redshift=self.save_data and self.save_redshift,
+            save_gt_bin_spectra=self.save_data and self.plot_gt_bin_spectra,
             save_qtz_weights=self.save_data and self.save_qtz_weights,
             save_redshift_logits=self.regularize_redshift_logits or \
                                  (self.save_data and self.classify_redshift) or \
@@ -1750,12 +1779,8 @@ class SpectraTrainer(BaseTrainer):
             if self.regress_redshift:
                 spectra_loss = self.redshift_loss(ret["redshift"], data["spectra_redshift"])
             elif self.classify_redshift:
-                # print(ret["redshift_logits"].shape)
-                # print(torch.sum(ret["redshift_logits"], dim=-1))
-                # print(data["gt_redshift_bin_mask"].shape)
-                # print(data["gt_redshift_bin_ids"].shape)
                 if self.extra_args["redshift_classification_strategy"] == "binary":
-                    gt = data["gt_redshift_bin_mask"].flatten().to(torch.float32)
+                    gt = data["redshift_bins_mask"].flatten().to(torch.float32)
                     spectra_loss = self.redshift_loss(ret["redshift_logits"], gt)
                     weight = torch.ones_like(spectra_loss)
                     weight[gt==1.] = self.num_redshift_bins
@@ -1768,7 +1793,7 @@ class SpectraTrainer(BaseTrainer):
 
         elif self.classification_mode:
             est = ret["redshift_logits"]
-            gt = data["gt_redshift_bin_mask_b"].flatten().to(torch.float32) # bool to float
+            gt = data["redshift_bins_mask_b"].flatten().to(torch.float32) # bool to float
 
             # print(est.shape, gt.shape)
             # print(est, gt)
@@ -1815,12 +1840,12 @@ class SpectraTrainer(BaseTrainer):
         all_bin_loss = ret[loss_name] # [bsz,n_bins] no `nan` or any invalid values
 
         if self.optimize_gt_bin_only:
-            _mask = data["gt_redshift_bin_mask"].to(all_bin_loss.device)
+            _mask = data["redshift_bins_mask"].to(all_bin_loss.device)
             spectra_loss = self.spectra_reduce_func(all_bin_loss * _mask)
         elif self.dont_optimize_gt_bin:
             # spectra_loss = self.spectra_reduce_func(
-            #     all_bin_loss[~data["gt_redshift_bin_mask"]])
-            inv_mask = ~data["gt_redshift_bin_mask"].to(all_bin_loss.device)
+            #     all_bin_loss[~data["redshift_bins_mask"]])
+            inv_mask = ~data["redshift_bins_mask"].to(all_bin_loss.device)
             spectra_loss = self.spectra_reduce_func(all_bin_loss * inv_mask)
         else: # optimize all bins together
             if self.calculate_spectra_loss_based_on_optimal_bin:
@@ -1835,7 +1860,7 @@ class SpectraTrainer(BaseTrainer):
                 spectra_loss = self.spectra_reduce_func(spectra_loss)
             else:
                 if self.sanity_check_with_weights:
-                    gt_bin_loss = all_bin_loss[data["gt_redshift_bin_mask"]] # [bsz]
+                    gt_bin_loss = all_bin_loss[data["redshift_bins_mask"]] # [bsz]
                     _, optimal_wrong_bin_loss = \
                         self._get_optimal_wrong_bin_data(ret, data) # [bsz]
                     spectra_regu = gt_bin_loss - optimal_wrong_bin_loss
@@ -1850,7 +1875,8 @@ class SpectraTrainer(BaseTrainer):
                 spectra_loss = self.spectra_reduce_func(all_bin_loss)
 
         if self.plot_gt_bin_loss:
-            all_spectra_gt_bin_loss = all_bin_loss[data["gt_redshift_bin_mask"]]
+            mask = data["redshift_bins_mask"]
+            all_spectra_gt_bin_loss = all_bin_loss[mask]
             gt_bin_loss = self.spectra_reduce_func(all_spectra_gt_bin_loss)
             loss_name = f"gt_bin{loss_name_suffix}_loss"
             self.log_dict[loss_name] += gt_bin_loss.item()
@@ -1861,7 +1887,7 @@ class SpectraTrainer(BaseTrainer):
         """ Calculate spectra loss under negative supervision settings.
         """
         all_bin_loss = ret["spectra_binwise_loss"] # [bsz,n_bins]
-        gt_bin_loss = torch.mean(all_bin_loss[data["gt_redshift_bin_mask"]])
+        gt_bin_loss = torch.mean(all_bin_loss[data["redshift_bins_mask"]])
         self.log_dict["gt_bin_loss"] += gt_bin_loss.item()
 
         if self.cur_neg_sup_target == "latents":
@@ -1870,7 +1896,7 @@ class SpectraTrainer(BaseTrainer):
                 _, optimal_wrong_bin_loss = self._get_optimal_wrong_bin_data(ret, data)
                 self.log_dict["wrong_bin_loss"] += torch.mean(optimal_wrong_bin_loss).item()
             else:
-                wrong_bin_loss = all_bin_loss[~data["gt_redshift_bin_mask"]] # [n,]
+                wrong_bin_loss = all_bin_loss[~data["redshift_bins_mask"]] # [n,]
                 self.log_dict["wrong_bin_loss"] += torch.mean(wrong_bin_loss).item()
 
         elif self.cur_neg_sup_target == "net":
@@ -1882,7 +1908,7 @@ class SpectraTrainer(BaseTrainer):
                     optimal_wrong_bin_loss
                 wrong_bin_loss[wrong_bin_loss < 0] = 0
             else:
-                wrong_bin_loss = all_bin_loss[~data["gt_redshift_bin_mask"]] # [n,nbins-1]
+                wrong_bin_loss = all_bin_loss[~data["redshift_bins_mask"]] # [n,nbins-1]
                 self.log_dict["wrong_bin_loss"] += torch.mean(wrong_bin_loss).item()
                 # wrong_bin_loss = self.extra_args["neg_sup_constant"] - wrong_bin_loss
                 wrong_bin_loss = wrong_bin_loss - self.extra_args["neg_sup_constant"]
@@ -2088,6 +2114,11 @@ class SpectraTrainer(BaseTrainer):
                 self._add_spectra_latents(gt_bin_spectra_latents, latents_group)
                 self._add_spectra_latents(wrong_bin_spectra_latents, latents_group)
             else:
+                # if self.sanity_check_sample_bins:
+                #     selected_bins_mask = self.dataset.get_selected_bins_mask()
+                #     bsz,nbins,dim = spectra_latents.shape
+                #     mask = torch.tensor(selected_bins_mask[...,None]).tile(1,1,dim)
+                #     spectra_latents = spectra_latents[mask].view(bsz,-1,dim)
                 self._add_spectra_latents(spectra_latents, latents_group)
 
         # codebook coefficients parameters

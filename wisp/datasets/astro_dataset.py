@@ -87,8 +87,8 @@ class AstroDataset(Dataset):
         self.perform_integration = True
         self.use_predefined_wave_range = False
         self.classifier_train_sample_bins = False
+        self.sanity_check_sample_bins = False
         self.sanity_check_sample_bins_per_step = False
-        self.sanity_check_sample_bins = get_bool_sanity_check_sample_bins(**self.kwargs)
 
     ############
     # Setters
@@ -156,6 +156,9 @@ class AstroDataset(Dataset):
 
     def toggle_classifier_train_sample_bins(self, sample: bool):
         self.classifier_train_sample_bins = sample
+
+    def toggle_sanity_check_sample_bins(self, sample: bool):
+        self.sanity_check_sample_bins = sample
 
     def toggle_sanity_check_sample_bins_per_step(self, sample: bool):
         self.sanity_check_sample_bins_per_step = sample
@@ -417,7 +420,9 @@ class AstroDataset(Dataset):
         if "gt_redshift_bin_ids" in self.requested_fields:
             self.get_gt_redshift_bin_ids(out)
         if "redshift_bins_mask" in self.requested_fields:
-            self.get_redshift_bins_mask(out)
+            out["redshift_bins_mask"] = self.get_redshift_bins_mask(out)
+        if "selected_redshift_bins_mask" in self.requested_fields:
+            self.get_selected_redshift_bins_mask(out)
         if "global_restframe_spectra_loss" in self.requested_fields:
             out["global_restframe_spectra_loss"] = \
                 self.data["global_restframe_spectra_loss"]
@@ -429,9 +434,10 @@ class AstroDataset(Dataset):
             self.sample_spectra_loss_data(out)
 
     def sample_sanity_check_data(self, out):
-        # print(out.keys())
-        # print(out["gt_redshift_bin_ids"].shape, out["redshift_bins_mask"].shape)
-        _, _, out["selected_bin_mask"] = batch_sample_bins(
+        """
+        At each step, we randomly sample a few wrong bins and combine with the gt bin.
+        """
+        _, _, out["selected_bins_mask"] = batch_sample_bins(
             None, out["redshift_bins_mask"], out["gt_redshift_bin_ids"],
             self.kwargs["sanity_check_num_bins_to_sample"] - 1)
 
@@ -600,11 +606,12 @@ class AstroDataset(Dataset):
         out["num_sup_spectra"] = len(spectra_coords)
 
     def get_redshift_data(self, out):
-        """ From currently sampled pixels, pick spectra pixels and get corresponding redshift.
-            Called during main train redshift semi-supervision only.
-            @Param
-              spectra_id_map: label each spectra pixel with corresponding global spectra id.
-              spectra_bin_map: binary map that mask (sets as 0) all non-spectra pixels.
+        """
+        From currently sampled pixels, pick spectra pixels and get corresponding redshift.
+        Called during main train redshift semi-supervision only.
+        @Param
+          spectra_id_map: label each spectra pixel with corresponding global spectra id.
+          spectra_bin_map: binary map that mask (sets as 0) all non-spectra pixels.
         """
         assert not self.kwargs["train_spectra_pixels_only"]
         ids = out["spectra_id_map"]
@@ -614,24 +621,27 @@ class AstroDataset(Dataset):
         del out["spectra_id_map"]
 
     def get_gt_redshift_bin_ids(self, out):
+        """
+        Get id of each gt redshift bin.
+        @Return: ids [bsz]
+        """
         out["gt_redshift_bin_ids"] = get_gt_redshift_bin_ids(
-            out["spectra_redshift"].numpy(), add_batch_dim=True, **self.kwargs)
+            out["spectra_redshift"].numpy(), **self.kwargs)
 
     def get_redshift_bins_mask(self, out):
-        if "gt_redshift_bin_ids" not in out:
-            gt_bin_ids = get_gt_redshift_bin_ids(
-                out["spectra_redshift"].numpy(), add_batch_dim=True, **self.kwargs)
-        else: gt_bin_ids = out["gt_redshift_bin_ids"]
-
-        out["redshift_bins_mask"] = create_redshift_bins_mask(
-            self.num_redshift_bins, gt_bin_ids, to_bool=True)
-
+        """
+        Get mask where 1 indicate gt bin and 0 for all other bins.
+        Note: during sanity check, if we only train with selected bins, we update
+              the mask as well to remove unselected bins.
+        @Return: mask [bsz,n_bins]
+        """
+        redshift_bins_mask = create_redshift_bins_mask(
+            self.num_redshift_bins, out["spectra_redshift"], **self.kwargs)
         if self.sanity_check_sample_bins:
-            bsz = out["redshift_bins_mask"].shape[0]
-            out["selected_redshift_bins_mask"] = (out["redshift_bins_mask"][
-                out["selected_bins_mask"]]).reshape(bsz,-1)
-            # print(out["selected_redshift_bins_mask"].shape)
-            # print(np.sum(out["selected_redshift_bins_mask"], axis=-1))
+            bsz = redshift_bins_mask.shape[0]
+            selected_bins_mask = out["selected_bins_mask"]
+            redshift_bins_mask = (redshift_bins_mask[selected_bins_mask]).reshape(bsz,-1)
+        return redshift_bins_mask
 
     ############
     # Debug data
@@ -652,8 +662,7 @@ class AstroDataset(Dataset):
         # ids = get_bin_ids(
         #     lo, self.kwargs["redshift_bin_width"],
         #     out["spectra_redshift"], add_batched_dim=True)
-        ids = get_gt_redshift_bin_ids(
-            out["spectra_redshift"].numpy(), add_batch_dim=True, **self.kwargs)
+        ids = get_gt_redshift_bin_ids(out["spectra_redshift"].numpy(), **self.kwargs)
         init_probs[ids[0], ids[1]] = 1
         out["init_redshift_prob"] = init_probs
 
