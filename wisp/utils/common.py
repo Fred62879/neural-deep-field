@@ -128,12 +128,11 @@ def get_bool_sanity_check_sample_bins_per_step(**kwargs):
     return kwargs["sanity_check_sample_bins_per_step"] and \
         ("sanity_check" in tasks or "sanity_check_infer" in tasks)
 
-def get_bool_classifier_use_bin_sampled_data(**kwargs):
+def get_bool_classifier_train_use_bin_sampled_data(**kwargs):
     tasks = set(kwargs["tasks"])
-    return kwargs["classifier_use_bin_sampled_data"] and \
+    return kwargs["classifier_train_use_bin_sampled_data"] and \
         ("redshift_classification_train" in tasks or \
-         "redshift_classification_sc_infer" in tasks or \
-         "redshift_classification_genlz_infer" in tasks)
+         "redshift_classification_sc_infer" in tasks)
 
 def get_bool_classify_redshift_based_on_l2(**kwargs):
     return get_bool_classify_redshift(**kwargs) and \
