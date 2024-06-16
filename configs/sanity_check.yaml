@@ -6,7 +6,7 @@ global:
     log_fname: sc
 
     tasks: [train, sanity_check] #, recon_spectra]
-    tasks: [infer, sanity_check_infer, recon_spectra, save_redshift] #, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca save_redshift_classification_data
+    tasks: [infer, sanity_check_infer, save_redshift_classification_data] #recon_spectra, save_redshift] #, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca
 
 optimizer:
     optimizer_type: adam
@@ -114,7 +114,7 @@ infer:
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
-    infer_outlier_only: True
+    infer_outlier_only: False
 
     classify_redshift_based_on_l2: False
     classify_redshift_based_on_combined_ssim_l2: False

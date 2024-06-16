@@ -277,9 +277,7 @@ def get_argmax_redshift_bin_ids(
         ids = torch.argmax(logits, dim=-1)
     return ids
 
-def get_argmax_redshift(
-        redshift, ids, bin_sampled=False, selected_bins_mask=None
-):
+def get_argmax_redshift(redshift, ids, bin_sampled=False, selected_bins_mask=None):
     if bin_sampled:
         assert selected_bins_mask is not None
         bsz = selected_bins_mask.shape[0]
