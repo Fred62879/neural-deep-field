@@ -6,7 +6,7 @@ global:
     log_fname: pretrain
 
     tasks: [train, spectra_pretrain]
-    tasks: [infer, spectra_pretrain_infer, recon_spectra, plot_spectra_latents_pca] #plot_global_lambdawise_spectra_loss]
+    # tasks: [infer, spectra_pretrain_infer, recon_spectra, plot_spectra_latents_pca] #plot_global_lambdawise_spectra_loss]
 
 optimizer:
     optimizer_type: adam
@@ -47,7 +47,7 @@ pretrain:
 
 decoder:
     decoder_activation_type: relu
-    decoder_batch_norm: False
+    decoder_batch_norm: True
     decoder_num_hidden_layers: 5
     decoder_hidden_dim: 512
     decoder_skip_layers: []

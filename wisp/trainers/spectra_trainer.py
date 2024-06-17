@@ -1034,7 +1034,6 @@ class SpectraTrainer(BaseTrainer):
             zero_init=self.extra_args["zero_init_spectra_latents"],
             freeze=not self.optimize_spectra_latents
         )
-        assert 0
         return latents
 
     def init_brute_force_redshift_latents(self):
@@ -1793,8 +1792,6 @@ class SpectraTrainer(BaseTrainer):
             est = ret["redshift_logits"]
             gt = data["redshift_bins_mask_b"].flatten().to(torch.float32) # bool to float
 
-            # print(est.shape, gt.shape)
-            # print(est, gt)
             spectra_loss = self.bce_loss(est, gt)
             # print(spectra_loss.shape, spectra_loss)
             weight = torch.ones_like(spectra_loss)
