@@ -1,0 +1,152 @@
+parent: base_cc.yaml
+
+global:
+    use_tqdm: True
+    exp_name: vdz-spectra-ssim
+    log_fname: pretrain
+
+    tasks: [train, spectra_pretrain]
+    tasks: [infer, spectra_pretrain_infer, recon_spectra] #, plot_spectra_latents_pca] #plot_global_lambdawise_spectra_loss]
+
+optimizer:
+    optimizer_type: adam
+
+    b1: 0.5
+    b2: 0.999
+    lr: 1e-4
+    spectra_latents_lr: 1e-3
+    spectra_pretrain_lr: 1e-3
+    weight_decay: 1e-5
+
+    sgd_momentum: 0.9
+
+embedder:
+    encode_wave: True
+    wave_encode_method: positional_encoding
+    wave_embed_dim: 64
+    linear_norm_wave: True
+    wave_multiplier: 64
+
+pretrain:
+    pretrain_batch_size: 20000
+
+    use_latents_as_coords: True
+    zero_init_spectra_latents: True
+    optimize_spectra_latents: True
+    spectra_latent_dim: 16
+
+    pretrain_use_all_wave: False
+    pretrain_num_wave_samples: 100
+    pretrain_wave_sample_method: rand_dense
+
+    model_redshift: True
+    apply_gt_redshift: True
+
+    regularize_spectra_latents: True
+    spectra_latents_regu_beta: 16
+
+decoder:
+    decoder_activation_type: relu
+    decoder_batch_norm: True
+    decoder_num_hidden_layers: 5
+    decoder_hidden_dim: 512
+    decoder_skip_layers: []
+
+    decoder_gaussian_sigma: .1
+
+    decoder_activate_before_latents_skip: False
+    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_method: 'add'
+    decoder_latents_skip_add_conversion_method: 'multi_conversion'
+
+trainer:
+    num_epochs: 5000
+    batch_size: 5500
+    log_cli_every: 500
+    plot_grad_every: -1
+    save_data_every: -1
+    save_model_every: 500
+
+    plot_l2_loss: True
+
+    resume_train: False
+    resume_log_dir: ''
+    resume_model_fname: model-ep2000-bch0.pth
+
+    spectra_loss_cho: ssim1d
+    spectra_loss_reduction: mean
+    spectra_ssim_loss_filter_size: 9
+    spectra_ssim_loss_filter_sigma: 5
+
+infer:
+    infer_last_model_only: True
+
+    infer_log_dir: 20240617-052130_pretrain_100k_spectra_bn_5k_epochs
+    infer_selected: True
+    pretrain_num_infer_upper_bound: 280
+    spectra_inferrence_id_fname: '/val_redshift/model-0_redshift_outlier_ids.npy'
+    infer_outlier_only: False
+
+    pretrain_infer_batch_size: 100
+    pretrain_infer_use_all_wave: False
+    pretrain_infer_num_wave: 200
+    pretrain_infer_wave_sample_method: uniform_dense
+
+    plot_clipped_spectrum: True
+    plot_spectrum_with_loss: False
+    plot_spectrum_with_ivar: False
+    plot_spectrum_with_lines: False
+    plot_spectrum_with_recon: True
+    plot_spectrum_color_based_on_loss: False
+    plot_spectrum_under_gt_bin: False
+    plot_spectrum_under_optimal_wrong_bin: False
+    plot_global_lambdawise_spectra_loss_with_ivar: False
+    plot_global_lambdawise_spectra_loss_with_lines: False
+    emitted_wave_overlap_discretization_val: 1e-1
+
+    num_spectrum_per_fig: 35
+    num_spectrum_per_row: 7
+
+    spectra_latents_plot_pca_dim: 2
+
+dataset:
+    calculate_wave_range_based_on_trans: False
+    calculate_wave_range_based_on_spectra: True
+    wave_range_fname: wave_range_spectra_6k_to_8k.npy
+    # wave_range_fname: wave_range_spectra_5k_to_9k.npy
+
+spectra_data:
+    require_only_basic_spectra: True
+
+    spectra_cho: v1
+    spectra_process_patch_info: False
+    spectra_data_sources: [deimos,zcosmos,vipers_w1,vipers_w4]
+    random_permute_source_spectra: True
+
+    spectra_supervision_wave_lo: 6000 #5000
+    spectra_supervision_wave_hi: 8000 #9000
+
+    min_num_valid_samples: 100
+    spectra_upsample_scale: 10
+    convolve_spectra: True
+    process_ivar: True
+    spectra_smooth_sigma: 15
+
+    sample_from_pretrain_spectra: True
+    sanity_check_max_num_spectra: 1000
+    num_gt_spectra_upper_bound: 200000 #25400
+    num_supervision_spectra_upper_bound: 200000 #25400
+
+    filter_redshift: False
+    filter_redshift_lo: 0.02
+    filter_redshift_hi: -1
+
+ablation:
+    perform_ablation: False
+    ablat_id: 0
+    ablat_params: ["decoder_num_hidden_layers","spectra_latent_dim"]
+    ablat_vals: [[5,7],[8,16,32]]
+    ablat_num_vals: [2,3]
+
+    # ablat_hardcode_params: [infer_log_dir]
+    # ablat_hardcode_vals: [[]]

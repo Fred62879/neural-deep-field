@@ -1084,6 +1084,9 @@ def define_cmd_line_args():
     infer_group.add_argument("--calculate-redshift-est-stats-based-on", type=str,
                              choices=["logits","residuals"])
 
+    infer_group.add_argument("--save-classification-data-individually",
+                             action="store_true")
+
     infer_group.add_argument("--num-spectrum-per-fig", type=int,
                              help="number of spectrum in each figure.")
     infer_group.add_argument("--num-spectrum-per-row", type=int,

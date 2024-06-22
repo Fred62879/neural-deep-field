@@ -1,0 +1,176 @@
+parent: base_cc.yaml
+
+global:
+    use_tqdm: True
+    exp_name: vdz-spectra-ssim
+    log_fname: genlz_bn
+
+    tasks: [train, generalization]
+    tasks: [infer, generalization_infer, save_redshift, save_redshift_classification_data] #plot_redshift_est_stats, plot_redshift_est_residuals] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
+
+optimizer:
+    optimizer_type: adam
+
+    b1: 0.5
+    b2: 0.999
+    lr: 1e-4
+    spectra_latents_lr: 1e-3
+    spectra_pretrain_lr: 1e-3
+    weight_decay: 1e-5
+
+    sgd_momentum: 0.9
+
+embedder:
+    encode_wave: True
+    wave_encode_method: positional_encoding
+    wave_embed_dim: 64
+    linear_norm_wave: True
+    wave_multiplier: 64
+
+pretrain:
+    generalize_train_first_layer: False
+
+    pretrain_batch_size: 72
+
+    use_latents_as_coords: True
+    zero_init_spectra_latents: True
+    optimize_spectra_latents: True
+    spectra_latent_dim: 16
+
+    pretrain_use_all_wave: False
+    pretrain_num_wave_samples: 100
+    pretrain_wave_sample_method: rand_dense
+
+    model_redshift: True
+    brute_force_redshift: True
+    optimize_latents_for_each_redshift_bin: True
+
+    load_pretrained_spectra_latents: False
+    load_pretrained_spectra_latents_to_gt_bin_only: False
+    optimize_gt_bin_only: False
+    dont_optimize_gt_bin: False
+
+    pretrain_log_dir: 20240617-052130_pretrain_100k_spectra_bn_5k_epochs
+    pretrained_model_name: model-ep5000-bch0.pth
+
+    regularize_spectra_latents: True
+    spectra_latents_regu_beta: 16
+
+    use_global_spectra_loss_as_lambdawise_weights: False
+    limit_redshift_to_pretrain_range: False
+    global_restframe_spectra_loss_fname: '/pretrain_spectra/global_restframe_l2_loss.npy'
+
+    regress_lambdawise_weights: False
+    regress_lambdawise_weights_share_latents: False
+    lambdawise_weights_decoder_num_layers: 1
+    lambdawise_weights_decoder_hidden_dim: 128
+
+decoder:
+    decoder_batch_norm: True
+    decoder_num_hidden_layers: 5
+    decoder_hidden_dim: 512
+    decoder_skip_layers: []
+
+    decoder_activate_before_latents_skip: False
+    decoder_latents_skip_all_layers: True
+    decoder_latents_skip_method: add
+    decoder_latents_skip_add_conversion_method: multi_conversion
+
+trainer:
+    num_epochs: 500
+    batch_size: 5500
+    log_cli_every: 50
+    plot_grad_every: -1
+    save_model_every: 50
+
+    plot_l2_loss: True
+    plot_gt_bin_loss: True
+
+    resume_train: False
+    resume_log_dir: ''
+    resume_model_fname: model-ep10000-bch0.pth
+
+    spectra_loss_cho: ssim1d
+    spectra_loss_reduction: mean
+    spectra_lambdawise_loss_reduction: mean
+    spectra_ssim_loss_filter_size: 9
+    spectra_ssim_loss_filter_sigma: 5
+
+infer:
+    infer_last_model_only: True
+
+    infer_log_dir: 20240619-215941_genlz_bn_5k_spectra_500_epochs_052130
+
+    infer_selected: False
+    pretrain_num_infer_upper_bound: 35
+    spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
+    infer_outlier_only: False
+
+    classify_redshift_based_on_l2: False
+    infer_use_global_loss_as_lambdawise_weights: False
+
+    pretrain_infer_batch_size: 75
+    pretrain_infer_use_all_wave: False
+    pretrain_infer_num_wave: 280
+    pretrain_infer_wave_sample_method: uniform_dense
+
+    plot_clipped_spectrum: True
+    plot_spectrum_with_loss: False
+    plot_spectrum_with_ivar: False
+    plot_spectrum_with_lines: False
+    plot_spectrum_with_recon: False
+    plot_spectrum_color_based_on_loss: False
+    plot_spectrum_under_gt_bin: True
+    plot_spectrum_under_optimal_wrong_bin: True
+
+    num_spectrum_per_fig: 35
+    num_spectrum_per_row: 7
+
+    sanity_check_plot_same_pca_dim_as_pretrain: True
+    pretrain_pca_dim_fname: '' #'/latents/2-dim/selected_axes.npy'
+    spectra_latents_plot_pca_dim: 2
+
+    log_redshift_est_stats: False
+    log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
+
+    save_classification_data_individually: False
+
+dataset:
+    calculate_wave_range_based_on_trans: False
+    calculate_wave_range_based_on_spectra: True
+    wave_range_fname: wave_range_spectra_6k_to_8k.npy
+
+spectra_data:
+    require_only_basic_spectra: True
+
+    spectra_cho: v1
+    spectra_process_patch_info: False
+    spectra_data_sources: [deimos,zcosmos,vipers_w1,vipers_w4]
+    random_permute_source_spectra: True
+
+    spectra_supervision_wave_lo: 6000
+    spectra_supervision_wave_hi: 8000
+
+    min_num_valid_samples: 100
+    spectra_upsample_scale: 10
+    convolve_spectra: True
+    process_ivar: True
+    spectra_smooth_sigma: 15
+
+    generalization_max_num_spectra: 1000
+    num_gt_spectra_upper_bound: 200000
+    num_supervision_spectra_upper_bound: 200000
+
+    filter_redshift: False
+    filter_redshift_lo: 0.02
+    filter_redshift_hi: -1
+
+ablation:
+    perform_ablation: False
+    ablat_id: 0
+    ablat_params: ["decoder_num_hidden_layers","spectra_latent_dim"]
+    ablat_vals: [[5,7],[8,16,32]]
+    ablat_num_vals: [2,3]
+
+    # ablat_hardcode_params: [pretrain_log_dir]
+    # ablat_hardcode_vals: [[]]

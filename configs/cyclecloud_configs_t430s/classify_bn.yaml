@@ -1,0 +1,119 @@
+parent: base_cc.yaml
+
+global:
+    use_tqdm: True
+    exp_name: vdz-spectra-ssim
+    log_fname: clsfy_bn
+
+    tasks: [train, redshift_classification_train]
+    # tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    # tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+
+optimizer:
+    optimizer_type: adam
+
+    b1: 0.5
+    b2: 0.999
+    lr: 1e-4
+    spectra_latents_lr: 1e-3
+    spectra_pretrain_lr: 1e-3
+    weight_decay: 1e-5
+
+    sgd_momentum: 0.9
+
+pretrain:
+    pretrain_batch_size: 1000
+    pretrain_use_all_wave: True
+   
+    classifier_train_use_bin_sampled_data: True
+    sanity_check_num_bins_to_sample: 5
+    classifier_train_sample_bins: False
+    classifier_train_num_bins_to_sample: 2
+
+    model_redshift: True
+    brute_force_redshift: True
+    optimize_latents_for_each_redshift_bin: True
+
+decoder:
+    classifier_decoder_input_dim: 280
+    classifier_decoder_batch_norm: True
+    classifier_decoder_num_hidden_layers: 5
+    classifier_decoder_hidden_dim: 512
+
+    classify_based_on_loss: False
+    classify_concat_spectra: False
+    classify_based_on_wave_loss: False
+
+trainer:
+    num_epochs: 10000
+    log_cli_every: 1000
+    plot_grad_every: -1
+    save_data_every: -1
+    save_model_every: 1000
+
+    resume_train: False
+    resume_log_dir: ''
+    resume_model_fname: 'model-ep800-bch0.pth'
+
+infer:
+    infer_last_model_only: True
+
+    infer_log_dir: 20240619-223946_clsfy_bn_10k_epochs_042926
+
+    infer_selected: False
+    pretrain_num_infer_upper_bound: 100
+    infer_outlier_only: False
+
+    pretrain_infer_batch_size: 100
+
+    plot_clipped_spectrum: True
+    plot_spectrum_with_loss: False
+    plot_spectrum_with_ivar: False
+    plot_spectrum_with_lines: False
+    plot_spectrum_with_recon: False
+    plot_spectrum_with_weights: True
+    plot_spectrum_color_based_on_loss: False
+    plot_spectrum_under_gt_bin: True
+    plot_spectrum_under_optimal_wrong_bin: True
+
+    num_spectrum_per_fig: 35
+    num_spectrum_per_row: 7
+
+    log_redshift_est_stats: False
+    log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
+
+dataset:
+    calculate_wave_range_based_on_trans: False
+    calculate_wave_range_based_on_spectra: True
+    wave_range_fname: wave_range_spectra_6k_to_8k.npy
+
+spectra_data:
+    require_only_basic_spectra: True
+
+    redshift_classification_sc_data_dir: 20240618-042926_sc_100k_spectra_bn_500_epochs_052130
+    redshift_classification_genlz_data_dir: 20240619-215941_genlz_bn_5k_spectra_500_epochs_052130
+    redshift_classification_data_fname_prefix: model-0
+
+    spectra_cho: v1
+    spectra_process_patch_info: False
+    spectra_data_sources: [deimos,zcosmos,vipers_w1,vipers_w4]
+    random_permute_source_spectra: True
+
+    spectra_supervision_wave_lo: 6000
+    spectra_supervision_wave_hi: 8000
+
+    min_num_valid_samples: 100
+    spectra_upsample_scale: 10
+    convolve_spectra: True
+    process_ivar: True
+    spectra_smooth_sigma: 15
+
+    sample_from_pretrain_spectra: True
+    sanity_check_max_num_spectra: 200000
+    generalization_max_num_spectra: 1000
+    num_gt_spectra_upper_bound: 200000
+    num_supervision_spectra_upper_bound: 200000
+
+    filter_redshift: False
+    filter_redshift_lo: 0.02
+    filter_redshift_hi: -1
