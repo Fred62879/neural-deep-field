@@ -2025,21 +2025,29 @@ class AstroInferrer(BaseInferrer):
             print('saving')
             self.gt_spectra_s = torch.stack(
                 self.gt_spectra_s).numpy() # [bsz,nsmpl]
+            print(0)
             self.recon_spectra_s = torch.stack(
                 self.recon_spectra_s).numpy() # [bsz,nsmpl]
+            print(1)
             self.gt_bin_ids_s = torch.stack(
                 self.gt_bin_ids_s).numpy() # [bsz,2]
+            print(2)
             self.redshift_bins_mask_s = torch.stack(
                 self.redshift_bins_mask_s).numpy() # [bsz,nbins]
             if self.sanity_check_infer:
+                print(3)
                 self.selected_bins_mask_s = torch.stack(
                     self.selected_bins_mask_s).numpy() # [bsz,nbins]
+            print(4)
             self.spectra_wave_s = torch.stack(
                 self.spectra_wave_s).numpy() # [bsz,nsmpl]
+            print(5)
             self.spectra_mask_s = torch.stack(
                 self.spectra_mask_s).numpy() # [bsz,nsmpl]
+            print(6)
             self.spectra_redshift_s = torch.stack(
                 self.spectra_redshift_s).numpy() # [bsz,nsmpl]
+            print(7)
             self.spectra_lambdawise_losses_s = torch.stack(
                 self.spectra_lambdawise_losses_s).numpy() # [bsz,nbins,nsmpl]
 
@@ -2499,6 +2507,7 @@ class AstroInferrer(BaseInferrer):
             fnames.append(f"model-{model_id}_selected_bins_mask{suffix}")
             data_names.append("selected_bins_mask_s")
 
+        print('saving')
         for fname, data_name in zip(fnames, data_names):
             fname = join(self.redshift_classification_data_dir, fname)
             np.save(fname, getattr(self, data_name))

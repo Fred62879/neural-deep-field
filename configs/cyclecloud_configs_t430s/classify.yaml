@@ -6,8 +6,8 @@ global:
     log_fname: clsfy
 
     tasks: [train, redshift_classification_train]
-    # tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
-    # tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    #tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    #tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
 
 optimizer:
     optimizer_type: adam
@@ -41,7 +41,7 @@ decoder:
     classifier_decoder_hidden_dim: 512
 
     classify_based_on_loss: False
-    classify_concat_spectra: False
+    classify_concat_spectra: True
     classify_based_on_wave_loss: False
 
 trainer:
@@ -58,7 +58,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240617-054623_clsfy_50k_epochs_050251
+    #infer_log_dir: 20240617-054623_clsfy_50k_epochs_050251 #20240622-231627_clsfy_based_on_wave_loss #20240622-231809_clsfy_based_on_loss
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -92,8 +92,8 @@ dataset:
 spectra_data:
     require_only_basic_spectra: True
 
-    redshift_classification_sc_data_dir: 20240616-050251_sc_100k_spectra_500_epochs_033031
-    redshift_classification_genlz_data_dir: 20240619-220256_genlz_5k_spectra_500_epochs_033031
+    redshift_classification_sc_data_dir: 20240622-225435_sc_10_bins_100k_spectra_300_epochs_033031 #20240616-050251_sc_100k_spectra_500_epochs_033031
+    redshift_classification_genlz_data_dir: '' #20240619-220256_genlz_5k_spectra_500_epochs_033031
     redshift_classification_data_fname_prefix: model-0
 
     spectra_cho: v1

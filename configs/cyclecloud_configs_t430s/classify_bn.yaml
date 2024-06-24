@@ -6,8 +6,8 @@ global:
     log_fname: clsfy_bn
 
     tasks: [train, redshift_classification_train]
-    # tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
-    # tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
 
 optimizer:
     optimizer_type: adam
@@ -41,7 +41,7 @@ decoder:
     classifier_decoder_hidden_dim: 512
 
     classify_based_on_loss: False
-    classify_concat_spectra: False
+    classify_concat_spectra: True
     classify_based_on_wave_loss: False
 
 trainer:
@@ -58,7 +58,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240619-223946_clsfy_bn_10k_epochs_042926
+    infer_log_dir: 20240619-223946_clsfy_bn_10k_epochs_042926 #20240622-233348_clsfy_bn_based_on_wave_loss #20240622-230819_clsfy_bn_based_on_loss
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100

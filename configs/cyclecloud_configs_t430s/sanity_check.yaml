@@ -6,7 +6,7 @@ global:
     log_fname: sc_10_bins
 
     tasks: [train, sanity_check]
-    # tasks: [infer, sanity_check_infer, save_redshift_classification_data, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] #plot_spectra_latents_pca
+    tasks: [infer, sanity_check_infer, save_redshift_classification_data] #save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] #plot_spectra_latents_pca
 
 optimizer:
     optimizer_type: adam
@@ -109,7 +109,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: 20240616-050251_sc_100k_spectra_500_epochs_033031
+    infer_log_dir: 20240622-225435_sc_10_bins_100k_spectra_300_epochs_033031 #20240616-050251_sc_100k_spectra_500_epochs_033031
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
