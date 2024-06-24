@@ -3,11 +3,11 @@ parent: base_cc_t430s.yaml
 global:
     use_tqdm: True
     exp_name: vdz-spectra-ssim
-    log_fname: clsfy
+    log_fname: clsfy_bn
 
     tasks: [train, redshift_classification_train]
-    #tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
-    #tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
 
 optimizer:
     optimizer_type: adam
@@ -36,7 +36,7 @@ pretrain:
 
 decoder:
     classifier_decoder_input_dim: 280
-    classifier_decoder_batch_norm: False
+    classifier_decoder_batch_norm: True
     classifier_decoder_num_hidden_layers: 5
     classifier_decoder_hidden_dim: 512
 
@@ -59,7 +59,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240617-054623_clsfy_50k_epochs_050251
+    infer_log_dir: 20240619-223946_clsfy_bn_10k_epochs_042926
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -91,8 +91,8 @@ dataset:
 spectra_data:
     require_only_basic_spectra: True
 
-    redshift_classification_sc_data_dir: 20240616-050251_sc_100k_spectra_500_epochs_033031
-    redshift_classification_genlz_data_dir: 20240619-220256_genlz_5k_spectra_500_epochs_033031
+    redshift_classification_sc_data_dir: 20240618-042926_sc_100k_spectra_bn_500_epochs_052130
+    redshift_classification_genlz_data_dir: 20240619-215941_genlz_bn_5k_spectra_500_epochs_052130
     redshift_classification_data_fname_prefix: model-0
 
     spectra_cho: v1

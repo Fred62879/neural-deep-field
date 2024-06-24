@@ -3,7 +3,7 @@ parent: base_cc.yaml
 global:
     use_tqdm: False
     exp_name: vdz-spectra-ssim
-    log_fname: sc
+    log_fname: sc_bn
 
     tasks: [train, sanity_check] #, recon_spectra]
     tasks: [infer, sanity_check_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca save_redshift_classification_data
@@ -52,7 +52,7 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: 20240607-033031_pretrain_100k_spectra_m64_100_samples_divide_wave_norm_pe_dim_64_5k_epochs
+    pretrain_log_dir: 20240617-052130_pretrain_100k_spectra_bn_5k_epochs
     pretrained_model_name: model-ep5000-bch0.pth
 
     regularize_spectra_latents: True
@@ -74,7 +74,7 @@ pretrain:
 
 decoder:
     decoder_activation_type: relu
-    decoder_batch_norm: False
+    decoder_batch_norm: True
     decoder_num_hidden_layers: 5
     decoder_hidden_dim: 512
     decoder_skip_layers: []
@@ -109,7 +109,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240616-050251_sc_100k_spectra_500_epochs_033031
+    infer_log_dir: 20240618-042926_sc_100k_spectra_bn_500_epochs_052130
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100

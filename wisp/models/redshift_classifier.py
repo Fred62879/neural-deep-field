@@ -31,8 +31,11 @@ class RedshiftClassifier(nn.Module):
         #     **self.kwargs)
         if self.kwargs["classify_based_on_loss"]:
             input_dim = self.kwargs["classifier_decoder_input_dim"]
-        elif self.kwargs["classify_concat_spectra"] or self.kwargs["classify_based_on_wave_loss"]:
+        elif self.kwargs["classify_based_on_concat_spectra"] or \
+             self.kwargs["classify_based_on_concat_wave_loss"]:
             input_dim = 2 * self.kwargs["classifier_decoder_input_dim"]
+        elif self.kwargs["classify_based_on_concat_wave_spectra"]:
+            input_dim = 3 * self.kwargs["classifier_decoder_input_dim"]
         else: raise ValueError()
 
         output_dim = 1
@@ -83,7 +86,13 @@ class RedshiftClassifier(nn.Module):
             # todo: incorporate spectra mask into forward
             input = spectra_lambdawise_losses * spectra_mask[:,None]
 
-        elif self.kwargs["classify_based_on_wave_loss"]:
+        elif self.kwargs["classify_based_on_concat_spectra"]:
+            nbins = recon_spectra.shape[1]
+            input = torch.cat((gt_spectra[:,None].tile(1,nbins,1) * spectra_mask[:,None],
+                               recon_spectra * spectra_mask[:,None]), dim=-1)
+            # print(input.shape, input.dtype, input.device)
+
+        elif self.kwargs["classify_based_on_concat_wave_loss"]:
             nbins = spectra_lambdawise_losses.shape[1]
             # print(torch.min(wave), torch.max(wave))
             wave = self.shift_wave(wave, spectra_redshift)
@@ -95,12 +104,20 @@ class RedshiftClassifier(nn.Module):
             input = torch.cat((wave[:,None].tile(1,nbins,1) * spectra_mask[:,None],
                                spectra_lambdawise_losses * spectra_mask[:,None]), dim=-1)
 
-        elif self.kwargs["classify_concat_spectra"]:
+        elif self.kwargs["classify_based_on_concat_wave_spectra"]:
             nbins = recon_spectra.shape[1]
-            input = torch.cat((gt_spectra[:,None].tile(1,nbins,1) * spectra_mask[:,None],
-                               recon_spectra * spectra_mask[:,None]), dim=-1)
-            # print(input.shape, input.dtype, input.device)
-        else: raise ValueError()
+            # print(wave.shape, gt_spectra.shape, recon_spectra.shape)
+            # print(torch.min(wave), torch.max(wave))
+            wave = self.shift_wave(wave, spectra_redshift)
+            # print(torch.min(wave), torch.max(wave))
+            wave = self.linear_norm_wave(wave, wave_range)
+            # print(torch.min(wave), torch.max(wave))
+            # print(wave[0], gt_spectra[0], recon_spectra[0])
+            input = torch.cat((recon_spectra * spectra_mask[:,None],
+                               gt_spectra[:,None].tile(1,nbins,1) * spectra_mask[:,None],
+                               wave[:,None].tile(1,nbins,1) * spectra_mask[:,None]), dim=-1)
+        else:
+            raise ValueError()
 
         logits = self.decoder(input)
         logits = logits.flatten() # [bsz,nbins,1] -> [n,]

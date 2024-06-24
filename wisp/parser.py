@@ -390,8 +390,9 @@ def define_cmd_line_args():
     decoder_group.add_argument("--classifier-decoder-batch-norm", action="store_true")
 
     decoder_group.add_argument("--classify-based-on-loss", action="store_true")
-    decoder_group.add_argument("--classify-concat-spectra", action="store_true")
-    decoder_group.add_argument("--classify-based-on-wave-loss", action="store_true")
+    decoder_group.add_argument("--classify-based-on-concat-spectra", action="store_true")
+    decoder_group.add_argument("--classify-based-on-concat-wave-loss", action="store_true")
+    decoder_group.add_argument("--classify-based-on-concat-wave-spectra", action="store_true")
 
     decoder_group.add_argument("--siren-seed", type=int, default=1)
     decoder_group.add_argument("--siren-first-w0", type=int, default=30)

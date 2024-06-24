@@ -1,4 +1,4 @@
-parent: base_cc.yaml
+parent: base_cc_t430s.yaml
 
 global:
     use_tqdm: True
@@ -6,7 +6,7 @@ global:
     log_fname: genlz
 
     tasks: [train, generalization]
-    tasks: [infer, generalization_infer, save_redshift_classification_data] #, recon_spectra, save_redshift, plot_redshift_est_stats, plot_redshift_est_residuals] #,'plot_redshift_logits'] #'plot_spectra_latents_pca'
+    tasks: [infer, generalization_infer, save_redshift, plot_redshift_est_stats, plot_redshift_est_residuals] #,'plot_redshift_logits'] #plot_spectra_latents_pca save_redshift_classification_data
 
 optimizer:
     optimizer_type: adam
@@ -50,7 +50,7 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: ''
+    pretrain_log_dir: 20240607-033031_pretrain_100k_spectra_m64_100_samples_divide_wave_norm_pe_dim_64_5k_epochs
     pretrained_model_name: model-ep5000-bch0.pth
 
     regularize_spectra_latents: True
@@ -66,6 +66,7 @@ pretrain:
     lambdawise_weights_decoder_hidden_dim: 128
 
 decoder:
+    decoder_activation_type: relu
     decoder_batch_norm: False
     decoder_num_hidden_layers: 5
     decoder_hidden_dim: 512
@@ -78,7 +79,6 @@ decoder:
 
 trainer:
     num_epochs: 200
-    batch_size: 5500
     log_cli_every: 20
     plot_grad_every: -1
     save_model_every: 20
@@ -99,7 +99,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240610-191054_genlz_100_spectra_200_epochs_033031
+    infer_log_dir: 20240619-220256_genlz_5k_spectra_500_epochs_033031
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 35
@@ -155,7 +155,7 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    generalization_max_num_spectra: 100
+    generalization_max_num_spectra: 3000
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 

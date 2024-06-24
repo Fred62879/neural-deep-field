@@ -3,7 +3,7 @@ parent: base_cc_t430s.yaml
 global:
     use_tqdm: True
     exp_name: vdz-spectra-ssim
-    log_fname: clsfy
+    log_fname: clsfy_based_on_concat_wave_spectra
 
     tasks: [train, redshift_classification_train]
     #tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
@@ -41,9 +41,9 @@ decoder:
     classifier_decoder_hidden_dim: 512
 
     classify_based_on_loss: False
-    classify_based_on_concat_spectra: True
+    classify_based_on_concat_spectra: False
     classify_based_on_concat_wave_loss: False
-    classify_based_on_concat_wave_spectra: False
+    classify_based_on_concat_wave_spectra: True
 
 trainer:
     num_epochs: 10000
