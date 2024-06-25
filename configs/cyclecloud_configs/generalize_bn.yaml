@@ -6,7 +6,7 @@ global:
     log_fname: genlz_bn
 
     tasks: [train, generalization]
-    tasks: [infer, generalization_infer, save_redshift_classification_data] #save_redshift, plot_redshift_est_stats, plot_redshift_est_residuals] #,'plot_redshift_logits'] #plot_spectra_latents_pca
+    tasks: [infer, generalization_infer, save_redshift, plot_redshift_est_stats, plot_redshift_est_residuals] #,'plot_redshift_logits'] #plot_spectra_latents_pca save_redshift_classification_data
 
 optimizer:
     optimizer_type: adam

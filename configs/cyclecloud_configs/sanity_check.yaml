@@ -6,7 +6,7 @@ global:
     log_fname: sc
 
     tasks: [train, sanity_check] #, recon_spectra]
-    tasks: [infer, sanity_check_infer, save_redshift_classification_data] #save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca
+    tasks: [infer, sanity_check_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca save_redshift_classification_data
 
 optimizer:
     optimizer_type: adam
@@ -41,7 +41,7 @@ pretrain:
 
     sanity_check_sample_bins: True
     sanity_check_sample_bins_per_step: False
-    sanity_check_num_bins_to_sample: 5
+    sanity_check_num_bins_to_sample: 10
     
     model_redshift: True
     brute_force_redshift: True
@@ -109,7 +109,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240616-050251_sc_100k_spectra_500_epochs_033031
+    infer_log_dir: 20240622-225435_sc_10_bins_100k_spectra_300_epochs_033031
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -122,7 +122,7 @@ infer:
 
     pretrain_infer_batch_size: 2000
     pretrain_infer_use_all_wave: False
-    pretrain_infer_num_wave: 384 #280
+    pretrain_infer_num_wave: 280
     pretrain_infer_wave_sample_method: uniform_dense
 
     plot_clipped_spectrum: True

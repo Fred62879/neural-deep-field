@@ -6,8 +6,8 @@ global:
     log_fname: clsfy
 
     tasks: [train, redshift_classification_train]
-    # tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
-    # tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
+    tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
+    tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
 
 optimizer:
     optimizer_type: adam
@@ -35,7 +35,7 @@ pretrain:
     optimize_latents_for_each_redshift_bin: True
 
 decoder:
-    classifier_decoder_input_dim: 496 #280
+    classifier_decoder_input_dim: -1
     classifier_decoder_batch_norm: False
     classifier_decoder_num_hidden_layers: 5
     classifier_decoder_hidden_dim: 512
@@ -59,7 +59,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    #infer_log_dir: 20240617-054623_clsfy_50k_epochs_050251
+    infer_log_dir: nan
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -123,5 +123,8 @@ ablation:
     perform_ablation: True
     ablat_id: 0
     ablat_params: [classifier_decoder_input_dim]
-    ablat_vals: [[64,128,384,496]]
-    ablat_num_vals: [4]
+    ablat_vals: [[64,128,280,384,496]]
+    ablat_num_vals: [5]
+
+    ablat_hardcode_params: [infer_log_dir]
+    ablat_hardcode_vals: [[20240625-024134_clsfy_classifier_decoder_input_dim_64,20240625-020946_clsfy_classifier_decoder_input_dim_128,20240617-054623_clsfy_5_bins_50k_epochs_050251,20240625-021420_clsfy_classifier_decoder_input_dim_384,20240625-021420_clsfy_classifier_decoder_input_dim_496]]

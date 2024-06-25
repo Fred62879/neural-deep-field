@@ -109,9 +109,9 @@ infer:
     classify_redshift_based_on_l2: False
     infer_use_global_loss_as_lambdawise_weights: False
 
-    pretrain_infer_batch_size: 50
+    pretrain_infer_batch_size: 25
     pretrain_infer_use_all_wave: False
-    pretrain_infer_num_wave: 280
+    pretrain_infer_num_wave: 384
     pretrain_infer_wave_sample_method: uniform_dense
 
     plot_clipped_spectrum: True
