@@ -6,7 +6,7 @@ global:
     log_fname: genlz
 
     tasks: [train, generalization]
-    tasks: [infer, generalization_infer, save_redshift, plot_redshift_est_stats, plot_redshift_est_residuals] #,'plot_redshift_logits'] #plot_spectra_latents_pca save_redshift_classification_data
+    tasks: [infer, generalization_infer, save_redshift_classification_data] #save_redshift, plot_redshift_est_stats, plot_redshift_est_residuals] #,'plot_redshift_logits'] #plot_spectra_latents_pca
 
 optimizer:
     optimizer_type: adam
@@ -155,7 +155,7 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    generalization_max_num_spectra: 3000
+    generalization_max_num_spectra: 5000
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 

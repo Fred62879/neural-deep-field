@@ -122,7 +122,7 @@ infer:
 
     pretrain_infer_batch_size: 2000
     pretrain_infer_use_all_wave: False
-    pretrain_infer_num_wave: 384 #280
+    pretrain_infer_num_wave: 496 #280
     pretrain_infer_wave_sample_method: uniform_dense
 
     plot_clipped_spectrum: True
@@ -179,9 +179,9 @@ spectra_data:
 ablation:
     perform_ablation: False
     ablat_id: 0
-    ablat_params: ["decoder_batch_norm"] #["decoder_num_hidden_layers","decoder_hidden_dim"]
-    ablat_vals: [[True,False]] #[[3,5],[128,256,512]]
-    ablat_num_vals: [2] #[2,3]
+    ablat_params: [pretrain_infer_num_wave]
+    ablat_vals: [[64,128,384,496]]
+    ablat_num_vals: [4]
 
     #ablat_hardcode_params: ["pretrain_log_dir"]
     #ablat_hardcode_vals: [["20240222-015410_1600-spectra-skip-same-dim_decoder_batch_norm_True","20240222-165434_1600-spectra-skip-same-dim_decoder_batch_norm_False"]]

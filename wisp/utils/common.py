@@ -42,15 +42,17 @@ def get_exp_dir(**kwargs):
     return exp_dir
 
 def get_redshift_classification_data_dir(mode, **kwargs):
+    # assert kwargs["pretrain_infer_num_wave"] == kwargs["classifier_decoder_input_dim"]
+    dim = kwargs["classifier_decoder_input_dim"]
     if mode == "redshift_classification_train":
         log_dir = join(kwargs["redshift_classification_sc_data_dir"],
-                       "val_redshift_classification_data")
+                       f"val_{dim}_dim_redshift_classification_data")
     elif mode == "redshift_classification_sc_infer":
         log_dir = join(kwargs["redshift_classification_sc_data_dir"],
-                       "val_redshift_classification_data")
+                       f"val_{dim}_dim_redshift_classification_data")
     elif mode == "redshift_classification_genlz_infer":
         log_dir = join(kwargs["redshift_classification_genlz_data_dir"],
-                       "test_redshift_classification_data")
+                       f"test_{dim}_dim_redshift_classification_data")
     else: raise ValueError()
     return log_dir
 

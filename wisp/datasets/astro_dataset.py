@@ -512,7 +512,7 @@ class AstroDataset(Dataset):
                     sup_bounds=out["spectra_sup_bounds"],
                     keep_sample_ids=True)
 
-                # wave = out["spectra_source_data"][:,0]
+                wave = out["spectra_source_data"][:,0]
 
                 out["spectra_mask"] = batch_sample_torch(
                     out["spectra_mask"], self.num_wave_samples,

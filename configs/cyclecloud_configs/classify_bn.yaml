@@ -111,7 +111,7 @@ spectra_data:
 
     sample_from_pretrain_spectra: True
     sanity_check_max_num_spectra: 200000
-    generalization_max_num_spectra: 3000
+    generalization_max_num_spectra: 5000
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 

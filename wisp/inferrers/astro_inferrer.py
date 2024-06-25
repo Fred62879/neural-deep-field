@@ -82,19 +82,25 @@ class AstroInferrer(BaseInferrer):
             "redshift_test_infer": "test",
         }[self.mode]
 
-        for cur_path, cur_pname, in zip(
-                ["model_dir","recon_dir","recon_synthetic_dir","metric_dir",
-                 "zoomed_recon_dir","scaler_dir","pixel_distrib_dir","qtz_weights_dir",
-                 "embed_map_dir","latents_dir","redshift_dir","latent_embed_dir","spectra_dir",
-                 "codebook_coeff_dir","spectra_latents_dir","redshift_classification_data_dir",
-                 "codebook_spectra_dir", "codebook_spectra_individ_dir"],
-                ["models","recons","recon_synthetic","metrics",
-                 "zoomed_recon","scaler","pixel_distrib","qtz_weights",
-                 "embed_map","latents",f"{prefix}_redshift","latent_embed",f"{prefix}_spectra",
-                 f"{prefix}_codebook_coeff",f"{prefix}_spectra_latents",
-                 f"{prefix}_redshift_classification_data",
-                 f"{prefix}_codebook_spectra",f"{prefix}_codebook_spectra_individ"]
-        ):
+        paths = [
+            "model_dir","recon_dir","recon_synthetic_dir","metric_dir",
+            "zoomed_recon_dir","scaler_dir","pixel_distrib_dir","qtz_weights_dir",
+            "embed_map_dir","latents_dir","redshift_dir","latent_embed_dir","spectra_dir",
+            "codebook_coeff_dir","spectra_latents_dir",
+            "codebook_spectra_dir", "codebook_spectra_individ_dir"]
+        path_names = [
+            "models","recons","recon_synthetic","metrics",
+            "zoomed_recon","scaler","pixel_distrib","qtz_weights",
+            "embed_map","latents",f"{prefix}_redshift","latent_embed",f"{prefix}_spectra",
+            f"{prefix}_codebook_coeff",f"{prefix}_spectra_latents",
+            f"{prefix}_codebook_spectra",f"{prefix}_codebook_spectra_individ"]
+
+        if self.save_redshift_classification_data:
+            paths.append("redshift_classification_data_dir")
+            dim = self.extra_args["pretrain_infer_num_wave"]
+            path_names.append(f"{prefix}_{dim}_dim_redshift_classification_data")
+
+        for cur_path, cur_pname, in zip(paths, path_names):
             path = join(self.log_dir, cur_pname)
             setattr(self, cur_path, path)
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -2022,32 +2028,23 @@ class AstroInferrer(BaseInferrer):
                     self.spectra_lambdawise_weights).detach().cpu().numpy()
 
         if self.save_redshift_classification_data:
-            print('saving')
             self.gt_spectra_s = torch.stack(
                 self.gt_spectra_s).numpy() # [bsz,nsmpl]
-            print(0)
             self.recon_spectra_s = torch.stack(
                 self.recon_spectra_s).numpy() # [bsz,nsmpl]
-            print(1)
             self.gt_bin_ids_s = torch.stack(
                 self.gt_bin_ids_s).numpy() # [bsz,2]
-            print(2)
             self.redshift_bins_mask_s = torch.stack(
                 self.redshift_bins_mask_s).numpy() # [bsz,nbins]
             if self.sanity_check_infer:
-                print(3)
                 self.selected_bins_mask_s = torch.stack(
                     self.selected_bins_mask_s).numpy() # [bsz,nbins]
-            print(4)
             self.spectra_wave_s = torch.stack(
                 self.spectra_wave_s).numpy() # [bsz,nsmpl]
-            print(5)
             self.spectra_mask_s = torch.stack(
                 self.spectra_mask_s).numpy() # [bsz,nsmpl]
-            print(6)
             self.spectra_redshift_s = torch.stack(
                 self.spectra_redshift_s).numpy() # [bsz,nsmpl]
-            print(7)
             self.spectra_lambdawise_losses_s = torch.stack(
                 self.spectra_lambdawise_losses_s).numpy() # [bsz,nbins,nsmpl]
 
@@ -2507,12 +2504,10 @@ class AstroInferrer(BaseInferrer):
             fnames.append(f"model-{model_id}_selected_bins_mask{suffix}")
             data_names.append("selected_bins_mask_s")
 
-        print('saving')
         for fname, data_name in zip(fnames, data_names):
             fname = join(self.redshift_classification_data_dir, fname)
             np.save(fname, getattr(self, data_name))
 
-        print('done')
         fnames = [
             f"model-{model_id}_wave{suffix}",
             f"model-{model_id}_lambdawise_losses{suffix}",

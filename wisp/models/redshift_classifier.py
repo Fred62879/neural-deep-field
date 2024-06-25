@@ -62,6 +62,11 @@ class RedshiftClassifier(nn.Module):
         # return self.wave_multiplier * (wave - lo) / (hi - lo)
         return wave / hi
 
+
+    def mask_invalid(self, data, mask):
+        data[~mask] = 0
+        return data
+
     def forward(
             self, channels, wave, wave_range, spectra_mask, spectra_redshift,
             gt_spectra, recon_spectra, spectra_lambdawise_losses, idx=None, selected_ids=None
@@ -88,9 +93,10 @@ class RedshiftClassifier(nn.Module):
 
         elif self.kwargs["classify_based_on_concat_spectra"]:
             nbins = recon_spectra.shape[1]
-            input = torch.cat((gt_spectra[:,None].tile(1,nbins,1) * spectra_mask[:,None],
-                               recon_spectra * spectra_mask[:,None]), dim=-1)
-            # print(input.shape, input.dtype, input.device)
+            # print(gt_spectra.shape, recon_spectra.shape, spectra_mask.shape)
+            input = torch.cat((
+                self.mask_invalid(gt_spectra, spectra_mask)[:,None].tile(1,nbins,1),
+                self.mask_invalid(recon_spectra, spectra_mask[:,None].tile(1,nbins,1))), dim=-1)
 
         elif self.kwargs["classify_based_on_concat_wave_loss"]:
             nbins = spectra_lambdawise_losses.shape[1]
