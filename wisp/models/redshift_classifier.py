@@ -83,17 +83,11 @@ class RedshiftClassifier(nn.Module):
         """
         ret = {}
         if self.kwargs["classify_based_on_loss"]:
-            # print('*', spectra_mask.shape, spectra_lambdawise_losses.shape, wave.shape)
-            # print(wave[0])
-            # pe_wave = self.encoder(wave)
-            # pe_losses = self.encoder(spetra_lambdawise_losses)
-            # print(pe_wave.shape, pe_losses.shape)
-            # todo: incorporate spectra mask into forward
-            input = spectra_lambdawise_losses * spectra_mask[:,None]
+            input = self.mask_invalid(
+                spectra_lambdawise_losses, spectra_mask[:,None].tile(1,nbins,1))
 
         elif self.kwargs["classify_based_on_concat_spectra"]:
             nbins = recon_spectra.shape[1]
-            # print(gt_spectra.shape, recon_spectra.shape, spectra_mask.shape)
             input = torch.cat((
                 self.mask_invalid(gt_spectra, spectra_mask)[:,None].tile(1,nbins,1),
                 self.mask_invalid(recon_spectra, spectra_mask[:,None].tile(1,nbins,1))), dim=-1)
@@ -105,7 +99,7 @@ class RedshiftClassifier(nn.Module):
             # print(torch.min(wave), torch.max(wave))
             wave = self.linear_norm_wave(wave, wave_range)
             # print(torch.min(wave), torch.max(wave))
-            # print(wave.shape, wave[0], spectra_lambdawise_losses[0])
+            # print(wave[0], spectra_lambdawise_losses[0])
             input = torch.cat((
                 self.mask_invalid(wave, spectra_mask)[:,None].tile(1,nbins,1),
                 self.mask_invalid(
@@ -113,7 +107,6 @@ class RedshiftClassifier(nn.Module):
 
         elif self.kwargs["classify_based_on_concat_wave_spectra"]:
             nbins = recon_spectra.shape[1]
-            # print(wave.shape, gt_spectra.shape, recon_spectra.shape)
             # print(torch.min(wave), torch.max(wave))
             wave = self.shift_wave(wave, spectra_redshift)
             # print(torch.min(wave), torch.max(wave))

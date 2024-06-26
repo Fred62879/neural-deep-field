@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: vdz-spectra-ssim
+    exp_name: vdz-spectra-ssim-azure
     log_fname: sc
 
     tasks: [train, sanity_check] #, recon_spectra]
@@ -41,7 +41,7 @@ pretrain:
 
     sanity_check_sample_bins: True
     sanity_check_sample_bins_per_step: False
-    sanity_check_num_bins_to_sample: 5
+    sanity_check_num_bins_to_sample: 10
     
     model_redshift: True
     brute_force_redshift: True
@@ -63,7 +63,7 @@ pretrain:
 
     use_global_spectra_loss_as_lambdawise_weights: False
     limit_redshift_to_pretrain_range: False
-    global_restframe_spectra_loss_fname: 20240518-093832_ssim_4500_epochs/pretrain_spectra/global_restframe_l2_loss.npy
+    global_restframe_spectra_loss_fname: '' #/pretrain_spectra/global_restframe_l2_loss.npy
 
     regress_lambdawise_weights: False
     regress_lambdawise_weights_share_latents: False
@@ -109,7 +109,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240614-190659_sc_1k_spectra_500_epochs
+    infer_log_dir: 20240622-225435_sc_10_bins_100k_spectra_300_epochs_033031
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -120,10 +120,10 @@ infer:
     classify_redshift_based_on_combined_ssim_l2: False
     infer_use_global_loss_as_lambdawise_weights: False
 
-    pretrain_infer_batch_size: 20
+    pretrain_infer_batch_size: 500 #20
     pretrain_infer_use_all_wave: False
-    pretrain_infer_num_wave: 280
-    pretrain_infer_wave_sample_method: 'uniform_dense'
+    pretrain_infer_num_wave: 256
+    pretrain_infer_wave_sample_method: uniform_dense
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False
@@ -144,6 +144,13 @@ infer:
 
     log_redshift_est_stats: False
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
+
+    classify_based_on_loss: False
+    classify_based_on_concat_spectra: True
+    classify_based_on_concat_wave_loss: False
+    classify_based_on_concat_wave_spectra: False
+    redshift_classification_batched_data_fields: [spectra_redshift] #,gt_spectra,selected_bins_mask,recon_spectra,redshift_bins_mask,spectra_mask]
+    save_classification_data_individually: False
 
 dataset:
     calculate_wave_range_based_on_trans: False
@@ -168,7 +175,7 @@ spectra_data:
     spectra_smooth_sigma: 15
 
     sample_from_pretrain_spectra: True
-    sanity_check_max_num_spectra: 1000
+    sanity_check_max_num_spectra: 1200
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 

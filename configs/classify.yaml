@@ -41,8 +41,9 @@ decoder:
     classifier_decoder_hidden_dim: 512
 
     classify_based_on_loss: False
-    classify_concat_spectra: True
-    classify_based_on_wave_loss: False
+    classify_based_on_concat_spectra: True
+    classify_based_on_concat_wave_loss: False
+    classify_based_on_concat_wave_spectra: False
 
 trainer:
     num_epochs: 10000
