@@ -150,7 +150,7 @@ infer:
     classify_based_on_concat_wave_loss: False
     classify_based_on_concat_wave_spectra: False
     redshift_classification_batched_data_fields: [spectra_redshift] #,gt_spectra,selected_bins_mask,recon_spectra,redshift_bins_mask,spectra_mask]
-    save_classification_data_individually: False
+    save_classification_data_individually: True
 
 dataset:
     calculate_wave_range_based_on_trans: False
