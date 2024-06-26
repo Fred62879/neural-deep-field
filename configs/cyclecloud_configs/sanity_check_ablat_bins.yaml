@@ -1,7 +1,7 @@
 parent: base_cc_t430s.yaml
 
 global:
-    use_tqdm: False
+    use_tqdm: True
     exp_name: vdz-spectra-ssim
     log_fname: sc
 
@@ -28,7 +28,7 @@ embedder:
     wave_multiplier: 64
 
 pretrain:
-    pretrain_batch_size: 5000
+    pretrain_batch_size: 2500
 
     use_latents_as_coords: True
     zero_init_spectra_latents: True
@@ -169,7 +169,7 @@ spectra_data:
 
     sample_from_pretrain_spectra: True
     sanity_check_max_num_spectra: 200000
-    num_gt_spectra_upper_bound: 5000
+    num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 
     filter_redshift: False
@@ -183,5 +183,5 @@ ablation:
     ablat_vals: [[16,32]]
     ablat_num_vals: [2]
 
-    # ablat_hardcode_params: [infer_log_dir]
-    # ablat_hardcode_vals: [[]]
+    ablat_hardcode_params: [pretrain_batch_size] #infer_log_dir]
+    ablat_hardcode_vals: [[2500,1000]]
