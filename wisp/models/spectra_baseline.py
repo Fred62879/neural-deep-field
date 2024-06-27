@@ -63,7 +63,7 @@ class SpectraBaseline(nn.Module):
             ret["redshift"] = output.flatten()
         elif self.redshift_model_method == "classification":
             if self.kwargs["redshift_classification_strategy"] == "binary":
-                ret["redshift_logits"] = output.flatten()
+                ret["redshift_logits"] = output #.flatten()
             elif self.kwargs["redshift_classification_strategy"] == "multi_class":
                 ret["redshift_logits"] = F.softmax(output, dim=-1)
             else: raise ValueError()

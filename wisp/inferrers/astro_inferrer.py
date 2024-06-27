@@ -411,6 +411,7 @@ class AstroInferrer(BaseInferrer):
         self.find_nn_spectra = "find_nn_spectra" in tasks
         self.save_pixel_values = "save_pixel_values" in tasks
         self.plot_codebook_coeff = "plot_codebook_coeff" in tasks
+        self.save_redshift_logits = "save_redshift_logits" in tasks
         self.save_optimal_bin_ids = "save_optimal_bin_ids" in tasks
         self.save_spectra_latents = "save_spectra_latents" in tasks
         self.plot_spectra_residual = "plot_spectra_residual" in tasks
@@ -452,6 +453,8 @@ class AstroInferrer(BaseInferrer):
         assert not self.save_spectra_latents or self.qtz_spectra
         assert not self.plot_spectra_residual or self.recon_spectra
         assert not self.plot_redshift_est_stats or self.save_redshift
+        assert not self.save_redshift_logits or (
+            self.classify_redshift and self.save_redshift)
         assert not self.plot_est_redshift_logits or (
             self.classify_redshift and self.save_redshift)
         assert not self.plot_redshift_est_residuals or self.save_redshift
@@ -1129,7 +1132,8 @@ class AstroInferrer(BaseInferrer):
             self.est_redshift = []
             if self.classify_redshift:
                 self.weighted_redshift = []
-                if self.plot_est_redshift_logits:
+                if self.save_redshift_logits or \
+                   self.plot_est_redshift_logits:
                     self.redshift_logits = []
 
         if self.save_optimal_bin_ids:
@@ -1797,7 +1801,8 @@ class AstroInferrer(BaseInferrer):
                 save_gt_bin_spectra=self.plot_gt_bin_spectra,
                 save_codebook_logits=self.plot_codebook_coeff or \
                                      self.plot_codebook_coeff_all_bins,
-                save_redshift_logits=self.plot_est_redshift_logits,
+                save_redshift_logits=self.save_redshift_logits or \
+                                     self.plot_est_redshift_logits,
                 save_spectra_latents=self.save_spectra_latents,
                 save_spectra_all_bins=self.recon_spectra_all_bins or \
                                       self.plot_optimal_wrong_bin_spectra or \
@@ -1916,6 +1921,9 @@ class AstroInferrer(BaseInferrer):
             elif self.classify_redshift:
                 suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
                 redshift_logits = ret[f"redshift_logits{suffix}"]
+                if self.save_redshift_logits:
+                    logits = F.softmax(redshift_logits, dim=-1)
+                    self.redshift_logits.extend(logits)
                 if self.extra_args["redshift_classification_strategy"] == "binary":
                     redshift_logits = redshift_logits.view(-1, self.num_redshift_bins)
                 ids = torch.argmax(redshift_logits, dim=-1).detach().cpu().numpy()
@@ -1930,6 +1938,8 @@ class AstroInferrer(BaseInferrer):
                 if self.classifier_train_use_bin_sampled_data:
                     n_bins = self.extra_args["sanity_check_num_bins_to_sample"]
                 else: n_bins = self.num_redshift_bins
+                print(ret["redshift_logits"].shape)
+                assert 0
                 logits = ret["redshift_logits"].view(-1,n_bins)
                 ids = get_argmax_redshift_bin_ids(logits)
                 if self.sanity_check_sample_bins:
@@ -1951,8 +1961,7 @@ class AstroInferrer(BaseInferrer):
                 ids = get_argmax_redshift_bin_ids(
                     ret["redshift_logits"], logits2=logits2,
                     classify_base_on_combined_metrics=\
-                        self.classify_redshift_based_on_combined_ssim_l2
-                )
+                        self.classify_redshift_based_on_combined_ssim_l2)
 
                 if self.sanity_check_sample_bins or \
                    self.classifier_train_use_bin_sampled_data:
@@ -2148,6 +2157,10 @@ class AstroInferrer(BaseInferrer):
             fname = join(self.redshift_dir, f"model-{model_id}_est_redshift.txt")
             log_data(self, "est_redshift", gt_field="gt_redshift",
                      fname=fname, log_to_console=False)
+            if self.save_redshift_logits:
+                fname = join(self.redshift_dir, f"model-{model_id}_redshift_logits.npy")
+                redshift_logits = torch.stack(self.redshift_logits).detach().cpu().numpy()
+                np.save(fname, redshift_logits)
 
         elif self.save_redshift_during_spectra_infer:
             if self.classify_redshift:

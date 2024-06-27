@@ -1780,7 +1780,8 @@ class SpectraTrainer(BaseTrainer):
             elif self.classify_redshift:
                 if self.extra_args["redshift_classification_strategy"] == "binary":
                     gt = data["redshift_bins_mask"].flatten().to(torch.float32)
-                    spectra_loss = self.redshift_loss(ret["redshift_logits"], gt)
+                    logits = ret["redshift_logits"].flatten()
+                    spectra_loss = self.redshift_loss(logits, gt)
                     weight = torch.ones_like(spectra_loss)
                     weight[gt==1.] = self.num_redshift_bins
                     spectra_loss = (spectra_loss * weight).mean()
@@ -1791,7 +1792,7 @@ class SpectraTrainer(BaseTrainer):
             else: raise ValueError()
 
         elif self.classification_mode:
-            est = ret["redshift_logits"]
+            est = ret["redshift_logits"].flatten()
             gt = data["redshift_bins_mask_b"].flatten().to(torch.float32) # bool to float
             spectra_loss = self.bce_loss(est, gt)
             weight = torch.ones_like(spectra_loss)
