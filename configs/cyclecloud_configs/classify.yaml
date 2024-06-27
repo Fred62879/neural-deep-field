@@ -40,6 +40,11 @@ decoder:
     classifier_decoder_num_hidden_layers: 5
     classifier_decoder_hidden_dim: 512
 
+    classifier_decoder_activate_before_skip: False
+    classifier_decoder_skip_all_layers: True
+    classifier_decoder_skip_method: add
+    classifier_decoder_skip_add_conversion_method: multi_conversion
+
     classify_based_on_loss: False
     classify_based_on_concat_spectra: True
     classify_based_on_concat_wave_loss: False

@@ -389,6 +389,12 @@ def define_cmd_line_args():
                                help="Network width")
     decoder_group.add_argument("--classifier-decoder-batch-norm", action="store_true")
 
+    decoder_group.add_argument("--classifier-decoder-skip-all-layers", action="store_true",
+                               help="pass latents as skip to each decoder layer.")
+    decoder_group.add_argument("--classifier-decoder-activate-before-skip", action="store_true")
+    decoder_group.add_argument("--classifier-decoder-skip-method", nargs="+")
+    decoder_group.add_argument("--classifier-decoder-skip-add-conversion-method", nargs="+")
+
     decoder_group.add_argument("--classify-based-on-loss", action="store_true")
     decoder_group.add_argument("--classify-based-on-concat-spectra", action="store_true")
     decoder_group.add_argument("--classify-based-on-concat-wave-loss", action="store_true")

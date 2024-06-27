@@ -43,7 +43,13 @@ class RedshiftClassifier(nn.Module):
             input_dim, output_dim, True,
             num_layers=self.kwargs["classifier_decoder_num_hidden_layers"] + 1,
             hidden_dim=self.kwargs["classifier_decoder_hidden_dim"],
-            batch_norm=self.kwargs["classifier_decoder_batch_norm"])
+            batch_norm=self.kwargs["classifier_decoder_batch_norm"],
+            skip=[],
+            skip_method=self.kwargs["classifier_decoder_skip_method"],
+            skip_all_layers=self.kwargs["classifier_decoder_skip_all_layers"],
+            activate_before_skip=self.kwargs["classifier_decoder_activate_before_skip"],
+            skip_add_conversion_method= \
+                self.kwargs["classifier_decoder_skip_add_conversion_method"])
 
     def index_latents(self, data, selected_ids, idx):
         ret = data

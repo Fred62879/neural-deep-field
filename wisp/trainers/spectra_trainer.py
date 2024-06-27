@@ -30,6 +30,8 @@ from wisp.utils.plot import plot_grad_flow, plot_multiple, \
 from wisp.loss import get_loss, get_reduce, spectra_supervision_loss, pretrain_pixel_loss
 
 
+torch.backends.cudnn.benchmark = True
+
 class SpectraTrainer(BaseTrainer):
     def __init__(self, pipeline, dataset, optim_cls, optim_params, device, **extra_args):
         super().__init__(pipeline, dataset, optim_cls, optim_params, device, **extra_args)

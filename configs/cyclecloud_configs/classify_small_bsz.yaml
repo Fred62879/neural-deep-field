@@ -3,11 +3,11 @@ parent: base_cc_t430s.yaml
 global:
     use_tqdm: True
     exp_name: vdz-spectra-ssim
-    log_fname: clsfy_bn
+    log_fname: clsfy_small_bsz
 
     tasks: [train, redshift_classification_train]
-    tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
-    tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    # tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
+    # tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
 
 optimizer:
     optimizer_type: adam
@@ -22,7 +22,7 @@ optimizer:
     sgd_momentum: 0.9
 
 pretrain:
-    pretrain_batch_size: 1000
+    pretrain_batch_size: 512
     pretrain_use_all_wave: True
 
     classifier_train_use_bin_sampled_data: True
@@ -36,12 +36,12 @@ pretrain:
 
 decoder:
     classifier_decoder_input_dim: 280
-    classifier_decoder_batch_norm: True
+    classifier_decoder_batch_norm: False
     classifier_decoder_num_hidden_layers: 5
     classifier_decoder_hidden_dim: 512
 
     classifier_decoder_activate_before_skip: False
-    classifier_decoder_skip_all_layers: False
+    classifier_decoder_skip_all_layers: True
     classifier_decoder_skip_method: add
     classifier_decoder_skip_add_conversion_method: multi_conversion
 
@@ -64,13 +64,13 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240626-054049_clsfy_bn_sanity_check_num_bins_to_sample_5
+    # infer_log_dir: 20240625-001812_clsfy_10_bins
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
     infer_outlier_only: False
 
-    pretrain_infer_batch_size: 1000
+    pretrain_infer_batch_size: 100
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False

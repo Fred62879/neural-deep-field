@@ -629,7 +629,9 @@ class AstroInferrer(BaseInferrer):
 
         if self.redshift_infer:
             self.requested_fields.extend([
-                "wave_range","spectra_mask","spectra_redshift","spectra_source_data"])
+                "redshift_bins","wave_range","spectra_mask",
+                "spectra_redshift","spectra_source_data"])
+
             if self.classify_redshift:
                 self.requested_fields.append("redshift_bins_mask")
 
@@ -1917,7 +1919,7 @@ class AstroInferrer(BaseInferrer):
                 if self.extra_args["redshift_classification_strategy"] == "binary":
                     redshift_logits = redshift_logits.view(-1, self.num_redshift_bins)
                 ids = torch.argmax(redshift_logits, dim=-1).detach().cpu().numpy()
-                argmax_redshift = self.redshift_bins[ids]
+                argmax_redshift = data["redshift_bins"][ids]
                 self.est_redshift.extend(argmax_redshift)
             else: raise ValueError()
 
