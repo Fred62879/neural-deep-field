@@ -653,6 +653,15 @@ class AstroInferrer(BaseInferrer):
                     "spectra_redshift_b","redshift_bins"])
                 if self.clsfy_sc_infer and self.classifier_train_use_bin_sampled_data:
                     self.requested_fields.append("selected_bins_mask_b")
+                if self.extra_args["classifier_add_baseline_logits"]:
+                    self.requested_fields.append("baseline_redshift_logits")
+                    suffix = self.extra_args["baseline_logits_fname_suffix"]
+                    fname = join(
+                        self.log_dir, self.extra_args["baseline_logits_path"],
+                        "test_redshift", f"{suffix}_redshift_logits.npy"
+                    )
+                    data = np.load(fname)
+                    self.dataset.set_hardcode_data("baseline_redshift_logits", data)
             else:
                 self.requested_fields.extend([
                     "idx","wave_data","spectra_source_data",
@@ -1922,7 +1931,7 @@ class AstroInferrer(BaseInferrer):
                 suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
                 redshift_logits = ret[f"redshift_logits{suffix}"]
                 if self.save_redshift_logits:
-                    logits = F.softmax(redshift_logits, dim=-1)
+                    logits = torch.sigmoid(redshift_logits)
                     self.redshift_logits.extend(logits)
                 if self.extra_args["redshift_classification_strategy"] == "binary":
                     redshift_logits = redshift_logits.view(-1, self.num_redshift_bins)
@@ -1938,15 +1947,23 @@ class AstroInferrer(BaseInferrer):
                 if self.classifier_train_use_bin_sampled_data:
                     n_bins = self.extra_args["sanity_check_num_bins_to_sample"]
                 else: n_bins = self.num_redshift_bins
-                print(ret["redshift_logits"].shape)
-                assert 0
                 logits = ret["redshift_logits"].view(-1,n_bins)
-                ids = get_argmax_redshift_bin_ids(logits)
+
+                if self.extra_args["classifier_add_baseline_logits"]:
+                    baseline_logits = data["baseline_redshift_logits"]
+                    # print(torch.max(baseline_logits, dim=-1), torch.min(baseline_logits, dim=-1))
+                    # print(torch.max(logits, dim=-1), torch.min(logits, dim=-1))
+                    # print(baseline_logits.shape, logits.shape)
+                    logits = (torch.sigmoid(logits) + baseline_logits) / 2
+                    # print(torch.max(logits, dim=-1), torch.min(logits, dim=-1))
+
                 if self.sanity_check_sample_bins:
                     mask = data["selected_bins_mask"]
                 elif self.classifier_train_use_bin_sampled_data:
                     mask = data["selected_bins_mask_b"]
                 else: mask = None
+
+                ids = get_argmax_redshift_bin_ids(logits)
                 argmax_redshift = get_argmax_redshift(
                     data["redshift_bins"], ids,
                     bin_sampled=self.classifier_train_use_bin_sampled_data,
