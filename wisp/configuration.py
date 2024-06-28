@@ -58,7 +58,9 @@ def get_inferrer_from_config(pipelines, dataset, device, tasks, args):
                    "generalization_infer","redshift_classification_sc_infer",
                    "redshift_classification_genlz_infer",
                    "redshift_pretrain_infer","redshift_test_infer"]
-    cur_infer_task = find_common(tasks, infer_tasks)[0]
+    cur_infer_task = find_common(tasks, infer_tasks)
+    if len(cur_infer_task) == 0: cur_infer_task = "no_model_run"
+    else: cur_infer_task = cur_infer_task[0]
     inferrer = globals()[args.inferrer_type](
         pipelines, dataset, device, mode=cur_infer_task, **vars(args))
     return inferrer

@@ -80,6 +80,7 @@ class AstroInferrer(BaseInferrer):
             "redshift_classification_genlz_infer": "test",
             "redshift_pretrain_infer": "pretrain",
             "redshift_test_infer": "test",
+            "no_model_run": ""
         }[self.mode]
 
         paths = [
@@ -156,6 +157,9 @@ class AstroInferrer(BaseInferrer):
             self.dataset.set_spectra_source("test")
             self.num_spectra = self.dataset.get_num_test_spectra()
 
+        elif self.no_model_run:
+            pass
+
         else: raise ValueError()
 
         if self.infer_selected:
@@ -167,8 +171,9 @@ class AstroInferrer(BaseInferrer):
     def init_model(self):
         if "full" in self.pipelines:
             self.full_pipeline = self.pipelines["full"]
-
-        if self.clsfy_sc_infer or self.clsfy_genlz_infer:
+        if self.no_model_run:
+            pass
+        elif self.clsfy_sc_infer or self.clsfy_genlz_infer:
             self.spectra_infer_pipeline = self.pipelines["redshift_classifier"]
         elif self.redshift_pretrain_infer or self.redshift_test_infer:
             self.spectra_infer_pipeline = self.pipelines["spectra_baseline"]
@@ -232,12 +237,15 @@ class AstroInferrer(BaseInferrer):
         self.clsfy_genlz_infer = self.mode == "redshift_classification_genlz_infer"
         self.redshift_pretrain_infer = self.mode == "redshift_pretrain_infer"
         self.redshift_test_infer = self.mode == "redshift_test_infer"
+        self.no_model_run = self.mode == "no_model_run"
 
         self.spectra_infer = self.spectra_pretrain_infer or \
             self.sanity_check_infer or self.generalization_infer or \
             self.clsfy_sc_infer or self.clsfy_genlz_infer
         self.redshift_infer = self.redshift_pretrain_infer or self.redshift_test_infer
-        assert sum([self.test,self.img_infer,self.spectra_infer,self.redshift_infer]) == 1
+        assert sum([
+            self.test,self.img_infer,self.spectra_infer,self.redshift_infer, self.no_model_run
+        ]) == 1
 
         # quantization setups
         assert not self.extra_args["temped_qtz"]
@@ -886,7 +894,7 @@ class AstroInferrer(BaseInferrer):
             self._plot_spectra_latents_pca(-1, ids=ids, all_models_together=True)
 
         if self.overlay_redshift_est_stats:
-            pass #here
+            self._overlay_redshift_est_stats()
 
     #############
     # Infer with checkpoint
@@ -1606,6 +1614,15 @@ class AstroInferrer(BaseInferrer):
     #######################
     # no model run helpers
     #######################
+
+    def _overlay_redshift_est_stats(self):
+        log_dir = get_log_dir(**self.extra_args)
+        for fname in (self.extra_args["redshift_est_stats_fnames"]):
+            data = np.load(join(log_dir, fname)) # [residual_levels,accs]
+            plt.plot(data[0], data[1])
+        plt.legend(self.extra_args["redshift_est_stats_labels"])
+        fname = join(log_dir, self.extra_args["overlay_redshift_est_stats_fname"])
+        plt.savefig(fname); plt.close()
 
     def _plot_spectra_latents_pca(
             self, model_id, suffix="", ids=None, all_models_together=False

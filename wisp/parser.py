@@ -1113,6 +1113,10 @@ def define_cmd_line_args():
     infer_group.add_argument("--pretrain-pca-dim-fname", type=str)
     infer_group.add_argument("--spectra-latents-plot-pca-dim", type=int)
 
+    infer_group.add_argument("--redshift-est-stats-labels", type=str, nargs="+")
+    infer_group.add_argument("--redshift-est-stats-fnames", type=str, nargs="+")
+    infer_group.add_argument("--overlay-redshift-est-stats-fname", type=str)
+
     ###################
     # Argument for unit test
     ###################
