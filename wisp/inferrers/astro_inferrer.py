@@ -106,7 +106,8 @@ class AstroInferrer(BaseInferrer):
             Path(path).mkdir(parents=True, exist_ok=True)
 
         if self.classify_redshift and \
-           (self.sanity_check_infer or self.generalization_infer):
+           (self.sanity_check_infer or self.generalization_infer or \
+            self.clsfy_sc_infer or self.clsfy_genlz_infer):
             suffix = ""
             if self.classify_redshift_based_on_l2:
                 suffix += "l2_based_"
@@ -114,10 +115,11 @@ class AstroInferrer(BaseInferrer):
                 suffix += "ssim_l2_based_"
             if self.extra_args["infer_use_global_loss_as_lambdawise_weights"] and \
                not self.extra_args["use_global_spectra_loss_as_lambdawise_weights"]:
-                suffix += "weighted"
-
-            if suffix != "" and suffix[-1] == "_": suffix = suffix[:-1]
-            self.redshift_dir = f"{self.redshift_dir}/{suffix}"
+                suffix += "weighted_"
+            if self.extra_args["classifier_add_baseline_logits"]:
+                suffix += "addup_baseline_"
+            if suffix != "":
+                self.redshift_dir = join(self.redshift_dir, suffix[:-1])
             Path(self.redshift_dir).mkdir(parents=True, exist_ok=True)
 
     def init_data(self):
@@ -494,6 +496,7 @@ class AstroInferrer(BaseInferrer):
         self.plot_gt_pixel_distrib = "plot_gt_pixel_distrib" in tasks
         self.plot_spectra_latents_pca = "plot_spectra_latents_pca" in tasks and \
             not self.extra_args["infer_outlier_only"]
+        self.overlay_redshift_est_stats = "overlay_redshift_est_stats" in tasks
 
         # *) keep only tasks required
         self.group_tasks = []
@@ -511,7 +514,8 @@ class AstroInferrer(BaseInferrer):
             self.group_tasks.append("infer_hardcode_coords_modified_model")
 
         if self.plot_img_residual or self.integrate_gt_spectra or \
-           self.plot_gt_pixel_distrib or self.plot_spectra_latents_pca:
+           self.plot_gt_pixel_distrib or self.plot_spectra_latents_pca or \
+           self.overlay_redshift_est_stats:
             self.group_tasks.append("infer_no_model_run")
 
         self.infer_selected = self.extra_args["infer_selected"]
@@ -880,6 +884,9 @@ class AstroInferrer(BaseInferrer):
                 ids = np.load(fname)
             else: ids = None
             self._plot_spectra_latents_pca(-1, ids=ids, all_models_together=True)
+
+        if self.overlay_redshift_est_stats:
+            pass #here
 
     #############
     # Infer with checkpoint
@@ -2207,12 +2214,12 @@ class AstroInferrer(BaseInferrer):
         """
         self.gt_redshift = torch.stack(self.gt_redshift).detach().cpu().numpy()
         self.est_redshift = torch.stack(self.est_redshift).detach().cpu().numpy()
-        self.redshift_residual = self.est_redshift - self.gt_redshift
+        self.redshift_residual = np.abs(self.est_redshift - self.gt_redshift)
         fname = join(self.redshift_dir, f"model-{model_id}_redshift_residual.txt")
         log_data(self, "redshift_residual", fname=fname, log_to_console=False)
 
         ids = np.arange(len(self.redshift_residual))
-        outlier = ids[np.abs(self.redshift_residual) > self.extra_args["redshift_bin_width"]]
+        outlier = ids[self.redshift_residual >= self.extra_args["redshift_bin_width"]]
         outlier_gt = self.gt_redshift[outlier]
         outlier_est = self.est_redshift[outlier]
         to_save = np.array(list(outlier) + list(outlier_gt) + list(outlier_est)).reshape(3,-1)
@@ -2601,6 +2608,7 @@ class AstroInferrer(BaseInferrer):
             stats = plot_redshift_estimation_stats_together(
                 self.redshift_residual, fname,
                 self.extra_args["num_redshift_est_stats_residual_levels"],
+                self.extra_args["redshift_bin_width"],
                 cho=self.extra_args["redshift_est_stats_cho"],
                 residual_levels=residual_levels)
 

@@ -2,7 +2,7 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: vdz-spectra-baseline
+    exp_name: vdz-spectra-azure-baseline
     log_fname: baseline
 
     tasks: [train, redshift_pretrain]

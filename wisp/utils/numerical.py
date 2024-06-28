@@ -187,7 +187,7 @@ def normalize_data(data, norm_cho):
 #     return threshes, np.array(precision), np.array(recall)
 
 def calculate_redshift_estimation_stats_based_on_residuals(
-        residuals, num_residual_levels, cho="accuracy", residual_levels=None
+        residuals, num_residual_levels, bin_width, cho="accuracy", residual_levels=None
 ):
     """ Calculate precision and recall based on result for all spectra.
         We didn't use threshold from 0-1 as in case of a multi-class classification.
@@ -198,8 +198,6 @@ def calculate_redshift_estimation_stats_based_on_residuals(
           logits: [num_spectra,num_bins]
     """
     n_spectra = len(residuals)
-    residuals = np.abs(residuals)
-    residuals = np.around(residuals, decimals=2)
 
     lo, hi = np.min(residuals), np.max(residuals)
     if lo == hi:
@@ -213,15 +211,15 @@ def calculate_redshift_estimation_stats_based_on_residuals(
         residual_levels = np.sort(residual_levels)
     else:
         step = (hi - lo) / num_residual_levels
-        residual_levels = np.arange(lo, hi + 1e-6, step)
+        residual_levels = np.arange(lo, hi + 1e-6, step) + bin_width
 
     def calculate_accuracy(residual_level):
-        ps = sum(residuals <= residual_level)
+        ps = sum(residuals < residual_level)
         stats.append(ps / n_spectra)
 
     def calculate_precision_recall(residual_level):
-        tps = residuals <= residual_level
-        fns = residuals > residual_level
+        tps = residuals < residual_level
+        fns = residuals >= residual_level
         n_tps = sum(tps)
         n_fns = sum(fns)
         stats[0].append(n_tps / (n_tps + n_fns) ) # recall

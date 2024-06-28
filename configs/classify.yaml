@@ -2,12 +2,13 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: vdz-spectra-ssim-azure
+    exp_name: vdz-spectra-ssim-t430s-azure
     log_fname: clsfy
 
     tasks: [train, redshift_classification_train]
     tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
     tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    # tasks: [infer, overlay_redshift_est_stats]
 
 optimizer:
     optimizer_type: adam
@@ -22,7 +23,7 @@ optimizer:
     sgd_momentum: 0.9
 
 pretrain:
-    pretrain_batch_size: 1000
+    pretrain_batch_size: 512
     pretrain_use_all_wave: True
 
     classifier_train_use_bin_sampled_data: True
@@ -30,8 +31,8 @@ pretrain:
     classifier_train_sample_bins: False
     classifier_train_num_bins_to_sample: 2
 
-    classifier_add_baseline_logits: True
-    baseline_logits_path: ../../vdz-spectra-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/
+    classifier_add_baseline_logits: False
+    baseline_logits_path: ../../vdz-spectra-azure-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/
     baseline_logits_fname_suffix: model-0
 
     model_redshift: True
@@ -40,12 +41,12 @@ pretrain:
 
 decoder:
     classifier_decoder_input_dim: 280
-    classifier_decoder_batch_norm: False
+    classifier_decoder_batch_norm: True
     classifier_decoder_num_hidden_layers: 5
     classifier_decoder_hidden_dim: 512
 
     classifier_decoder_activate_before_skip: False
-    classifier_decoder_skip_all_layers: False
+    classifier_decoder_skip_all_layers: True
     classifier_decoder_skip_method: add
     classifier_decoder_skip_add_conversion_method: multi_conversion
 
@@ -68,7 +69,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240617-054623_clsfy_5_bins_50k_epochs_050251
+    infer_log_dir: 20240627-012320_clsfy_small_bsz_bn_5_layers
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -91,6 +92,8 @@ infer:
 
     log_redshift_est_stats: False
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
+
+    # redshift_est_stats_paths: [vdz-spectra-azure-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/test_redshift/
 
 dataset:
     calculate_wave_range_based_on_trans: False

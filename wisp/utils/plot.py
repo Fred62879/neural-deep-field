@@ -198,7 +198,8 @@ def plot_redshift_estimation_stats_individually(
     fig.tight_layout(); plt.savefig(fname); plt.close()
 
 def plot_redshift_estimation_stats_together(
-        redshift_residuals, fname, num_residual_levels, cho="accuracy", residual_levels=None
+        redshift_residuals, fname, num_residual_levels, bin_width,
+        cho="accuracy", residual_levels=None
 ):
     """ Plot redshfit estimation statistics combining all spectra together.
         @param
@@ -206,7 +207,8 @@ def plot_redshift_estimation_stats_together(
           num_residual_levels: num residual levels for which we calculate the stats.
     """
     residual_levels, stats = calculate_redshift_estimation_stats_based_on_residuals(
-        redshift_residuals, num_residual_levels, cho=cho, residual_levels=residual_levels
+        redshift_residuals, num_residual_levels, bin_width,
+        cho=cho, residual_levels=residual_levels
     )
     if residual_levels is None: return # residuals all 0
 
@@ -216,6 +218,8 @@ def plot_redshift_estimation_stats_together(
         plt.xlabel("residual"); plt.ylabel("accuracy")
         plt.title(f"Accuracy under different residual levels")
         plt.tight_layout(); plt.savefig(fname + "_accuracy.png"); plt.close()
+        np.save(f"{fname}_accuracy",
+                np.concatenate((residual_levels[None,:], stats[None,:]),axis=0))
 
     elif cho == "precision_recall":
         recall, precision = stats
