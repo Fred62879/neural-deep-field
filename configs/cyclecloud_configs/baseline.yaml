@@ -6,8 +6,8 @@ global:
     log_fname: baseline
 
     tasks: [train, redshift_pretrain]
-    #tasks: [infer, redshift_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
-    #tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
+    tasks: [infer, redshift_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
+    tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats']
 
 optimizer:
     optimizer_type: adam
@@ -57,7 +57,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: ''
+    infer_log_dir: 20240627-005506_baseline_bin_class_100k_spectra_bn_5_layers_skip_all_20k_epochs_lr_1e-5
     infer_selected: False
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
@@ -107,7 +107,7 @@ spectra_data:
 
     redshift_regress_spectra_sample_method: uniform_dense
 
-    generalization_max_num_spectra: 50000
+    generalization_max_num_spectra: 20000
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 
