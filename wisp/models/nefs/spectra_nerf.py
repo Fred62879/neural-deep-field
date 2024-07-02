@@ -207,7 +207,7 @@ class SpectraNerf(BaseNeuralField):
 
         if self.has_redshift_latents:
             redshift_latents = self.redshift_latents
-            redshift_latents = self.index_latents(redshift_latents, selected_ids, idx)
+            redshift_latents = self.index_data(redshift_latents, selected_ids, idx)
         else: redshift_latents = None
 
         # `latents` is either coefficients or qtz latents or latents
@@ -242,13 +242,13 @@ class SpectraNerf(BaseNeuralField):
             assert coords is None
             if self.kwargs["regularize_binwise_spectra_latents"]:
                 nbins = self.addup_latents.shape[1]
-                addup_latents = self.index_latents(self.addup_latents, selected_ids, idx)
-                base_latents = self.index_latents(
+                addup_latents = self.index_data(self.addup_latents, selected_ids, idx)
+                base_latents = self.index_data(
                     self.base_latents, selected_ids, idx)[:,None].tile(1,nbins,1)
                 coords = base_latents + addup_latents
             else:
                 coords = self.latents
-                coords = self.index_latents(coords, selected_ids, idx)
+                coords = self.index_data(coords, selected_ids, idx)
 
             # if self.sanity_check_sample_bins:
             #     assert selected_bins_mask is not None
@@ -269,13 +269,13 @@ class SpectraNerf(BaseNeuralField):
                 raise NotImplementedError()
 
         if self.sanity_check_sample_bins_per_step:
-            # assert selected_bins_mask is not None
-            raise NotImplementedError()
+            bsz, _, dim = coords.shape
+            coords = coords[selected_bins_mask].view(bsz,-1,dim)
 
         coords = coords[:,None]
         return coords
 
-    def index_latents(self, data, selected_ids, idx):
+    def index_data(self, data, selected_ids, idx):
         ret = data
         # index with `selected_ids` first
         if selected_ids is not None: ret = ret[selected_ids]

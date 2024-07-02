@@ -600,7 +600,6 @@ class SpectraTrainer(BaseTrainer):
                 cur_field_name = f"{field}_b"
                 fields.append(cur_field_name)
                 self.dataset.set_hardcode_data(cur_field_name, np.load(fname))
-
             self.dataset.toggle_classifier_train_sample_bins(
                 self.extra_args["classifier_train_sample_bins"])
 
@@ -616,6 +615,7 @@ class SpectraTrainer(BaseTrainer):
                 fields.extend(["redshift_bins_mask","selected_bins_mask"])
                 self.dataset.toggle_sanity_check_sample_bins(True)
             elif self.sanity_check_sample_bins_per_step:
+                fields.append("idx")
                 self.dataset.toggle_sanity_check_sample_bins_per_step(True)
 
         # todo, codebook pretrain "coords" not handled
@@ -1652,6 +1652,10 @@ class SpectraTrainer(BaseTrainer):
             steps = self.spectra_pretrain_total_steps
         else: steps = self.total_steps
 
+        if self.classification_mode:
+            clsfy_forward_data_fields = self.classification_forward_data_fields
+        else: clsfy_forward_data_fields = None
+
         if self.sanity_check_sample_bins or \
            self.sanity_check_sample_bins_per_step:
             self.pipeline.toggle_sample_bins(True)
@@ -1675,10 +1679,12 @@ class SpectraTrainer(BaseTrainer):
             trans_sample_method=self.trans_sample_method,
             spectra_baseline_mode=self.baseline_mode,
             spectra_classification_mode=self.classification_mode,
-            spectra_classification_fields=self.classification_forward_data_fields,
+            spectra_classification_fields=clsfy_forward_data_fields,
             optimize_bins_separately=self.optimize_bins_separately,
-            sanity_check_sample_bins=self.sanity_check_sample_bins or \
-                self.sanity_check_sample_bins_per_step,
+            # sanity_check_sample_bins=self.sanity_check_sample_bins or \
+            #     self.sanity_check_sample_bins_per_step,
+            sanity_check_sample_bins=self.sanity_check_sample_bins,
+            sanity_check_sample_bins_per_step=self.sanity_check_sample_bins_per_step,
             regularize_codebook_spectra=self.regularize_codebook_spectra,
             calculate_binwise_spectra_loss= self.calculate_binwise_spectra_loss,
             regress_lambdawise_weights_share_latents=\
@@ -1889,6 +1895,8 @@ class SpectraTrainer(BaseTrainer):
 
         if self.plot_gt_bin_loss:
             mask = data["redshift_bins_mask"]
+            if self.sanity_check_sample_bins_per_step:
+                mask = mask[data["selected_bins_mask"]].view(mask.shape[0], -1)
             all_spectra_gt_bin_loss = all_bin_loss[mask]
             gt_bin_loss = self.spectra_reduce_func(all_spectra_gt_bin_loss)
             loss_name = f"gt_bin{loss_name_suffix}_loss"

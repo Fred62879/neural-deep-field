@@ -752,9 +752,7 @@ class AstroInferrer(BaseInferrer):
             self.batch_size = min(
                 self.dataset_length * self.neighbour_size**2, self.batch_size)
         else: self.batch_size = self.neighbour_size**2
-        if self.save_redshift_classification_data:
-            self.set_redshift_classification_data_fields()
-        else: self.classification_forward_data_fields = None
+        self.set_redshift_classification_data_fields()
         self.reset_dataloader()
 
     def post_inferrence_selected_coords_partial_model(self):
@@ -1802,6 +1800,10 @@ class AstroInferrer(BaseInferrer):
                self.classify_redshift_based_on_combined_ssim_l2:
                 l2_loss_func = self._get_spectra_loss_func("l2")
 
+        if self.save_redshift_classification_data:
+            clsfy_forward_data_fields = self.classification_forward_data_fields
+        else: clsfy_forward_data_fields = None
+
         if self.sanity_check_sample_bins:
             self.spectra_infer_pipeline.toggle_sample_bins(True)
 
@@ -1821,7 +1823,7 @@ class AstroInferrer(BaseInferrer):
                 apply_gt_redshift=self.apply_gt_redshift,
                 spectra_baseline_mode=self.redshift_infer,
                 spectra_classification_mode=self.clsfy_sc_infer or self.clsfy_genlz_infer,
-                spectra_classification_fields=self.classification_forward_data_fields,
+                spectra_classification_fields=clsfy_forward_data_fields,
                 sanity_check_sample_bins=self.sanity_check_sample_bins,
                 classify_redshift_based_on_l2= \
                     self.classify_redshift_based_on_l2 or \
