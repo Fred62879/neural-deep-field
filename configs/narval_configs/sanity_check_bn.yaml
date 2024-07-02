@@ -1,12 +1,12 @@
-parent: base_cc_t430s.yaml
+parent: base_narval.yaml
 
 global:
-    use_tqdm: True
+    use_tqdm: False
     exp_name: vdz-spectra-ssim
-    log_fname: genlz
+    log_fname: sc_bn
 
-    tasks: [train, generalization]
-    tasks: [infer, generalization_infer, save_redshift_classification_data] #save_redshift, plot_redshift_est_stats, plot_redshift_est_residuals] #,'plot_redshift_logits'] #plot_spectra_latents_pca
+    tasks: [train, sanity_check] #, recon_spectra]
+    tasks: [infer, sanity_check_infer, save_redshift_classification_data] #save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca
 
 optimizer:
     optimizer_type: adam
@@ -28,9 +28,7 @@ embedder:
     wave_multiplier: 64
 
 pretrain:
-    generalize_train_first_layer: False
-
-    pretrain_batch_size: 100
+    pretrain_batch_size: 5000
 
     use_latents_as_coords: True
     zero_init_spectra_latents: True
@@ -41,6 +39,10 @@ pretrain:
     pretrain_num_wave_samples: 100
     pretrain_wave_sample_method: rand_dense
 
+    sanity_check_sample_bins: True
+    sanity_check_sample_bins_per_step: False
+    sanity_check_num_bins_to_sample: 16
+    
     model_redshift: True
     brute_force_redshift: True
     optimize_latents_for_each_redshift_bin: True
@@ -50,27 +52,34 @@ pretrain:
     optimize_gt_bin_only: False
     dont_optimize_gt_bin: False
 
-    pretrain_log_dir: 20240607-033031_pretrain_100k_spectra_m64_100_samples_divide_wave_norm_pe_dim_64_5k_epochs
+    pretrain_log_dir: 20240617-052130_pretrain_100k_spectra_bn_5k_epochs
     pretrained_model_name: model-ep5000-bch0.pth
 
     regularize_spectra_latents: True
     spectra_latents_regu_beta: 16
 
+    sanity_check_finetune: False
+    spectra_wrong_bin_regu_beta: 16
+
     use_global_spectra_loss_as_lambdawise_weights: False
     limit_redshift_to_pretrain_range: False
-    global_restframe_spectra_loss_fname: '/pretrain_spectra/global_restframe_l2_loss.npy'
+    global_restframe_spectra_loss_fname: nan #/pretrain_spectra/global_restframe_l2_loss.npy
 
     regress_lambdawise_weights: False
     regress_lambdawise_weights_share_latents: False
+    regress_lambdawise_weights_use_gt_bin_latent: False
+    wrong_bin_regu_beta: 1
     lambdawise_weights_decoder_num_layers: 1
     lambdawise_weights_decoder_hidden_dim: 128
 
 decoder:
     decoder_activation_type: relu
-    decoder_batch_norm: False
+    decoder_batch_norm: True
     decoder_num_hidden_layers: 5
     decoder_hidden_dim: 512
     decoder_skip_layers: []
+
+    decoder_gaussian_sigma: .1
 
     decoder_activate_before_latents_skip: False
     decoder_latents_skip_all_layers: True
@@ -78,17 +87,18 @@ decoder:
     decoder_latents_skip_add_conversion_method: multi_conversion
 
 trainer:
-    num_epochs: 200
-    log_cli_every: 20
+    num_epochs: 500
+    log_cli_every: 50
     plot_grad_every: -1
-    save_model_every: 20
+    save_data_every: -1
+    save_model_every: 50
 
     plot_l2_loss: True
     plot_gt_bin_loss: True
 
     resume_train: False
     resume_log_dir: ''
-    resume_model_fname: model-ep10000-bch0.pth
+    resume_model_fname: 'model-ep800-bch0.pth'
 
     spectra_loss_cho: ssim1d
     spectra_loss_reduction: mean
@@ -99,26 +109,28 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240619-220256_genlz_5k_spectra_500_epochs_033031
+    infer_log_dir: 20240626-002713_sc_sanity_check_num_bins_to_sample_16
 
     infer_selected: False
-    pretrain_num_infer_upper_bound: 35
-    spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
+    pretrain_num_infer_upper_bound: 100
+    spectra_inferrence_id_fname: nan #/redshift/model-0_redshift_outlier_ids.npy
     infer_outlier_only: False
 
     classify_redshift_based_on_l2: False
+    classify_redshift_based_on_combined_ssim_l2: False
     infer_use_global_loss_as_lambdawise_weights: False
 
-    pretrain_infer_batch_size: 25
+    pretrain_infer_batch_size: 2000
     pretrain_infer_use_all_wave: False
-    pretrain_infer_num_wave: 384
-    pretrain_infer_wave_sample_method: uniform_dense
+    pretrain_infer_num_wave: 280
+    pretrain_infer_wave_sample_method: 'uniform_dense'
 
     plot_clipped_spectrum: True
     plot_spectrum_with_loss: False
     plot_spectrum_with_ivar: False
     plot_spectrum_with_lines: False
     plot_spectrum_with_recon: False
+    plot_spectrum_with_weights: True
     plot_spectrum_color_based_on_loss: False
     plot_spectrum_under_gt_bin: True
     plot_spectrum_under_optimal_wrong_bin: True
@@ -155,7 +167,8 @@ spectra_data:
     process_ivar: True
     spectra_smooth_sigma: 15
 
-    generalization_max_num_spectra: 5000
+    sample_from_pretrain_spectra: True
+    sanity_check_max_num_spectra: 200000
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 
@@ -166,9 +179,9 @@ spectra_data:
 ablation:
     perform_ablation: False
     ablat_id: 0
-    ablat_params: ["decoder_num_hidden_layers","spectra_latent_dim"]
-    ablat_vals: [[5,7],[8,16,32]]
-    ablat_num_vals: [2,3]
+    ablat_params: ["decoder_batch_norm"] #["decoder_num_hidden_layers","decoder_hidden_dim"]
+    ablat_vals: [[True,False]] #[[3,5],[128,256,512]]
+    ablat_num_vals: [2] #[2,3]
 
-    # ablat_hardcode_params: [pretrain_log_dir]
-    # ablat_hardcode_vals: [[]]
+    #ablat_hardcode_params: ["pretrain_log_dir"]
+    #ablat_hardcode_vals: [["20240222-015410_1600-spectra-skip-same-dim_decoder_batch_norm_True","20240222-165434_1600-spectra-skip-same-dim_decoder_batch_norm_False"]]

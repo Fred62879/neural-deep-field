@@ -171,6 +171,8 @@ class AstroInferrer(BaseInferrer):
     def init_model(self):
         if "full" in self.pipelines:
             self.full_pipeline = self.pipelines["full"]
+            log.info(self.full_pipeline)
+
         if self.no_model_run:
             pass
         elif self.clsfy_sc_infer or self.clsfy_genlz_infer:
@@ -1515,6 +1517,9 @@ class AstroInferrer(BaseInferrer):
             self.redshift_classification_data_fields.extend(["gt_spectra","recon_spectra"])
         if self.redshift_classification_need_emit_wave:
             self.redshift_classification_data_fields.extend(["spectra_wave","spectra_redshift"])
+        self.classification_forward_data_fields = list(
+            set(self.redshift_classification_data_fields) -
+            set(["redshift_bins_mask","selected_bins_mask"]))
 
         if self.extra_args["save_classification_data_individually"]:
             self.redshift_classification_batched_fields = \
@@ -1529,48 +1534,53 @@ class AstroInferrer(BaseInferrer):
             self.redshift_classification_unbatched_fields = []
 
     def set_redshift_classification_data(self):
-        log_dir = get_redshift_classification_data_dir(self.mode, **self.extra_args)
-        dir = join(self.log_dir, "..", log_dir)
+        log_dir = join(self.log_dir, "..",
+                       get_redshift_classification_data_dir(self.mode, **self.extra_args))
         prefix = self.extra_args["redshift_classification_data_fname_prefix"]
 
-        mask_fname = join(dir, f"{prefix}_spectra_mask.npy")
-        redshift_fname = join(dir, f"{prefix}_spectra_redshift.npy")
-        redshift_bins_mask_fname = join(dir, f"{prefix}_redshift_bins_mask.npy")
-        self.dataset.set_hardcode_data("spectra_mask_b", np.load(mask_fname))
-        self.dataset.set_hardcode_data("spectra_redshift_b", np.load(redshift_fname))
-        self.dataset.set_hardcode_data(
-            "redshift_bins_mask_b", np.load(redshift_bins_mask_fname))
-        if self.clsfy_sc_infer and self.classifier_train_use_bin_sampled_data:
-            selected_bins_mask_fname = join(dir, f"{prefix}_selected_bins_mask.npy")
-            self.dataset.set_hardcode_data(
-                "selected_bins_mask_b", np.load(selected_bins_mask_fname))
+        for field in self.redshift_classification_batched_fields:
+            fname = join(log_dir, f"{prefix}_{field}.npy")
+            cur_field_name = f"{field}_b"
+            self.dataset.set_hardcode_data(cur_field_name, np.load(fname))
 
-        if self.extra_args["save_classification_data_individually"]:
-            wave_dir = join(dir, f"{prefix}_wave")
-            loss_dir = join(dir, f"{prefix}_lambdawise_losses")
-            gt_spectra_dir = join(dir, f"{prefix}_gt_spectra")
-            recon_spectra_dir = join(dir, f"{prefix}_recon_spectra")
-            n = len(os.listdir(wave_dir))
-            wave, loss, gt_spectra, recon_spectra = [], [], [], []
-            for i in range(n):
-                wave.append(np.load(join(wave_dir, f"{i}.npy")))
-                loss.append(np.load(join(loss_dir, f"{i}.npy")))
-                gt_spectra.append(np.load(join(gt_spectra_dir, f"{i}.npy")))
-                recon_spectra.append(np.load(join(recon_spectra_dir,  f"{i}.npy")))
+        # mask_fname = join(dir, f"{prefix}_spectra_mask.npy")
+        # redshift_fname = join(dir, f"{prefix}_spectra_redshift.npy")
+        # redshift_bins_mask_fname = join(dir, f"{prefix}_redshift_bins_mask.npy")
+        # self.dataset.set_hardcode_data("spectra_mask_b", np.load(mask_fname))
+        # self.dataset.set_hardcode_data("spectra_redshift_b", np.load(redshift_fname))
+        # self.dataset.set_hardcode_data(
+        #     "redshift_bins_mask_b", np.load(redshift_bins_mask_fname))
+        # if self.clsfy_sc_infer and self.classifier_train_use_bin_sampled_data:
+        #     selected_bins_mask_fname = join(dir, f"{prefix}_selected_bins_mask.npy")
+        #     self.dataset.set_hardcode_data(
+        #         "selected_bins_mask_b", np.load(selected_bins_mask_fname))
 
-            self.dataset.set_hardcode_data("wave", np.array(wave))
-            self.dataset.set_hardcode_data("spectra_lambdawise_losses", np.array(loss))
-            self.dataset.set_hardcode_data("gt_spectra", np.array(gt_spectra))
-            self.dataset.set_hardcode_data("recon_spectra", np.array(recon_spectra))
-        else:
-            wave_fname = join(dir, f"{prefix}_wave.npy")
-            loss_fname = join(dir, f"{prefix}_lambdawise_losses.npy")
-            gt_spectra_fname = join(dir, f"{prefix}_gt_spectra.npy")
-            recon_spectra_fname = join(dir, f"{prefix}_recon_spectra.npy")
-            self.dataset.set_hardcode_data("wave", np.load(wave_fname))
-            self.dataset.set_hardcode_data("spectra_lambdawise_losses", np.load(loss_fname))
-            self.dataset.set_hardcode_data("gt_spectra", np.load(gt_spectra_fname))
-            self.dataset.set_hardcode_data("recon_spectra", np.load(recon_spectra_fname))
+        # if self.extra_args["save_classification_data_individually"]:
+        #     wave_dir = join(dir, f"{prefix}_wave")
+        #     loss_dir = join(dir, f"{prefix}_lambdawise_losses")
+        #     gt_spectra_dir = join(dir, f"{prefix}_gt_spectra")
+        #     recon_spectra_dir = join(dir, f"{prefix}_recon_spectra")
+        #     n = len(os.listdir(wave_dir))
+        #     wave, loss, gt_spectra, recon_spectra = [], [], [], []
+        #     for i in range(n):
+        #         wave.append(np.load(join(wave_dir, f"{i}.npy")))
+        #         loss.append(np.load(join(loss_dir, f"{i}.npy")))
+        #         gt_spectra.append(np.load(join(gt_spectra_dir, f"{i}.npy")))
+        #         recon_spectra.append(np.load(join(recon_spectra_dir,  f"{i}.npy")))
+
+        #     self.dataset.set_hardcode_data("wave", np.array(wave))
+        #     self.dataset.set_hardcode_data("spectra_lambdawise_losses", np.array(loss))
+        #     self.dataset.set_hardcode_data("gt_spectra", np.array(gt_spectra))
+        #     self.dataset.set_hardcode_data("recon_spectra", np.array(recon_spectra))
+        # else:
+        #     wave_fname = join(dir, f"{prefix}_wave.npy")
+        #     loss_fname = join(dir, f"{prefix}_lambdawise_losses.npy")
+        #     gt_spectra_fname = join(dir, f"{prefix}_gt_spectra.npy")
+        #     recon_spectra_fname = join(dir, f"{prefix}_recon_spectra.npy")
+        #     self.dataset.set_hardcode_data("wave", np.load(wave_fname))
+        #     self.dataset.set_hardcode_data("spectra_lambdawise_losses", np.load(loss_fname))
+        #     self.dataset.set_hardcode_data("gt_spectra", np.load(gt_spectra_fname))
+        #     self.dataset.set_hardcode_data("recon_spectra", np.load(recon_spectra_fname))
 
     def _get_spectra_loss_func(self, loss_cho):
         loss_func = get_loss(
@@ -1810,6 +1820,7 @@ class AstroInferrer(BaseInferrer):
                 apply_gt_redshift=self.apply_gt_redshift,
                 spectra_baseline_mode=self.redshift_infer,
                 spectra_classification_mode=self.clsfy_sc_infer or self.clsfy_genlz_infer,
+                spectra_classification_fields=self.classification_forward_data_fields,
                 sanity_check_sample_bins=self.sanity_check_sample_bins,
                 classify_redshift_based_on_l2= \
                     self.classify_redshift_based_on_l2 or \

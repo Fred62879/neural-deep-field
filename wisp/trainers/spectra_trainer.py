@@ -588,15 +588,22 @@ class SpectraTrainer(BaseTrainer):
         """ Configure dataset with selected fields and set length accordingly.
         """
         self.dataset.set_mode(self.mode)
+        fields = ["wave_range","spectra_sup_bounds"]
 
-        fields = ["spectra_sup_bounds"]
         if self.classification_mode:
-            fields.extend(["spectra_lambdawise_losses",
-                           "wave","wave_range","gt_spectra","recon_spectra",
-                           "spectra_mask_b","spectra_redshift_b",
-                           "gt_redshift_bin_ids_b","redshift_bins_mask_b"])
+            batched_fields, unbatched_fields = self.get_classification_data_fields()
+            log_dir = get_redshift_classification_data_dir(self.mode, **self.extra_args)
+            log_dir = join(self.log_dir, "..", log_dir)
+            prefix = self.extra_args["redshift_classification_data_fname_prefix"]
+            for field in self.classification_data_fields:
+                fname = join(log_dir, f"{prefix}_{field}.npy")
+                cur_field_name = f"{field}_b"
+                fields.append(cur_field_name)
+                self.dataset.set_hardcode_data(cur_field_name, np.load(fname))
+
             self.dataset.toggle_classifier_train_sample_bins(
                 self.extra_args["classifier_train_sample_bins"])
+
         elif self.baseline_mode:
             fields.extend([
                 "wave_range","spectra_mask","spectra_redshift","spectra_source_data"])
@@ -666,31 +673,42 @@ class SpectraTrainer(BaseTrainer):
                         self.dataset.set_hardcode_data("optm_bin_ids", self.optm_bin_ids)
                     fields.append("optm_bin_ids")
 
-        # train classifier on top of trained model to predict redshift
-        if self.classification_mode:
-            log_dir = get_redshift_classification_data_dir(self.mode, **self.extra_args)
-            dir = join(self.log_dir, "..", log_dir)
-            prefix = self.extra_args["redshift_classification_data_fname_prefix"]
-
-            loss_fname = join(dir, f"{prefix}_lambdawise_losses.npy")
-            wave_fname = join(dir, f"{prefix}_wave.npy")
-            gt_spectra_fname = join(dir, f"{prefix}_gt_spectra.npy")
-            recon_spectra_fname = join(dir, f"{prefix}_recon_spectra.npy")
-            mask_fname = join(dir, f"{prefix}_spectra_mask.npy")
-            gt_bin_ids_fname = join(dir, f"{prefix}_gt_bin_ids.npy")
-            redshift_fname = join(dir, f"{prefix}_spectra_redshift.npy")
-            redshift_bins_mask_fname = join(dir, f"{prefix}_redshift_bins_mask.npy")
-
-            self.dataset.set_hardcode_data("spectra_lambdawise_losses",np.load(loss_fname))
-            self.dataset.set_hardcode_data("wave",np.load(wave_fname))
-            self.dataset.set_hardcode_data("gt_spectra", np.load(gt_spectra_fname))
-            self.dataset.set_hardcode_data("recon_spectra", np.load(recon_spectra_fname))
-            self.dataset.set_hardcode_data("spectra_mask_b",np.load(mask_fname))
-            self.dataset.set_hardcode_data("spectra_redshift_b",np.load(redshift_fname))
-            self.dataset.set_hardcode_data("gt_redshift_bin_ids_b",np.load(gt_bin_ids_fname))
-            self.dataset.set_hardcode_data("redshift_bins_mask_b",np.load(redshift_bins_mask_fname))
-
         self.dataset.set_fields(fields)
+
+    def get_classification_data_fields(self):
+        self.redshift_classification_need_loss = \
+            self.extra_args["classify_based_on_loss"] or \
+            self.extra_args["classify_based_on_concat_wave_loss"]
+        self.redshift_classification_need_spectra = \
+            self.extra_args["classify_based_on_concat_spectra"] or \
+            self.extra_args["classify_based_on_concat_wave_spectra"]
+        self.redshift_classification_need_emit_wave = \
+            self.extra_args["classify_based_on_concat_wave_loss"] or \
+            self.extra_args["classify_based_on_concat_wave_spectra"]
+
+        self.classification_data_fields = [ "spectra_mask","redshift_bins_mask" ]
+        if self.extra_args["classifier_train_use_bin_sampled_data"]:
+            self.classification_data_fields.append("selected_bins_mask")
+        if self.redshift_classification_need_loss:
+            self.classification_data_fields.append("spectra_lambdawise_losses")
+        if self.redshift_classification_need_spectra:
+            self.classification_data_fields.extend(["gt_spectra","recon_spectra"])
+        if self.redshift_classification_need_emit_wave:
+            self.classification_data_fields.extend(["spectra_wave","spectra_redshift"])
+        self.classification_forward_data_fields = list(
+            set(self.classification_data_fields) -
+            set(["redshift_bins_mask","selected_bins_mask"]))
+
+        if self.extra_args["save_classification_data_individually"]:
+            batched_fields = \
+                self.extra_args["redshift_classification_batched_data_fields"]
+            unbatched_fields = list(
+                set(self.classification_data_fields) - set(batched_fields))
+            self.redshift_classification_num_files_saved_offset = 0
+        else:
+            batched_fields = self.classification_data_fields
+            unbatched_fields = []
+        return batched_fields, unbatched_fields
 
     #############
     # Training logic
@@ -1657,6 +1675,7 @@ class SpectraTrainer(BaseTrainer):
             trans_sample_method=self.trans_sample_method,
             spectra_baseline_mode=self.baseline_mode,
             spectra_classification_mode=self.classification_mode,
+            spectra_classification_fields=self.classification_forward_data_fields,
             optimize_bins_separately=self.optimize_bins_separately,
             sanity_check_sample_bins=self.sanity_check_sample_bins or \
                 self.sanity_check_sample_bins_per_step,

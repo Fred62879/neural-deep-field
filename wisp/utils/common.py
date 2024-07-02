@@ -650,6 +650,7 @@ def forward(
         spectra_supervision=False,
         perform_integration=False,
         spectra_classification_mode=False,
+        spectra_classification_fields=None,
         spectra_baseline_mode=False,
         trans_sample_method="none",
         optimize_bins_separately=False,
@@ -683,7 +684,8 @@ def forward(
         save_lambdawise_weights=False,
         save_redshift_classification_data=False
 ):
-    net_args, requested_channels = {}, []
+    net_args = defaultdict(None)
+    requested_channels = []
     if "coords" in data:
         net_args["coords"] = data["coords"]
 
@@ -801,11 +803,13 @@ def forward(
             net_args["spectra_source_data"] = data["spectra_source_data"]
 
         if spectra_classification_mode:
-            net_args["gt_spectra"] = data["gt_spectra"]
-            net_args["recon_spectra"] = data["recon_spectra"]
-            net_args["spectra_mask"] = data["spectra_mask_b"]
-            net_args["spectra_redshift"] = data["spectra_redshift_b"]
-            net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses"]
+            for field in spectra_classification_fields:
+                net_args[field] = data[f"{field}_b"]
+            # net_args["gt_spectra"] = data["gt_spectra_b"]
+            # net_args["recon_spectra"] = data["recon_spectra_b"]
+            # net_args["spectra_mask"] = data["spectra_mask_b"]
+            # net_args["spectra_redshift"] = data["spectra_redshift_b"]
+            # net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses_b"]
 
         if sanity_check_sample_bins:
             net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
