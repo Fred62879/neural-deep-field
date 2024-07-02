@@ -712,7 +712,8 @@ def forward(
 
         if "wave" in data:
             net_args["wave"] = data["wave"]
-        net_args["wave_range"] = data["wave_range"] # linear normalization
+        if "wave_range" in data:
+            net_args["wave_range"] = data["wave_range"] # linear normalization
 
         if index_latent:
             if "idx" in data:

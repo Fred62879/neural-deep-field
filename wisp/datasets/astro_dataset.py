@@ -393,7 +393,7 @@ class AstroDataset(Dataset):
         else:
             raise ValueError(f"Unrecognized data field: {field}.")
 
-        #print('*', field) #, data.shape, idx)
+        # print('*', field, data.shape, idx)
         data = self.index_selected_data(data, idx)
         return data
 

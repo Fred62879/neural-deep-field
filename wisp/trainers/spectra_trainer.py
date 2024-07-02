@@ -588,13 +588,14 @@ class SpectraTrainer(BaseTrainer):
         """ Configure dataset with selected fields and set length accordingly.
         """
         self.dataset.set_mode(self.mode)
-        fields = ["wave_range","spectra_sup_bounds"]
+        fields = ["spectra_sup_bounds"]
 
         if self.classification_mode:
             batched_fields, unbatched_fields = self.get_classification_data_fields()
             log_dir = get_redshift_classification_data_dir(self.mode, **self.extra_args)
             log_dir = join(self.log_dir, "..", log_dir)
             prefix = self.extra_args["redshift_classification_data_fname_prefix"]
+            # todo, single file loading
             for field in self.classification_data_fields:
                 fname = join(log_dir, f"{prefix}_{field}.npy")
                 cur_field_name = f"{field}_b"
@@ -694,7 +695,8 @@ class SpectraTrainer(BaseTrainer):
         if self.redshift_classification_need_spectra:
             self.classification_data_fields.extend(["gt_spectra","recon_spectra"])
         if self.redshift_classification_need_emit_wave:
-            self.classification_data_fields.extend(["spectra_wave","spectra_redshift"])
+            self.classification_data_fields.extend([
+                "wave_range","spectra_wave","spectra_redshift"])
         self.classification_forward_data_fields = list(
             set(self.classification_data_fields) -
             set(["redshift_bins_mask","selected_bins_mask"]))

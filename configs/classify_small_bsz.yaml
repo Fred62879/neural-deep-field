@@ -6,7 +6,7 @@ global:
     log_fname: clsfy_small_bsz
 
     tasks: [train, redshift_classification_train]
-    # tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
+    tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
     # tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
 
 optimizer:
@@ -97,7 +97,7 @@ spectra_data:
     require_only_basic_spectra: True
 
     redshift_classification_sc_data_dir: 20240626-002713_sc_sanity_check_num_bins_to_sample_16
-    redshift_classification_genlz_data_dir: nan #20240619-220256_genlz_5k_spectra_500_epochs_033031
+    redshift_classification_genlz_data_dir: 20240619-220256_genlz_5k_spectra_500_epochs_033031
     redshift_classification_data_fname_prefix: model-0
 
     spectra_cho: v1
@@ -115,7 +115,7 @@ spectra_data:
     spectra_smooth_sigma: 15
 
     sample_from_pretrain_spectra: True
-    sanity_check_max_num_spectra: 200000
+    sanity_check_max_num_spectra: 20
     generalization_max_num_spectra: 5000
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
