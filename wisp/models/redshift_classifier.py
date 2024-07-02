@@ -73,10 +73,11 @@ class RedshiftClassifier(nn.Module):
         data[~mask] = 0
         return data
 
-    def forward(
-            self, channels, wave, wave_range, spectra_mask, spectra_redshift,
-            gt_spectra, recon_spectra, spectra_lambdawise_losses, idx=None, selected_ids=None
-    ):
+    def forward(self, channels, wave_range, spectra_mask,
+                wave=None, spectra_redshift=None,
+                gt_spectra=None, recon_spectra=None,
+                spectra_lambdawise_losses=None,
+                idx=None, selected_ids=None):
         """
         @Params
           wave: [bsz,nsmpl]

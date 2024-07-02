@@ -754,6 +754,7 @@ class AstroInferrer(BaseInferrer):
         else: self.batch_size = self.neighbour_size**2
         if self.save_redshift_classification_data:
             self.set_redshift_classification_data_fields()
+        else: self.classification_forward_data_fields = None
         self.reset_dataloader()
 
     def post_inferrence_selected_coords_partial_model(self):

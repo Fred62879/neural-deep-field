@@ -684,8 +684,7 @@ def forward(
         save_lambdawise_weights=False,
         save_redshift_classification_data=False
 ):
-    net_args = defaultdict(None)
-    requested_channels = []
+    net_args, requested_channels = {}, []
     if "coords" in data:
         net_args["coords"] = data["coords"]
 
