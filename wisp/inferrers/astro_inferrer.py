@@ -1759,6 +1759,7 @@ class AstroInferrer(BaseInferrer):
             if self.plot_lambdawise_spectra_loss:
                 loss_func = self._get_spectra_loss_func(
                     self.extra_args["spectra_loss_cho"])
+
         elif self.brute_force:
             if self.qtz:
                 self.spectra_infer_pipeline.set_batch_reduction_order("qtz_first")
