@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: vdz-spectra-ssim #-t430s-azure
+    exp_name: vdz-spectra-ssim-t430s-azure
     log_fname: sc
 
     tasks: [train, sanity_check]
-    tasks: [infer, sanity_check_infer, save_redshift_classification_data] #save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca
+    tasks: [infer, sanity_check_infer, save_redshift_classification_data, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca
 
 optimizer:
     optimizer_type: adam
@@ -39,8 +39,8 @@ pretrain:
     pretrain_num_wave_samples: 100
     pretrain_wave_sample_method: rand_dense
 
-    sanity_check_sample_bins: False
-    sanity_check_sample_bins_per_step: True
+    sanity_check_sample_bins: True
+    sanity_check_sample_bins_per_step: False
     sanity_check_num_bins_to_sample: 5
     
     model_redshift: True
@@ -114,7 +114,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240702-002704_sc_sample_5_bins_per_step
+    # infer_log_dir: 20240702-002704_sc_sample_5_bins_per_step
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -154,8 +154,6 @@ infer:
     classify_based_on_concat_spectra: True
     classify_based_on_concat_wave_loss: False
     classify_based_on_concat_wave_spectra: False
-    redshift_classification_batched_data_fields: [spectra_redshift] #,gt_spectra,selected_bins_mask,recon_spectra,redshift_bins_mask,spectra_mask]
-    save_classification_data_individually: True
 
 dataset:
     calculate_wave_range_based_on_trans: False
@@ -188,12 +186,15 @@ spectra_data:
     filter_redshift_lo: 0.02
     filter_redshift_hi: -1
 
+    redshift_classification_batched_data_fields: [spectra_redshift]
+    save_classification_data_individually: False
+
 ablation:
     perform_ablation: False
     ablat_id: 0
-    ablat_params: ["decoder_batch_norm"] #["decoder_num_hidden_layers","decoder_hidden_dim"]
-    ablat_vals: [[True,False]] #[[3,5],[128,256,512]]
-    ablat_num_vals: [2] #[2,3]
+    ablat_params: ["decoder_batch_norm"]
+    ablat_vals: [[True,False]]
+    ablat_num_vals: [2]
 
-    #ablat_hardcode_params: ["pretrain_log_dir"]
-    #ablat_hardcode_vals: [["20240222-015410_1600-spectra-skip-same-dim_decoder_batch_norm_True","20240222-165434_1600-spectra-skip-same-dim_decoder_batch_norm_False"]]
+    # ablat_hardcode_params: []
+    # ablat_hardcode_vals: [[]]

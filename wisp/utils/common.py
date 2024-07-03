@@ -644,7 +644,7 @@ def spectra_redshift_forward(
         plot_l2_loss=False,
         spectra_baseline=False,  #
         apply_gt_redshift=False, #
-        regress_redshift=False,
+        regress_redshift=False,  #
         classify_redshift=False, #
         brute_force=False,       #
         freeze_spectra=False,    #
@@ -654,6 +654,7 @@ def spectra_redshift_forward(
         classify_redshift_based_on_l2=False,
         calculate_binwise_spectra_loss=False,
         calculate_lambdawise_spectra_loss=False,
+        save_coords=False,
         save_spectra=False,
         save_latents=False,
         save_redshift=False,
@@ -665,6 +666,7 @@ def spectra_redshift_forward(
 ):
     net_args, requested_channels = {}, []
 
+    if save_coords: requested_channels.append("coords")
     if save_spectra: requested_channels.append("spectra")
     if save_latents: requested_channels.append("latents")
     if save_redshift: requested_channels.append("redshift")
@@ -705,6 +707,7 @@ def spectra_redshift_forward(
             net_args["spectra_mask"] = data["spectra_mask"]
             net_args["spectra_loss_func"] = spectra_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
+            requested_channels.extend(["redshift_logits"])
 
             if sanity_check_sample_bins:
                 net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
@@ -730,8 +733,9 @@ def spectra_redshift_forward(
                 net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
 
         elif freeze_spectra:
-            for field in spectra_classification_fields:
-                net_args[field] = data[f"{field}_b"]
+            for field in freeze_spectra_data_fields:
+                d_field = get_redshift_classification_data_field_name(field)
+                net_args[field] = data[d_field]
         else:
             raise ValueError()
 

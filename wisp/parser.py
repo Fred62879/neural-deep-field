@@ -567,9 +567,13 @@ def define_cmd_line_args():
     pretrain_group.add_argument("--classifier-train-sample-bins", action="store_true")
     pretrain_group.add_argument("--classifier-train-num-bins-to-sample", action="store_true")
 
-    pretrain_group.add_argument("--classifier-add-baseline-logits", action="store_true")
+    pretrain_group.add_argument("--classifier-train-add-baseline-logits", action="store_true")
+    pretrain_group.add_argument("--classifier-test-add-baseline-logits", action="store_true")
     pretrain_group.add_argument("--baseline-logits-path", type=str)
     pretrain_group.add_argument("--baseline-logits-fname-suffix", type=str)
+
+    pretrain_group.add_argument("--load-classification-data-individually",
+                                action="store_true")
 
     ###################
     # Spatial Decoder arguments

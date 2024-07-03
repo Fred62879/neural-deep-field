@@ -73,11 +73,12 @@ class RedshiftClassifier(nn.Module):
         data[~mask] = 0
         return data
 
-    def forward(self, channels, spectra_mask,
-                wave=None, wave_range=None, spectra_redshift=None,
-                gt_spectra=None, recon_spectra=None,
-                spectra_lambdawise_losses=None,
-                idx=None, selected_ids=None
+    def forward(
+            self, channels, spectra_mask,
+            wave=None, wave_range=None, spectra_redshift=None,
+            gt_spectra=None, recon_spectra=None,
+            spectra_lambdawise_losses=None,
+            idx=None, selected_ids=None
     ):
         """
         @Params
@@ -102,12 +103,8 @@ class RedshiftClassifier(nn.Module):
 
         elif self.kwargs["classify_based_on_concat_wave_loss"]:
             nbins = spectra_lambdawise_losses.shape[1]
-            # print(torch.min(wave), torch.max(wave))
             wave = self.shift_wave(wave, spectra_redshift)
-            # print(torch.min(wave), torch.max(wave))
             wave = self.linear_norm_wave(wave, wave_range)
-            # print(torch.min(wave), torch.max(wave))
-            # print(wave[0], spectra_lambdawise_losses[0])
             input = torch.cat((
                 self.mask_invalid(wave, spectra_mask)[:,None].tile(1,nbins,1),
                 self.mask_invalid(
@@ -131,5 +128,7 @@ class RedshiftClassifier(nn.Module):
         logits = self.decoder(input)
         # logits = logits.flatten() # [bsz,nbins,1] -> [n,]
         assert not torch.isnan(logits).any()
+        # todo, calculate logits use sigmoid
+        logits = torch.sigmoid(logits)
         ret["redshift_logits"] = logits
         return ret

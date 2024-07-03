@@ -117,7 +117,7 @@ class AstroInferrer(BaseInferrer):
             if self.extra_args["infer_use_global_loss_as_lambdawise_weights"] and \
                not self.extra_args["use_global_spectra_loss_as_lambdawise_weights"]:
                 suffix += "weighted_"
-            if self.extra_args["classifier_add_baseline_logits"]:
+            if self.extra_args["classifier_test_add_baseline_logits"]:
                 suffix += "addup_baseline_"
             if suffix != "":
                 self.redshift_dir = join(self.redshift_dir, suffix[:-1])
@@ -1109,7 +1109,8 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_redshift_classification_data:
             for field in self.redshift_classification_batched_fields:
-                setattr(self, get_redshift_classification_data_field_name(field), [])
+                field = get_redshift_classification_data_field_name(field)
+                setattr(self, field, [])
             for field in self.redshift_classification_unbatched_fields:
                 path = join(self.redshift_classification_data_dir, f"model-{model_id}_{field}")
                 setattr(self, f"redshift_clsfy_{field}_dir", path)
@@ -1541,7 +1542,18 @@ class AstroInferrer(BaseInferrer):
             self.requested_fields.append(field)
             self.dataset.set_hardcode_data(field, np.load(fname))
 
-        if self.extra_args["classifier_add_baseline_logits"]:
+        if self.clsfy_sc_infer and \
+           self.extra_args["classifier_train_add_baseline_logits"]:
+            self.requested_fields.append("baseline_redshift_logits")
+            suffix = self.extra_args["baseline_logits_fname_suffix"]
+            log_dir = get_log_dir(**self.extra_args)
+            fname = join(log_dir, self.extra_args["baseline_logits_path"],
+                         "pretrain_redshift", f"{suffix}_redshift_logits.npy")
+            data = np.load(fname)
+            self.dataset.set_hardcode_data("baseline_redshift_logits", data)
+
+        if self.clsfy_genlz_infer and \
+           self.extra_args["classifier_test_add_baseline_logits"]:
             self.requested_fields.append("baseline_redshift_logits")
             suffix = self.extra_args["baseline_logits_fname_suffix"]
             log_dir = get_log_dir(**self.extra_args)
@@ -1798,8 +1810,8 @@ class AstroInferrer(BaseInferrer):
                     self.calculate_binwise_spectra_loss,
                 calculate_lambdawise_spectra_loss= \
                     self.plot_lambdawise_spectra_loss,
-                save_redshift=self.save_redshift,
                 save_spectra=self.recon_spectra,
+                save_redshift=self.save_redshift,
                 save_optimal_bin_ids=self.save_optimal_bin_ids,
                 save_gt_bin_spectra=self.plot_gt_bin_spectra,
                 save_redshift_logits=self.save_redshift_logits or \
@@ -1920,7 +1932,8 @@ class AstroInferrer(BaseInferrer):
                 suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
                 redshift_logits = ret[f"redshift_logits{suffix}"]
                 if self.save_redshift_logits:
-                    logits = torch.softmax(redshift_logits, dim=-1)
+                    # todo, logits with sigmoid
+                    logits = torch.sigmoid(redshift_logits)
                     self.redshift_logits.extend(logits)
                 if self.extra_args["redshift_classification_strategy"] == "binary":
                     redshift_logits = redshift_logits.view(-1, self.num_redshift_bins)
@@ -1933,19 +1946,32 @@ class AstroInferrer(BaseInferrer):
             self.gt_redshift.extend(data["spectra_redshift"])
 
             if self.clsfy_sc_infer or self.clsfy_genlz_infer:
-                if self.classifier_train_use_bin_sampled_data:
+                if self.clsfy_sc_infer and \
+                   self.classifier_train_use_bin_sampled_data:
                     n_bins = self.extra_args["sanity_check_num_bins_to_sample"]
                 else: n_bins = self.num_redshift_bins
-                logits = ret["redshift_logits"].view(-1,n_bins)
+                bsz = len(ret["redshift_logits"])
+                logits = ret["redshift_logits"].view(bsz,n_bins)
 
-                if self.extra_args["classifier_add_baseline_logits"]:
+                if self.clsfy_sc_infer and \
+                   self.extra_args["classifier_train_add_baseline_logits"]:
                     baseline_logits = data["baseline_redshift_logits"]
-                    logits = (torch.softmax(logits, dim=-1) + baseline_logits) / 2
+                    if self.classifier_train_use_bin_sampled_data:
+                        selected_bins_mask = data[
+                            get_redshift_classification_data_field_name("selected_bins_mask")]
+                        baseline_logits = baseline_logits[selected_bins_mask].view(logits.shape)
 
-                if self.sanity_check_sample_bins:
-                    mask = data["selected_bins_mask"]
-                elif self.classifier_train_use_bin_sampled_data:
-                    mask = data["selected_bins_mask_b"]
+                    # todo, logits with sigmoid
+                    logits = (torch.sigmoid(logits) + baseline_logits) / 2
+
+                if self.clsfy_genlz_infer and \
+                   self.extra_args["classifier_test_add_baseline_logits"]:
+                    baseline_logits = data["baseline_redshift_logits"]
+                    # todo, logits with sigmoid
+                    logits = (torch.sigmoid(logits) + baseline_logits) / 2
+
+                if self.classifier_train_use_bin_sampled_data:
+                    mask = data[get_redshift_classification_data_field_name("selected_bins_mask")]
                 else: mask = None
 
                 ids = get_argmax_redshift_bin_ids(logits)
@@ -2017,14 +2043,15 @@ class AstroInferrer(BaseInferrer):
         # print(self.redshift_classification_unbatched_fields)
 
         for field in self.redshift_classification_batched_fields:
-            getattr(self, field).extend(data[field].detach().cpu())
+            d_field = get_redshift_classification_data_field_name(field)
+            getattr(self, d_field).extend(data[field].detach().cpu())
 
-        n = 0
-        for field in self.redshift_classification_unbatched_fields:
-            n = len(data[field])
-            self.save_file_individually(field, data[field].detach().cpu().numpy())
-        self.redshift_classification_num_files_saved_offset += n
-        assert 0
+        if len(self.redshift_classification_unbatched_fields) != 0:
+            for field in self.redshift_classification_unbatched_fields:
+                n = len(data[field])
+                self.save_file_individually(
+                    field, data[field].detach().cpu().numpy())
+            self.redshift_classification_num_files_saved_offset += n
 
     def save_file_individually(self, field, data):
         print(field, data.shape)
@@ -2088,7 +2115,8 @@ class AstroInferrer(BaseInferrer):
 
         if self.save_redshift_classification_data:
             for field in self.redshift_classification_batched_fields:
-                setattr(self, f"{field}_s", torch.stack(getattr(self, f"{field}_s")).numpy())
+                field = get_redshift_classification_data_field_name(field)
+                setattr(self, field, torch.stack(getattr(self, field)).numpy())
 
             # self.gt_spectra_s = torch.stack(self.gt_spectra_s).numpy()
             # self.recon_spectra_s = torch.stack(self.recon_spectra_s).numpy()
@@ -2556,8 +2584,8 @@ class AstroInferrer(BaseInferrer):
         for field in self.redshift_classification_batched_fields:
             fname = f"model-{model_id}_{field}{suffix}"
             fname = join(self.redshift_classification_data_dir, fname)
-            # todo, change field name
-            np.save(fname, getattr(self, f"{field}_s"))
+            field = get_redshift_classification_data_field_name(field)
+            np.save(fname, getattr(self, field))
 
     # def _save_pixel_value(self, model_id):
     #     self.recon_pixels = self.trans_obj.integrate(recon_fluxes)

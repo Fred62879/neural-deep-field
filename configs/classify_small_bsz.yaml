@@ -31,12 +31,11 @@ pretrain:
     classifier_train_sample_bins: False
     classifier_train_num_bins_to_sample: 2
 
-    classifier_add_baseline_logits: True
-    baseline_logits_path: vdz-spectra-azure-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/
-    baseline_logits_fname_suffix: model-0
-
+    classifier_train_add_baseline_logits: True
+    classifier_test_add_baseline_logits: True
+    
     model_redshift: True
-    brute_force_redshift: True
+    brute_force_redshift: False
     optimize_latents_for_each_redshift_bin: True
 
 decoder:
@@ -105,10 +104,6 @@ dataset:
 spectra_data:
     require_only_basic_spectra: True
 
-    redshift_classification_sc_data_dir: 20240626-002713_sc_sanity_check_num_bins_to_sample_16
-    redshift_classification_genlz_data_dir: 20240619-220256_genlz_5k_spectra_500_epochs_033031
-    redshift_classification_data_fname_prefix: model-0
-
     spectra_cho: v1
     spectra_process_patch_info: False
     spectra_data_sources: [deimos,zcosmos,vipers_w1,vipers_w4]
@@ -132,6 +127,15 @@ spectra_data:
     filter_redshift: False
     filter_redshift_lo: 0.02
     filter_redshift_hi: -1
+
+    redshift_classification_batched_data_fields: [spectra_redshift]
+    load_classification_data_individually: False
+    redshift_classification_sc_data_dir: 20240626-002713_sc_sanity_check_num_bins_to_sample_16
+    redshift_classification_genlz_data_dir: 20240619-220256_genlz_5k_spectra_500_epochs_033031
+    redshift_classification_data_fname_prefix: model-0
+
+    baseline_logits_path: vdz-spectra-azure-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/
+    baseline_logits_fname_suffix: model-0
 
 ablation:
     perform_ablation: False
