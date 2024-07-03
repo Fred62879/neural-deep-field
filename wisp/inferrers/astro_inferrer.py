@@ -1537,7 +1537,8 @@ class AstroInferrer(BaseInferrer):
         if self.extra_args["classifier_add_baseline_logits"]:
             self.requested_fields.append("baseline_redshift_logits")
             suffix = self.extra_args["baseline_logits_fname_suffix"]
-            fname = join(self.log_dir, self.extra_args["baseline_logits_path"],
+            log_dir = get_log_dir(**self.extra_args)
+            fname = join(log_dir, self.extra_args["baseline_logits_path"],
                          "test_redshift", f"{suffix}_redshift_logits.npy")
             data = np.load(fname)
             self.dataset.set_hardcode_data("baseline_redshift_logits", data)

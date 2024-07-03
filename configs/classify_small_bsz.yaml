@@ -7,7 +7,8 @@ global:
 
     tasks: [train, redshift_classification_train]
     tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
-    # tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
+    tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
+    tasks: [infer, overlay_redshift_est_stats]
 
 optimizer:
     optimizer_type: adam
@@ -26,9 +27,13 @@ pretrain:
     pretrain_use_all_wave: True
 
     classifier_train_use_bin_sampled_data: True
-    sanity_check_num_bins_to_sample: 5
+    sanity_check_num_bins_to_sample: 16
     classifier_train_sample_bins: False
     classifier_train_num_bins_to_sample: 2
+
+    classifier_add_baseline_logits: True
+    baseline_logits_path: vdz-spectra-azure-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/
+    baseline_logits_fname_suffix: model-0
 
     model_redshift: True
     brute_force_redshift: True
@@ -64,7 +69,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: 20240625-001812_clsfy_10_bins
+    infer_log_dir: 20240702-001814_clsfy_small_bsz_sanity_check_num_bins_to_sample_16
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -87,6 +92,10 @@ infer:
 
     log_redshift_est_stats: False
     log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
+
+    redshift_est_stats_labels: ['baseline', 'our_model (5 bins)+baseline', 'our_model (16 bins)+baseline']
+    redshift_est_stats_fnames: [vdz-spectra-azure-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/test_redshift/model-0_all_residuals_accuracy.npy, vdz-spectra-ssim-t430s-azure/20240627-012320_clsfy_small_bsz_bn_5_layers/test_redshift/addup_baseline/model-0_all_residuals_accuracy.npy, vdz-spectra-ssim-t430s-azure/20240702-001814_clsfy_small_bsz_sanity_check_num_bins_to_sample_16/test_redshift/addup_baseline/model-0_all_residuals_accuracy.npy, ]
+    overlay_redshift_est_stats_fname: overlay_redshift_est_stats.png
 
 dataset:
     calculate_wave_range_based_on_trans: False
@@ -115,7 +124,7 @@ spectra_data:
     spectra_smooth_sigma: 15
 
     sample_from_pretrain_spectra: True
-    sanity_check_max_num_spectra: 20
+    sanity_check_max_num_spectra: 200000
     generalization_max_num_spectra: 5000
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
@@ -125,7 +134,7 @@ spectra_data:
     filter_redshift_hi: -1
 
 ablation:
-    perform_ablation: True
+    perform_ablation: False
     ablat_id: 0
     ablat_params: [sanity_check_num_bins_to_sample]
     ablat_vals: [[16,32]]

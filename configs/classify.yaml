@@ -32,7 +32,7 @@ pretrain:
     classifier_train_num_bins_to_sample: 2
 
     classifier_add_baseline_logits: True
-    baseline_logits_path: ../../vdz-spectra-azure-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/
+    baseline_logits_path: vdz-spectra-azure-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/
     baseline_logits_fname_suffix: model-0
 
     model_redshift: True
