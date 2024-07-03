@@ -41,6 +41,9 @@ def get_exp_dir(**kwargs):
     exp_dir = os.path.join(log_dir, kwargs["exp_name"])
     return exp_dir
 
+def get_redshift_classification_data_field_name(name):
+    return f"{name}_clsfy"
+
 def get_redshift_classification_data_dir(mode, **kwargs):
     # assert kwargs["pretrain_infer_num_wave"] == kwargs["classifier_decoder_input_dim"]
     dim = kwargs["classifier_decoder_input_dim"]
@@ -632,6 +635,109 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
     #coords = reshape_coords(coords, args, infer=infer, spectrum=spectrum, coord_wave=coord_wave)
     return coords
 
+def spectra_redshift_forward(
+        data,
+        pipeline,
+        spectra_loss_func=None,
+        spectra_l2_loss_func=None,
+        index_latent=False,
+        plot_l2_loss=False,
+        spectra_baseline=False,  #
+        apply_gt_redshift=False, #
+        regress_redshift=False,
+        classify_redshift=False, #
+        brute_force=False,       #
+        freeze_spectra=False,    #
+        freeze_spectra_data_fields=None,
+        sanity_check_sample_bins=False,
+        sanity_check_sample_bins_per_step=False,
+        classify_redshift_based_on_l2=False,
+        calculate_binwise_spectra_loss=False,
+        calculate_lambdawise_spectra_loss=False,
+        save_spectra=False,
+        save_latents=False,
+        save_redshift=False,
+        save_gt_bin_spectra=False,
+        save_redshift_logits=False,
+        save_optimal_bin_ids=False,
+        save_spectra_latents=False,
+        save_spectra_all_bins=False,
+):
+    net_args, requested_channels = {}, []
+
+    if save_spectra: requested_channels.append("spectra")
+    if save_latents: requested_channels.append("latents")
+    if save_redshift: requested_channels.append("redshift")
+    if save_gt_bin_spectra: requested_channels.append("gt_bin_spectra")
+    if save_optimal_bin_ids: requested_channels.append("optimal_bin_ids")
+    if save_redshift_logits: requested_channels.append("redshift_logits")
+    if save_spectra_latents: requested_channels.append("spectra_latents")
+    if save_spectra_all_bins: requested_channels.append("spectra_all_bins")
+
+    if "wave" in data: net_args["wave"] = data["wave"]
+    if "wave_range" in data: net_args["wave_range"] = data["wave_range"]
+    if index_latent:
+        if "idx" in data: net_args["idx"] = data["idx"]
+        if "selected_ids" in data: net_args["selected_ids"] = data["selected_ids"]
+
+    net_args["spectra_mask"] = data["spectra_mask"]
+    net_args["spectra_loss_func"] = spectra_loss_func
+    net_args["spectra_source_data"] = data["spectra_source_data"]
+
+    if spectra_baseline:
+        if regress_redshift:
+            requested_channels.append("redshift")
+        elif classify_redshift:
+            requested_channels.append("redshift_logits")
+        net_args["spectra_mask"] = data["spectra_mask"]
+        net_args["spectra_source_data"] = data["spectra_source_data"]
+
+    elif apply_gt_redshift:
+        net_args["specz"] = data["spectra_redshift"]
+        requested_channels.append("spectrawise_loss")
+        if plot_l2_loss or classify_redshift_based_on_l2:
+            assert spectra_l2_loss_func is not None
+            net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
+            requested_channels.append("spectrawise_loss_l2")
+
+    elif classify_redshift:
+        if brute_force:
+            if sanity_check_sample_bins:
+                net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
+                net_args["selected_bins_mask"] = data["selected_bins_mask"]
+            elif sanity_check_sample_bins_per_step:
+                # need this data during training only
+                net_args["selected_bins_mask"] = data["selected_bins_mask"]
+
+            if calculate_binwise_spectra_loss:
+                requested_channels.extend(["spectra_binwise_loss","redshift_logits"])
+                if plot_l2_loss or classify_redshift_based_on_l2:
+                    assert spectra_l2_loss_func is not None
+                    net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
+                    requested_channels.extend([
+                        "spectra_binwise_loss_l2","redshift_logits_l2"])
+
+            if calculate_lambdawise_spectra_loss:
+                requested_channels.append("spectra_lambdawise_loss")
+                if spectra_l2_loss_func is not None:
+                    requested_channels.append("spectra_lambdawise_loss_l2")
+
+            if save_gt_bin_spectra:
+                net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
+
+        elif freeze_spectra:
+            for field in spectra_classification_fields:
+                net_args[field] = data[f"{field}_b"]
+        else:
+            raise ValueError()
+
+    else: raise ValueError()
+
+    requested_channels = set(requested_channels)
+    # print('forward', requested_channels, net_args.keys())
+    return pipeline(channels=requested_channels, **net_args)
+
+
 def forward(
         data,
         pipeline,
@@ -682,7 +788,7 @@ def forward(
         save_codebook_spectra=False,
         save_spectra_all_bins=False,
         save_lambdawise_weights=False,
-        save_redshift_classification_data=False
+        # save_redshift_classification_data=False
 ):
     net_args, requested_channels = {}, []
     if "coords" in data:
@@ -721,69 +827,36 @@ def forward(
             if "selected_ids" in data:
                 net_args["selected_ids"] = data["selected_ids"]
 
-        if split_latent:
-            if "scaler_latents" in data:
-                net_args["scaler_latents"] = data["scaler_latents"]
-            if "redshift_latents" in data:
-                net_args["redshift_latents"] = data["redshift_latents"]
-
-        if perform_integration:
-            net_args["trans"] = data["trans"]
-            net_args["nsmpl"] = data["nsmpl"]
-            # net_args["trans_mask"] = data["trans_mask"]
-        if spectra_supervision:
-            net_args["num_sup_spectra"] = data["num_sup_spectra"]
-            net_args["sup_spectra_wave"] = data["sup_spectra_wave"]
-            requested_channels.append("sup_spectra")
-        if qtz:
-            qtz_args = defaultdict(lambda: False)
-            if qtz_strategy == "soft":
-                qtz_args["save_qtz_weights"] = save_qtz_weights
-                qtz_args["temperature"] = step_num + 1
-                if save_embed_ids:
-                    qtz_args["find_embed_id"] = save_embed_ids
-            qtz_args["save_codebook_spectra"] = save_codebook_spectra
-            net_args["qtz_args"] = qtz_args
-        if regularize_codebook_spectra:
-            net_args["full_emitted_wave"] = data["full_emitted_wave"]
-            requested_channels.append("full_range_codebook_spectra")
-        if save_gt_bin_spectra or optimize_bins_separately:
-            net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
-
-        if apply_gt_redshift:
-            net_args["specz"] = data["spectra_redshift"]
+        if model_redshift:
             net_args["spectra_mask"] = data["spectra_mask"]
             net_args["spectra_loss_func"] = spectra_loss_func
             net_args["spectra_source_data"] = data["spectra_source_data"]
-            requested_channels.append("spectrawise_loss")
-            if plot_l2_loss or classify_redshift_based_on_l2:
-                assert spectra_l2_loss_func is not None
-                net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
-                requested_channels.append("spectrawise_loss_l2")
 
-        if calculate_binwise_spectra_loss:
-            net_args["spectra_mask"] = data["spectra_mask"]
-            net_args["spectra_loss_func"] = spectra_loss_func
-            net_args["spectra_source_data"] = data["spectra_source_data"]
-            requested_channels.extend(["spectra_binwise_loss","redshift_logits"])
-            if plot_l2_loss or classify_redshift_based_on_l2:
-                assert spectra_l2_loss_func is not None
-                net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
-                requested_channels.extend([
-                    "spectra_binwise_loss_l2","redshift_logits_l2"])
+            if apply_gt_redshift:
+                net_args["specz"] = data["spectra_redshift"]
+                requested_channels.append("spectrawise_loss")
+                if plot_l2_loss or classify_redshift_based_on_l2:
+                    assert spectra_l2_loss_func is not None
+                    net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
+                    requested_channels.append("spectrawise_loss_l2")
 
-        if calculate_lambdawise_spectra_loss:
-            net_args["spectra_mask"] = data["spectra_mask"]
-            net_args["spectra_loss_func"] = spectra_loss_func
-            net_args["spectra_source_data"] = data["spectra_source_data"]
-            requested_channels.append("spectra_lambdawise_loss")
-            if spectra_l2_loss_func is not None:
-                requested_channels.append("spectra_lambdawise_loss_l2")
+            elif brute_force:
+                if calculate_binwise_spectra_loss:
+                    requested_channels.extend(["spectra_binwise_loss","redshift_logits"])
+                    if plot_l2_loss or classify_redshift_based_on_l2:
+                        assert spectra_l2_loss_func is not None
+                        net_args["spectra_l2_loss_func"] = spectra_l2_loss_func
+                        requested_channels.extend([
+                            "spectra_binwise_loss_l2","redshift_logits_l2"])
 
-        if save_redshift_classification_data:
-            requested_channels.append("spectra")
+                if calculate_lambdawise_spectra_loss:
+                    requested_channels.append("spectra_lambdawise_loss")
+                    if spectra_l2_loss_func is not None:
+                        requested_channels.append("spectra_lambdawise_loss_l2")
 
-        # train with lambdawise weights (either generate with mlp or use global loss)
+                if save_gt_bin_spectra or optimize_bins_separately:
+                    net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
+
         if regress_lambdawise_weights_share_latents:
             if regress_lambdawise_weights_use_gt_bin_latent:
                 net_args["gt_redshift_bin_ids"] = data["gt_redshift_bin_ids"]
@@ -805,22 +878,43 @@ def forward(
         if spectra_classification_mode:
             for field in spectra_classification_fields:
                 net_args[field] = data[f"{field}_b"]
-            # net_args["gt_spectra"] = data["gt_spectra_b"]
-            # net_args["recon_spectra"] = data["recon_spectra_b"]
-            # net_args["spectra_mask"] = data["spectra_mask_b"]
-            # net_args["spectra_redshift"] = data["spectra_redshift_b"]
-            # net_args["spectra_lambdawise_losses"] = data["spectra_lambdawise_losses_b"]
 
         if sanity_check_sample_bins:
             net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
             net_args["selected_bins_mask"] = data["selected_bins_mask"]
         elif sanity_check_sample_bins_per_step:
             net_args["selected_bins_mask"] = data["selected_bins_mask"]
+
+        # obsolete
+        # if split_latent:
+        #     if "scaler_latents" in data:
+        #         net_args["scaler_latents"] = data["scaler_latents"]
+        #     if "redshift_latents" in data:
+        #         net_args["redshift_latents"] = data["redshift_latents"]
+        # if perform_integration:
+        #     net_args["trans"] = data["trans"]
+        #     net_args["nsmpl"] = data["nsmpl"]
+        # if spectra_supervision:
+        #     net_args["num_sup_spectra"] = data["num_sup_spectra"]
+        #     net_args["sup_spectra_wave"] = data["sup_spectra_wave"]
+        #     requested_channels.append("sup_spectra")
+        # if qtz:
+        #     qtz_args = defaultdict(lambda: False)
+        #     if qtz_strategy == "soft":
+        #         qtz_args["save_qtz_weights"] = save_qtz_weights
+        #         qtz_args["temperature"] = step_num + 1
+        #         if save_embed_ids:
+        #             qtz_args["find_embed_id"] = save_embed_ids
+        #     qtz_args["save_codebook_spectra"] = save_codebook_spectra
+        #     net_args["qtz_args"] = qtz_args
+        # if regularize_codebook_spectra:
+        #     net_args["full_emitted_wave"] = data["full_emitted_wave"]
+        #     requested_channels.append("full_range_codebook_spectra")
     else:
         raise ValueError("Unsupported space dimension.")
 
     requested_channels = set(requested_channels)
-    # print(requested_channels, net_args.keys())
+    print('forward', requested_channels, net_args.keys())
     return pipeline(channels=requested_channels, **net_args)
 
 def load_layer_weights(checkpoint, layer_identifier):
