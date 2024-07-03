@@ -2,11 +2,11 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: vdz-spectra-ssim-t430s-azure
+    exp_name: vdz-spectra-ssim #-t430s-azure
     log_fname: sc
 
     tasks: [train, sanity_check]
-    # tasks: [infer, sanity_check_infer, recon_spectra, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca save_redshift_classification_data
+    tasks: [infer, sanity_check_infer, save_redshift_classification_data] #save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits] plot_spectra_latents_pca
 
 optimizer:
     optimizer_type: adam
@@ -40,7 +40,7 @@ pretrain:
     pretrain_wave_sample_method: rand_dense
 
     sanity_check_sample_bins: False
-    sanity_check_sample_bins_per_step: False
+    sanity_check_sample_bins_per_step: True
     sanity_check_num_bins_to_sample: 5
     
     model_redshift: True
@@ -86,6 +86,11 @@ decoder:
     decoder_latents_skip_method: add
     decoder_latents_skip_add_conversion_method: multi_conversion
 
+    classify_based_on_loss: False
+    classify_based_on_concat_spectra: True
+    classify_based_on_concat_wave_loss: False
+    classify_based_on_concat_wave_spectra: False
+
 trainer:
     num_epochs: 500
     log_cli_every: 50
@@ -109,7 +114,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    # infer_log_dir: 20240626-002713_sc_sanity_check_num_bins_to_sample_16
+    infer_log_dir: 20240702-002704_sc_sample_5_bins_per_step
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -120,9 +125,9 @@ infer:
     classify_redshift_based_on_combined_ssim_l2: False
     infer_use_global_loss_as_lambdawise_weights: False
 
-    pretrain_infer_batch_size: 500
+    pretrain_infer_batch_size: 10
     pretrain_infer_use_all_wave: False
-    pretrain_infer_num_wave: 256
+    pretrain_infer_num_wave: 280
     pretrain_infer_wave_sample_method: uniform_dense
 
     plot_clipped_spectrum: True
