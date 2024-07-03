@@ -680,10 +680,6 @@ def spectra_redshift_forward(
         if "idx" in data: net_args["idx"] = data["idx"]
         if "selected_ids" in data: net_args["selected_ids"] = data["selected_ids"]
 
-    net_args["spectra_mask"] = data["spectra_mask"]
-    net_args["spectra_loss_func"] = spectra_loss_func
-    net_args["spectra_source_data"] = data["spectra_source_data"]
-
     if spectra_baseline:
         if regress_redshift:
             requested_channels.append("redshift")
@@ -694,6 +690,10 @@ def spectra_redshift_forward(
 
     elif apply_gt_redshift:
         net_args["specz"] = data["spectra_redshift"]
+        net_args["spectra_mask"] = data["spectra_mask"]
+        net_args["spectra_loss_func"] = spectra_loss_func
+        net_args["spectra_source_data"] = data["spectra_source_data"]
+
         requested_channels.append("spectrawise_loss")
         if plot_l2_loss or classify_redshift_based_on_l2:
             assert spectra_l2_loss_func is not None
@@ -702,6 +702,10 @@ def spectra_redshift_forward(
 
     elif classify_redshift:
         if brute_force:
+            net_args["spectra_mask"] = data["spectra_mask"]
+            net_args["spectra_loss_func"] = spectra_loss_func
+            net_args["spectra_source_data"] = data["spectra_source_data"]
+
             if sanity_check_sample_bins:
                 net_args["redshift_bins_mask"] = data["redshift_bins_mask"]
                 net_args["selected_bins_mask"] = data["selected_bins_mask"]

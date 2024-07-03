@@ -1759,19 +1759,14 @@ class AstroInferrer(BaseInferrer):
             if self.plot_lambdawise_spectra_loss:
                 loss_func = self._get_spectra_loss_func(
                     self.extra_args["spectra_loss_cho"])
-        elif self.classify_redshift:
-            if self.brute_force:
-                if self.qtz:
-                    self.spectra_infer_pipeline.set_batch_reduction_order("qtz_first")
-                loss_func = self._get_spectra_loss_func(
-                    self.extra_args["spectra_loss_cho"])
-                if self.classify_redshift_based_on_l2 or \
-                   self.classify_redshift_based_on_combined_ssim_l2:
-                    l2_loss_func = self._get_spectra_loss_func("l2")
-            elif self.freeze_spectra:
-                pass
-            else: raise ValueError()
-        else: raise ValueError()
+        elif self.brute_force:
+            if self.qtz:
+                self.spectra_infer_pipeline.set_batch_reduction_order("qtz_first")
+            loss_func = self._get_spectra_loss_func(
+                self.extra_args["spectra_loss_cho"])
+            if self.classify_redshift_based_on_l2 or \
+               self.classify_redshift_based_on_combined_ssim_l2:
+                l2_loss_func = self._get_spectra_loss_func("l2")
 
         if self.save_redshift_classification_data or \
            self.clsfy_sc_infer or self.clsfy_genlz_infer:
@@ -1924,7 +1919,7 @@ class AstroInferrer(BaseInferrer):
                 suffix = "_l2" if self.classify_redshift_based_on_l2 else ""
                 redshift_logits = ret[f"redshift_logits{suffix}"]
                 if self.save_redshift_logits:
-                    logits = torch.sigmoid(redshift_logits)
+                    logits = torch.softmax(redshift_logits, dim=-1)
                     self.redshift_logits.extend(logits)
                 if self.extra_args["redshift_classification_strategy"] == "binary":
                     redshift_logits = redshift_logits.view(-1, self.num_redshift_bins)
@@ -1944,11 +1939,7 @@ class AstroInferrer(BaseInferrer):
 
                 if self.extra_args["classifier_add_baseline_logits"]:
                     baseline_logits = data["baseline_redshift_logits"]
-                    # print(torch.max(baseline_logits, dim=-1), torch.min(baseline_logits, dim=-1))
-                    # print(torch.max(logits, dim=-1), torch.min(logits, dim=-1))
-                    # print(baseline_logits.shape, logits.shape)
-                    logits = (torch.sigmoid(logits) + baseline_logits) / 2
-                    # print(torch.max(logits, dim=-1), torch.min(logits, dim=-1))
+                    logits = (torch.softmax(logits, dim=-1) + baseline_logits) / 2
 
                 if self.sanity_check_sample_bins:
                     mask = data["selected_bins_mask"]
@@ -2564,6 +2555,7 @@ class AstroInferrer(BaseInferrer):
         for field in self.redshift_classification_batched_fields:
             fname = f"model-{model_id}_{field}{suffix}"
             fname = join(self.redshift_classification_data_dir, fname)
+            # todo, change field name
             np.save(fname, getattr(self, f"{field}_s"))
 
     # def _save_pixel_value(self, model_id):

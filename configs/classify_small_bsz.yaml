@@ -6,9 +6,9 @@ global:
     log_fname: clsfy_small_bsz
 
     tasks: [train, redshift_classification_train]
-    tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
-    tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
-    tasks: [infer, overlay_redshift_est_stats]
+    # tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
+    # tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
+    # tasks: [infer, overlay_redshift_est_stats]
 
 optimizer:
     optimizer_type: adam

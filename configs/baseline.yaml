@@ -6,8 +6,8 @@ global:
     log_fname: baseline
 
     tasks: [train, redshift_pretrain]
-    tasks: [infer, redshift_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
-    tasks: ['infer','redshift_test_infer','save_redshift','plot_redshift_est_residuals','plot_redshift_est_stats','save_redshift_logits']
+    tasks: [infer, redshift_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats, save_redshift_logits]
+    # tasks: [infer, redshift_test_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats, save_redshift_logits]
 
 optimizer:
     optimizer_type: adam
