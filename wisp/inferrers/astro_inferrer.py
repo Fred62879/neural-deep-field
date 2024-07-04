@@ -685,8 +685,6 @@ class AstroInferrer(BaseInferrer):
                         "redshift_bins","redshift_bins_mask","selected_bins_mask"])
                     self.dataset.toggle_sanity_check_sample_bins(True)
 
-                # print(self.requested_fields)
-
                 self.wave_source = "spectra"
                 self.use_all_wave = self.extra_args["pretrain_infer_use_all_wave"]
                 if not self.use_all_wave:
@@ -739,7 +737,6 @@ class AstroInferrer(BaseInferrer):
             raise ValueError()
 
         self.configure_spectra_metrics()
-
         if not self.extra_args["infer_spectra_individually"]:
             self.batch_size = min(
                 self.dataset_length * self.neighbour_size**2, self.batch_size)

@@ -1,9 +1,9 @@
 parent: base_narval.yaml
 
 global:
-    use_tqdm: True
+    use_tqdm: False
     exp_name: vdz-spectra-ssim
-    log_fname: clsfy_small_bsz
+    log_fname: clsfy_refiner
 
     tasks: [train, redshift_classification_train]
     # tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
@@ -22,7 +22,7 @@ optimizer:
     sgd_momentum: 0.9
 
 pretrain:
-    pretrain_batch_size: 1024
+    pretrain_batch_size: 2048
     pretrain_use_all_wave: True
 
     classifier_train_use_bin_sampled_data: True

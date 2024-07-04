@@ -86,11 +86,6 @@ decoder:
     decoder_latents_skip_method: add
     decoder_latents_skip_add_conversion_method: multi_conversion
 
-    classify_based_on_loss: False
-    classify_based_on_concat_spectra: True
-    classify_based_on_concat_wave_loss: False
-    classify_based_on_concat_wave_spectra: False
-
 trainer:
     num_epochs: 500
     log_cli_every: 50
