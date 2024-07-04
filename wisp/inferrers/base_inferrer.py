@@ -186,7 +186,7 @@ class BaseInferrer(ABC):
     def get_cur_patch_data(self, i, tract, patch):
         self.cur_patch = PatchData(
             tract, patch,
-            load_spectra=self.extra_args["space_dim"] == 3,
+            load_spectra=False, # self.extra_args["space_dim"] == 3, # todo spectra data
             cutout_num_rows=self.extra_args["patch_cutout_num_rows"][i],
             cutout_num_cols=self.extra_args["patch_cutout_num_cols"][i],
             cutout_start_pos=self.extra_args["patch_cutout_start_pos"][i],
@@ -195,7 +195,7 @@ class BaseInferrer(ABC):
             **self.extra_args
         )
         self.cur_patch_uid = create_patch_uid(tract, patch)
-        if self.extra_args["space_dim"] == 3:
+        if False: # self.extra_args["space_dim"] == 3: # todo, spectra data
             self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
 
     #############

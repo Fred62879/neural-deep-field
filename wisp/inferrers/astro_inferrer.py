@@ -75,7 +75,8 @@ class AstroInferrer(BaseInferrer):
             "spectra_pretrain_infer":"pretrain",
             "sanity_check_infer":"val",
             "generalization_infer":"test",
-            "main_infer":"val","test":"test",
+            "main_infer":"val",
+            "test":"test",
             "redshift_classification_sc_infer": "val",
             "redshift_classification_genlz_infer": "test",
             "redshift_pretrain_infer": "pretrain",
@@ -149,8 +150,8 @@ class AstroInferrer(BaseInferrer):
 
         elif self.img_infer:
             self.batch_size = self.extra_args["infer_batch_size"]
-            self.dataset.set_spectra_source("val")
-            self.num_spectra = self.dataset.get_num_validation_spectra()
+            # self.dataset.set_spectra_source("val")
+            # self.num_spectra = self.dataset.get_num_validation_spectra()
 
         elif self.test:
             self.batch_size = self.extra_args["infer_batch_size"]
@@ -175,6 +176,8 @@ class AstroInferrer(BaseInferrer):
 
         if self.no_model_run:
             pass
+        elif self.img_infer:
+            assert "full" in self.pipelines
         elif self.clsfy_sc_infer or self.clsfy_genlz_infer:
             self.spectra_infer_pipeline = self.pipelines["redshift_classifier"]
         elif self.redshift_pretrain_infer or self.redshift_test_infer:
@@ -1345,7 +1348,7 @@ class AstroInferrer(BaseInferrer):
             add_to_device(data, self.extra_args["gpu_data"], self.device)
 
             with torch.no_grad():
-                ret = forward(
+                ret = img_forward(
                     data,
                     self.full_pipeline,
                     iterations,
@@ -1358,6 +1361,7 @@ class AstroInferrer(BaseInferrer):
                     trans_sample_method=self.trans_sample_method,
                     save_scaler=self.save_scaler,
                     save_redshift=self.save_redshift,
+                    save_intensity=self.recon_img,
                     save_embed_ids=self.plot_embed_map,
                     save_latents=self.plot_latent_embed,
                     save_qtz_weights=self.save_qtz_weights)

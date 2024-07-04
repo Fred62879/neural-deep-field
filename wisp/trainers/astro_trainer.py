@@ -54,6 +54,34 @@ class AstroTrainer(BaseTrainer):
         self.init_loss()
         self.init_optimizer()
 
+    def train(self):
+        self.timer.reset()
+
+        for i, (tract, patch) in enumerate(zip(
+                self.extra_args["tracts"], self.extra_args["patches"]
+        )):
+            self.begin_train(i, tract, patch)
+            self.timer.check("train begun for current patch")
+
+            epochs = tqdm(range(self.num_epochs + 1)) if self.use_tqdm \
+                else range(self.num_epochs + 1)
+
+            for epoch in epochs:
+                self.epoch = epoch
+                self.begin_epoch()
+
+                for batch in range(self.num_iterations_cur_epoch):
+                    data = self.next_batch()
+                    self.timer.check("got data")
+                    self.pre_step()
+                    self.step(data)
+                    self.post_step()
+                    self.iteration += 1
+                    self.total_steps += 1
+
+                self.end_epoch()
+            self.end_train()
+
     #############
     # Initializations
     #############
@@ -149,10 +177,10 @@ class AstroTrainer(BaseTrainer):
         log.info(f"logging to {self.log_dir}")
 
         for cur_path, cur_pname, in zip(
-                ["model_dir","recon_dir","spectra_dir","codebook_spectra_dir",
+                ["loss_dir","model_dir","recon_dir","spectra_dir","codebook_spectra_dir",
                  "embed_map_dir","latent_dir","scaler_dir","redshift_dir",
                  "codebook_dir","qtz_weights_dir"],
-                ["models","train_recons","train_spectra","train_codebook_spectra",
+                ["losses","models","train_recons","train_spectra","train_codebook_spectra",
                  "train_embed_maps","latents","scaler","train_redshift",
                  "codebook","train_qtz_weights"]
         ):
@@ -163,7 +191,7 @@ class AstroTrainer(BaseTrainer):
         self.grad_fname = join(self.log_dir, "grad.png")
 
         if self.plot_loss:
-            self.loss_fname = join(self.log_dir, "loss")
+            self.loss_fname = join(self.loss_dir, "loss")
 
         if self.pretrain_codebook:
             self.pretrained_model_fname, _ = get_pretrained_model_fname(
@@ -172,10 +200,13 @@ class AstroTrainer(BaseTrainer):
                 self.extra_args["pretrained_model_name"])
 
         if self.extra_args["resume_train"]:
-            self.resume_model_fname, self.resume_loss_fname = get_pretrained_model_fname(
+            pretrained_dir, self.resume_model_fname = get_pretrained_model_fname(
                 self.log_dir,
                 self.extra_args["resume_log_dir"],
                 self.extra_args["resume_model_name"])
+
+            loss_dir = join(pretrained_dir, "losses")
+            self.resume_loss_fname = join(loss_dir, "loss.npy")
 
     def init_loss(self):
         # if self.spectra_supervision:
@@ -220,32 +251,6 @@ class AstroTrainer(BaseTrainer):
 
         if self.extra_args["resume_train"]:
             self.resume_train()
-
-    def train(self):
-        self.timer.reset()
-
-        for i, (tract, patch) in enumerate(zip(
-                self.extra_args["tracts"], self.extra_args["patches"]
-        )):
-            self.begin_train(i, tract, patch)
-            self.timer.check("train begun for current patch")
-
-            for epoch in range(self.num_epochs + 1):
-                self.epoch = epoch
-                self.begin_epoch()
-
-                # for batch in tqdm(range(self.num_iterations_cur_epoch)):
-                for batch in range(self.num_iterations_cur_epoch):
-                    data = self.next_batch()
-                    self.timer.check("got data")
-                    self.pre_step()
-                    self.step(data)
-                    self.post_step()
-                    self.iteration += 1
-                    self.total_steps += 1
-
-                self.end_epoch()
-            self.end_train()
 
     def end_train(self):
         self.writer.close()
@@ -833,8 +838,8 @@ class AstroTrainer(BaseTrainer):
         if self.verbose: log.info(f"Saving model checkpoint to: {model_fname}")
 
         checkpoint = {
-            "iterations": self.total_steps,
-            "epoch_trained": self.epoch,
+            "total_steps": self.total_steps,
+            "total_epochs": self.epoch,
             "model_state_dict": self.pipeline.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict()
         }

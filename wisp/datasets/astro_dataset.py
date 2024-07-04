@@ -67,7 +67,7 @@ class AstroDataset(Dataset):
             self.spectra_dataset.finalize_spectra()
         else: self.spectra_dataset = None
 
-        if has_common(self.kwargs["tasks"], ["main_train"]):
+        if has_common(self.kwargs["tasks"], ["main_train","main_infer","test"]):
             self.fits_dataset = FitsData(self.device, self.spectra_dataset, **self.kwargs)
             self.mask_dataset = MaskData(self.fits_dataset, self.device, **self.kwargs)
 

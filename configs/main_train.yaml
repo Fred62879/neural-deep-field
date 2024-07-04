@@ -6,7 +6,7 @@ global:
     log_fname: main_train
 
     tasks: [train, main_train]
-    # tasks: [infer, main_infer, recon_gt_spectra, save_redshift, recon_img]
+    tasks: [infer, main_infer, recon_img]
     # tasks: [test]
     # recon_img, recon_synthetic_band
     # log_pixel_value, save_qtz_weights, save_soft_qtz_weights, log_soft_qtz_weights
@@ -245,16 +245,16 @@ trainer:
     step_based_sample_wo_replace: False
 
     num_steps: 20000
-    num_epochs: 10000
+    num_epochs: 1000
     batch_size: 5500
     valid_every: -1
     render_tb_every: -1
     log_tb_every: -1
-    log_cli_every: 2000
+    log_cli_every: 200
     log_gpu_every: -1
     plot_grad_every: -1
     save_data_every: -1
-    save_model_every: 2000
+    save_model_every: 200
 
     train_with_all_pixels: True
     train_pixel_ratio: 1
@@ -407,7 +407,7 @@ dataset:
 patch_data:
     tracts: ['9812']
     patches: ['1,5']
-    use_full_patch: True
+    use_full_patch: False
 
     #### *** test patches ****
     test_tracts: []

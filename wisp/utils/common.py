@@ -821,11 +821,23 @@ def img_forward(
             net_args["num_sup_spectra"] = data["num_sup_spectra"]
             net_args["sup_spectra_wave"] = data["sup_spectra_wave"]
             requested_channels.append("sup_spectra")
+        if qtz:
+            qtz_args = defaultdict(lambda: False)
+            if qtz_strategy == "soft":
+                qtz_args["save_qtz_weights"] = save_qtz_weights
+                qtz_args["temperature"] = step_num + 1
+                if save_embed_ids:
+                    qtz_args["find_embed_id"] = save_embed_ids
+            qtz_args["save_codebook_spectra"] = save_codebook_spectra
+            net_args["qtz_args"] = qtz_args
+        if regularize_codebook_spectra:
+            net_args["full_emitted_wave"] = data["full_emitted_wave"]
+            requested_channels.append("full_range_codebook_spectra")
     else:
         raise ValueError("Unsupported space dimension.")
 
     requested_channels = set(requested_channels)
-    print('forward', requested_channels, net_args.keys())
+    # print('img_forward', requested_channels, net_args.keys())
     return pipeline(channels=requested_channels, **net_args)
 
 def forward(
