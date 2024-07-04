@@ -569,6 +569,7 @@ def define_cmd_line_args():
 
     pretrain_group.add_argument("--classifier-train-add-baseline-logits", action="store_true")
     pretrain_group.add_argument("--classifier-test-add-baseline-logits", action="store_true")
+    pretrain_group.add_argument("--baseline-logits-scale-weight", type=float)
     pretrain_group.add_argument("--baseline-logits-path", type=str)
     pretrain_group.add_argument("--baseline-logits-fname-suffix", type=str)
 

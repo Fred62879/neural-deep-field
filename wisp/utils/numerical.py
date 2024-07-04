@@ -11,6 +11,9 @@ from skimage.metrics import structural_similarity
 from wisp.utils.common import to_numpy, init_redshift_bins
 
 
+def combine_base_logits(base, est, base_weight):
+    return base * base_weight + est * (1 - base_weight)
+
 def reduce_latents_dim_pca(all_latents, n, selected_axes=None):
     """
     Cast high-dim latetns to low dim and plot.

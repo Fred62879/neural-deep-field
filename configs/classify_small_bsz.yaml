@@ -7,7 +7,7 @@ global:
 
     tasks: [train, redshift_classification_train]
     # tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
-    # tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
+    tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
     # tasks: [infer, overlay_redshift_est_stats]
 
 optimizer:
@@ -27,12 +27,13 @@ pretrain:
     pretrain_use_all_wave: True
 
     classifier_train_use_bin_sampled_data: True
-    sanity_check_num_bins_to_sample: 16
+    sanity_check_num_bins_to_sample: 5
     classifier_train_sample_bins: False
     classifier_train_num_bins_to_sample: 2
 
     classifier_train_add_baseline_logits: True
     classifier_test_add_baseline_logits: True
+    baseline_logits_scale_weight: 0.35
     
     model_redshift: True
     brute_force_redshift: False
@@ -130,7 +131,7 @@ spectra_data:
 
     redshift_classification_batched_data_fields: [spectra_redshift]
     load_classification_data_individually: False
-    redshift_classification_sc_data_dir: 20240626-002713_sc_sanity_check_num_bins_to_sample_16
+    redshift_classification_sc_data_dir: 20240616-050251_sc_100k_spectra_500_epochs_033031
     redshift_classification_genlz_data_dir: 20240619-220256_genlz_5k_spectra_500_epochs_033031
     redshift_classification_data_fname_prefix: model-0
 

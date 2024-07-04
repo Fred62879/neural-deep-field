@@ -21,7 +21,7 @@ from wisp.datasets.data_utils import get_bound_id
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
 from wisp.utils.common import *
-from wisp.utils.numerical import reduce_latents_dim_pca
+from wisp.utils.numerical import reduce_latents_dim_pca, combine_base_logits
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_line, \
     plot_latent_embed, annotated_heat, plot_simple, plot_multiple, plot_latents, \
     plot_redshift_estimation_stats_together, plot_redshift_estimation_stats_individually
@@ -1957,15 +1957,18 @@ class AstroInferrer(BaseInferrer):
                         selected_bins_mask = data[
                             get_redshift_classification_data_field_name("selected_bins_mask")]
                         baseline_logits = baseline_logits[selected_bins_mask].view(logits.shape)
-
                     # todo, logits with sigmoid
-                    logits = (torch.sigmoid(logits) + baseline_logits) / 2
+                    logits = combine_base_logits(
+                        baseline_logits, torch.sigmoid(logits),
+                        self.extra_args["baseline_logits_scale_weight"])
 
                 if self.clsfy_genlz_infer and \
                    self.extra_args["classifier_test_add_baseline_logits"]:
                     baseline_logits = data["baseline_redshift_logits"]
                     # todo, logits with sigmoid
-                    logits = (torch.sigmoid(logits) + baseline_logits) / 2
+                    logits = combine_base_logits(
+                        baseline_logits, torch.sigmoid(logits),
+                        self.extra_args["baseline_logits_scale_weight"])
 
                 if self.classifier_train_use_bin_sampled_data:
                     mask = data[get_redshift_classification_data_field_name("selected_bins_mask")]

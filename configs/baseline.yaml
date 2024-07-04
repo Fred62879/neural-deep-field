@@ -7,7 +7,7 @@ global:
 
     tasks: [train, redshift_pretrain]
     tasks: [infer, redshift_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats, save_redshift_logits]
-    # tasks: [infer, redshift_test_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats, save_redshift_logits]
+    tasks: [infer, redshift_test_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats, save_redshift_logits]
 
 optimizer:
     optimizer_type: adam
@@ -104,7 +104,7 @@ spectra_data:
 
     redshift_regress_spectra_sample_method: uniform_dense
 
-    generalization_max_num_spectra: 50000
+    generalization_max_num_spectra: 5000
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
 
