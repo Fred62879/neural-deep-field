@@ -1,35 +1,20 @@
+parent: base.yaml
 
 global:
-    verbose: False
-    use_gpu: True
     use_tqdm: True
-    on_cedar: False
-    on_graham: False
-    on_narval: False
-    on_sockeye: False
-    print_shape: False
-    show_memory: False
-    activate_model_timer: False
-    activate_trainer_timer: False
-    exp_name: 'autodecoder-100-spectra'
-    # log_fname: ''
-    seed: 80
+    exp_name: spectral-inpaint
+    log_fname: main_train
 
-    tasks: ['spectra_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_logits'] #,'recon_codebook_spectra','save_qtz_weights,'save_pixel_values']
-    #tasks: ['spectra_pretrain_infer','recon_spectra'] #'save_redshift','plot_redshift_residual','plot_redshift_logits'] #,'plot_codebook_coeff_all_bins','recon_spectra_all_bins','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra','save_qtz_weights','save_pixel_values','recon_img','integrate_gt_spectra']
-    tasks: ['redshift_pretrain'] #,'recon_gt_spectra','save_redshift','plot_codebook_coeff'] #,'save_pixel_values','recon_codebook_spectra_individ']
-    #tasks: ['redshift_pretrain_infer','recon_spectra','save_redshift'] #,'plot_redshift_logits','plot_redshift_residuals'] #,'plot_binwise_spectra_loss','plot_codebook_coeff','save_optimal_bin_ids','recon_codebook_spectra''save_spectra_latents','save_qtz_weights','recon_spectra_all_bins']
-
-ablation:
-    perform_ablation: False
-    ablat_id: 11
-    ablat_params: ["neg_sup_beta","neg_sup_constant"]
-    ablat_vals: [[1,2,4],[0.05,0.08,0.1,0.2]]
-    ablat_num_vals: [3,4]
+    tasks: [train, main_train]
+    # tasks: [infer, main_infer, recon_gt_spectra, save_redshift, recon_img]
+    # tasks: [test]
+    # recon_img, recon_synthetic_band
+    # log_pixel_value, save_qtz_weights, save_soft_qtz_weights, log_soft_qtz_weights
+    # plot_scaler, plot_redshift, plot_embed_map, plot_latent_embed, plot_gt_pixel_distrib
+    # recon_dummy_spectra, recon_gt_spectra, recon_codebook_spectra, recon_codebook_spectra_individ
 
 optimizer:
-    optimizer_type: 'adam' #'sgd' #'adamw'
-    optimize_latents_use_lbfgs: False
+    optimizer_type: adam
 
     b1: 0.5
     b2: 0.999
@@ -45,17 +30,19 @@ optimizer:
     sgd_momentum: 0.9
 
 net:
-    nef_type: 'AstroHyperSpectralNerf' #'AstroNerf'
+    nef_type: AstroHyperSpectralNerf
     model_redshift: False
-    redshift_model_method: 'classification' #'regression'
-    redshift_classification_method: 'weighted_avg' #'argmax'
+    redshift_model_method: classification
+    redshift_classification_method: argmax
 
-    encode_wave: False
-    wave_encode_method: 'positional_encoding'
-    wave_multiplier: 20
+    encode_wave: True
+    wave_encode_method: positional_encoding
+    wave_embed_dim: 32
+    linear_norm_wave: True
+    wave_multiplier: 64 # 20
 
-    encode_coords: False
-    coords_encode_method: 'grid' #'positional_encoding'
+    encode_coords: True
+    coords_encode_method: grid # positional_encoding
 
 embedder:
     coords_embed_bias: True
@@ -290,7 +277,7 @@ trainer:
     #### ******** Constantly modify ********
     train_spectra_pixels_only: False
 
-    pixel_supervision: False
+    pixel_supervision: True
     spectra_supervision: False
 
     apply_gt_redshift: False
@@ -408,22 +395,14 @@ dataset:
     plot_img_distrib: True
     load_patch_data_cache: True
 
-    dataset_path: '/scratch/projects/vision/data/pdr3'
-    cedar_dataset_path: '/home/fred862/scratch/vision/data/pdr3'
-    sockeye_dataset_path: '/arc/project/pr-kmyi-1/fred/data/pdr3'
-    cedar_input_fits_path: '/home/fred862/projects/rrg-kyi/astro/hsc/pdr3_dud'
-    graham_input_fits_path: '/home/fred862/projects/rrg-kyi/astro/fred862/pdr3_dud'
-    sockeye_input_fits_path: '/arc/project/pr-kmyi-1/fred/data/pdr3/input/pdr3_dud'
-    narval_input_fits_path: '/home/fred862/projects/def-kyi-ab/fred862/astro/hsc/pdr3_dud'
-
     calculate_wave_range_based_on_trans: False
     calculate_wave_range_based_on_spectra: False
     wave_range_fname: 'wave_range0.npy'
 
-    coords_type: "img"
+    coords_type: img
     normalize_coords: True
-    gt_img_norm_cho: 'identity'   # identity/arcsinh/linear/clip(0,1)
-    train_pixels_norm: 'identity' # identity/arcsinh/sinh/linear/clip(0,1)
+    gt_img_norm_cho: identity   # identity/arcsinh/linear/clip(0,1)
+    train_pixels_norm: identity # identity/arcsinh/sinh/linear/clip(0,1)
 
 patch_data:
     tracts: ['9812']
@@ -447,41 +426,14 @@ patch_data:
     #### *************************************************
 
 trans_data:
-    # num_bands: 1
-    # sensor_collection_name: '1_i'
-    # filter_ids: [2]
-    # filters: [i]
-    # sensors_full_name: [HSC-I]
-    # plot_labels: ['i']
-    # plot_colors: ['blue']
-    # plot_styles: ['solid']
-
-    num_bands: 3
-    sensor_collection_name: '3_gri'
-    filter_ids: [0,1,2]
-    filters: [g,r,i]
-    sensors_full_name: [HSC-G,HSC-R,HSC-I]
-    plot_labels: ['g', 'r', 'i']
-    plot_colors: ['green','red','blue']
-    plot_styles: ['solid','solid','solid']
- 
-    # num_bands: 5
-    # sensor_collection_name: '5_grizy'
-    # filter_ids: [0,1,2,3,4]
-    # filters: [g,r,i,z,y]
-    # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y]
-    # plot_labels: ['g', 'r', 'i', 'z', 'y']
-    # plot_colors: ['green','red','blue','gray','yellow']
-    # plot_styles: ['solid','solid','solid','solid','solid']
-
-    # num_bands: 10
-    # sensor_collection_name: '10'
-    # filter_ids: [0,1,2,3,4,5,6,7,8,9]
-    # filters: [g,r,i,z,y,nb387,nb816,nb921,u,us]
-    # sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y,NB0387,NB0816,NB0921,u,uS]
-    # plot_labels: ['g', 'r', 'i', 'z', 'y', 'nb387', 'nb816', 'nb921','u','u*']
-    # plot_colors: ['green','red','blue','gray','yellow','gray','red','blue','yellow','blue']
-    # plot_styles: ['solid','solid','solid','solid','solid','dashed','dashed','dashed','dashdot','dashdot']
+    num_bands: 5
+    sensor_collection_name: '5_grizy'
+    filter_ids: [0,1,2,3,4]
+    filters: [g,r,i,z,y]
+    sensors_full_name: [HSC-G,HSC-R,HSC-I,HSC-Z,HSC-Y]
+    plot_labels: ['g', 'r', 'i', 'z', 'y']
+    plot_colors: ['green','red','blue','gray','yellow']
+    plot_styles: ['solid','solid','solid','solid','solid']
 
     plot_trans: True
     trans_sample_method: 'mixture'
@@ -492,33 +444,8 @@ trans_data:
 spectra_data:
     spectra_cho: v1
     spectra_drop_not_in_patch: False
-    spectra_process_patch_info: False
-    spectra_data_sources: [zcosmos]
-
-    download_deimos_source_spectra: False
-    deimos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/deimos/spec1d_tbl
-    deimos_spectra_data_format: tbl
-    deimos_processed_spectra_cho: v7
-    deimos_source_spectra_fname: source_deimos_table_v7_different_wave_range_exclude_0_flux.tbl
-
-    download_zcosmos_source_spectra: False
-    zcosmos_source_spectra_link: https://irsa.ipac.caltech.edu/data/COSMOS/spectra/z-cosmos/DR3
-    zcosmos_spectra_data_format: tbl
-    zcosmos_processed_spectra_cho: v1
-    zcosmos_source_spectra_fname: source_zcosmos_table.fits
-
-    deep2_spectra_data_format: fits
-    deep2_processed_spectra_cho: v1
-    deep2_source_spectra_fname: source_deep2_table.tbl
-
-    deep3_spectra_data_format: fits
-    deep3_processed_spectra_cho: v1
-    deep3_source_spectra_fname: source_deep3_table.tbl
-
-    vipers_spectra_data_format: fits
-    vipers_processed_spectra_cho: v1
-    vipers_w1_source_spectra_fname: source_vipers_w1_table.tbl
-    vipers_w4_source_spectra_fname: source_vipers_w4_table.tbl
+    spectra_process_patch_info: True
+    spectra_data_sources: [deimos,zcosmos,vipers_w1,vipers_w4]
 
     max_spectra_len: 8191 # hardcoded
 

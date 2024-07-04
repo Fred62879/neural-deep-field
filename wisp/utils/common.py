@@ -105,6 +105,11 @@ def get_bool_encode_coords(**kwargs):
         ( kwargs["pretrain_codebook"] and \
           kwargs["main_train_with_pretrained_latents"] )
 
+def get_bool_needs_spectra_data(**kwargs):
+    return not (
+        "main_train" in set(kwargs["tasks"]) or \
+        "main_infer" in set(kwargs["tasks"]) )
+
 def get_bool_regress_redshift(**kwargs):
     return kwargs["space_dim"] == 3 and \
         kwargs["model_redshift"] and \
@@ -745,6 +750,83 @@ def spectra_redshift_forward(
     # print('forward', requested_channels, net_args.keys())
     return pipeline(channels=requested_channels, **net_args)
 
+def img_forward(
+        data,
+        pipeline,
+        step_num,
+        space_dim,
+        qtz=False,
+        qtz_strategy="none",
+        index_latent=False,
+        split_latent=False,
+        regress_redshift=False,
+        classify_redshift=False,
+        apply_gt_redshift=False,
+        spectra_supervision=False,
+        perform_integration=False,
+        trans_sample_method="none",
+        regularize_codebook_spectra=False,
+        save_coords=False,
+        save_scaler=False,
+        save_spectra=False,
+        save_latents=False,
+        save_codebook=False,
+        save_redshift=False,
+        save_embed_ids=False,
+        save_intensity=False,
+        save_qtz_weights=False,
+        save_codebook_loss=False,
+        save_codebook_logits=False,
+        save_spectra_latents=False,
+        save_codebook_spectra=False
+):
+    net_args, requested_channels = {}, []
+    if "coords" in data:
+        net_args["coords"] = data["coords"]
+
+    if space_dim == 2:
+        assert save_pixel_val
+        requested_channels = ["intensity"]
+    elif space_dim == 3:
+        if save_coords: requested_channels.append("coords")
+        if save_scaler: requested_channels.append("scaler")
+        if save_spectra: requested_channels.append("spectra")
+        if save_latents: requested_channels.append("latents")
+        if save_codebook: requested_channels.append("codebook")
+        if save_redshift: requested_channels.append("redshift")
+        if save_intensity: requested_channels.append("intensity")
+        if save_embed_ids: requested_channels.append("min_embed_ids")
+        if save_qtz_weights: requested_channels.append("qtz_weights")
+        if save_codebook_loss: requested_channels.append("codebook_loss")
+        if save_codebook_logits: requested_channels.append("codebook_logits")
+        if save_spectra_latents: requested_channels.append("spectra_latents")
+        if save_codebook_spectra: requested_channels.append("codebook_spectra")
+
+        if "wave" in data: net_args["wave"] = data["wave"]
+        if "wave_range" in data: net_args["wave_range"] = data["wave_range"]
+        if index_latent:
+            if "idx" in data:
+                net_args["idx"] = data["idx"]
+            if "selected_ids" in data:
+                net_args["selected_ids"] = data["selected_ids"]
+        if split_latent:
+            if "scaler_latents" in data:
+                net_args["scaler_latents"] = data["scaler_latents"]
+            if "redshift_latents" in data:
+                net_args["redshift_latents"] = data["redshift_latents"]
+        if perform_integration:
+            net_args["trans"] = data["trans"]
+            net_args["nsmpl"] = data["nsmpl"]
+        if spectra_supervision:
+            net_args["num_sup_spectra"] = data["num_sup_spectra"]
+            net_args["sup_spectra_wave"] = data["sup_spectra_wave"]
+            requested_channels.append("sup_spectra")
+    else:
+        raise ValueError("Unsupported space dimension.")
+
+    requested_channels = set(requested_channels)
+    print('forward', requested_channels, net_args.keys())
+    return pipeline(channels=requested_channels, **net_args)
 
 def forward(
         data,

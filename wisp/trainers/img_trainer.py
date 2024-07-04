@@ -19,13 +19,15 @@ from torch.utils.data import BatchSampler, SequentialSampler, \
 from wisp.datasets.patch_data import PatchData
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_grad_flow
-from wisp.utils.common import *
+from wisp.utils.common import get_gpu_info, add_to_device, sort_alphanumeric, \
+    load_pretrained_model_weights, forward, print_shape, create_patch_uid, \
+    get_bool_classify_redshift, get_pretrained_model_fname
 from wisp.trainers import BaseTrainer, log_metric_to_wandb, log_images_to_wandb
 from wisp.loss import get_loss, spectra_supervision_loss, \
     spectral_masking_loss, redshift_supervision_loss
 
 
-class AstroTrainer(BaseTrainer):
+class ImgTrainer(BaseTrainer):
     """ Trainer class for astro dataset.
         This trainer is used only in three cases:
           i)   main train (without pretrain)
@@ -39,7 +41,6 @@ class AstroTrainer(BaseTrainer):
         self.spectra_beta = self.extra_args["spectra_beta"]
         self.redshift_beta = self.extra_args["redshift_beta"]
 
-        self.pretrain_codebook = extra_args["pretrain_codebook"]
         self.use_all_pixels = extra_args["train_with_all_pixels"]
         self.spectra_n_neighb = extra_args["spectra_neighbour_size"]**2
         self.classify_redshift = get_bool_classify_redshift(**self.extra_args)
@@ -69,15 +70,6 @@ class AstroTrainer(BaseTrainer):
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
 
-        self.qtz_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
-        self.qtz_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
-        assert not (self.qtz_latent and self.qtz_spectra)
-        self.qtz = self.qtz_latent or self.qtz_spectra
-        self.qtz_strategy = self.extra_args["quantization_strategy"]
-        self.cal_codebook_loss = self.qtz_latent and self.qtz_strategy == "hard"
-        self.save_qtz_weights = "save_qtz_weights_during_train" in tasks and \
-            (self.qtz_spectra or (self.qtz_latent and qtz_strategy == "soft"))
-
         # sample only pixels with GT spectra
         self.train_spectra_pixels_only = self.extra_args["train_spectra_pixels_only"]
         if self.use_pretrained_latents_as_coords:
@@ -88,7 +80,7 @@ class AstroTrainer(BaseTrainer):
         self.pixel_supervision = self.extra_args["pixel_supervision"]
         self.spectra_supervision = self.space_dim == 3 and \
             self.extra_args["spectra_supervision"]
-        # assert not self.spectra_supervision
+        assert not self.spectra_supervis
         assert self.pixel_supervision + self.spectra_supervision >= 1
 
         self.spectral_inpaint = self.pixel_supervision and \
@@ -183,11 +175,11 @@ class AstroTrainer(BaseTrainer):
         #     self.spectra_loss = partial(spectra_supervision_loss, loss)
 
         if self.redshift_semi_supervision:
-            loss = get_loss(self.extra_args["redshift_loss_cho"], "mean", self.cuda)
+            loss = get_loss(self.extra_args["redshift_loss_cho"], self.cuda)
             self.redshift_loss = partial(redshift_supervision_loss, loss)
 
         if self.pixel_supervision:
-            loss = get_loss(self.extra_args["pixel_loss_cho"], "mean", self.cuda)
+            loss = get_loss(self.extra_args["pixel_loss_cho"], self.cuda)
             if self.spectral_inpaint:
                 loss = partial(spectral_masking_loss, loss,
                                self.extra_args["relative_train_bands"],
@@ -289,6 +281,7 @@ class AstroTrainer(BaseTrainer):
     def reset_data_iterator(self):
         """ Rewind the iterator for the new epoch.
         """
+        self.scene_state.optimization.iterations_per_epoch = len(self.train_data_loader)
         self.train_data_loader_iter = iter(self.train_data_loader)
 
     #############
@@ -453,10 +446,9 @@ class AstroTrainer(BaseTrainer):
     #############
 
     def get_cur_patch_data(self, i, tract, patch):
-        # todo, update `load_spectra` later
         self.cur_patch = PatchData(
             tract, patch,
-            load_spectra=False, #self.extra_args["space_dim"] == 3,
+            load_spectra=self.extra_args["space_dim"] == 3,
             cutout_num_rows=self.extra_args["patch_cutout_num_rows"][i],
             cutout_num_cols=self.extra_args["patch_cutout_num_cols"][i],
             cutout_start_pos=self.extra_args["patch_cutout_start_pos"][i],
@@ -467,9 +459,8 @@ class AstroTrainer(BaseTrainer):
         self.dataset.set_patch(self.cur_patch)
 
         self.cur_patch_uid = create_patch_uid(tract, patch)
-        # todo, spectra relevant
-        # if self.extra_args["space_dim"] == 3:
-        #     self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
+        if self.extra_args["space_dim"] == 3:
+            self.val_spectra_map = self.cur_patch.get_spectra_bin_map()
 
     def init_dataloader(self):
         """ (Re-)Initialize dataloader.
@@ -696,30 +687,28 @@ class AstroTrainer(BaseTrainer):
         add_to_device(data, self.extra_args["gpu_data"], self.device)
 
         self.timer.reset()
-        ret = img_forward(
-            data,
-            self.pipeline,
-            self.total_steps,
-            self.space_dim,
-            qtz=self.qtz,
-            qtz_strategy=self.qtz_strategy,
-            apply_gt_redshift=self.apply_gt_redshift,
-            classify_redshift=self.classify_redshift,
-            perform_integration=self.perform_integration,
-            trans_sample_method=self.trans_sample_method,
-            spectra_supervision=self.spectra_supervision,
-            save_scaler=self.save_data and self.save_scaler,
-            save_latents=self.save_data and self.save_latents,
-            save_codebook=self.save_data and self.save_codebook,
-            save_redshift=self.redshift_semi_supervision or \
-                          self.save_data and self.save_redshift,
-            save_intensity=self.pixel_supervision,
-            save_embed_ids=self.save_data and self.plot_embed_map,
-            save_spectra=self.save_data and self.recon_gt_spectra,
-            save_codebook_loss=self.save_data and self.cal_codebook_loss,
-            save_qtz_weights=self.save_data and self.save_qtz_weights,
-            save_codebook_spectra=self.save_data and \
-                                  self.recon_codebook_spectra_individ
+        ret = forward(data,
+                      self.pipeline,
+                      self.total_steps,
+                      self.space_dim,
+                      qtz=self.qtz,
+                      qtz_strategy=self.qtz_strategy,
+                      apply_gt_redshift=self.apply_gt_redshift,
+                      classify_redshift=self.classify_redshift,
+                      perform_integration=self.perform_integration,
+                      trans_sample_method=self.trans_sample_method,
+                      spectra_supervision=self.spectra_supervision,
+                      save_scaler=self.save_data and self.save_scaler,
+                      save_latents=self.save_data and self.save_latents,
+                      save_codebook=self.save_data and self.save_codebook,
+                      save_redshift=self.redshift_semi_supervision or \
+                                    self.save_data and self.save_redshift,
+                      save_embed_ids=self.save_data and self.plot_embed_map,
+                      save_spectra=self.save_data and self.recon_gt_spectra,
+                      save_codebook_loss=self.save_data and self.cal_codebook_loss,
+                      save_qtz_weights=self.save_data and self.save_qtz_weights,
+                      save_codebook_spectra=self.save_data and \
+                                            self.recon_codebook_spectra_individ
         )
         self.timer.check("forward")
 

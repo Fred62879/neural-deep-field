@@ -13,7 +13,7 @@ from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
 from wisp.utils.common import print_shape, has_common, create_batch_ids, \
-    get_bool_classify_redshift, init_redshift_bins, \
+    get_bool_needs_spectra_data, get_bool_classify_redshift, init_redshift_bins, \
     get_gt_redshift_bin_ids, create_redshift_bins_mask, get_bool_sanity_check_sample_bins
 from wisp.datasets.data_utils import clip_data_to_ref_wave_range, \
     get_wave_range_fname, batch_sample_bins, batch_sample_torch, get_bound_id
@@ -57,14 +57,15 @@ class AstroDataset(Dataset):
         self.data = {}
 
         self.trans_dataset = TransData(self.device, **self.kwargs)
-        self.spectra_dataset = SpectraData(self.trans_dataset, self.device, **self.kwargs)
 
-        if get_bool_classify_redshift(**self.kwargs):
-            self.redshift_bins = init_redshift_bins(**self.kwargs)
-            self.num_redshift_bins = len(self.redshift_bins)
-            self.spectra_dataset.set_num_redshift_bins(self.num_redshift_bins)
-
-        self.spectra_dataset.finalize_spectra()
+        if get_bool_needs_spectra_data(**self.kwargs):
+            self.spectra_dataset = SpectraData(self.trans_dataset, self.device, **self.kwargs)
+            if get_bool_classify_redshift(**self.kwargs):
+                self.redshift_bins = init_redshift_bins(**self.kwargs)
+                self.num_redshift_bins = len(self.redshift_bins)
+                self.spectra_dataset.set_num_redshift_bins(self.num_redshift_bins)
+            self.spectra_dataset.finalize_spectra()
+        else: self.spectra_dataset = None
 
         if has_common(self.kwargs["tasks"], ["main_train"]):
             self.fits_dataset = FitsData(self.device, self.spectra_dataset, **self.kwargs)

@@ -84,15 +84,18 @@ class BasicDecoder(nn.Module):
         self.gaussian_sigma = gaussian_sigma
 
         self.skip = skip
-        self.skip_method = skip_method
-        assert self.skip_method == "add" or self.skip_method == "concat"
-        self.skip_add_conversion_method = skip_add_conversion_method
-        assert self.skip_add_conversion_method == "convert_input" or \
-            self.skip_add_conversion_method == "single_conversion" or \
-            self.skip_add_conversion_method == "multi_conversion"
         if skip_all_layers:
             self.skip = np.arange(num_layers)
         self.perform_skip = len(self.skip) > 0
+
+        if self.perform_skip:
+            self.skip_method = skip_method
+            assert self.skip_method == "add" or self.skip_method == "concat"
+
+            self.skip_add_conversion_method = skip_add_conversion_method
+            assert self.skip_add_conversion_method == "convert_input" or \
+                self.skip_add_conversion_method == "single_conversion" or \
+                self.skip_add_conversion_method == "multi_conversion"
 
         self.init()
 

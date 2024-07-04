@@ -42,7 +42,7 @@ class PatchData:
         self.load_pixels = load_pixels
         self.load_coords = load_coords
         self.load_weights = load_weights
-        self.load_spectra = load_spectra # and kwargs["space_dim"] == 3
+        self.load_spectra = load_spectra
         self.mark_spectra_on_patch = mark_spectra_on_patch
 
         self.use_full_patch = full_patch

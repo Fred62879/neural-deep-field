@@ -144,11 +144,13 @@ class AstroHyperSpectralNerf(BaseNeuralField):
             latents, self.codebook, qtz_args, ret, specz=specz, sup_id=sup_id)
         timer.check("nef::spatial decoding done")
 
-        self.hps_decoder(latents, wave, trans, nsmpl, wave_range,
-                         codebook=self.codebook,
-                         qtz_args=qtz_args, ret=ret,
-                         num_sup_spectra=num_sup_spectra,
-                         sup_spectra_wave=sup_spectra_wave)
+        self.hps_decoder(
+            latents, wave, trans, nsmpl, wave_range,
+            codebook=self.codebook,
+            qtz_args=qtz_args, ret=ret,
+            # num_sup_spectra=num_sup_spectra,
+            # sup_spectra_wave=sup_spectra_wave
+        )
         timer.check("nef::hyperspectral decoding done")
 
         if self.codebook is not None:
