@@ -6,7 +6,7 @@ global:
     log_fname: clsfy_small_bsz
 
     tasks: [train, redshift_classification_train]
-    # tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
+    tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
     tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats]
     # tasks: [infer, overlay_redshift_est_stats]
 
@@ -32,8 +32,8 @@ pretrain:
     classifier_train_num_bins_to_sample: 2
 
     classifier_train_add_baseline_logits: True
-    classifier_test_add_baseline_logits: True
-    baseline_logits_scale_weight: 0.35
+    classifier_test_add_baseline_logits: False
+    baseline_logits_scale_weight: 0.5
     
     model_redshift: True
     brute_force_redshift: False
@@ -69,7 +69,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240702-001814_clsfy_small_bsz_sanity_check_num_bins_to_sample_16
+    infer_log_dir: 20240703-202753_clsfy_refiner
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100

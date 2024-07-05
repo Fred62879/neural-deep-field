@@ -1,7 +1,6 @@
 
 import torch.nn as nn
 
-from wisp.utils import PerfTimer
 from wisp.models.grids import *
 from wisp.utils.common import get_input_latent_dim
 
@@ -25,7 +24,6 @@ class Encoder(nn.Module):
             self.init_grid()
         elif encode_method == "positional_encoding":
             self.pe = RandGaus(embedder_args)
-            # self.embedder = RandGaus(embedder_args)
 
     def init_grid(self):
         grid_type = self.kwargs["grid_type"]
@@ -61,24 +59,20 @@ class Encoder(nn.Module):
         """
         Encode given coords
           @Param
-            coords: [...,batch_size,num_samples,coord_dim]
+            coords: [...,bsz,nsmpls,coord_dim]
           @Return
-            latents: [batch_size,num_samples,latent_dim]
+            latents: [...,bsz,nsmpls,latent_dim]
         """
-        timer = PerfTimer(activate=self.kwargs["activate_model_timer"],
-                          show_memory=self.kwargs["show_memory"])
-
-        (batch, num_samples) = coords.shape[-3:-1]
-
         if self.encode_method == "grid":
             if lod_idx is None:
                 lod_idx = len(self.grid.active_lods) - 1
             latents = self.grid.interpolate(coords, lod_idx)
-            latents = latents.reshape(batch, num_samples, self.effective_feature_dim)
-        # elif self.encode_method == "gaussian":
-        #     latents = self.garf(coords)
+            (bsz, nsmpls) = coords.shape[-3:-1]
+            latents = latents.reshape(bsz, nsmpls, self.effective_feature_dim)
+        elif self.encode_method == "gaussian":
+            latents = self.garf(coords)
         elif self.encode_method == "positional_encoding":
-            latents = self.pe(coords) # [bsz,num_samples,coords_embed_dim]
+            latents = self.pe(coords)
         else:
             latents = coords
         return latents

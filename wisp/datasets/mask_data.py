@@ -13,18 +13,14 @@ from wisp.datasets.data_utils import create_selected_patches_uid
 
 
 class MaskData:
-    """ Data class for masks.
-        Only used when doing inpainting
+    """
+    Data class for inpainting mask.
     """
     def __init__(self, fits_obj, device, **kwargs):
 
         self.spatial_inpaint = kwargs["inpaint_cho"] == "spatial_inpaint"
         self.spectral_inpaint = kwargs["inpaint_cho"] == "spectral_inpaint"
         assert not (self.spatial_inpaint and self.spectral_inpaint)
-
-        if not "train" in kwargs["tasks"] or \
-           not (self.spatial_inpaint or self.spectral_inpaint):
-            return
 
         self.kwargs = kwargs
         self.fits_obj = fits_obj
@@ -38,7 +34,6 @@ class MaskData:
         self.inpaint_sample_ratio = kwargs["inpaint_sample_ratio"]
         self.masked_ratio = (1 - self.inpaint_sample_ratio) * 100
         self.inpaint_bands_str = "".join(np.array(kwargs["filters"])[self.inpaint_bands])
-        print(self.inpaint_bands_str)
 
         self.set_path(kwargs["dataset_path"])
         self.data = defaultdict(lambda: [])
@@ -47,7 +42,6 @@ class MaskData:
     def set_path(self, dataset_path):
         input_path = join(dataset_path, "input")
         mask_path = join(input_path, "masks")
-        # mask path creation
         if self.mask_mode == "region":
             mask_str = "region_" + str(self.kwargs["m_start_r"]) + "_" \
                 + str(self.kwargs["m_start_c"]) + "_" \
@@ -61,29 +55,27 @@ class MaskData:
         else:
             self.mask_fname, self.masked_pixel_id_fname = None, None
 
-        # create path
         for path in [mask_path]:
             Path(path).mkdir(parents=True, exist_ok=True)
 
     def load_mask(self, flat=True, to_bool=True, to_tensor=True):
-        """ Load (or generate) mask dependeing on config for spectral inpainting.
-            If train bands and inpaint bands form a smaller set of
-              the band of the current mask file, then we load only and
-              slice the corresponding dimension from the larger mask.
+        """
+        Load (or generate) mask dependeing on config for spectral inpainting.
+        If train bands and inpaint bands form a smaller set of
+          the band of the current mask file, then we load only and
+          slice the corresponding dimension from the larger mask.
         """
         if exists(self.mask_fname) and exists(self.masked_pixel_ids_fname):
             if self.verbose:
                 log.info(f"loading spectral mask from {self.mask_fname}")
-            mask = np.load(self.mask_fname)
-            masked_pixel_ids = np.load(self.masked_pixel_ids_fname)
+            mask = np.load(self.mask_fname) # [npixels,nbands]
+            masked_pixel_ids = np.load(self.masked_pixel_ids_fname) # [n_inpaint_bands,n_masked]
         else:
             assert(len(self.kwargs["filters"]) ==
                    len(self.kwargs["train_bands"]) + len(self.kwargs["inpaint_bands"]))
             mask, masked_pixel_ids = self.create_mask_all_patches()
             mask = np.concatenate(mask) # [npixels,nbands]
             masked_pixel_ids = np.concatenate(masked_pixel_ids) # [n_masked_pixels]
-
-            # print(mask.shape, masked_pixel_ids.shape)
             np.save(self.mask_fname, mask)
             np.save(self.masked_pixel_ids_fname, masked_pixel_ids)
 
@@ -97,11 +89,10 @@ class MaskData:
         if to_tensor: mask = torch.tensor(mask)
 
         if self.spatial_inpaint:
-            # dont support spatial inpainting currently
-            assert 0
-            self.spatial_masking()
+            # self.spatial_masking()
+            raise NotImplementedError("dont support spatial inpainting currently")
 
-        self.data["mask"] = mask # [npixels,nbands]
+        self.data["mask"] = mask # [npixels,n_inpaint_bands]
         self.data["masked_pixel_ids"] = masked_pixel_ids # [n_masked_pixels]
 
     #############
@@ -124,15 +115,15 @@ class MaskData:
         offset = int(ratio*n)
         mask = np.zeros(n)
         mask[ids[:offset]] = 1
-        return mask, ids[-offset:]
+        # return mask, ids[-offset:] # todo, mask bug?
+        return mask, ids[offset:]
 
     def create_mask_one_patch(self, npixels, npixels_acc):
         """ Generate mask for one multi-band patch.
             Mask only pixels in inpaint_bands.
         """
         if self.mask_mode == "rand_diff" or self.mask_mode == "rand_same":
-            # mask different pixels in different bands
-            if self.verbose: log.info("mask diff pixels in diff bands")
+            if self.verbose: log.info("mask different pixels in different bands")
 
             ratio = self.inpaint_sample_ratio
             mask, masked_pixel_ids = np.ones((npixels, self.num_bands)), []
@@ -212,7 +203,7 @@ class MaskData:
 
     def get_mask(self, idx=None):
         assert self.kwargs["inpaint_cho"] == "spectral_inpaint"
-        if idx is None:
+        if idx is not None:
             return self.data["mask"][idx]
         return self.data["mask"]
 

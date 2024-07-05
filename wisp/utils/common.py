@@ -101,14 +101,18 @@ def get_current_ablate_params_and_vals(args):
     return params, final_vals
 
 def get_bool_encode_coords(**kwargs):
-    return kwargs["encode_coords"] and not \
-        ( kwargs["pretrain_codebook"] and \
-          kwargs["main_train_with_pretrained_latents"] )
+    tasks = set(kwargs["tasks"])
+    return kwargs["encode_coords"] # \
+        # and not \
+        # ( kwargs["pretrain_codebook"] and \
+        #   kwargs["main_train_with_pretrained_latents"] )
+
+def get_bool_needs_img_data(**kwargs):
+    return has_common(kwargs["tasks"], ["main_train","main_infer","test"])
 
 def get_bool_needs_spectra_data(**kwargs):
-    return not (
-        "main_train" in set(kwargs["tasks"]) or \
-        "main_infer" in set(kwargs["tasks"]) )
+    # todo, spectra data
+    return not has_common(kwargs["tasks"], ["main_train","main_infer","test"])
 
 def get_bool_regress_redshift(**kwargs):
     return kwargs["space_dim"] == 3 and \

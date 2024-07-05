@@ -8,13 +8,11 @@ from typing import Callable
 from itertools import product
 from torch.utils.data import Dataset
 
+from wisp.utils.common import *
 from wisp.datasets.fits_data import FitsData
 from wisp.datasets.mask_data import MaskData
 from wisp.datasets.trans_data import TransData
 from wisp.datasets.spectra_data import SpectraData
-from wisp.utils.common import print_shape, has_common, create_batch_ids, \
-    get_bool_needs_spectra_data, get_bool_classify_redshift, init_redshift_bins, \
-    get_gt_redshift_bin_ids, create_redshift_bins_mask, get_bool_sanity_check_sample_bins
 from wisp.datasets.data_utils import clip_data_to_ref_wave_range, \
     get_wave_range_fname, batch_sample_bins, batch_sample_torch, get_bound_id
 
@@ -54,10 +52,6 @@ class AstroDataset(Dataset):
         """ Initializes the dataset.
             Load only needed data based on given tasks (in kwargs).
         """
-        self.data = {}
-
-        self.trans_dataset = TransData(self.device, **self.kwargs)
-
         if get_bool_needs_spectra_data(**self.kwargs):
             self.spectra_dataset = SpectraData(self.trans_dataset, self.device, **self.kwargs)
             if get_bool_classify_redshift(**self.kwargs):
@@ -67,14 +61,17 @@ class AstroDataset(Dataset):
             self.spectra_dataset.finalize_spectra()
         else: self.spectra_dataset = None
 
-        if has_common(self.kwargs["tasks"], ["main_train","main_infer","test"]):
+        if get_bool_needs_img_data(**self.kwargs):
+            self.trans_dataset = TransData(self.device, **self.kwargs)
             self.fits_dataset = FitsData(self.device, self.spectra_dataset, **self.kwargs)
-            self.mask_dataset = MaskData(self.fits_dataset, self.device, **self.kwargs)
+            if self.kwargs["perform_inpainting"]:
+                self.mask_dataset = MaskData(self.fits_dataset, self.device, **self.kwargs)
+
+        self.data = {}
 
         wave_range_fname = get_wave_range_fname(**self.kwargs)
         self.data["wave_range"] = np.load(wave_range_fname)
 
-        # randomly initialize
         self.set_length(0)
         self.mode = "main_train"
         self.wave_source = "trans"
@@ -387,14 +384,14 @@ class AstroDataset(Dataset):
 
         elif field == "selected_bins_mask":
             data = self.get_selected_bins_mask()
-        # elif field == "mask":
-        #     data = self.mask_dataset.get_mask()
+        elif field == "inpaint_mask":
+            data = self.mask_dataset.get_mask()
         elif field in self.data:
             data = self.data[field]
         else:
             raise ValueError(f"Unrecognized data field: {field}.")
 
-        # print('*', field, data.shape, idx)
+        # print('*', field, data.shape) #, idx)
         data = self.index_selected_data(data, idx)
         return data
 

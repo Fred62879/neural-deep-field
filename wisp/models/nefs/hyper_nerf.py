@@ -6,7 +6,7 @@ import numpy as np
 from collections import defaultdict
 
 from wisp.utils import PerfTimer
-from wisp.utils.common import print_shape, get_bool_encode_coords
+from wisp.utils.common import get_bool_encode_coords
 
 from wisp.models.embedders import Encoder
 from wisp.models.layers import init_codebook
@@ -35,31 +35,26 @@ class AstroHyperSpectralNerf(BaseNeuralField):
     def init_codebook(self):
         if self.kwargs["quantize_latent"] or self.kwargs["quantize_spectra"]:
             self.codebook = init_codebook(
-                self.kwargs["qtz_seed"],
-                self.kwargs["qtz_num_embed"],
-                self.kwargs["qtz_latent_dim"]
-            )
+                self.kwargs["qtz_seed"], self.kwargs["qtz_num_embed"],
+                self.kwargs["qtz_latent_dim"])
         else: self.codebook = None
 
     def init_encoder(self):
         self.encode_coords = get_bool_encode_coords(**self.kwargs)
         if not self.encode_coords: return
 
-        embedder_args = (
-            2,
-            self.kwargs["coords_embed_dim"],
-            self.kwargs["coords_embed_omega"],
-            self.kwargs["coords_embed_sigma"],
-            self.kwargs["coords_embed_bias"],
-            self.kwargs["coords_embed_seed"]
-
-        )
+        encode_method=self.kwargs["coords_encode_method"]
+        if encode_method == "positional_encoding":
+            embedder_args = (
+                2, self.kwargs["coords_embed_dim"],
+                self.kwargs["coords_embed_omega"],
+                self.kwargs["coords_embed_sigma"],
+                self.kwargs["coords_embed_bias"],
+                self.kwargs["coords_embed_seed"])
+        else: embedder_args = None
         self.spatial_encoder = Encoder(
-            input_dim=2,
-            encode_method=self.kwargs["coords_encode_method"],
-            embedder_args=embedder_args,
-            **self.kwargs
-        )
+            input_dim=2, encode_method=encode_method,
+            embedder_args=embedder_args, **self.kwargs)
 
     def init_decoder(self, integrate):
         self.spatial_decoder = SpatialDecoder(

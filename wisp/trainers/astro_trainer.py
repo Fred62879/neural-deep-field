@@ -120,7 +120,8 @@ class AstroTrainer(BaseTrainer):
         assert self.pixel_supervision + self.spectra_supervision >= 1
 
         self.spectral_inpaint = self.pixel_supervision and \
-            self.space_dim == 3 and "spectral_inpaint" in tasks
+            self.space_dim == 3 and self.extra_args["perform_inpainting"] and \
+            self.extra_args["inpaint_cho"] == "spectral_inpaint"
         self.perform_integration = self.pixel_supervision
         self.trans_sample_method = self.extra_args["trans_sample_method"]
 
@@ -556,6 +557,9 @@ class AstroTrainer(BaseTrainer):
                 fields.extend([
                     "spectra_id_map","spectra_bin_map","redshift_data"])
 
+        if self.spectral_inpaint:
+            fields.append("inpaint_mask")
+
         length = self.get_dataset_length()
         self.dataset.set_length(length)
         self.dataset.set_fields(fields)
@@ -743,7 +747,7 @@ class AstroTrainer(BaseTrainer):
                 recon_pixels = recon_pixels * weights
 
             if self.spectral_inpaint:
-                mask = data["mask"]
+                mask = data["inpaint_mask"]
                 recon_loss = self.pixel_loss(gt_pixels, recon_pixels, mask)
             else:
                 recon_loss = self.pixel_loss(gt_pixels, recon_pixels)

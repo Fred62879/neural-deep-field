@@ -1137,6 +1137,7 @@ def define_cmd_line_args():
     inpaint_group = parser.add_argument_group("inpaint")
 
     # inpainting args
+    inpaint_group.add_argument("--perform-inpainting", action="store_true")
     inpaint_group.add_argument("--mask-bandset-cho", type=str,default="None")
     inpaint_group.add_argument("--mask-mode", type=str, default="rand_diff")
     inpaint_group.add_argument("--inpaint-cho", type=str, default="no_inpaint",
