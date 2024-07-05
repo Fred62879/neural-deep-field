@@ -97,6 +97,25 @@ class AstroTrainer(BaseTrainer):
     def summarize_training_tasks(self):
         tasks = set(self.extra_args["tasks"])
 
+        self.pixel_supervision = self.extra_args["pixel_supervision"]
+        self.spectra_supervision = self.space_dim == 3 and self.extra_args["spectra_supervision"]
+        assert self.pixel_supervision + self.spectra_supervision >= 1
+
+        self.trans_sample_method = self.extra_args["trans_sample_method"]
+        self.spectral_inpaint = self.pixel_supervision and \
+            self.space_dim == 3 and self.extra_args["perform_inpainting"] and \
+            self.extra_args["inpaint_cho"] == "spectral_inpaint"
+
+        self.model_redshift = self.space_dim == 3 and self.extra_args["model_redshift"]
+        self.apply_gt_redshift = self.model_redshift and self.extra_args["apply_gt_redshift"]
+        self.redshift_unsupervision = self.model_redshift and \
+            self.extra_args["redshift_unsupervision"]
+        self.redshift_semi_supervision = self.model_redshift and \
+            self.extra_args["redshift_semi_supervision"]
+        assert sum([
+            self.apply_gt_redshift, self.redshift_unsupervision,
+            self.redshift_semi_supervision ]) <= 1
+
         self.qtz_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
         self.qtz_spectra = self.space_dim == 3 and self.extra_args["quantize_spectra"]
         assert not (self.qtz_latent and self.qtz_spectra)
@@ -106,36 +125,10 @@ class AstroTrainer(BaseTrainer):
         self.save_qtz_weights = "save_qtz_weights_during_train" in tasks and \
             (self.qtz_spectra or (self.qtz_latent and qtz_strategy == "soft"))
 
-        # sample only pixels with GT spectra
+        # train only with pixels that corresponds to GT spectra
         self.train_spectra_pixels_only = self.extra_args["train_spectra_pixels_only"]
-        if self.use_pretrained_latents_as_coords:
-            assert self.train_spectra_pixels_only
-        if self.train_spectra_pixels_only:
-            assert self.extra_args["use_full_patch"]
-
-        self.pixel_supervision = self.extra_args["pixel_supervision"]
-        self.spectra_supervision = self.space_dim == 3 and \
-            self.extra_args["spectra_supervision"]
-        # assert not self.spectra_supervision
-        assert self.pixel_supervision + self.spectra_supervision >= 1
-
-        self.spectral_inpaint = self.pixel_supervision and \
-            self.space_dim == 3 and self.extra_args["perform_inpainting"] and \
-            self.extra_args["inpaint_cho"] == "spectral_inpaint"
-        self.perform_integration = self.pixel_supervision
-        self.trans_sample_method = self.extra_args["trans_sample_method"]
-
-        if self.space_dim == 3 and self.qtz and self.extra_args["model_redshift"]:
-            self.apply_gt_redshift = self.extra_args["apply_gt_redshift"]
-            self.redshift_unsupervision = self.extra_args["redshift_unsupervision"]
-            self.redshift_semi_supervision = self.extra_args["redshift_semi_supervision"]
-            # assert self.redshift_semi_supervision
-            assert sum([
-                self.apply_gt_redshift, self.redshift_unsupervision,
-                self.redshift_semi_supervision]) <= 1 # at most one of these three can be True
-        else:
-            self.apply_gt_redshift, self.redshift_unsupervision, \
-                self.redshift_semi_supervision = False, False, False
+        assert not self.use_pretrained_latents_as_coords or self.train_spectra_pixels_only
+        assert not self.train_spectra_pixels_only or self.extra_args["use_full_patch"]
 
         self.plot_loss = self.extra_args["plot_loss"]
 
@@ -714,7 +707,7 @@ class AstroTrainer(BaseTrainer):
             qtz_strategy=self.qtz_strategy,
             apply_gt_redshift=self.apply_gt_redshift,
             classify_redshift=self.classify_redshift,
-            perform_integration=self.perform_integration,
+            perform_integration=self.pixel_supervision,
             trans_sample_method=self.trans_sample_method,
             spectra_supervision=self.spectra_supervision,
             save_scaler=self.save_data and self.save_scaler,

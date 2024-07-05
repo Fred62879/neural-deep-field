@@ -6,7 +6,7 @@ global:
     log_fname: main_train
 
     tasks: [train, main_train]
-    tasks: [infer, main_infer, recon_img]
+    # tasks: [infer, main_infer, recon_img]
     # tasks: [test]
     # recon_img, recon_synthetic_band
     # log_pixel_value, save_qtz_weights, save_soft_qtz_weights, log_soft_qtz_weights
@@ -30,7 +30,7 @@ optimizer:
 net:
     nef_type: AstroHyperSpectralNerf
 
-    model_redshift: False
+    model_redshift: True
     redshift_model_method: classification
     redshift_classification_method: argmax
 
@@ -163,6 +163,20 @@ decoder:
     siren_hidden_w0: 6
     siren_coords_scaler: 8
     siren_last_linear: False
+
+qtz:
+    quantize_latent: False
+    quantize_spectra: False
+
+    quantization_strategy: soft
+    quantization_calculate_loss: False # only if hard qtz
+    qtz_latent_dim: 32
+    qtz_num_embed: 32
+    qtz_beta: 1
+    qtz_seed: 8
+
+    temped_qtz: False
+    qtz_temperature_scale: 0.01
 
 spatial_decod:
     decode_bias: False
@@ -360,12 +374,11 @@ patch_data:
     #### *********************
 
     #### **** below fields should be changed together ****
-    patch_selection_cho: "512_cutout"
-
+    patch_selection_cho: 64_cutout
     # if don't use full patch, we can select cutout from tiles
-    patch_cutout_num_rows: [512]
-    patch_cutout_num_cols: [512]
-    patch_cutout_start_pos: [[1917,754]] #[[1750,550]] #[[86,188]]
+    patch_cutout_num_rows: [64]
+    patch_cutout_num_cols: [64]
+    patch_cutout_start_pos: [[86,188]] #[[1917,754]] #[[1750,550]]
     #### *************************************************
 
 trans_data:

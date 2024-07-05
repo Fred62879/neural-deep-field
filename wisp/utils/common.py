@@ -647,6 +647,8 @@ def world2NormPix(coords, args, infer=True, spectrum=True, coord_wave=None):
 def spectra_redshift_forward(
         data,
         pipeline,
+        qtz=False,
+        qtz_strategy="none",
         spectra_loss_func=None,
         spectra_l2_loss_func=None,
         index_latent=False,
@@ -663,10 +665,16 @@ def spectra_redshift_forward(
         classify_redshift_based_on_l2=False,
         calculate_binwise_spectra_loss=False,
         calculate_lambdawise_spectra_loss=False,
+        regularize_codebook_spectra=False,
         save_coords=False,
         save_spectra=False,
         save_latents=False,
+        save_codebook=False,
         save_redshift=False,
+        save_qtz_weights=False,
+        save_codebook_loss=False,
+        save_codebook_logits=False,
+        save_codebook_spectra=False,
         save_gt_bin_spectra=False,
         save_redshift_logits=False,
         save_optimal_bin_ids=False,
@@ -678,18 +686,31 @@ def spectra_redshift_forward(
     if save_coords: requested_channels.append("coords")
     if save_spectra: requested_channels.append("spectra")
     if save_latents: requested_channels.append("latents")
+    if save_codebook: requested_channels.append("codebook")
     if save_redshift: requested_channels.append("redshift")
-    if save_gt_bin_spectra: requested_channels.append("gt_bin_spectra")
-    if save_optimal_bin_ids: requested_channels.append("optimal_bin_ids")
-    if save_redshift_logits: requested_channels.append("redshift_logits")
+    if save_qtz_weights: requested_channels.append("qtz_weights")
+    if save_codebook_loss: requested_channels.append("codebook_loss")
+    if save_codebook_logits: requested_channels.append("codebook_logits")
     if save_spectra_latents: requested_channels.append("spectra_latents")
-    if save_spectra_all_bins: requested_channels.append("spectra_all_bins")
+    if save_codebook_spectra: requested_channels.append("codebook_spectra")
 
     if "wave" in data: net_args["wave"] = data["wave"]
     if "wave_range" in data: net_args["wave_range"] = data["wave_range"]
     if index_latent:
         if "idx" in data: net_args["idx"] = data["idx"]
         if "selected_ids" in data: net_args["selected_ids"] = data["selected_ids"]
+    if qtz:
+        qtz_args = defaultdict(lambda: False)
+        if qtz_strategy == "soft":
+            qtz_args["save_qtz_weights"] = save_qtz_weights
+            qtz_args["temperature"] = step_num + 1
+            if save_embed_ids:
+                qtz_args["find_embed_id"] = save_embed_ids
+        qtz_args["save_codebook_spectra"] = save_codebook_spectra
+        net_args["qtz_args"] = qtz_args
+    if regularize_codebook_spectra:
+        net_args["full_emitted_wave"] = data["full_emitted_wave"]
+        requested_channels.append("full_range_codebook_spectra")
 
     if spectra_baseline:
         if regress_redshift:

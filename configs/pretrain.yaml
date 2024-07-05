@@ -45,6 +45,18 @@ pretrain:
     regularize_spectra_latents: True
     spectra_latents_regu_beta: 16
 
+qtz:
+    quantize_spectra: True
+    quantization_strategy: soft
+
+    qtz_latent_dim: 32
+    qtz_num_embed: 32
+    qtz_beta: 1
+    qtz_seed: 8
+
+    temped_qtz: False
+    qtz_temperature_scale: 0.01
+
 decoder:
     decoder_activation_type: relu
     decoder_batch_norm: False

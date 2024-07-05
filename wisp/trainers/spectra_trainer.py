@@ -1687,6 +1687,8 @@ class SpectraTrainer(BaseTrainer):
         ret = spectra_redshift_forward(
             data,
             self.pipeline,
+            qtz=self.qtz,
+            qtz_strategy=self.qtz_strategy,
             spectra_loss_func=spectra_loss_func,
             spectra_l2_loss_func=spectra_l2_loss_func,
             index_latent=self.index_latent,
