@@ -2618,7 +2618,7 @@ class AstroInferrer(BaseInferrer):
             if self.extra_args["log_redshift_est_stats"] else "_all_residuals"
         fname = join(self.redshift_dir, f"model-{model_id}{suffix}")
 
-        residual_levels = self.extra_args["log_redshift_est_stats_residual_levels"] \
+        residual_levels = self.extra_args["redshift_est_stats_residual_levels"] \
             if self.extra_args["log_redshift_est_stats"] else None
 
         if self.extra_args["plot_redshift_est_stats_individually"]:
@@ -2634,7 +2634,8 @@ class AstroInferrer(BaseInferrer):
                 self.extra_args["num_redshift_est_stats_residual_levels"],
                 self.extra_args["redshift_bin_width"],
                 cho=self.extra_args["redshift_est_stats_cho"],
-                residual_levels=residual_levels)
+                residual_levels=residual_levels,
+                max_residual=self.extra_args["redshift_est_stats_max_residual"])
 
         if self.extra_args["log_redshift_est_stats"]:
             log.info(f"Redshift estimation accuracy: {stats}")

@@ -390,9 +390,10 @@ infer:
     redshift_est_stats_cho: 'accuracy'
     calculate_redshift_est_stats_based_on: 'residuals'
     num_redshift_est_stats_residual_levels: 10
+    redshift_est_stats_max_residual: -1
 
     log_redshift_est_stats: False
-    log_redshift_est_stats_residual_levels: []
+    redshift_est_stats_residual_levels: []
 
     # plot pca latents scatter plot
     sanity_check_plot_same_pca_dim_as_pretrain: False

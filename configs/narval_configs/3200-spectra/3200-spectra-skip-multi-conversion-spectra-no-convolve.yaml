@@ -96,7 +96,7 @@ infer:
     spectra_latents_plot_pca_dim: 2
 
     log_redshift_est_stats: True
-    log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
+    redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 spectra_data:
     convolve_spectra: False

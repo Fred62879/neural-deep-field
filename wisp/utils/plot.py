@@ -199,7 +199,7 @@ def plot_redshift_estimation_stats_individually(
 
 def plot_redshift_estimation_stats_together(
         redshift_residuals, fname, num_residual_levels, bin_width,
-        cho="accuracy", residual_levels=None
+        cho="accuracy", residual_levels=None, max_residual=-1
 ):
     """ Plot redshfit estimation statistics combining all spectra together.
         @param
@@ -208,7 +208,7 @@ def plot_redshift_estimation_stats_together(
     """
     residual_levels, stats = calculate_redshift_estimation_stats_based_on_residuals(
         redshift_residuals, num_residual_levels, bin_width,
-        cho=cho, residual_levels=residual_levels
+        cho=cho, residual_levels=residual_levels, max_residual=max_residual
     )
     if residual_levels is None: return # residuals all 0
 

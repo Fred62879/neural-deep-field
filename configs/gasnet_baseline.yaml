@@ -6,8 +6,8 @@ global:
     log_fname: gasnet_baseline
 
     tasks: [train, gasnet_pretrain]
-    #tasks: [infer, gasnet_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #, save_redshift_logits]
-    #tasks: [infer, gasnet_test_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #, save_redshift_logits]
+    tasks: [infer, gasnet_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #, save_redshift_logits]
+    tasks: [infer, gasnet_test_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #, save_redshift_logits]
 
 optimizer:
     optimizer_type: adam
@@ -41,7 +41,7 @@ decoder:
     baseline_decoder_skip_add_conversion_method: multi_conversion
 
 trainer:
-    num_epochs: 20000
+    num_epochs: 10000
     log_cli_every: 2000
     plot_grad_every: -1
     save_data_every: -1
@@ -80,6 +80,8 @@ infer:
 
     spectra_latents_plot_pca_dim: 2
 
+    redshift_est_stats_max_residual: 1
+
 dataset:
     calculate_wave_range_based_on_trans: False
     calculate_wave_range_based_on_spectra: True
@@ -106,7 +108,7 @@ spectra_data:
 
     generalization_max_num_spectra: 5000
     num_gt_spectra_upper_bound: 200000
-    num_supervision_spectra_upper_bound: 200
+    num_supervision_spectra_upper_bound: 20
 
     filter_redshift: False
     filter_redshift_lo: 0.02

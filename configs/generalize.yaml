@@ -125,7 +125,7 @@ infer:
     spectra_latents_plot_pca_dim: 2
 
     log_redshift_est_stats: False
-    log_redshift_est_stats_residual_levels: [0.02,0.04,0.08]
+    redshift_est_stats_residual_levels: [0.02,0.04,0.08]
 
 dataset:
     calculate_wave_range_based_on_trans: False

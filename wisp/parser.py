@@ -1092,12 +1092,15 @@ def define_cmd_line_args():
     infer_group.add_argument("--infer-spectra-individually", action="store_true")
     infer_group.add_argument("--codebook-spectra-clip-range", nargs="+")
 
+    infer_group.add_argument("--log-redshift-est-stats", action="store_true")
     infer_group.add_argument("--redshift-est-stats-cho", type=str,
                              choices=["accuracy","precision_recall"])
     infer_group.add_argument("--num-redshift-est-stats-residual-levels", type=int)
-    infer_group.add_argument("--log-redshift-est-stats", action="store_true")
-    infer_group.add_argument("--log-redshift-est-stats-residual-levels", nargs="+")
-    infer_group.add_argument("--plot-redshift-est-stats-individually", action="store_true")
+    infer_group.add_argument("--redshift-est-stats-residual-levels", nargs="+")
+    infer_group.add_argument("--redshift-est-stats-max-residual",
+                             type=float, default=-1)
+    infer_group.add_argument("--plot-redshift-est-stats-individually",
+                             action="store_true")
     infer_group.add_argument("--calculate-redshift-est-stats-based-on", type=str,
                              choices=["logits","residuals"])
 

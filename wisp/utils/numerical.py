@@ -190,7 +190,7 @@ def normalize_data(data, norm_cho):
 #     return threshes, np.array(precision), np.array(recall)
 
 def calculate_redshift_estimation_stats_based_on_residuals(
-        residuals, num_residual_levels, bin_width, cho="accuracy", residual_levels=None
+        residuals, num_residual_levels, bin_width, cho="accuracy", residual_levels=None, max_residual=-1,
 ):
     """ Calculate precision and recall based on result for all spectra.
         We didn't use threshold from 0-1 as in case of a multi-class classification.
@@ -206,6 +206,7 @@ def calculate_redshift_estimation_stats_based_on_residuals(
     if lo == hi:
         assert lo == 0
         return None, None
+    if max_residual > lo: hi = max_residual
 
     if residual_levels is not None:
         pass
