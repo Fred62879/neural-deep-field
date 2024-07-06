@@ -46,8 +46,8 @@ class SpectraBaseline(nn.Module):
             ret = ret[idx]
         return ret
 
-    def forward(self, channels, wave_range, spectra_mask, spectra_source_data,
-                idx=None, selected_ids=None):
+    def forward(self, channels, spectra_mask, spectra_source_data,
+                selected_ids=None, idx=None):
         """
         @Params
           spectra_mask: [bsz,nsmpl]
@@ -56,6 +56,7 @@ class SpectraBaseline(nn.Module):
           logits: [bsz*nsmpl]
         """
         ret = {}
+        # print(spectra_mask.shape, spectra_source_data.shape)
         wave = spectra_source_data[:,0]
         spectra = spectra_source_data[:,1]
         output = self.decoder(spectra * spectra_mask)

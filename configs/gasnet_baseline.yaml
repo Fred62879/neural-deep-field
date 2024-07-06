@@ -2,12 +2,12 @@ parent: base.yaml
 
 global:
     use_tqdm: True
-    exp_name: vdz-spectra-azure-baseline
-    log_fname: baseline
+    exp_name: vdz-spectra-gasnet-baseline
+    log_fname: gasnet_baseline
 
-    tasks: [train, redshift_pretrain]
-    # tasks: [infer, redshift_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats, save_redshift_logits]
-    # tasks: [infer, redshift_test_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats, save_redshift_logits]
+    tasks: [train, gasnet_pretrain]
+    #tasks: [infer, gasnet_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #, save_redshift_logits]
+    #tasks: [infer, gasnet_test_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #, save_redshift_logits]
 
 optimizer:
     optimizer_type: adam
@@ -26,11 +26,11 @@ pretrain:
     pretrain_use_all_wave: True
 
     model_redshift: True
-    redshift_model_method: regression #classification
+    redshift_model_method: classification #regression
     redshift_classification_strategy: binary
 
 decoder:
-    baseline_decoder_input_dim: 280
+    baseline_decoder_input_dim: 256
     baseline_decoder_num_hidden_layers: 3
     baseline_decoder_hidden_dim: 512
 
@@ -54,7 +54,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5
+    # infer_log_dir: 
     infer_selected: False
     pretrain_num_infer_upper_bound: 140
     spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
@@ -106,7 +106,7 @@ spectra_data:
 
     generalization_max_num_spectra: 5000
     num_gt_spectra_upper_bound: 200000
-    num_supervision_spectra_upper_bound: 200000
+    num_supervision_spectra_upper_bound: 200
 
     filter_redshift: False
     filter_redshift_lo: 0.02

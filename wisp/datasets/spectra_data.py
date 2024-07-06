@@ -12,13 +12,11 @@ import numpy as np
 import logging as log
 import matplotlib.pyplot as plt
 
-from wisp.datasets.patch_data import PatchData
+from wisp.utils.common import *
 from wisp.utils.plot import plot_spectra
-from wisp.utils.common import create_patch_uid, to_numpy, segment_bool_array, \
-    create_redshift_bins_mask, get_bool_infer_spectra_with_lambdawise_weights, \
-    get_bool_classify_redshift_based_on_l2, get_bool_regress_redshift, \
-    get_bool_redshift_pretrain_mode, get_bool_sanity_check_sample_bins
 from wisp.utils.numerical import normalize_coords, calculate_metrics
+
+from wisp.datasets.patch_data import PatchData
 from wisp.datasets.data_utils import set_input_path, patch_exists, \
     get_bound_id, clip_data_to_ref_wave_range, get_wave_range_fname, \
     get_coords_norm_range_fname, add_dummy_dim, wave_within_bound, \
@@ -717,7 +715,7 @@ class SpectraData:
           becomes the latent dim ([bsz,1,nsmpl]). We need to sample spectra data properly
           s.t. there are as few invalid samples as possible.
         """
-        if not get_bool_redshift_pretrain_mode(**self.kwargs): return
+        if not get_bool_pretrain_mode(**self.kwargs): return
 
         num_wave_samples = self.kwargs["baseline_decoder_input_dim"]
         sample_method = self.kwargs["redshift_regress_spectra_sample_method"]

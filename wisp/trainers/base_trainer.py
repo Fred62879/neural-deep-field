@@ -50,7 +50,7 @@ class BaseTrainer(ABC):
 
                 validate()
     """
-    def __init__(self, pipeline, dataset, optim_cls, optim_params, device, scene_state=None, **extra_args):
+    def __init__(self, pipeline, dataset, optim_cls, optim_params, device, mode, **extra_args):
         """ @Params
             pipeline (wisp.core.Pipeline): The pipeline with tracer and neural field to train.
             dataset (torch.Dataset): The dataset to use for training.
@@ -62,6 +62,7 @@ class BaseTrainer(ABC):
         """
         log.info(f'Training on {extra_args["dataset_path"]}')
 
+        self.mode = mode
         self.extra_args = extra_args
 
         self.cuda = "cuda" in str(device)

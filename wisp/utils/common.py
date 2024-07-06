@@ -126,11 +126,10 @@ def get_bool_classify_redshift(**kwargs):
         not kwargs["apply_gt_redshift"] and \
         kwargs["redshift_model_method"] == "classification"
 
-def get_bool_redshift_pretrain_mode(**kwargs):
-    tasks = set(kwargs["tasks"])
-    return "redshift_pretrain" in tasks or \
-        "redshift_pretrain_infer" in tasks or \
-        "redshift_test_infer" in tasks
+def get_bool_pretrain_mode(**kwargs):
+    return has_common(kwargs["tasks"], [
+        "redshift_pretrain","redshift_pretrain_infer","redshift_test_infer",
+        "gasnet_pretrain","gasnet_pretrain_infer","gasnet_test_infer"])
 
 def get_bool_sanity_check_sample_bins(**kwargs):
     tasks = set(kwargs["tasks"])
@@ -653,7 +652,7 @@ def spectra_redshift_forward(
         spectra_l2_loss_func=None,
         index_latent=False,
         plot_l2_loss=False,
-        spectra_baseline=False,  #
+        baseline=False,          #
         apply_gt_redshift=False, #
         regress_redshift=False,  #
         classify_redshift=False, #
@@ -712,7 +711,7 @@ def spectra_redshift_forward(
         net_args["full_emitted_wave"] = data["full_emitted_wave"]
         requested_channels.append("full_range_codebook_spectra")
 
-    if spectra_baseline:
+    if baseline:
         if regress_redshift:
             requested_channels.append("redshift")
         elif classify_redshift:

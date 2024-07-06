@@ -52,6 +52,8 @@ class AstroDataset(Dataset):
         """ Initializes the dataset.
             Load only needed data based on given tasks (in kwargs).
         """
+        self.trans_dataset = TransData(self.device, **self.kwargs)
+
         if get_bool_needs_spectra_data(**self.kwargs):
             self.spectra_dataset = SpectraData(self.trans_dataset, self.device, **self.kwargs)
             if get_bool_classify_redshift(**self.kwargs):
@@ -62,7 +64,6 @@ class AstroDataset(Dataset):
         else: self.spectra_dataset = None
 
         if get_bool_needs_img_data(**self.kwargs):
-            self.trans_dataset = TransData(self.device, **self.kwargs)
             self.fits_dataset = FitsData(self.device, self.spectra_dataset, **self.kwargs)
             if self.kwargs["perform_inpainting"]:
                 self.mask_dataset = MaskData(self.fits_dataset, self.device, **self.kwargs)

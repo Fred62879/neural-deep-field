@@ -48,16 +48,28 @@ def get_optimizer_from_config(args):
     return optim_cls, optim_params
 
 def get_trainer_from_config(pipeline, dataset, optim_cls, optim_params, device, tasks, args):
+    train_tasks = [
+        "main_train","test",
+        "redshift_pretrain","gasnet_pretrain",
+        "spectra_pretrain","sanity_check","generalization",
+        "redshift_classification_train"
+    ]
+    cur_train_task = find_common(tasks, train_tasks)
+    assert len(cur_train_task) == 1
     trainer_cls = AstroTrainer if "main_train" in tasks else SpectraTrainer
     trainer = trainer_cls(
-        pipeline, dataset, optim_cls, optim_params, device, **vars(args))
+        pipeline, dataset, optim_cls, optim_params,
+        device, mode=cur_train_task[0], **vars(args))
     return trainer
 
 def get_inferrer_from_config(pipelines, dataset, device, tasks, args):
-    infer_tasks = ["main_infer","test","spectra_pretrain_infer","sanity_check_infer",
-                   "generalization_infer","redshift_classification_sc_infer",
-                   "redshift_classification_genlz_infer",
-                   "redshift_pretrain_infer","redshift_test_infer"]
+    infer_tasks = [
+        "main_infer","test",
+        "spectra_pretrain_infer","sanity_check_infer","generalization_infer",
+        "redshift_classification_sc_infer","redshift_classification_genlz_infer",
+        "redshift_pretrain_infer","redshift_test_infer",
+        "gasnet_pretrain_infer","gasnet_test_infer"
+    ]
     cur_infer_task = find_common(tasks, infer_tasks)
     if len(cur_infer_task) == 0: cur_infer_task = "no_model_run"
     else: cur_infer_task = cur_infer_task[0]
@@ -74,6 +86,8 @@ def get_train_pipeline_from_config(device, tasks, args):
         else: raise ValueError()
     elif "redshift_pretrain" in tasks:
         pipeline = AstroPipeline(SpectraBaseline(**vars(args)))
+    elif "gasnet_pretrain" in tasks:
+        pipeline = AstroPipeline(GasNet(**vars(args)))
     elif has_common(tasks, ["spectra_pretrain","sanity_check","generalization"]):
         pipeline = AstroPipeline(SpectraNerf(**vars(args)))
     elif has_common(tasks, ["redshift_classification_train"]):
@@ -99,6 +113,9 @@ def get_infer_pipelines_from_config(device, tasks, args):
 
     elif "redshift_pretrain_infer" in tasks or "redshift_test_infer" in tasks:
         pipelines["spectra_baseline"] = AstroPipeline(SpectraBaseline(**vars(args)))
+
+    elif "gasnet_pretrain_infer" in tasks or "gasnet_test_infer" in tasks:
+        pipelines["spectra_baseline"] = AstroPipeline(GasNet(**vars(args)))
 
     elif has_common(
         tasks, ["spectra_pretrain_infer","sanity_check_infer","generalization_infer"]

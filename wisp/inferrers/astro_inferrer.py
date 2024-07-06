@@ -81,6 +81,8 @@ class AstroInferrer(BaseInferrer):
             "redshift_classification_genlz_infer": "test",
             "redshift_pretrain_infer": "pretrain",
             "redshift_test_infer": "test",
+            "gasnet_pretrain_infer": "pretrain",
+            "gasnet_test_infer": "test",
             "no_model_run": ""
         }[self.mode]
 
@@ -125,13 +127,15 @@ class AstroInferrer(BaseInferrer):
             Path(self.redshift_dir).mkdir(parents=True, exist_ok=True)
 
     def init_data(self):
-        if self.redshift_infer:
+        if self.baseline_infer:
             self.batch_size = self.extra_args["pretrain_infer_batch_size"]
 
-            if self.redshift_pretrain_infer:
+            if self.spectra_baseline_train_infer or \
+               self.gasnet_baseline_train_infer:
                 self.dataset.set_spectra_source("sup")
                 self.num_spectra = self.dataset.get_num_supervision_spectra()
-            elif self.redshift_test_infer:
+            elif self.spectra_baseline_test_infer or \
+                 self.gasnet_baseline_test_infer:
                 self.dataset.set_spectra_source("test")
                 self.num_spectra = self.dataset.get_num_test_spectra()
 
@@ -180,7 +184,7 @@ class AstroInferrer(BaseInferrer):
             assert "full" in self.pipelines
         elif self.clsfy_sc_infer or self.clsfy_genlz_infer:
             self.spectra_infer_pipeline = self.pipelines["redshift_classifier"]
-        elif self.redshift_pretrain_infer or self.redshift_test_infer:
+        elif self.baseline_infer:
             self.spectra_infer_pipeline = self.pipelines["spectra_baseline"]
         else:
             self.spectra_infer_pipeline = self.pipelines["spectra_infer"]
@@ -231,27 +235,35 @@ class AstroInferrer(BaseInferrer):
     def summarize_inferrence_tasks(self):
         """ Group similar inferrence tasks (tasks using same dataset and same model) together.
         """
-        tasks = set(self.extra_args["tasks"])
-
-        self.test = self.mode == "test"
+        self.no_model_run = self.mode == "no_model_run"
         self.img_infer = self.mode == "main_infer"
+        self.test = self.mode == "test"
+
+        self.gasnet_baseline_train_infer = self.mode == "gasnet_pretrain_infer"
+        self.gasnet_baseline_test_infer = self.mode == "gasnet_test_infer"
+        self.spectra_baseline_train_infer = self.mode == "redshift_pretrain_infer"
+        self.spectra_baseline_test_infer = self.mode == "redshift_test_infer"
+
         self.spectra_pretrain_infer = self.mode == "spectra_pretrain_infer"
         self.sanity_check_infer = self.mode == "sanity_check_infer"
         self.generalization_infer = self.mode == "generalization_infer"
         self.clsfy_sc_infer = self.mode == "redshift_classification_sc_infer"
         self.clsfy_genlz_infer = self.mode == "redshift_classification_genlz_infer"
-        self.redshift_pretrain_infer = self.mode == "redshift_pretrain_infer"
-        self.redshift_test_infer = self.mode == "redshift_test_infer"
-        self.no_model_run = self.mode == "no_model_run"
 
+        self.gasnet_baseline_infer = self.gasnet_baseline_train_infer or \
+            self.gasnet_baseline_test_infer
+        self.spectra_baseline_infer = self.spectra_baseline_train_infer or \
+            self.spectra_baseline_test_infer
+        self.baseline_infer = self.gasnet_baseline_infer or \
+            self.spectra_baseline_infer
         self.spectra_infer = self.spectra_pretrain_infer or \
             self.sanity_check_infer or self.generalization_infer or \
             self.clsfy_sc_infer or self.clsfy_genlz_infer
-        self.redshift_infer = self.redshift_pretrain_infer or self.redshift_test_infer
-        assert sum([
-            self.test,self.img_infer,self.spectra_infer,self.redshift_infer, self.no_model_run
-        ]) == 1
 
+        assert sum([self.no_model_run,self.test,self.img_infer,self.spectra_infer,
+                    self.spectra_baseline_infer,self.gasnet_baseline_infer]) == 1
+
+        tasks = set(self.extra_args["tasks"])
         # quantization setups
         assert not self.extra_args["temped_qtz"]
         self.qtz_latent = self.space_dim == 3 and self.extra_args["quantize_latent"]
@@ -377,9 +389,12 @@ class AstroInferrer(BaseInferrer):
 
         self.save_redshift = "save_redshift" in tasks and self.model_redshift
         self.save_redshift_test = self.save_redshift and self.test
-        self.save_redshift_during_img_infer = self.save_redshift and self.img_infer
-        self.save_redshift_during_spectra_infer = self.save_redshift and self.spectra_infer
-        self.save_redshift_during_redshift_infer = self.save_redshift and self.redshift_infer
+        self.save_redshift_during_img_infer = \
+            self.save_redshift and self.img_infer
+        self.save_redshift_during_spectra_infer = \
+            self.save_redshift and self.spectra_infer
+        self.save_redshift_during_baseline_infer = \
+            self.save_redshift and self.baseline_infer
 
         self.regress_lambdawise_weights = self.extra_args["regress_lambdawise_weights"] and \
             (self.sanity_check_infer or self.generalization_infer)
@@ -656,14 +671,12 @@ class AstroInferrer(BaseInferrer):
         self.perform_integration = False
         self.requested_fields = []
 
-        if self.redshift_infer:
+        if self.baseline_infer:
             self.requested_fields.extend([
-                "redshift_bins","wave_range","spectra_mask",
-                "spectra_redshift","spectra_source_data"])
-
+                "spectra_mask","spectra_redshift","spectra_source_data"])
             if self.classify_redshift:
-                self.requested_fields.append("redshift_bins_mask")
-
+                self.requested_fields.extend([
+                    "redshift_bins","redshift_bins_mask"])
             if self.infer_selected:
                 self.dataset_length = min(self.num_selected, self.num_spectra)
                 self.requested_fields.append("selected_ids")
@@ -1797,7 +1810,7 @@ class AstroInferrer(BaseInferrer):
                 spectra_loss_func=loss_func,
                 spectra_l2_loss_func=l2_loss_func,
                 index_latent=self.index_latent,
-                spectra_baseline=self.redshift_infer,     # |
+                baseline=self.baseline_infer,             # |
                 apply_gt_redshift=self.apply_gt_redshift, # | different redshift
                 classify_redshift=self.classify_redshift, # | learning strategy
                 brute_force=self.brute_force,             # |
@@ -1925,7 +1938,7 @@ class AstroInferrer(BaseInferrer):
             self.collect_redshift_classification_data_after_each_step(data, ret)
 
     def collect_redshift_data_after_each_step(self, data, ret):
-        if self.save_redshift_during_redshift_infer:
+        if self.save_redshift_during_baseline_infer:
             self.gt_redshift.extend(data["spectra_redshift"])
             if self.regress_redshift:
                 self.est_redshift.extend(ret["redshift"])
@@ -2065,7 +2078,7 @@ class AstroInferrer(BaseInferrer):
             np.save(fname, each_d)
 
     def collect_spectra_inferrence_data_after_each_epoch(self):
-        if self.spectra_infer or self.redshift_infer:
+        if self.spectra_infer or self.baseline_infer:
             self.collect_pretrain_spectra_inferrence_data_after_each_epoch()
         else:
             self.collect_main_train_spectra_inferrence_data_after_each_epoch()
@@ -2186,7 +2199,7 @@ class AstroInferrer(BaseInferrer):
 
     def _save_redshift(self, model_id):
         outlier_ids = None
-        if self.save_redshift_during_redshift_infer:
+        if self.save_redshift_during_baseline_infer:
             outlier_ids = self._log_redshift_residual_outlier(model_id)
             fname = join(self.redshift_dir, f"model-{model_id}_est_redshift.txt")
             log_data(self, "est_redshift", gt_field="gt_redshift",

@@ -33,8 +33,8 @@ from wisp.loss import get_loss, get_reduce, spectra_supervision_loss, pretrain_p
 torch.backends.cudnn.benchmark = True
 
 class SpectraTrainer(BaseTrainer):
-    def __init__(self, pipeline, dataset, optim_cls, optim_params, device, **extra_args):
-        super().__init__(pipeline, dataset, optim_cls, optim_params, device, **extra_args)
+    def __init__(self, pipeline, dataset, optim_cls, optim_params, device, mode, **extra_args):
+        super().__init__(pipeline, dataset, optim_cls, optim_params, device, mode, **extra_args)
 
         assert(extra_args["space_dim"] == 3)
 
@@ -79,8 +79,19 @@ class SpectraTrainer(BaseTrainer):
     #############
 
     def summarize_training_tasks(self):
-        tasks = set(self.extra_args["tasks"])
+        assert has_common([self.mode], [
+            "redshift_pretrain","gasnet_pretrain","spectra_pretrain",
+            "sanity_check","generalization","redshift_classification_train"
+        ])
+        self.spectra_baseline = self.mode == "redshift_pretrain"
+        self.gasnet_baseline = self.mode == "gasnet_pretrain"
+        self.spectra_pretrain = self.mode == "spectra_pretrain"
+        self.sanity_check = self.mode == "sanity_check"
+        self.generalization = self.mode == "generalization"
+        self.freeze_spectra = self.mode == "redshift_classification_train"
+        self.pre_classification_mode = self.sanity_check or self.generalization
 
+        tasks = set(self.extra_args["tasks"])
         self.save_redshift = "save_redshift" in tasks
         self.save_qtz_weights = "save_qtz_weights" in tasks
         self.recon_spectra = "recon_spectra" in tasks
@@ -89,31 +100,14 @@ class SpectraTrainer(BaseTrainer):
         self.recon_codebook_spectra_individ = "recon_codebook_spectra_individ" in tasks
         self.plot_gt_bin_spectra = self.extra_args["plot_spectrum_under_gt_bin"]
 
-        if "spectra_pretrain" in tasks:
-            self.mode = "spectra_pretrain"
-        elif "redshift_pretrain" in tasks:
-            self.mode = "redshift_pretrain"
-        elif "sanity_check" in tasks:
-            self.mode = "sanity_check"
-        elif "redshift_classification_train" in tasks:
-            self.mode = "redshift_classification_train"
-        elif "generalization" in tasks:
-            self.mode = "generalization"
-        else: raise ValueError("Invalid mode!")
-
-        self.baseline_mode =self.mode == "redshift_pretrain"
-        self.pre_classification_mode = self.mode == "sanity_check" or \
-            self.mode == "generalization"
-        self.freeze_spectra = self.mode == "redshift_classification_train"
-
-        self.generalize_train_first_layer = self.mode == "generalization" and \
+        self.generalize_train_first_layer = self.generalization and \
             self.extra_args["generalize_train_first_layer"]
 
-        if self.mode == "spectra_pretrain" or self.mode == "redshift_pretrain":
+        if self.spectra_pretrain or self.spectra_baseline or self.gasnet_baseline:
             self.num_spectra = self.dataset.get_num_supervision_spectra()
-        elif self.mode == "sanity_check" or self.mode == "redshift_classification_train":
+        elif self.sanity_check or self.freeze_spectra:
             self.num_spectra = self.dataset.get_num_validation_spectra()
-        elif self.mode == "generalization":
+        elif self.generalization:
             self.num_spectra = self.dataset.get_num_test_spectra()
         else: raise ValueError("Invalid mode!")
 
@@ -165,7 +159,7 @@ class SpectraTrainer(BaseTrainer):
 
         # redshift regression only needs train and test phase
         assert not self.regress_redshift or (
-            self.mode == "redshift_pretrain" or self.mode == "generalization")
+            self.spectra_baseline or self.gasnet_baseline or self.generalization)
         # if we want to calculate binwise spectra loss when we do quantization
         #  we need to perform qtz first in hyperspectral_decoder::dim_reduction
         assert not self.brute_force or \
@@ -176,20 +170,20 @@ class SpectraTrainer(BaseTrainer):
             self.extra_args["spectra_loss_cho"] != "l2"
 
         self.neg_sup_wrong_redshift = \
-            self.mode == "spectra_pretrain" and self.brute_force and \
+            self.spectra_pretrain and self.brute_force and \
             self.extra_args["negative_supervise_wrong_redshift"]
         self.neg_sup_optimize_alternately = \
             self.neg_sup_wrong_redshift and \
             self.extra_args["neg_sup_optimize_alternately"]
 
         # pretrain mandates either apply gt redshift directly or brute force
-        assert not self.mode == "spectra_pretrain" or (
+        assert not self.spectra_pretrain or (
             self.apply_gt_redshift or self.brute_force)
         # brute force during pretrain mandates negative supervision
-        assert not(self.mode == "spectra_pretrain" and self.brute_force) or \
+        assert not(self.spectra_pretrain and self.brute_force) or \
             self.neg_sup_wrong_redshift
         # sanity check & generalization mandates brute force
-        assert not (self.mode == "sanity_check" or self.mode == "generalization") or \
+        assert not (self.sanity_check or self.generalization) or \
                     self.brute_force
 
         # three different brute force strategies during sc & generalization
@@ -228,11 +222,11 @@ class SpectraTrainer(BaseTrainer):
         When we perform sanity check with lambdawise weights, we fine-tune the model
           such that gt bin gets better quality spectra than that of all other wrong bins.
         """
-        self.sanity_check_with_weights = self.mode == "sanity_check" and \
+        self.sanity_check_with_weights = self.sanity_check and \
             (self.regress_lambdawise_weights or \
              self.use_global_spectra_loss_as_lambdawise_weights)
         self.sanity_check_finetune = self.extra_args["sanity_check_finetune"] and \
-            self.mode == "sanity_check"
+            self.sanity_check
         assert not self.sanity_check_with_weights or self.sanity_check_finetune
 
         self.sanity_check_sample_bins = \
@@ -276,7 +270,8 @@ class SpectraTrainer(BaseTrainer):
         # self.train_within_wave_range = not self.pixel_supervision and \
         #     self.extra_args["learn_spectra_within_wave_range"]
         self.trans_sample_method = self.extra_args["trans_sample_method"]
-        if self.mode == "redshift_pretrain": assert not self.sample_wave
+        if self.spectra_baseline or self.gasnet_baseline:
+            assert not self.sample_wave
 
         # all others
         self.plot_loss = self.extra_args["plot_loss"]
@@ -300,7 +295,7 @@ class SpectraTrainer(BaseTrainer):
             self.extra_args["regularize_within_codebook_spectra"]
         self.regularize_across_codebook_spectra = self.qtz_spectra and \
             self.extra_args["regularize_across_codebook_spectra"]
-        self.regularize_codebook_spectra = self.mode == "spectra_pretrain" and \
+        self.regularize_codebook_spectra = self.spectra_pretrain and \
             (self.regularize_within_codebook_spectra or self.regularize_across_codebook_spectra)
         assert not self.regularize_redshift_logits or \
             (self.classify_redshift and \
@@ -383,7 +378,7 @@ class SpectraTrainer(BaseTrainer):
             if self.plot_gt_bin_loss:
                 self.gt_bin_l2_loss_fname = join(self.loss_dir, "gt_bin_l2_loss")
 
-        if self.mode == "sanity_check" or self.mode == "generalization":
+        if self.sanity_check or self.generalization:
             _, self.pretrained_model_fname = get_pretrained_model_fname(
                 self.log_dir,
                 self.extra_args["pretrain_log_dir"],
@@ -413,8 +408,8 @@ class SpectraTrainer(BaseTrainer):
             self.pipeline.set_batch_reduction_order(
                 self.extra_args["spectra_batch_reduction_order"])
 
-        if self.mode != "redshift_classification_train" and \
-           self.mode != "redshift_pretrain":
+        if not self.freeze_spectra and \
+           not self.spectra_baseline and not self.gasnet_baseline:
             # latents here are used to
             #  EITHER generate codebook coefficients (wo softmax) in codebook qtz setting
             #  OR concat with lambda to be directly decoded as spectra in autodecoder setting
@@ -465,7 +460,7 @@ class SpectraTrainer(BaseTrainer):
             self.init_dataloader()
 
     def init_loss(self):
-        if self.baseline_mode:
+        if self.spectra_baseline or self.gasnet_baseline:
             if self.regress_redshift:
                 self.redshift_loss = nn.MSELoss(reduction="mean")
             elif self.classify_redshift:
@@ -527,7 +522,7 @@ class SpectraTrainer(BaseTrainer):
         )
 
     def init_optimizer(self):
-        if self.mode == "spectra_pretrain":
+        if self.spectra_pretrain:
             latents, net_params = self._assign_pretrain_optimization_params()
             if self.neg_sup_optimize_alternately:
                 assert not self.use_lbfgs
@@ -575,7 +570,7 @@ class SpectraTrainer(BaseTrainer):
                     net_params.extend(latents)
                     optms = { "all_params": self.optim_cls(net_params, **self.optim_params) }
 
-        elif self.freeze_spectra or self.mode == "redshift_pretrain":
+        elif self.freeze_spectra or self.spectra_baseline or self.gasnet_baseline:
             if self.freeze_spectra: lr = self.extra_args["classifier_lr"]
             else: lr = self.extra_args["baseline_lr"]
             net_params = self._assign_model_optimization_params(lr)
@@ -599,9 +594,9 @@ class SpectraTrainer(BaseTrainer):
             self.dataset.toggle_classifier_train_sample_bins(
                 self.extra_args["classifier_train_sample_bins"])
 
-        elif self.baseline_mode:
+        elif self.spectra_baseline or self.gasnet_baseline:
             fields.extend([
-                "wave_range","spectra_mask","spectra_redshift","spectra_source_data"])
+                "spectra_mask","spectra_redshift","spectra_source_data"])
             if self.classify_redshift:
                 fields.extend(["gt_redshift_bin_ids","redshift_bins_mask"])
         else:
@@ -625,9 +620,9 @@ class SpectraTrainer(BaseTrainer):
 
         # set spectra data source
         # tmp: in sanity check mode, we manually change sup_id and val_id in spectra_data
-        if self.mode == "generalization":
+        if self.generalization:
             self.dataset.set_spectra_source("test")
-        elif self.mode == "sanity_check" or self.mode == "redshift_classification_train":
+        elif self.sanity_check or self.freeze_spectra:
             self.dataset.set_spectra_source("val")
         else: self.dataset.set_spectra_source("sup")
 
@@ -977,7 +972,7 @@ class SpectraTrainer(BaseTrainer):
     #############
 
     def init_latents(self):
-        if self.mode == "spectra_pretrain":
+        if self.spectra_pretrain:
             assert not self.split_latent
             latents = self.init_pretrain_spectra_latents()
             redshift_latents = None
@@ -996,9 +991,9 @@ class SpectraTrainer(BaseTrainer):
             Note: if we also resume, then `resume_train` should overwrite model states
                   i.e. `resume_train` called after this func
         """
-        if self.mode == "spectra_pretrain" or self.mode == "redshift_classification_train":
+        if self.spectra_pretrain or self.freeze_spectra:
             pass
-        elif self.mode == "sanity_check" or self.mode == "generalization":
+        elif self.sanity_check or self.generalization:
             load_excls, freeze_excls = [], []
 
             # we load latents in `init_latents` only
@@ -1037,7 +1032,7 @@ class SpectraTrainer(BaseTrainer):
                         freeze_excls.append(n)
                         load_excls.append(n)
 
-            if self.regress_lambdawise_weights and self.mode == "sanity_check":
+            if self.regress_lambdawise_weights and self.sanity_check:
                 # in case of weighted sanity check, we dont freeze any layers
                 assert(exists(self.pretrained_model_fname))
                 checkpoint = torch.load(self.pretrained_model_fname)
@@ -1058,7 +1053,7 @@ class SpectraTrainer(BaseTrainer):
             #     freeze_excls.append(n)
             # done
 
-            if self.mode == "generalization" or not self.sanity_check_finetune:
+            if self.generalization or not self.sanity_check_finetune:
                 freeze_layers_excl(self.pipeline, excls=freeze_excls)
                 log.info(f"only {freeze_excls} not frozen!")
             else: log.info("no layers frozen!")
@@ -1112,7 +1107,7 @@ class SpectraTrainer(BaseTrainer):
         if not self.load_pretrained_spectra_latents:
             pretrained = None
         else:
-            assert self.mode == "sanity_check"
+            assert self.sanity_check
             # checkpoint comes from codebook pretrain (use sup spectra)
             checkpoint = torch.load(self.pretrained_model_fname)
             assert checkpoint["model_state_dict"]["model.latents"].shape[-1] == sp_z_dim
@@ -1122,7 +1117,7 @@ class SpectraTrainer(BaseTrainer):
             pretrained = checkpoint["model_state_dict"]["model.latents"][permute_ids].detach()
 
             if self.optimize_latents_for_each_redshift_bin:
-                if self.mode == "spectra_pretrain":
+                if self.spectra_pretrain:
                     # when we pretrain with brute force
                     assert pretrained.ndim == 3 and self.brute_force
                     raise NotImplementedError()
@@ -1204,7 +1199,7 @@ class SpectraTrainer(BaseTrainer):
             self.pipeline, checkpoint["model_state_dict"], excls=excls)
 
         self.spectra_pretrain_total_steps = 0
-        if self.mode == "sanity_check" or self.mode == "generalization":
+        if self.sanity_check or self.generalization:
             """
             `pretrain_total_steps` is needed only when we do temperaturized quantization.
             After codebook pretrain, we only have `total_steps` in the saved model and we
@@ -1667,7 +1662,7 @@ class SpectraTrainer(BaseTrainer):
         self.timer.check("added to gpu")
 
         spectra_loss_func, spectra_l2_loss_func = None, None
-        if not self.baseline_mode and not self.freeze_spectra:
+        if not (self.spectra_baseline or self.gasnet_baseline or self.freeze_spectra):
             spectra_loss_func = self.spectra_loss_func
             if self.plot_l2_loss:
                 spectra_l2_loss_func = self.spectra_l2_loss_func
@@ -1693,8 +1688,10 @@ class SpectraTrainer(BaseTrainer):
             spectra_l2_loss_func=spectra_l2_loss_func,
             index_latent=self.index_latent,
             plot_l2_loss=self.plot_l2_loss,
-            spectra_baseline=self.baseline_mode,
+            baseline=self.spectra_baseline or \
+                     self.gasnet_baseline,
             apply_gt_redshift=self.apply_gt_redshift,
+            regress_redshift=self.regress_redshift,
             classify_redshift=self.classify_redshift,
             brute_force=self.brute_force,
             freeze_spectra=self.freeze_spectra,
@@ -1798,9 +1795,10 @@ class SpectraTrainer(BaseTrainer):
     def _calculate_spectra_loss(self, ret, data):
         spectra_wrong_bin_regu, spectra_l2_loss = 0, None
 
-        if self.baseline_mode:
+        if self.spectra_baseline or self.gasnet_baseline:
             if self.regress_redshift:
-                spectra_loss = self.redshift_loss(ret["redshift"], data["spectra_redshift"])
+                spectra_loss = self.redshift_loss(
+                    ret["redshift"], data["spectra_redshift"])
             elif self.classify_redshift:
                 if self.extra_args["redshift_classification_strategy"] == "binary":
                     gt = data["redshift_bins_mask"].flatten().to(torch.float32)
