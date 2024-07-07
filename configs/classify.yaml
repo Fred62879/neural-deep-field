@@ -7,8 +7,8 @@ global:
 
     tasks: [train, redshift_classification_train]
     tasks: [infer, redshift_classification_sc_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
-    # tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
-    # tasks: [infer, overlay_redshift_est_stats]
+    tasks: [infer, redshift_classification_genlz_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats] #plot_est_redshift_logits]
+    tasks: [infer, redshift_classification_genlz_infer, overlay_redshift_est_stats]
 
 optimizer:
     optimizer_type: adam
@@ -33,6 +33,7 @@ pretrain:
 
     classifier_train_add_baseline_logits: True
     classifier_test_add_baseline_logits: True
+    baseline_logits_scale_weight: 0.5
 
     model_redshift: True
     brute_force_redshift: False
@@ -68,7 +69,7 @@ trainer:
 infer:
     infer_last_model_only: True
 
-    infer_log_dir: 20240627-012320_clsfy_small_bsz_bn_5_layers
+    infer_log_dir: 20240706-150015_clsfy_refiner_gasnet_baseline_10k_epochs
 
     infer_selected: False
     pretrain_num_infer_upper_bound: 100
@@ -91,10 +92,12 @@ infer:
 
     log_redshift_est_stats: False
     redshift_est_stats_residual_levels: [0.02,0.04,0.08]
+    redshift_est_stats_max_residual: 1
 
-    redshift_est_stats_labels: ['baseline', 'our_model+baseline']
-    redshift_est_stats_fnames: [vdz-spectra-azure-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/test_redshift/model-0_all_residuals_accuracy.npy, vdz-spectra-ssim-t430s-azure/20240627-012320_clsfy_small_bsz_bn_5_layers/test_redshift/addup_baseline/model-0_all_residuals_accuracy.npy]
-    overlay_redshift_est_stats_fname: overlay_redshift_est_stats.png
+    # set weight value according to `baseline_logits_scale_weight` (above)
+    redshift_est_stats_labels: ['baseline', 'our_model+baseline (weight 0.5)']
+    redshift_est_stats_fnames: [vdz-spectra-gasnet-baseline/20240705-214457_gasnet_baseline_redshift_model_method_classification/test_redshift/model-0_all_residuals_accuracy.npy, vdz-spectra-ssim-t430s-azure/20240706-150015_clsfy_refiner_gasnet_baseline_10k_epochs/test_redshift/addup_baseline_weight_0.5/model-0_all_residuals_accuracy.npy]
+    overlay_redshift_est_stats_fname: overlay_redshift_est_stats
 
 dataset:
     calculate_wave_range_based_on_trans: False
@@ -119,7 +122,7 @@ spectra_data:
     spectra_smooth_sigma: 15
 
     sample_from_pretrain_spectra: True
-    sanity_check_max_num_spectra: 20
+    sanity_check_max_num_spectra: 200000
     generalization_max_num_spectra: 5000
     num_gt_spectra_upper_bound: 200000
     num_supervision_spectra_upper_bound: 200000
@@ -130,9 +133,9 @@ spectra_data:
 
     redshift_classification_batched_data_fields: [spectra_redshift]
     load_classification_data_individually: False
-    redshift_classification_sc_data_dir: 20240703-141528_sc
+    redshift_classification_sc_data_dir: 20240616-050251_sc_100k_spectra_500_epochs_033031
     redshift_classification_genlz_data_dir: 20240619-220256_genlz_5k_spectra_500_epochs_033031
     redshift_classification_data_fname_prefix: model-0
 
-    baseline_logits_path: vdz-spectra-azure-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/
+    baseline_logits_path: vdz-spectra-gasnet-baseline/20240705-214457_gasnet_baseline_redshift_model_method_classification
     baseline_logits_fname_suffix: model-0

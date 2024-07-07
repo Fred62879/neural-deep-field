@@ -11,7 +11,14 @@ from skimage.metrics import structural_similarity
 from wisp.utils.common import to_numpy, init_redshift_bins
 
 
+def get_logits_scale_weight(**kwargs):
+    w = kwargs["baseline_logits_scale_weight"]
+    if w < 0 or w > 1: w = 0.5
+    return w
+
 def combine_base_logits(base, est, base_weight):
+    assert torch.max(base) <= 1 and torch.min(base) >= 0 and \
+        torch.max(est) <= 1 and torch.min(est) >= 0
     return base * base_weight + est * (1 - base_weight)
 
 def reduce_latents_dim_pca(all_latents, n, selected_axes=None):

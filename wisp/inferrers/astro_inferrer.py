@@ -21,7 +21,8 @@ from wisp.datasets.data_utils import get_bound_id
 from wisp.datasets.data_utils import get_neighbourhood_center_pixel_id
 
 from wisp.utils.common import *
-from wisp.utils.numerical import reduce_latents_dim_pca, combine_base_logits
+from wisp.utils.numerical import reduce_latents_dim_pca, combine_base_logits, \
+    get_logits_scale_weight
 from wisp.utils.plot import plot_horizontally, plot_embed_map, plot_line, \
     plot_latent_embed, annotated_heat, plot_simple, plot_multiple, plot_latents, \
     plot_redshift_estimation_stats_together, plot_redshift_estimation_stats_individually
@@ -120,8 +121,10 @@ class AstroInferrer(BaseInferrer):
             if self.extra_args["infer_use_global_loss_as_lambdawise_weights"] and \
                not self.extra_args["use_global_spectra_loss_as_lambdawise_weights"]:
                 suffix += "weighted_"
-            if self.extra_args["classifier_test_add_baseline_logits"]:
-                suffix += "addup_baseline_"
+            if self.clsfy_genlz_infer and \
+               self.extra_args["classifier_test_add_baseline_logits"]:
+                w = get_logits_scale_weight(**self.extra_args)
+                suffix += f"addup_baseline_weight_{w}_"
             if suffix != "":
                 self.redshift_dir = join(self.redshift_dir, suffix[:-1])
             Path(self.redshift_dir).mkdir(parents=True, exist_ok=True)
@@ -1624,9 +1627,15 @@ class AstroInferrer(BaseInferrer):
         for fname in (self.extra_args["redshift_est_stats_fnames"]):
             data = np.load(join(log_dir, fname)) # [residual_levels,accs]
             plt.plot(data[0], data[1])
-        plt.legend(self.extra_args["redshift_est_stats_labels"])
+        if self.extra_args["redshift_est_stats_max_residual"] > 0:
+            plt.xlim(0, self.extra_args["redshift_est_stats_max_residual"])
+
         fname = join(log_dir, self.extra_args["overlay_redshift_est_stats_fname"])
-        plt.savefig(fname); plt.close()
+        if self.clsfy_genlz_infer and self.extra_args["classifier_test_add_baseline_logits"]:
+            w = get_logits_scale_weight(**self.extra_args)
+            fname += f"_baseline_weight_{w}"
+        plt.legend(self.extra_args["redshift_est_stats_labels"])
+        plt.savefig(f"{fname}.png"); plt.close()
 
     def _plot_spectra_latents_pca(
             self, model_id, suffix="", ids=None, all_models_together=False
@@ -1975,17 +1984,17 @@ class AstroInferrer(BaseInferrer):
                             get_redshift_classification_data_field_name("selected_bins_mask")]
                         baseline_logits = baseline_logits[selected_bins_mask].view(logits.shape)
                     # todo, logits with sigmoid
-                    logits = combine_base_logits(
-                        baseline_logits, torch.sigmoid(logits),
-                        self.extra_args["baseline_logits_scale_weight"])
+                    w = self.extra_args["baseline_logits_scale_weight"]
+                    if w <= 0 or w >= 1: w = 0.5
+                    logits = combine_base_logits(baseline_logits, torch.sigmoid(logits), w)
 
                 if self.clsfy_genlz_infer and \
                    self.extra_args["classifier_test_add_baseline_logits"]:
                     baseline_logits = data["baseline_redshift_logits"]
                     # todo, logits with sigmoid
-                    logits = combine_base_logits(
-                        baseline_logits, torch.sigmoid(logits),
-                        self.extra_args["baseline_logits_scale_weight"])
+                    w = self.extra_args["baseline_logits_scale_weight"]
+                    if w <= 0 or w >= 1: w = 0.5
+                    logits = combine_base_logits(baseline_logits, torch.sigmoid(logits), w)
 
                 if self.classifier_train_use_bin_sampled_data:
                     mask = data[get_redshift_classification_data_field_name("selected_bins_mask")]

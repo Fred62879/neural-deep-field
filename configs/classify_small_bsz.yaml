@@ -92,6 +92,7 @@ infer:
 
     log_redshift_est_stats: False
     redshift_est_stats_residual_levels: [0.02,0.04,0.08]
+    redshift_est_stats_max_residual: 1
 
     redshift_est_stats_labels: ['baseline', 'our_model+baseline']
     redshift_est_stats_fnames: [vdz-spectra-azure-baseline/20240612-233100_baseline_bin_class_100k_spectra_bn_20k_epochs_lr_1e-5/test_redshift/model-0_all_residuals_accuracy.npy, vdz-spectra-ssim-t430s-azure/20240703-202753_clsfy_refiner/test_redshift/addup_baseline/model-0_all_residuals_accuracy.npy]
