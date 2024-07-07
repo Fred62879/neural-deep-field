@@ -1,0 +1,123 @@
+parent: base_narval.yaml
+
+global:
+    use_tqdm: True
+    exp_name: vdz-spectra-gasnet-baseline
+    log_fname: gasnet_baseline
+
+    tasks: [train, gasnet_pretrain]
+    tasks: [infer, gasnet_pretrain_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats, save_redshift_logits]
+    tasks: [infer, gasnet_test_infer, save_redshift, plot_redshift_est_residuals, plot_redshift_est_stats, save_redshift_logits]
+
+optimizer:
+    optimizer_type: adam
+
+    b1: 0.5
+    b2: 0.999
+    lr: 1e-4
+    spectra_latents_lr: 1e-3
+    spectra_pretrain_lr: 1e-3
+    weight_decay: 1e-5
+
+    sgd_momentum: 0.9
+
+pretrain:
+    pretrain_batch_size: 50000
+    pretrain_use_all_wave: True
+
+    model_redshift: True
+    redshift_model_method: regression #classification
+    redshift_classification_strategy: binary
+
+decoder:
+    baseline_decoder_input_dim: 256
+    baseline_decoder_num_hidden_layers: 3
+    baseline_decoder_hidden_dim: 512
+
+    baseline_decoder_batch_norm: True
+    baseline_decoder_activate_before_skip: False
+    baseline_decoder_skip_all_layers: False
+    baseline_decoder_skip_method: add
+    baseline_decoder_skip_add_conversion_method: multi_conversion
+
+trainer:
+    num_epochs: 20000
+    log_cli_every: 2000
+    plot_grad_every: -1
+    save_data_every: -1
+    save_model_every: 2000
+
+    resume_train: False
+    resume_log_dir: ''
+    resume_model_fname: 'model-ep10000-bch0.pth'
+
+infer:
+    infer_last_model_only: True
+
+    # infer_log_dir: 
+    infer_selected: False
+    pretrain_num_infer_upper_bound: 140
+    spectra_inferrence_id_fname: '' #'/redshift/model-0_redshift_outlier_ids.npy'
+    infer_outlier_only: False
+
+    pretrain_infer_batch_size: 1000
+    pretrain_infer_use_all_wave: True
+
+    plot_clipped_spectrum: True
+    plot_spectrum_with_loss: False
+    plot_spectrum_with_ivar: False
+    plot_spectrum_with_lines: False
+    plot_spectrum_with_recon: True
+    plot_spectrum_color_based_on_loss: False
+    plot_spectrum_under_gt_bin: False
+    plot_spectrum_under_optimal_wrong_bin: False
+    plot_global_lambdawise_spectra_loss_with_ivar: False
+    plot_global_lambdawise_spectra_loss_with_lines: False
+    emitted_wave_overlap_discretization_val: 1e-1
+
+    num_spectrum_per_fig: 35
+    num_spectrum_per_row: 7
+
+    spectra_latents_plot_pca_dim: 2
+
+dataset:
+    calculate_wave_range_based_on_trans: False
+    calculate_wave_range_based_on_spectra: True
+    wave_range_fname: wave_range_spectra_6k_to_8k.npy
+
+spectra_data:
+    require_only_basic_spectra: True
+
+    spectra_cho: v1
+    spectra_process_patch_info: False
+    spectra_data_sources: [deimos,zcosmos,vipers_w1,vipers_w4]
+    random_permute_source_spectra: True
+
+    spectra_supervision_wave_lo: 6000
+    spectra_supervision_wave_hi: 8000
+
+    min_num_valid_samples: 100
+    spectra_upsample_scale: 10
+    convolve_spectra: True
+    process_ivar: True
+    spectra_smooth_sigma: 15
+
+    redshift_regress_spectra_sample_method: uniform_dense
+
+    generalization_max_num_spectra: 5000
+    num_gt_spectra_upper_bound: 200000
+    num_supervision_spectra_upper_bound: 200000
+
+    filter_redshift: False
+    filter_redshift_lo: 0.02
+    filter_redshift_hi: -1
+
+ablation:
+    perform_ablation: True
+    ablat_id: 0
+    ablat_params: [redshift_model_method]
+    ablat_vals: [[regression,classification]]
+    ablat_num_vals: [2]
+
+    ablat_hardcode_params: [infer_log_dir]
+    ablat_hardcode_vals: [[20240705-214454_gasnet_baseline_redshift_model_method_regression,20240705-214457_gasnet_baseline_redshift_model_method_classification]]
